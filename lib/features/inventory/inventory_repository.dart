@@ -88,6 +88,7 @@ class InventoryRepository with OfflineWriteable {
   Future<String?> saveProduct({
     String? externalId,
     required String name,
+    String? description,
     required double salePrice,
     double costPrice = 0,
     double currentStock = 0,
@@ -110,6 +111,7 @@ class InventoryRepository with OfflineWriteable {
       if (!isCreate) 'id': ext,
       'external_id': ext,
       'name': name,
+      if (description != null && description.isNotEmpty) 'description': description,
       'sale_price': salePrice,
       'cost_price': costPrice,
       'current_stock': currentStock,
@@ -133,6 +135,7 @@ class InventoryRepository with OfflineWriteable {
     final optimisticRow = <String, dynamic>{
       'id': ext,
       'name': name,
+      'description': description ?? '',
       'barcode': barcode ?? '',
       'sku': sku ?? '',
       'sale_price': salePrice,

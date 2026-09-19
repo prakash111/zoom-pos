@@ -521,10 +521,85 @@ class _PlanOptionCard extends StatelessWidget {
                 ),
                 Text(
                   isFree ? 'Free' : '${plan.currency} ${plan.price.toStringAsFixed(2)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            // Dynamic Limits Chips
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                _badgeChip(
+                  context,
+                  plan.invoiceLimit == -1 ? 'Unlimited Invoices' : '${plan.invoiceLimit} Invoices/mo',
+                  Icons.receipt_long,
+                ),
+                _badgeChip(
+                  context,
+                  plan.deviceLimit == -1 ? 'Unlimited POS' : '${plan.deviceLimit} Devices',
+                  Icons.point_of_sale,
+                ),
+                _badgeChip(
+                  context,
+                  plan.staffLimit == -1 ? 'Unlimited Staff' : '${plan.staffLimit} Staff',
+                  Icons.people_alt_outlined,
+                ),
+              ],
+            ),
+            if (plan.extensions.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final ext in plan.extensions)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Text(
+                        ext.replaceAll('_', ' ').toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+            if (plan.features.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final feat in plan.features.take(5))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline, size: 14, color: Color(0xFF10B981)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              feat,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
             if (showButton) ...[
               const SizedBox(height: 12),
               SizedBox(
@@ -539,6 +614,27 @@ class _PlanOptionCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _badgeChip(BuildContext context, String text, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.grey.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: Colors.grey.shade700),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade800),
+          ),
+        ],
       ),
     );
   }

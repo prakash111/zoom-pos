@@ -16,6 +16,7 @@ class ProductModel {
     required this.taxRate,
     required this.active,
     required this.isLowStock,
+    this.description,
     this.durationMinutes,
     this.categoryType,
     this.variants = const [],
@@ -51,6 +52,7 @@ class ProductModel {
       taxRate: (json['tax_rate'] as num?)?.toDouble() ?? 0,
       active: json['active'] as bool? ?? true,
       isLowStock: json['is_low_stock'] as bool? ?? false,
+      description: json['description']?.toString(),
       durationMinutes: (json['duration_minutes'] as num?)?.toInt(),
       categoryType: json['category_type'] as String?,
       variants: _parseOptions(json['variants']),
@@ -66,6 +68,7 @@ class ProductModel {
 
   final String id;
   final String name;
+  final String? description;
   final String barcode;
   final String sku;
   final double salePrice;
@@ -108,6 +111,7 @@ class ProductModel {
     return {
       'id': id,
       'name': name,
+      'description': description,
       'barcode': barcode,
       'sku': sku,
       'sale_price': salePrice,

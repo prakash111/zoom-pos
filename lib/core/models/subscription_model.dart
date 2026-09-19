@@ -72,21 +72,54 @@ class SubscriptionPlan {
     required this.currency,
     required this.billingCycle,
     required this.features,
+    this.invoiceLimit = -1,
+    this.deviceLimit = -1,
+    this.staffLimit = -1,
+    this.extensions = const [],
+    this.limits = const {},
   });
 
   factory SubscriptionPlan.fromJson(Map<String, dynamic> json) {
     final feats = json['features'];
-    final featuresList = feats is List
-        ? feats.map((e) => e.toString()).toList()
-        : <String>[];
+    final List<String> featuresList = [];
+    if (feats is List) {
+      for (final f in feats) {
+        if (f != null) featuresList.add(f.toString());
+      }
+    } else if (feats is Map) {
+      feats.forEach((k, v) {
+        if (v == true || v == 1 || v == '1') {
+          featuresList.add(k.toString().replaceAll('_', ' '));
+        } else if (v is String && v.isNotEmpty) {
+          featuresList.add('$k: $v');
+        }
+      });
+    }
+
+    final rawExtensions = json['extensions'];
+    final List<String> extensionList = [];
+    if (rawExtensions is List) {
+      for (final e in rawExtensions) {
+        if (e != null) extensionList.add(e.toString());
+      }
+    }
+
+    final rawLimits = json['limits'] is Map
+        ? Map<String, dynamic>.from(json['limits'] as Map)
+        : const <String, dynamic>{};
 
     return SubscriptionPlan(
       name: json['name']?.toString() ?? '',
-      displayName: json['display_name']?.toString() ?? '',
+      displayName: json['display_name']?.toString() ?? json['name']?.toString() ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       currency: json['currency']?.toString() ?? 'USD',
-      billingCycle: json['billing_cycle']?.toString(),
+      billingCycle: json['billing_cycle']?.toString() ?? json['billing_period']?.toString(),
       features: featuresList,
+      invoiceLimit: (json['invoice_limit'] as num?)?.toInt() ?? (rawLimits['invoices'] as num?)?.toInt() ?? -1,
+      deviceLimit: (json['device_limit'] as num?)?.toInt() ?? (rawLimits['dispositivos'] as num?)?.toInt() ?? -1,
+      staffLimit: (json['staff_limit'] as num?)?.toInt() ?? (rawLimits['usuarios'] as num?)?.toInt() ?? -1,
+      extensions: extensionList,
+      limits: rawLimits,
     );
   }
 
@@ -96,4 +129,9 @@ class SubscriptionPlan {
   final String currency;
   final String? billingCycle;
   final List<String> features;
+  final int invoiceLimit;
+  final int deviceLimit;
+  final int staffLimit;
+  final List<String> extensions;
+  final Map<String, dynamic> limits;
 }

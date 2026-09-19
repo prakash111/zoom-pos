@@ -5,12 +5,80 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/config/locale_provider.dart';
+import '../../../core/config/theme_provider.dart';
 import '../../../core/widgets/app_network_image.dart';
 import '../../auth/auth_provider.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../dashboard/dashboard_screen.dart';
 import '../models/landing_data.dart';
 import '../services/landing_provider.dart';
+import '../widgets/interactive_contact_form.dart';
+
+class _LandingThemeTokens {
+  final bool isDark;
+  final Color scaffoldBg;
+  final Color sectionAltBg;
+  final Color surfaceCard;
+  final Color borderColor;
+  final Color textPrimary;
+  final Color textSecondary;
+  final Color primaryColor;
+  final Color accentColor;
+
+  const _LandingThemeTokens({
+    required this.isDark,
+    required this.scaffoldBg,
+    required this.sectionAltBg,
+    required this.surfaceCard,
+    required this.borderColor,
+    required this.textPrimary,
+    required this.textSecondary,
+    required this.primaryColor,
+    required this.accentColor,
+  });
+
+  factory _LandingThemeTokens.resolve({
+    required BuildContext context,
+    required LandingBranding branding,
+    required ThemeProvider themeProvider,
+  }) {
+    final mode = themeProvider.themeMode;
+    final isDark = mode == ThemeMode.dark ||
+        (mode == ThemeMode.system &&
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+
+    final primary =
+        _parseColorStatic(branding.primaryColorHex, const Color(0xFF10B981));
+    final accent =
+        _parseColorStatic(branding.accentColorHex, const Color(0xFF38BDF8));
+
+    return _LandingThemeTokens(
+      isDark: isDark,
+      scaffoldBg: isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC),
+      sectionAltBg: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+      surfaceCard: isDark ? const Color(0xFF131D2D) : const Color(0xFFFFFFFF),
+      borderColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+      textPrimary: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+      textSecondary:
+          isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+      primaryColor: primary,
+      accentColor: accent,
+    );
+  }
+
+  static Color _parseColorStatic(String? hex, Color fallback) {
+    if (hex == null || hex.isEmpty) return fallback;
+    final buffer = StringBuffer();
+    if (hex.length == 6 || hex.length == 7) buffer.write('ff');
+    buffer.write(hex.replaceFirst('#', ''));
+    try {
+      return Color(int.parse(buffer.toString(), radix: 16));
+    } catch (_) {
+      return fallback;
+    }
+  }
+}
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -29,6 +97,17 @@ class _LandingScreenState extends State<LandingScreen> {
   final GlobalKey _contactKey = GlobalKey();
 
   late final LandingProvider _landingProvider;
+
+  static const List<Map<String, String>> _languages = [
+    {'code': 'en', 'label': 'English', 'flag': '🇺🇸'},
+    {'code': 'ar', 'label': 'العربية', 'flag': '🇸🇦'},
+    {'code': 'es', 'label': 'Español', 'flag': '🇪🇸'},
+    {'code': 'hi', 'label': 'हिन्दी', 'flag': '🇮🇳'},
+    {'code': 'fr', 'label': 'Français', 'flag': '🇫🇷'},
+    {'code': 'pt', 'label': 'Português', 'flag': '🇧🇷'},
+    {'code': 'de', 'label': 'Deutsch', 'flag': '🇩🇪'},
+    {'code': 'zh', 'label': '中文', 'flag': '🇨🇳'},
+  ];
 
   @override
   void initState() {
@@ -71,31 +150,6 @@ class _LandingScreenState extends State<LandingScreen> {
     }
   }
 
-  Future<void> _launchWhatsApp(String phone) async {
-    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    final url = Uri.parse(
-        'https://wa.me/$digits?text=${Uri.encodeComponent('Hello, I would like to learn more about ZoomPOS.')}');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  Future<void> _launchCall(String phone) async {
-    final clean = phone.replaceAll(RegExp(r'[^0-9+]'), '');
-    final url = Uri.parse('tel:$clean');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    }
-  }
-
-  Future<void> _launchEmail(String email) async {
-    final url = Uri.parse(
-        'mailto:$email?subject=${Uri.encodeComponent('ZoomPOS Enterprise Inquiry')}');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    }
-  }
-
   Future<void> _launchExternalUrl(String? urlString) async {
     if (urlString == null || urlString.isEmpty) return;
     final uri = Uri.tryParse(urlString);
@@ -104,8 +158,133 @@ class _LandingScreenState extends State<LandingScreen> {
     }
   }
 
+  String _formatExtensionName(String ext) {
+    switch (ext.toLowerCase()) {
+      case 'leadmanagement':
+        return 'CRM & Leads';
+      case 'whatsapp_api':
+        return 'WhatsApp API';
+      case 'custom_domain':
+        return 'Custom Domain';
+      default:
+        return ext
+            .replaceAll('_', ' ')
+            .split(' ')
+            .map((w) => w.isNotEmpty
+                ? '${w[0].toUpperCase()}${w.substring(1)}'
+                : '')
+            .join(' ');
+    }
+  }
+
+  Widget _buildLimitChip({
+    required IconData icon,
+    required String label,
+    required _LandingThemeTokens tokens,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: tokens.isDark
+            ? tokens.primaryColor.withValues(alpha: 0.12)
+            : tokens.primaryColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: tokens.primaryColor.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: tokens.primaryColor),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color:
+                  tokens.isDark ? tokens.textPrimary : const Color(0xFF065F46),
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLanguageDropdown(
+    BuildContext context,
+    LocaleProvider localeProvider,
+    _LandingThemeTokens tokens,
+  ) {
+    final currentCode = localeProvider.locale.languageCode;
+    final activeCode =
+        _languages.any((l) => l['code'] == currentCode) ? currentCode : 'en';
+
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        value: activeCode,
+        dropdownColor: tokens.surfaceCard,
+        icon: Icon(Icons.keyboard_arrow_down,
+            color: tokens.textSecondary, size: 18),
+        style: TextStyle(
+          color: tokens.textPrimary,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+        items: _languages.map((lang) {
+          return DropdownMenuItem<String>(
+            value: lang['code'],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(lang['flag']!, style: const TextStyle(fontSize: 14)),
+                const SizedBox(width: 6),
+                Text(
+                  lang['label']!,
+                  style: TextStyle(
+                    color: tokens.textPrimary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+        onChanged: (code) {
+          if (code != null) {
+            localeProvider.setLocale(Locale(code));
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildThemeToggle(
+    BuildContext context,
+    ThemeProvider themeProvider,
+    _LandingThemeTokens tokens,
+  ) {
+    return IconButton(
+      tooltip: tokens.isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+      icon: Icon(
+        tokens.isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+        color: tokens.textPrimary,
+        size: 20,
+      ),
+      onPressed: () {
+        themeProvider.setThemeMode(
+          tokens.isDark ? ThemeMode.light : ThemeMode.dark,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
+    final localeProvider = context.watch<LocaleProvider>();
+
     return ChangeNotifierProvider<LandingProvider>.value(
       value: _landingProvider,
       child: Consumer<LandingProvider>(
@@ -114,58 +293,45 @@ class _LandingScreenState extends State<LandingScreen> {
           final branding = data.branding;
           final hero = data.hero;
 
-          final primaryColor = _parseColor(
-              branding.primaryColorHex, const Color(0xFF10B981));
-          final accentColor = _parseColor(
-              branding.accentColorHex, const Color(0xFF38BDF8));
-          final bgDark = _parseColor(
-              branding.darkBgHex, const Color(0xFF0B1120));
+          final tokens = _LandingThemeTokens.resolve(
+            context: context,
+            branding: branding,
+            themeProvider: themeProvider,
+          );
 
           return Scaffold(
-            backgroundColor: bgDark,
-            appBar: _buildTopNav(context, data, primaryColor),
-            endDrawer: _buildMobileDrawer(context, data, primaryColor),
+            backgroundColor: tokens.scaffoldBg,
+            appBar: _buildTopNav(
+                context, data, tokens, themeProvider, localeProvider),
+            endDrawer: _buildMobileDrawer(
+                context, data, tokens, themeProvider, localeProvider),
             body: RefreshIndicator(
-              color: primaryColor,
-              backgroundColor: const Color(0xFF1E293B),
+              color: tokens.primaryColor,
+              backgroundColor: tokens.surfaceCard,
               onRefresh: () =>
                   _landingProvider.refresh(context.read<ApiClient>()),
               child: SingleChildScrollView(
                 controller: _scrollController,
                 child: Column(
                   children: [
-                    _buildHeroSection(
-                        context, hero, branding, primaryColor, accentColor),
-                    _buildHardwareBar(context, data.hardware, primaryColor),
-                    _buildStatsSection(context, data.stats, primaryColor),
-                    _buildSolutionsSection(
-                        context, data.solutions, primaryColor),
-                    _buildFeaturesSection(context, data.features, primaryColor),
-                    _buildPricingSection(
-                        context, data.plans, primaryColor, accentColor),
+                    _buildHeroSection(context, hero, branding, tokens),
+                    _buildHardwareBar(context, data.hardware, tokens),
+                    _buildStatsSection(context, data.stats, tokens),
+                    _buildSolutionsSection(context, data.solutions, tokens),
+                    _buildFeaturesSection(context, data.features, tokens),
+                    _buildPricingSection(context, data.plans, tokens),
                     if (data.testimonials.isNotEmpty)
                       _buildTestimonialsSection(
-                          context, data.testimonials, primaryColor),
-                    _buildFaqSection(context, data.faqs, primaryColor),
+                          context, data.testimonials, tokens),
+                    _buildFaqSection(context, data.faqs, tokens),
                     if (data.downloads.playstoreEnabled ||
                         data.downloads.windowsEnabled)
-                      _buildDownloadsSection(
-                          context, data.downloads, primaryColor),
-                    _buildContactSection(context, data.contact, primaryColor),
-                    _buildFooter(context, branding, primaryColor),
+                      _buildDownloadsSection(context, data.downloads, tokens),
+                    _buildContactSection(context, data.contact, tokens),
+                    _buildFooter(context, branding, tokens),
                   ],
                 ),
               ),
-            ),
-            floatingActionButton: FloatingActionButton.extended(
-              backgroundColor: const Color(0xFF25D366),
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.chat),
-              label: const Text(
-                'WhatsApp Support',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              onPressed: () => _launchWhatsApp(branding.supportWhatsapp),
             ),
           );
         },
@@ -174,16 +340,21 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   PreferredSizeWidget _buildTopNav(
-      BuildContext context, LandingData data, Color primaryColor) {
+    BuildContext context,
+    LandingData data,
+    _LandingThemeTokens tokens,
+    ThemeProvider themeProvider,
+    LocaleProvider localeProvider,
+  ) {
     final branding = data.branding;
     final isDesktop = MediaQuery.sizeOf(context).width >= 960;
 
     return AppBar(
-      backgroundColor: const Color(0xFF0B1120).withValues(alpha: 0.96),
+      backgroundColor: tokens.scaffoldBg.withValues(alpha: 0.96),
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 2,
-      shadowColor: Colors.black.withValues(alpha: 0.4),
+      shadowColor: Colors.black.withValues(alpha: tokens.isDark ? 0.4 : 0.08),
       titleSpacing: 20,
       title: Row(
         mainAxisSize: MainAxisSize.min,
@@ -204,18 +375,19 @@ class _LandingScreenState extends State<LandingScreen> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: primaryColor.withValues(alpha: 0.2),
+                color: tokens.primaryColor.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(Icons.storefront, color: primaryColor, size: 22),
+              child:
+                  Icon(Icons.storefront, color: tokens.primaryColor, size: 22),
             ),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
               branding.platformName,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: tokens.textPrimary,
                 fontWeight: FontWeight.w800,
                 fontSize: 18,
                 letterSpacing: -0.3,
@@ -226,18 +398,27 @@ class _LandingScreenState extends State<LandingScreen> {
       ),
       actions: [
         if (isDesktop) ...[
-          _navTextButton('Features', () => _scrollToSection(_featuresKey)),
-          _navTextButton('Solutions', () => _scrollToSection(_solutionsKey)),
-          _navTextButton('Hardware', () => _scrollToSection(_hardwareKey)),
-          _navTextButton('Pricing', () => _scrollToSection(_pricingKey)),
-          _navTextButton('FAQs', () => _scrollToSection(_faqsKey)),
-          _navTextButton('Contact', () => _scrollToSection(_contactKey)),
+          _navTextButton(
+              'Features', () => _scrollToSection(_featuresKey), tokens),
+          _navTextButton(
+              'Solutions', () => _scrollToSection(_solutionsKey), tokens),
+          _navTextButton(
+              'Hardware', () => _scrollToSection(_hardwareKey), tokens),
+          _navTextButton(
+              'Pricing', () => _scrollToSection(_pricingKey), tokens),
+          _navTextButton('FAQs', () => _scrollToSection(_faqsKey), tokens),
+          _navTextButton(
+              'Contact', () => _scrollToSection(_contactKey), tokens),
           const SizedBox(width: 12),
+          _buildLanguageDropdown(context, localeProvider, tokens),
+          const SizedBox(width: 6),
+          _buildThemeToggle(context, themeProvider, tokens),
+          const SizedBox(width: 10),
           Padding(
             padding: const EdgeInsets.only(right: 20),
             child: FilledButton.icon(
               style: FilledButton.styleFrom(
-                backgroundColor: primaryColor,
+                backgroundColor: tokens.primaryColor,
                 foregroundColor: Colors.white,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
@@ -253,14 +434,16 @@ class _LandingScreenState extends State<LandingScreen> {
             ),
           ),
         ] else ...[
+          _buildLanguageDropdown(context, localeProvider, tokens),
+          _buildThemeToggle(context, themeProvider, tokens),
           IconButton(
             tooltip: 'Sign In',
-            icon: const Icon(Icons.login, color: Colors.white),
+            icon: Icon(Icons.login, color: tokens.textPrimary),
             onPressed: () => _navigateToAuth(context),
           ),
           Builder(
             builder: (ctx) => IconButton(
-              icon: const Icon(Icons.menu, color: Colors.white),
+              icon: Icon(Icons.menu, color: tokens.textPrimary),
               onPressed: () => Scaffold.of(ctx).openEndDrawer(),
             ),
           ),
@@ -269,13 +452,14 @@ class _LandingScreenState extends State<LandingScreen> {
     );
   }
 
-  Widget _navTextButton(String title, VoidCallback onTap) {
+  Widget _navTextButton(
+      String title, VoidCallback onTap, _LandingThemeTokens tokens) {
     return TextButton(
       onPressed: onTap,
       child: Text(
         title,
         style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.82),
+          color: tokens.textSecondary,
           fontWeight: FontWeight.w600,
           fontSize: 14,
         ),
@@ -284,10 +468,15 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   Widget _buildMobileDrawer(
-      BuildContext context, LandingData data, Color primaryColor) {
+    BuildContext context,
+    LandingData data,
+    _LandingThemeTokens tokens,
+    ThemeProvider themeProvider,
+    LocaleProvider localeProvider,
+  ) {
     final branding = data.branding;
     return Drawer(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: tokens.surfaceCard,
       child: SafeArea(
         child: Column(
           children: [
@@ -298,18 +487,18 @@ class _LandingScreenState extends State<LandingScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: primaryColor.withValues(alpha: 0.2),
+                      color: tokens.primaryColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child:
-                        Icon(Icons.storefront, color: primaryColor, size: 24),
+                    child: Icon(Icons.storefront,
+                        color: tokens.primaryColor, size: 24),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       branding.platformName,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: tokens.textPrimary,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -318,84 +507,103 @@ class _LandingScreenState extends State<LandingScreen> {
                 ],
               ),
             ),
-            const Divider(color: Color(0xFF1E293B)),
-            ListTile(
-              leading: const Icon(Icons.star_outline, color: Colors.white70),
-              title: const Text('Features',
-                  style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _scrollToSection(_featuresKey);
-              },
+            Divider(color: tokens.borderColor),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  _drawerNavItem('Features', Icons.stars_outlined, () {
+                    Navigator.of(context).pop();
+                    _scrollToSection(_featuresKey);
+                  }, tokens),
+                  _drawerNavItem('Solutions', Icons.grid_view_outlined, () {
+                    Navigator.of(context).pop();
+                    _scrollToSection(_solutionsKey);
+                  }, tokens),
+                  _drawerNavItem('Hardware', Icons.devices_other_outlined, () {
+                    Navigator.of(context).pop();
+                    _scrollToSection(_hardwareKey);
+                  }, tokens),
+                  _drawerNavItem('Pricing', Icons.payments_outlined, () {
+                    Navigator.of(context).pop();
+                    _scrollToSection(_pricingKey);
+                  }, tokens),
+                  _drawerNavItem('FAQs', Icons.help_outline, () {
+                    Navigator.of(context).pop();
+                    _scrollToSection(_faqsKey);
+                  }, tokens),
+                  _drawerNavItem('Contact', Icons.contact_support_outlined, () {
+                    Navigator.of(context).pop();
+                    _scrollToSection(_contactKey);
+                  }, tokens),
+                ],
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.business_outlined, color: Colors.white70),
-              title: const Text('Solutions',
-                  style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _scrollToSection(_solutionsKey);
-              },
-            ),
-            ListTile(
-              leading:
-                  const Icon(Icons.devices_outlined, color: Colors.white70),
-              title: const Text('Hardware',
-                  style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _scrollToSection(_hardwareKey);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.price_check, color: Colors.white70),
-              title:
-                  const Text('Pricing', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _scrollToSection(_pricingKey);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.help_outline, color: Colors.white70),
-              title: const Text('FAQs', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _scrollToSection(_faqsKey);
-              },
-            ),
-            ListTile(
-              leading:
-                  const Icon(Icons.contact_support_outlined, color: Colors.white70),
-              title:
-                  const Text('Contact', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _scrollToSection(_contactKey);
-              },
-            ),
-            const Spacer(),
+            Divider(color: tokens.borderColor),
             Padding(
-              padding: const EdgeInsets.all(20),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Language',
+                        style: TextStyle(
+                          color: tokens.textSecondary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      _buildLanguageDropdown(context, localeProvider, tokens),
+                    ],
                   ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _navigateToAuth(context);
-                  },
-                  child: const Text(
-                    'Sign In / Launch POS',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, color: Colors.white),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        tokens.isDark ? 'Dark Mode' : 'Light Mode',
+                        style: TextStyle(
+                          color: tokens.textSecondary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Switch(
+                        value: tokens.isDark,
+                        activeThumbColor: tokens.primaryColor,
+                        onChanged: (val) {
+                          themeProvider.setThemeMode(
+                            val ? ThemeMode.dark : ThemeMode.light,
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: tokens.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.login, size: 18),
+                      label: const Text(
+                        'Sign In to POS',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _navigateToAuth(context);
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -404,21 +612,35 @@ class _LandingScreenState extends State<LandingScreen> {
     );
   }
 
+  Widget _drawerNavItem(
+    String title,
+    IconData icon,
+    VoidCallback onTap,
+    _LandingThemeTokens tokens,
+  ) {
+    return ListTile(
+      leading: Icon(icon, color: tokens.textSecondary, size: 20),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: tokens.textPrimary,
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+
   Widget _buildHeroSection(
     BuildContext context,
     LandingHero hero,
     LandingBranding branding,
-    Color primaryColor,
-    Color accentColor,
+    _LandingThemeTokens tokens,
   ) {
-    final width = MediaQuery.sizeOf(context).width;
-    final isDesktop = width >= 960;
-
-    final bannerUrl = hero.bannerImageUrl?.isNotEmpty == true
-        ? hero.bannerImageUrl
-        : (branding.authBannerImageUrl?.isNotEmpty == true
-            ? branding.authBannerImageUrl
-            : null);
+    final isDesktop = MediaQuery.sizeOf(context).width >= 960;
+    final bannerUrl = hero.bannerImageUrl ??
+        (branding.showAuthBanner ? branding.authBannerImageUrl : null);
 
     return Container(
       width: double.infinity,
@@ -426,14 +648,13 @@ class _LandingScreenState extends State<LandingScreen> {
         horizontal: isDesktop ? 48 : 20,
         vertical: isDesktop ? 64 : 36,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF0B1120),
-            Color(0xFF0F172A),
-          ],
+          colors: tokens.isDark
+              ? const [Color(0xFF0B1120), Color(0xFF0F172A)]
+              : const [Color(0xFFF8FAFC), Color(0xFFEEF2F6)],
         ),
       ),
       child: Center(
@@ -445,21 +666,20 @@ class _LandingScreenState extends State<LandingScreen> {
                   children: [
                     Expanded(
                       flex: 6,
-                      child: _buildHeroCopy(
-                          context, hero, primaryColor, accentColor),
+                      child: _buildHeroCopy(context, hero, tokens),
                     ),
                     const SizedBox(width: 48),
                     Expanded(
                       flex: 5,
-                      child: _buildHeroBanner(context, bannerUrl, primaryColor),
+                      child: _buildHeroBanner(context, bannerUrl, tokens),
                     ),
                   ],
                 )
               : Column(
                   children: [
-                    _buildHeroCopy(context, hero, primaryColor, accentColor),
+                    _buildHeroCopy(context, hero, tokens),
                     const SizedBox(height: 36),
-                    _buildHeroBanner(context, bannerUrl, primaryColor),
+                    _buildHeroBanner(context, bannerUrl, tokens),
                   ],
                 ),
         ),
@@ -470,8 +690,7 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildHeroCopy(
     BuildContext context,
     LandingHero hero,
-    Color primaryColor,
-    Color accentColor,
+    _LandingThemeTokens tokens,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -479,8 +698,9 @@ class _LandingScreenState extends State<LandingScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
-            color: primaryColor.withValues(alpha: 0.15),
-            border: Border.all(color: primaryColor.withValues(alpha: 0.35)),
+            color: tokens.primaryColor.withValues(alpha: 0.15),
+            border:
+                Border.all(color: tokens.primaryColor.withValues(alpha: 0.35)),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
@@ -489,7 +709,7 @@ class _LandingScreenState extends State<LandingScreen> {
               Text(
                 hero.badge,
                 style: TextStyle(
-                  color: primaryColor,
+                  color: tokens.primaryColor,
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                 ),
@@ -500,8 +720,8 @@ class _LandingScreenState extends State<LandingScreen> {
         const SizedBox(height: 18),
         Text(
           hero.title,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: tokens.textPrimary,
             fontWeight: FontWeight.w900,
             fontSize: 38,
             height: 1.15,
@@ -512,7 +732,7 @@ class _LandingScreenState extends State<LandingScreen> {
         Text(
           hero.subtitle,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.78),
+            color: tokens.textSecondary,
             fontSize: 16,
             height: 1.5,
           ),
@@ -524,7 +744,7 @@ class _LandingScreenState extends State<LandingScreen> {
           children: [
             FilledButton.icon(
               style: FilledButton.styleFrom(
-                backgroundColor: primaryColor,
+                backgroundColor: tokens.primaryColor,
                 foregroundColor: Colors.white,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
@@ -546,8 +766,8 @@ class _LandingScreenState extends State<LandingScreen> {
             ),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                foregroundColor: tokens.textPrimary,
+                side: BorderSide(color: tokens.borderColor),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -570,22 +790,22 @@ class _LandingScreenState extends State<LandingScreen> {
         const SizedBox(height: 20),
         Row(
           children: [
-            const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 16),
+            Icon(Icons.check_circle, color: tokens.primaryColor, size: 16),
             const SizedBox(width: 6),
             Text(
               'No credit card required',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.65),
+                color: tokens.textSecondary,
                 fontSize: 12,
               ),
             ),
             const SizedBox(width: 16),
-            const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 16),
+            Icon(Icons.check_circle, color: tokens.primaryColor, size: 16),
             const SizedBox(width: 6),
             Text(
               'Instant setup',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.65),
+                color: tokens.textSecondary,
                 fontSize: 12,
               ),
             ),
@@ -596,13 +816,13 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   Widget _buildHeroBanner(
-      BuildContext context, String? bannerUrl, Color primaryColor) {
+      BuildContext context, String? bannerUrl, _LandingThemeTokens tokens) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withValues(alpha: 0.2),
+            color: tokens.primaryColor.withValues(alpha: 0.2),
             blurRadius: 32,
             spreadRadius: 2,
             offset: const Offset(0, 10),
@@ -618,19 +838,23 @@ class _LandingScreenState extends State<LandingScreen> {
                 fit: BoxFit.cover,
                 fallbackIcon: Icons.point_of_sale,
               )
-            : _buildFallbackHeroGraphic(primaryColor),
+            : _buildFallbackHeroGraphic(tokens),
       ),
     );
   }
 
-  Widget _buildFallbackHeroGraphic(Color primaryColor) {
+  Widget _buildFallbackHeroGraphic(_LandingThemeTokens tokens) {
+    final cardInnerBg = tokens.isDark
+        ? const Color(0xFF1E293B)
+        : tokens.scaffoldBg;
+
     return Container(
       height: 360,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF131D2D),
+        color: tokens.surfaceCard,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF1E293B)),
+        border: Border.all(color: tokens.borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -659,15 +883,16 @@ class _LandingScreenState extends State<LandingScreen> {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: primaryColor.withValues(alpha: 0.15),
+                  color: tokens.primaryColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   'Live Counter',
                   style: TextStyle(
-                    color: primaryColor,
+                    color: tokens.primaryColor,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
@@ -682,18 +907,19 @@ class _LandingScreenState extends State<LandingScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
+                    color: cardInnerBg,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Today\'s Revenue',
-                          style: TextStyle(color: Colors.white60, fontSize: 11)),
-                      SizedBox(height: 4),
+                          style: TextStyle(
+                              color: tokens.textSecondary, fontSize: 11)),
+                      const SizedBox(height: 4),
                       Text('\$3,842.50',
                           style: TextStyle(
-                              color: Colors.white,
+                              color: tokens.textPrimary,
                               fontSize: 18,
                               fontWeight: FontWeight.bold)),
                     ],
@@ -705,18 +931,19 @@ class _LandingScreenState extends State<LandingScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
+                    color: cardInnerBg,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Completed Orders',
-                          style: TextStyle(color: Colors.white60, fontSize: 11)),
-                      SizedBox(height: 4),
+                          style: TextStyle(
+                              color: tokens.textSecondary, fontSize: 11)),
+                      const SizedBox(height: 4),
                       Text('184 sales',
                           style: TextStyle(
-                              color: Colors.white,
+                              color: tokens.textPrimary,
                               fontSize: 18,
                               fontWeight: FontWeight.bold)),
                     ],
@@ -730,28 +957,30 @@ class _LandingScreenState extends State<LandingScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B).withValues(alpha: 0.6),
+                color: cardInnerBg.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF334155)),
+                border: Border.all(color: tokens.borderColor),
               ),
-              child: const Column(
+              child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.point_of_sale, size: 48, color: Color(0xFF10B981)),
-                  SizedBox(height: 10),
+                  Icon(Icons.point_of_sale,
+                      size: 48, color: tokens.primaryColor),
+                  const SizedBox(height: 10),
                   Text(
                     'High-Speed Omnichannel POS Engine',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        color: Colors.white,
+                        color: tokens.textPrimary,
                         fontWeight: FontWeight.bold,
                         fontSize: 14),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     'Barcode Scanning · Cash Register · WhatsApp Digital Receipts',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white60, fontSize: 11),
+                    style:
+                        TextStyle(color: tokens.textSecondary, fontSize: 11),
                   ),
                 ],
               ),
@@ -765,14 +994,14 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildHardwareBar(
     BuildContext context,
     List<LandingHardwareItem> hardware,
-    Color primaryColor,
+    _LandingThemeTokens tokens,
   ) {
     if (hardware.isEmpty) return const SizedBox.shrink();
 
     return Container(
       key: _hardwareKey,
       width: double.infinity,
-      color: const Color(0xFF0F172A),
+      color: tokens.sectionAltBg,
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
       child: Center(
         child: ConstrainedBox(
@@ -782,7 +1011,7 @@ class _LandingScreenState extends State<LandingScreen> {
               Text(
                 'COMPATIBLE WITH STANDARD RETAIL & RESTAURANT HARDWARE',
                 style: TextStyle(
-                  color: primaryColor,
+                  color: tokens.primaryColor,
                   fontWeight: FontWeight.w700,
                   fontSize: 11,
                   letterSpacing: 1.2,
@@ -795,12 +1024,12 @@ class _LandingScreenState extends State<LandingScreen> {
                 alignment: WrapAlignment.center,
                 children: hardware.map((item) {
                   return Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
+                      color: tokens.surfaceCard,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF334155)),
+                      border: Border.all(color: tokens.borderColor),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -812,8 +1041,8 @@ class _LandingScreenState extends State<LandingScreen> {
                           children: [
                             Text(
                               item.title,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: tokens.textPrimary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
                               ),
@@ -821,7 +1050,7 @@ class _LandingScreenState extends State<LandingScreen> {
                             Text(
                               item.tag,
                               style: TextStyle(
-                                color: primaryColor,
+                                color: tokens.primaryColor,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -843,14 +1072,14 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildStatsSection(
     BuildContext context,
     List<LandingStatItem> stats,
-    Color primaryColor,
+    _LandingThemeTokens tokens,
   ) {
     if (stats.isEmpty) return const SizedBox.shrink();
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
-      color: const Color(0xFF0B1120),
+      color: tokens.scaffoldBg,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
@@ -868,16 +1097,16 @@ class _LandingScreenState extends State<LandingScreen> {
                         : (constraints.maxWidth - 24) / 2,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF131D2D),
+                      color: tokens.surfaceCard,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF1E293B)),
+                      border: Border.all(color: tokens.borderColor),
                     ),
                     child: Column(
                       children: [
                         Text(
                           s.value,
                           style: TextStyle(
-                            color: primaryColor,
+                            color: tokens.primaryColor,
                             fontSize: 32,
                             fontWeight: FontWeight.w900,
                           ),
@@ -886,8 +1115,8 @@ class _LandingScreenState extends State<LandingScreen> {
                         Text(
                           s.label,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white70,
+                          style: TextStyle(
+                            color: tokens.textSecondary,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
@@ -907,13 +1136,13 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildSolutionsSection(
     BuildContext context,
     List<LandingSolutionItem> solutions,
-    Color primaryColor,
+    _LandingThemeTokens tokens,
   ) {
     return Container(
       key: _solutionsKey,
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 64, horizontal: 20),
-      color: const Color(0xFF0F172A),
+      color: tokens.sectionAltBg,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
@@ -924,7 +1153,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 title: 'Engineered for Every Business Vertical',
                 subtitle:
                     'Specialized workflows that fit the exact operational model of your store.',
-                primaryColor: primaryColor,
+                tokens: tokens,
               ),
               const SizedBox(height: 48),
               LayoutBuilder(
@@ -941,9 +1170,9 @@ class _LandingScreenState extends State<LandingScreen> {
                         width: itemWidth,
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF131D2D),
+                          color: tokens.surfaceCard,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFF1E293B)),
+                          border: Border.all(color: tokens.borderColor),
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -951,7 +1180,8 @@ class _LandingScreenState extends State<LandingScreen> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: primaryColor.withValues(alpha: 0.15),
+                                color:
+                                    tokens.primaryColor.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Text(
@@ -966,8 +1196,8 @@ class _LandingScreenState extends State<LandingScreen> {
                                 children: [
                                   Text(
                                     sol.title,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: tokens.textPrimary,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 17,
                                     ),
@@ -976,8 +1206,7 @@ class _LandingScreenState extends State<LandingScreen> {
                                   Text(
                                     sol.desc,
                                     style: TextStyle(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.75),
+                                      color: tokens.textSecondary,
                                       fontSize: 13,
                                       height: 1.5,
                                     ),
@@ -1002,13 +1231,13 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildFeaturesSection(
     BuildContext context,
     List<LandingFeatureItem> features,
-    Color primaryColor,
+    _LandingThemeTokens tokens,
   ) {
     return Container(
       key: _featuresKey,
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 64, horizontal: 20),
-      color: const Color(0xFF0B1120),
+      color: tokens.scaffoldBg,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
@@ -1019,7 +1248,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 title: 'Everything You Need to Run & Scale',
                 subtitle:
                     'Cutting-edge omnichannel sales, real-time inventory, and offline-first peace of mind.',
-                primaryColor: primaryColor,
+                tokens: tokens,
               ),
               const SizedBox(height: 48),
               LayoutBuilder(
@@ -1040,9 +1269,9 @@ class _LandingScreenState extends State<LandingScreen> {
                         width: cardWidth,
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF131D2D),
+                          color: tokens.surfaceCard,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF1E293B)),
+                          border: Border.all(color: tokens.borderColor),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1050,7 +1279,8 @@ class _LandingScreenState extends State<LandingScreen> {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: primaryColor.withValues(alpha: 0.15),
+                                color:
+                                    tokens.primaryColor.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
@@ -1061,8 +1291,8 @@ class _LandingScreenState extends State<LandingScreen> {
                             const SizedBox(height: 16),
                             Text(
                               feat.title,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: tokens.textPrimary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
@@ -1071,7 +1301,7 @@ class _LandingScreenState extends State<LandingScreen> {
                             Text(
                               feat.body,
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.72),
+                                color: tokens.textSecondary,
                                 fontSize: 13,
                                 height: 1.5,
                               ),
@@ -1093,8 +1323,7 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildPricingSection(
     BuildContext context,
     List<LandingPlanItem> plans,
-    Color primaryColor,
-    Color accentColor,
+    _LandingThemeTokens tokens,
   ) {
     if (plans.isEmpty) return const SizedBox.shrink();
 
@@ -1102,7 +1331,7 @@ class _LandingScreenState extends State<LandingScreen> {
       key: _pricingKey,
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 64, horizontal: 20),
-      color: const Color(0xFF0F172A),
+      color: tokens.sectionAltBg,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
@@ -1113,7 +1342,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 title: 'Simple Plans for Businesses of Any Size',
                 subtitle:
                     'Zero hidden setup fees. Upgrade, downgrade, or cancel anytime.',
-                primaryColor: primaryColor,
+                tokens: tokens,
               ),
               const SizedBox(height: 48),
               LayoutBuilder(
@@ -1133,25 +1362,24 @@ class _LandingScreenState extends State<LandingScreen> {
                         width: cardWidth,
                         padding: const EdgeInsets.all(28),
                         decoration: BoxDecoration(
-                          color: plan.isFeatured
-                              ? const Color(0xFF1E293B)
-                              : const Color(0xFF131D2D),
+                          color: tokens.surfaceCard,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: plan.isFeatured
-                                ? primaryColor
-                                : const Color(0xFF1E293B),
+                                ? tokens.primaryColor
+                                : tokens.borderColor,
                             width: plan.isFeatured ? 2 : 1,
                           ),
-                          boxShadow: plan.isFeatured
-                              ? [
-                                  BoxShadow(
-                                    color: primaryColor.withValues(alpha: 0.2),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 8),
-                                  )
-                                ]
-                              : null,
+                          boxShadow: [
+                            BoxShadow(
+                              color: plan.isFeatured
+                                  ? tokens.primaryColor.withValues(alpha: 0.2)
+                                  : Colors.black.withValues(
+                                      alpha: tokens.isDark ? 0.3 : 0.05),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1161,7 +1389,7 @@ class _LandingScreenState extends State<LandingScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: primaryColor,
+                                  color: tokens.primaryColor,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Text(
@@ -1177,8 +1405,8 @@ class _LandingScreenState extends State<LandingScreen> {
                             ],
                             Text(
                               plan.name.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: tokens.textPrimary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
                               ),
@@ -1188,8 +1416,8 @@ class _LandingScreenState extends State<LandingScreen> {
                               const SizedBox(height: 4),
                               Text(
                                 plan.description!,
-                                style: const TextStyle(
-                                  color: Colors.white60,
+                                style: TextStyle(
+                                  color: tokens.textSecondary,
                                   fontSize: 12,
                                 ),
                               ),
@@ -1201,8 +1429,8 @@ class _LandingScreenState extends State<LandingScreen> {
                               children: [
                                 Text(
                                   '\$${plan.price.toStringAsFixed(plan.price.truncateToDouble() == plan.price ? 0 : 2)}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: tokens.textPrimary,
                                     fontSize: 36,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -1210,29 +1438,101 @@ class _LandingScreenState extends State<LandingScreen> {
                                 const SizedBox(width: 4),
                                 Text(
                                   '/${plan.billingPeriod}',
-                                  style: const TextStyle(
-                                    color: Colors.white60,
+                                  style: TextStyle(
+                                    color: tokens.textSecondary,
                                     fontSize: 14,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 24),
-                            const Divider(color: Color(0xFF334155)),
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _buildLimitChip(
+                                  icon: Icons.receipt_long_outlined,
+                                  label: plan.invoiceLimit == -1
+                                      ? 'Unlimited Invoices'
+                                      : '${plan.invoiceLimit} Invoices/mo',
+                                  tokens: tokens,
+                                ),
+                                _buildLimitChip(
+                                  icon: Icons.devices_outlined,
+                                  label: plan.deviceLimit == -1
+                                      ? 'Unlimited POS Devices'
+                                      : '${plan.deviceLimit} Devices',
+                                  tokens: tokens,
+                                ),
+                                _buildLimitChip(
+                                  icon: Icons.people_outline,
+                                  label: plan.staffLimit == -1
+                                      ? 'Unlimited Staff'
+                                      : '${plan.staffLimit} Staff',
+                                  tokens: tokens,
+                                ),
+                              ],
+                            ),
+                            if (plan.extensions.isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: plan.extensions.map((ext) {
+                                  final label = _formatExtensionName(ext);
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: tokens.accentColor
+                                          .withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: tokens.accentColor
+                                            .withValues(alpha: 0.28),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.extension_outlined,
+                                          size: 11,
+                                          color: tokens.accentColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          label,
+                                          style: TextStyle(
+                                            color: tokens.accentColor,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                            const SizedBox(height: 20),
+                            Divider(color: tokens.borderColor),
                             const SizedBox(height: 16),
                             ...plan.features.map((f) => Padding(
                                   padding: const EdgeInsets.only(bottom: 10),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Icon(Icons.check_circle,
-                                          color: primaryColor, size: 16),
+                                          color: tokens.primaryColor,
+                                          size: 16),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
                                           f,
-                                          style: const TextStyle(
-                                            color: Colors.white70,
+                                          style: TextStyle(
+                                            color: tokens.textSecondary,
                                             fontSize: 13,
                                           ),
                                         ),
@@ -1246,13 +1546,20 @@ class _LandingScreenState extends State<LandingScreen> {
                               child: FilledButton(
                                 style: FilledButton.styleFrom(
                                   backgroundColor: plan.isFeatured
-                                      ? primaryColor
-                                      : const Color(0xFF334155),
-                                  foregroundColor: Colors.white,
+                                      ? tokens.primaryColor
+                                      : (tokens.isDark
+                                          ? const Color(0xFF334155)
+                                          : const Color(0xFFE2E8F0)),
+                                  foregroundColor: plan.isFeatured
+                                      ? Colors.white
+                                      : (tokens.isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A)),
                                   padding:
                                       const EdgeInsets.symmetric(vertical: 14),
                                   shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10)),
+                                      borderRadius:
+                                          BorderRadius.circular(10)),
                                 ),
                                 onPressed: () => _navigateToAuth(context),
                                 child: Text(
@@ -1281,12 +1588,12 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildTestimonialsSection(
     BuildContext context,
     List<LandingTestimonialItem> testimonials,
-    Color primaryColor,
+    _LandingThemeTokens tokens,
   ) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 64, horizontal: 20),
-      color: const Color(0xFF0B1120),
+      color: tokens.scaffoldBg,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
@@ -1297,7 +1604,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 title: 'Trusted by Leading Merchants Globally',
                 subtitle:
                     'Hear how store owners streamline their business daily.',
-                primaryColor: primaryColor,
+                tokens: tokens,
               ),
               const SizedBox(height: 48),
               LayoutBuilder(
@@ -1315,9 +1622,9 @@ class _LandingScreenState extends State<LandingScreen> {
                         width: cardWidth,
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF131D2D),
+                          color: tokens.surfaceCard,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF1E293B)),
+                          border: Border.all(color: tokens.borderColor),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1333,7 +1640,7 @@ class _LandingScreenState extends State<LandingScreen> {
                             Text(
                               '"${t.quote}"',
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.85),
+                                color: tokens.textSecondary,
                                 fontSize: 13,
                                 height: 1.5,
                                 fontStyle: FontStyle.italic,
@@ -1344,12 +1651,12 @@ class _LandingScreenState extends State<LandingScreen> {
                               children: [
                                 CircleAvatar(
                                   radius: 16,
-                                  backgroundColor:
-                                      primaryColor.withValues(alpha: 0.2),
+                                  backgroundColor: tokens.primaryColor
+                                      .withValues(alpha: 0.2),
                                   child: Text(
                                     t.name.isNotEmpty ? t.name[0] : 'U',
                                     style: TextStyle(
-                                      color: primaryColor,
+                                      color: tokens.primaryColor,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
                                     ),
@@ -1358,20 +1665,21 @@ class _LandingScreenState extends State<LandingScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         t.name,
-                                        style: const TextStyle(
-                                          color: Colors.white,
+                                        style: TextStyle(
+                                          color: tokens.textPrimary,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 13,
                                         ),
                                       ),
                                       Text(
                                         t.role,
-                                        style: const TextStyle(
-                                          color: Colors.white60,
+                                        style: TextStyle(
+                                          color: tokens.textSecondary,
                                           fontSize: 11,
                                         ),
                                       ),
@@ -1397,7 +1705,7 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildFaqSection(
     BuildContext context,
     List<LandingFaqItem> faqs,
-    Color primaryColor,
+    _LandingThemeTokens tokens,
   ) {
     if (faqs.isEmpty) return const SizedBox.shrink();
 
@@ -1405,7 +1713,7 @@ class _LandingScreenState extends State<LandingScreen> {
       key: _faqsKey,
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 64, horizontal: 20),
-      color: const Color(0xFF0F172A),
+      color: tokens.sectionAltBg,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
@@ -1416,28 +1724,28 @@ class _LandingScreenState extends State<LandingScreen> {
                 title: 'Frequently Asked Questions',
                 subtitle:
                     'Have inquiries before starting? Find quick answers right here.',
-                primaryColor: primaryColor,
+                tokens: tokens,
               ),
               const SizedBox(height: 40),
               ...faqs.map((faq) {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF131D2D),
+                    color: tokens.surfaceCard,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF1E293B)),
+                    border: Border.all(color: tokens.borderColor),
                   ),
                   child: Theme(
                     data: Theme.of(context).copyWith(
                       dividerColor: Colors.transparent,
                     ),
                     child: ExpansionTile(
-                      iconColor: primaryColor,
-                      collapsedIconColor: Colors.white60,
+                      iconColor: tokens.primaryColor,
+                      collapsedIconColor: tokens.textSecondary,
                       title: Text(
                         faq.question,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: tokens.textPrimary,
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
                         ),
@@ -1449,7 +1757,7 @@ class _LandingScreenState extends State<LandingScreen> {
                           child: Text(
                             faq.answer,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.78),
+                              color: tokens.textSecondary,
                               fontSize: 13,
                               height: 1.5,
                             ),
@@ -1470,12 +1778,12 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildDownloadsSection(
     BuildContext context,
     LandingDownloads downloads,
-    Color primaryColor,
+    _LandingThemeTokens tokens,
   ) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 54, horizontal: 20),
-      color: const Color(0xFF0B1120),
+      color: tokens.scaffoldBg,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 900),
@@ -1484,32 +1792,33 @@ class _LandingScreenState extends State<LandingScreen> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF131D2D),
-                  primaryColor.withValues(alpha: 0.15),
+                  tokens.surfaceCard,
+                  tokens.primaryColor.withValues(alpha: 0.15),
                 ],
               ),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
+              border: Border.all(
+                  color: tokens.primaryColor.withValues(alpha: 0.3)),
             ),
             child: Column(
               children: [
-                const Icon(Icons.install_mobile,
-                    size: 40, color: Colors.white),
+                Icon(Icons.install_mobile,
+                    size: 40, color: tokens.primaryColor),
                 const SizedBox(height: 14),
-                const Text(
+                Text(
                   'Download Native Counter Apps',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: tokens.textPrimary,
                     fontWeight: FontWeight.bold,
                     fontSize: 22,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Experience blazing-fast offline performance with direct thermal printer and scanner hardware drivers.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                  style: TextStyle(color: tokens.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 24),
                 Wrap(
@@ -1538,7 +1847,7 @@ class _LandingScreenState extends State<LandingScreen> {
                         downloads.windowsUrl != null)
                       FilledButton.icon(
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF3B82F6),
+                          backgroundColor: const Color(0xFF38BDF8),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                               horizontal: 20, vertical: 14),
@@ -1564,115 +1873,38 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildContactSection(
     BuildContext context,
     LandingContact contact,
-    Color primaryColor,
+    _LandingThemeTokens tokens,
   ) {
     return Container(
       key: _contactKey,
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 64, horizontal: 20),
-      color: const Color(0xFF0F172A),
+      color: tokens.sectionAltBg,
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
+          constraints: const BoxConstraints(maxWidth: 860),
           child: Column(
             children: [
               _buildSectionHeader(
-                badge: 'SUPPORT & SALES',
-                title: contact.pageTitle,
-                subtitle: contact.pageSubtitle,
-                primaryColor: primaryColor,
+                badge: 'CONTACT & INQUIRIES',
+                title: contact.pageTitle.isNotEmpty
+                    ? contact.pageTitle
+                    : 'Connect with Our Sales & Support Team',
+                subtitle: contact.pageSubtitle.isNotEmpty
+                    ? contact.pageSubtitle
+                    : 'Have questions before signing up? Send us a message and our team will get in touch.',
+                tokens: tokens,
               ),
               const SizedBox(height: 40),
-              Container(
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF131D2D),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF1E293B)),
-                ),
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color:
-                              const Color(0xFF25D366).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.chat, color: Color(0xFF25D366)),
-                      ),
-                      title: const Text('Direct WhatsApp Chat',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
-                      subtitle: Text(contact.supportWhatsapp,
-                          style: const TextStyle(color: Colors.white70)),
-                      trailing: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF25D366),
-                        ),
-                        onPressed: () =>
-                            _launchWhatsApp(contact.supportWhatsapp),
-                        child: const Text('Chat Now'),
-                      ),
-                    ),
-                    const Divider(color: Color(0xFF1E293B)),
-                    ListTile(
-                      leading: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color:
-                              const Color(0xFF3B82F6).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child:
-                            const Icon(Icons.phone, color: Color(0xFF3B82F6)),
-                      ),
-                      title: const Text('Phone Hotline',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
-                      subtitle: Text(contact.supportPhone,
-                          style: const TextStyle(color: Colors.white70)),
-                      trailing: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Color(0xFF334155)),
-                        ),
-                        onPressed: () => _launchCall(contact.supportPhone),
-                        child: const Text('Call Us'),
-                      ),
-                    ),
-                    const Divider(color: Color(0xFF1E293B)),
-                    ListTile(
-                      leading: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color:
-                              const Color(0xFF6366F1).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.email_outlined,
-                            color: Color(0xFF6366F1)),
-                      ),
-                      title: const Text('Email Help Desk',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
-                      subtitle: Text(contact.supportEmail,
-                          style: const TextStyle(color: Colors.white70)),
-                      trailing: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Color(0xFF334155)),
-                        ),
-                        onPressed: () => _launchEmail(contact.supportEmail),
-                        child: const Text('Send Email'),
-                      ),
-                    ),
-                  ],
-                ),
+              InteractiveContactForm(
+                contact: contact,
+                isDark: tokens.isDark,
+                surfaceCard: tokens.surfaceCard,
+                borderColor: tokens.borderColor,
+                textPrimary: tokens.textPrimary,
+                textSecondary: tokens.textSecondary,
+                primaryColor: tokens.primaryColor,
+                accentColor: tokens.accentColor,
               ),
             ],
           ),
@@ -1684,11 +1916,11 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget _buildFooter(
     BuildContext context,
     LandingBranding branding,
-    Color primaryColor,
+    _LandingThemeTokens tokens,
   ) {
     return Container(
       width: double.infinity,
-      color: const Color(0xFF080C16),
+      color: tokens.isDark ? const Color(0xFF080C16) : const Color(0xFFE2E8F0),
       padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
       child: Center(
         child: ConstrainedBox(
@@ -1714,8 +1946,8 @@ class _LandingScreenState extends State<LandingScreen> {
                   ],
                   Text(
                     branding.platformName,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: tokens.textPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -1726,7 +1958,10 @@ class _LandingScreenState extends State<LandingScreen> {
               Text(
                 '© ${DateTime.now().year} ${branding.platformName}. All rights reserved. Cloud & Offline Enterprise POS Architecture.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white38, fontSize: 11),
+                style: TextStyle(
+                  color: tokens.textSecondary.withValues(alpha: 0.8),
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
@@ -1739,20 +1974,20 @@ class _LandingScreenState extends State<LandingScreen> {
     required String badge,
     required String title,
     required String subtitle,
-    required Color primaryColor,
+    required _LandingThemeTokens tokens,
   }) {
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: primaryColor.withValues(alpha: 0.15),
+            color: tokens.primaryColor.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Text(
             badge,
             style: TextStyle(
-              color: primaryColor,
+              color: tokens.primaryColor,
               fontWeight: FontWeight.bold,
               fontSize: 11,
               letterSpacing: 1.1,
@@ -1763,8 +1998,8 @@ class _LandingScreenState extends State<LandingScreen> {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: tokens.textPrimary,
             fontWeight: FontWeight.w900,
             fontSize: 28,
             letterSpacing: -0.5,
@@ -1777,7 +2012,7 @@ class _LandingScreenState extends State<LandingScreen> {
             subtitle,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: tokens.textSecondary,
               fontSize: 14,
               height: 1.4,
             ),
@@ -1785,17 +2020,5 @@ class _LandingScreenState extends State<LandingScreen> {
         ),
       ],
     );
-  }
-
-  Color _parseColor(String? hex, Color fallback) {
-    if (hex == null || hex.isEmpty) return fallback;
-    final buffer = StringBuffer();
-    if (hex.length == 6 || hex.length == 7) buffer.write('ff');
-    buffer.write(hex.replaceFirst('#', ''));
-    try {
-      return Color(int.parse(buffer.toString(), radix: 16));
-    } catch (_) {
-      return fallback;
-    }
   }
 }

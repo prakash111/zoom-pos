@@ -47,16 +47,17 @@ class _AuthGateState extends State<AuthGate> {
   @override
   Widget build(BuildContext context) {
     final status = context.watch<AuthProvider>().status;
+    final branding = context.watch<PlatformBrandingProvider>();
+    final showLanding = kIsWeb && branding.landingPageEnabled;
 
     if (_timedOut && status == AuthStatus.unknown) {
-      return kIsWeb ? const LandingScreen() : const LoginScreen();
+      return showLanding ? const LandingScreen() : const LoginScreen();
     }
 
     switch (status) {
       case AuthStatus.unknown:
         // Splash background + brand come from the Superadmin global settings
         // (GET /auth/branding). Tenant theme only applies once authenticated.
-        final branding = context.watch<PlatformBrandingProvider>();
         final bg = branding.splashBgColor;
         final onBg = bg.computeLuminance() < 0.5
             ? Colors.white
@@ -100,7 +101,7 @@ class _AuthGateState extends State<AuthGate> {
         return const DashboardScreen();
       case AuthStatus.authenticating:
       case AuthStatus.unauthenticated:
-        return kIsWeb ? const LandingScreen() : const LoginScreen();
+        return showLanding ? const LandingScreen() : const LoginScreen();
     }
   }
 }

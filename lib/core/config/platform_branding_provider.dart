@@ -36,6 +36,7 @@ class PlatformBrandingProvider extends ChangeNotifier {
   static const _supportEmailKey = 'zoom_pos.platform_support_email';
   static const _bannerKey = 'zoom_pos.platform_auth_banner_url';
   static const _showBannerKey = 'zoom_pos.platform_show_auth_banner';
+  static const _landingEnabledKey = 'zoom_pos.platform_landing_enabled';
 
   /// Fallbacks shown until (and unless) the server responds — these mirror the
   /// Superadmin contract defaults.
@@ -69,6 +70,7 @@ class PlatformBrandingProvider extends ChangeNotifier {
   String supportEmail = defaultSupportEmail;
   String? authBannerImageUrl;
   bool showAuthBanner = false;
+  bool landingPageEnabled = true;
   bool headerInline = defaultHeaderInline;
   bool showTagline = defaultShowTagline;
 
@@ -127,6 +129,9 @@ class PlatformBrandingProvider extends ChangeNotifier {
       authBannerImageUrl = str(_bannerKey) ?? authBannerImageUrl;
       if (prefs.containsKey(_showBannerKey)) {
         showAuthBanner = prefs.getBool(_showBannerKey) ?? showAuthBanner;
+      }
+      if (prefs.containsKey(_landingEnabledKey)) {
+        landingPageEnabled = prefs.getBool(_landingEnabledKey) ?? true;
       }
       if (prefs.containsKey(_inlineKey)) {
         headerInline = prefs.getBool(_inlineKey) ?? defaultHeaderInline;
@@ -188,6 +193,11 @@ class PlatformBrandingProvider extends ChangeNotifier {
           : (platform.containsKey('show_auth_banner')
               ? _asBool(platform['show_auth_banner'], showAuthBanner)
               : showAuthBanner);
+      final landingEnabled = response.containsKey('landing_page_enabled')
+          ? _asBool(response['landing_page_enabled'], landingPageEnabled)
+          : (platform.containsKey('landing_page_enabled')
+              ? _asBool(platform['landing_page_enabled'], landingPageEnabled)
+              : landingPageEnabled);
 
       // Primary colour under any of its aliases (theme.primary /
       // theme.primary_color / brand_color / primary_color).
@@ -224,6 +234,7 @@ class PlatformBrandingProvider extends ChangeNotifier {
       if (email != null) set(email, supportEmail, () => supportEmail = email);
       set(banner, authBannerImageUrl, () => authBannerImageUrl = banner);
       set(showBanner, showAuthBanner, () => showAuthBanner = showBanner);
+      set(landingEnabled, landingPageEnabled, () => landingPageEnabled = landingEnabled);
       set(inline, headerInline, () => headerInline = inline);
       set(showTag, showTagline, () => showTagline = showTag);
       set(primary, primaryColor, () => primaryColor = primary);
@@ -249,6 +260,7 @@ class PlatformBrandingProvider extends ChangeNotifier {
         await prefs.setString(_supportPhoneKey, supportPhone);
         await prefs.setString(_supportEmailKey, supportEmail);
         await prefs.setBool(_showBannerKey, showAuthBanner);
+        await prefs.setBool(_landingEnabledKey, landingPageEnabled);
         Future<void> put(String k, String? v) => (v != null && v.isNotEmpty)
             ? prefs.setString(k, v)
             : prefs.remove(k);

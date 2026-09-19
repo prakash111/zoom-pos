@@ -35,6 +35,7 @@ class ProductFormSheet extends StatefulWidget {
 class _ProductFormSheetState extends State<ProductFormSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
+  late final TextEditingController _descriptionController;
   late final TextEditingController _salePriceController;
   late final TextEditingController _costPriceController;
   late final TextEditingController _stockController;
@@ -64,6 +65,7 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
     }).catchError((_) {});
     final product = widget.product;
     _nameController = TextEditingController(text: product?.name ?? '');
+    _descriptionController = TextEditingController(text: product?.description ?? '');
     _salePriceController = TextEditingController(text: product == null ? '' : product.salePrice.toStringAsFixed(2));
     _costPriceController = TextEditingController(text: product == null ? '' : product.costPrice.toStringAsFixed(2));
     _stockController = TextEditingController(text: product == null ? '0' : product.currentStock.toStringAsFixed(0));
@@ -114,6 +116,7 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
   @override
   void dispose() {
     _nameController.dispose();
+    _descriptionController.dispose();
     _salePriceController.dispose();
     _costPriceController.dispose();
     _stockController.dispose();
@@ -134,6 +137,7 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
     final productId = await inventory.saveProduct(
       externalId: widget.product?.id,
       name: _nameController.text.trim(),
+      description: _descriptionController.text.trim(),
       salePrice: double.parse(_salePriceController.text),
       costPrice: double.tryParse(_costPriceController.text) ?? 0,
       currentStock: _isEditing ? widget.product!.currentStock : (double.tryParse(_stockController.text) ?? 0),
@@ -360,6 +364,16 @@ class _ProductFormSheetState extends State<ProductFormSheet> {
                     controller: _nameController,
                     decoration: const InputDecoration(labelText: 'Name'),
                     validator: (value) => (value == null || value.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _descriptionController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Description',
+                      hintText: 'Add product description for invoices, quotations, and online storefront…',
+                      alignLabelWithHint: true,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Row(

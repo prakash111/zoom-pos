@@ -67,6 +67,7 @@ class InventoryProvider extends ChangeNotifier {
   Future<String?> saveProduct({
     String? externalId,
     required String name,
+    String? description,
     required double salePrice,
     double costPrice = 0,
     double currentStock = 0,
@@ -87,6 +88,7 @@ class InventoryProvider extends ChangeNotifier {
       final id = await _repository.saveProduct(
         externalId: externalId,
         name: name,
+        description: description,
         salePrice: salePrice,
         costPrice: costPrice,
         currentStock: currentStock,

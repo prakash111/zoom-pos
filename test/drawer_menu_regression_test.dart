@@ -507,9 +507,9 @@ void main() {
           findsOneWidget);
       expect(find.byType(ExpansionTile), findsNothing);
 
-      // 4. Verify user avatar and Help & Support button are rendered
-      expect(find.text('prakash'), findsOneWidget);
-      expect(find.text('prakash@example.com'), findsOneWidget);
+      // 4. Verify user avatar is removed from footer and Help & Support button is rendered
+      expect(find.text('prakash'), findsNothing);
+      expect(find.text('prakash@example.com'), findsNothing);
       expect(find.widgetWithText(ListTile, 'Help & Support'), findsOneWidget);
     });
 
