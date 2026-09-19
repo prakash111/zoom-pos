@@ -514,7 +514,7 @@
                         </x-nav.expanded-item>
                     @endif
                     @if ($canCatalog)
-                        <x-nav.expanded-item :route="route('tenant.catalog.index')" :active="$isCatalog" item-key="products" title="{{ __('Online Catalog') }}" subtitle="{{ __('Digital catalog & WhatsApp share') }}">
+                        <x-nav.expanded-item :route="route('tenant.catalog.index')" :active="$isCatalog" item-key="products" title="{{ __('eCommerce Storefront & Website') }}" subtitle="{{ __('Online business store & WhatsApp sales') }}">
                             <span class="text-base shrink-0">🌐</span>
                         </x-nav.expanded-item>
                     @endif
@@ -913,7 +913,7 @@
                                 @endif
 
                                 @if ($canCatalog)
-                                    <x-nav.drawer-item item-key="catalog" :route="route('tenant.catalog.index')" title="{{ __('Online Digital Catalog') }}" subtitle="{{ __('Shareable web catalog & WhatsApp store') }}">🌐</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="catalog" :route="route('tenant.catalog.index')" title="{{ __('eCommerce Storefront & Website') }}" subtitle="{{ __('Online business store & WhatsApp sales') }}">🌐</x-nav.drawer-item>
                                 @endif
                             </div>
                         </div>

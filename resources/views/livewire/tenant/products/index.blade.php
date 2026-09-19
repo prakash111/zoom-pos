@@ -87,6 +87,12 @@
                     @error('name') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
 
+                <div class="sm:col-span-3">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Product Description') }}</label>
+                    <textarea wire:model="description" rows="2" placeholder="{{ __('Add detailed description, specifications, and marketing features for your eCommerce store & catalog...') }}" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    @error('description') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+
                 <div>
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Item Code') }}</label>
                     <div class="flex gap-2">

@@ -28,6 +28,8 @@ class Index extends Component
 
     public string $name = '';
 
+    public string $description = '';
+
     public string $code = '';
 
     public string $barcode = '';
@@ -96,6 +98,7 @@ class Index extends Component
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
             'code' => ['nullable', 'string', 'max:50', Rule::unique('products', 'code')->where(fn ($query) => $query->where('company_id', auth('web')->user()?->company_id))->ignore($this->editingId)],
             'barcode' => ['nullable', 'string', 'max:100', Rule::unique('products', 'barcode')->where(fn ($query) => $query->where('company_id', auth('web')->user()?->company_id))->ignore($this->editingId)],
             'imageFile' => ['nullable', 'image', 'max:5120'],
@@ -112,7 +115,7 @@ class Index extends Component
     public function newProduct(): void
     {
         $this->reset([
-            'editingId', 'name', 'code', 'barcode', 'imageFile', 'imageUrl', 'categoryId', 'brandId', 'unit',
+            'editingId', 'name', 'description', 'code', 'barcode', 'imageFile', 'imageUrl', 'categoryId', 'brandId', 'unit',
             'costPrice', 'salePrice', 'currentStock', 'minimumStock', 'variants', 'modifiers', 'spiceLevels',
         ]);
         $this->active = true;
@@ -236,6 +239,7 @@ class Index extends Component
         $product = Product::findOrFail($id);
         $this->editingId = $product->id;
         $this->name = $product->name;
+        $this->description = (string) ($product->description ?? '');
         $this->code = (string) $product->code;
         $this->barcode = (string) $product->barcode;
         $this->imageFile = null;
@@ -269,6 +273,7 @@ class Index extends Component
 
         $product = Product::updateOrCreate(['id' => $this->editingId], [
             'name' => $data['name'],
+            'description' => $data['description'] ?: null,
             'code' => $data['code'] ?: null,
             'barcode' => $data['barcode'] ?: null,
             'image_url' => $this->imageUrl ?: null,

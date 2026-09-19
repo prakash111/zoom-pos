@@ -13,12 +13,13 @@ class PublishedCatalog extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['company_id', 'title', 'product_ids', 'expires_at'];
+    protected $fillable = ['company_id', 'title', 'description', 'meta', 'product_ids', 'expires_at'];
 
     protected function casts(): array
     {
         return [
             'product_ids' => 'array',
+            'meta' => 'array',
             'expires_at' => 'datetime',
         ];
     }

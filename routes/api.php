@@ -75,6 +75,7 @@ use Modules\leadmanagement\Http\Controllers\LeadModuleController;
 // Signed "license issued" push from the vendor's License Manager after a
 // hosted-checkout purchase. HMAC-verified in the controller (no auth middleware).
 Route::post('/license/activate', [LicenseActivationController::class, 'activate']);
+Route::get('/public/landing', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
 
 Route::prefix('v1/tax')->middleware([AuthenticateTenantApi::class, PreventDemoModifications::class])->group(function () {
     Route::post('/calculate', [TaxApiController::class, 'calculate']);
@@ -841,6 +842,8 @@ Route::prefix('v1/pos')->group(function () {
     Route::get('/auth/public-settings', [PosSyncApiController::class, 'publicSettings']);
     Route::get('/app/public-settings', [PosSyncApiController::class, 'publicSettings']);
     Route::get('/public/settings', [PosSyncApiController::class, 'publicSettings']);
+    Route::get('/public/landing', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
+    Route::get('/auth/landing', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
     Route::get('/auth/auth-config', [PosSyncApiController::class, 'authConfig']);
     Route::get('/auth-config', [PosSyncApiController::class, 'authConfig']);
     Route::get('/app/auth-config', [PosSyncApiController::class, 'authConfig']);

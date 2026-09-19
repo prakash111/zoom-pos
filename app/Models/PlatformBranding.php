@@ -176,6 +176,11 @@ class PlatformBranding extends Model
                 'description' => $this->auth_description ?: null,
                 'logo_url' => $this->getLogoPublicUrl(),
                 'favicon_url' => $this->getFaviconPublicUrl(),
+                'support_phone' => $this->support_phone ?: '+918535075196',
+                'support_whatsapp' => $this->support_phone ?: '+918535075196',
+                'support_email' => $this->support_email ?: 'support@zoomnearby.com',
+                'auth_banner_image_url' => \App\Models\DynamicSetting::get('auth_banner_image_url') ?: null,
+                'show_auth_banner' => (bool) \App\Models\DynamicSetting::get('show_auth_banner', false),
             ],
             'theme' => [
                 'primary_color' => $primary,

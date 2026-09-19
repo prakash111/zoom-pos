@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\DynamicSetting;
+use App\Models\PlatformBranding;
 use App\Models\PlatformSystem;
 use App\Models\PushNotificationSetting;
 use App\Services\Localization\LocalizationService;
@@ -208,6 +210,11 @@ class AppBootstrapController extends Controller
                 'favicon_url' => $company->getFaviconUrl(),
                 'drawer_cover_url' => $company->getDrawerCoverUrl(),
                 'drawer_header' => $drawerHeader,
+                'support_phone' => PlatformBranding::current()->support_phone ?: '+918535075196',
+                'support_whatsapp' => PlatformBranding::current()->support_phone ?: '+918535075196',
+                'support_email' => PlatformBranding::current()->support_email ?: 'support@zoomnearby.com',
+                'auth_banner_image_url' => DynamicSetting::get('auth_banner_image_url') ?: null,
+                'show_auth_banner' => (bool) DynamicSetting::get('show_auth_banner', false),
             ],
             // Reserved for tenant-wide status/announcement banners.
             'messages' => [],

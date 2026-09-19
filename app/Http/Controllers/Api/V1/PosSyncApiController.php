@@ -454,6 +454,11 @@ class PosSyncApiController extends Controller
             // Primary colour under every name a client might parse.
             'primary_color' => $settings['theme']['primary_color'],
             'brand_color' => $settings['theme']['primary_color'],
+            'support_phone' => $settings['platform']['support_phone'],
+            'support_whatsapp' => $settings['platform']['support_whatsapp'],
+            'support_email' => $settings['platform']['support_email'],
+            'auth_banner_image_url' => $settings['platform']['auth_banner_image_url'],
+            'show_auth_banner' => $settings['platform']['show_auth_banner'],
             'platform_tagline' => null,
             'header_inline' => true,
             'show_tagline' => false,

@@ -14,7 +14,7 @@
 <body class="bg-slate-50 text-slate-900 min-h-screen antialiased flex flex-col justify-between"
       x-data="catalogCart({
           storeName: {{ json_encode($company?->name ?? 'Store') }},
-          storePhone: {{ json_encode($company?->phone ?? '') }},
+          storePhone: {{ json_encode(data_get($catalog->meta, 'whatsapp_number') ?: ($company?->phone ?? '')) }},
           currency: {{ json_encode($company?->currency ?? 'USD') }},
           catalogTitle: {{ json_encode($catalog->title) }}
       })">
@@ -81,7 +81,7 @@
                     {{ $catalog->title }}
                 </h2>
                 <p class="text-xs sm:text-sm text-blue-100 font-medium">
-                    Select your items below, add them to your cart, and place your order directly via WhatsApp in 1-click.
+                    {{ $catalog->description ?: 'Select your items below, add them to your cart, and place your order directly via WhatsApp in 1-click.' }}
                 </p>
             </div>
         </div>
@@ -117,6 +117,11 @@
                         </div>
                         @if ($product->code)
                             <div class="text-[10px] font-mono text-slate-400">{{ $product->code }}</div>
+                        @endif
+                        @if ($product->description)
+                            <p class="text-[11px] text-slate-500 line-clamp-2 text-left leading-relaxed mt-1" title="{{ $product->description }}">
+                                {{ $product->description }}
+                            </p>
                         @endif
                         <div class="text-base sm:text-lg font-black text-blue-600 pt-1">
                             ${{ number_format($product->sale_price, 2) }}
