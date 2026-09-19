@@ -346,6 +346,57 @@ class QuotesAndDocumentsTest extends TestCase
         });
     }
 
+    public function test_invoice_and_quotation_mailables_emit_exactly_one_pdf_mime_part(): void
+    {
+        [$company] = $this->actingAsTenantAdmin();
+        $mailer = app('mail.manager')->mailer('array');
+        $transport = $mailer->getSymfonyTransport();
+        $transport->flush();
+
+        $invoice = Sale::create([
+            'company_id' => $company->id,
+            'operation_type' => 'sale',
+            'sale_number' => 'INV-MIME-001',
+            'status' => 'completed',
+            'items' => [['name' => 'Invoice item', 'quantity' => 1, 'unit_price' => 100]],
+            'total' => 100,
+        ]);
+        $quotation = Sale::create([
+            'company_id' => $company->id,
+            'operation_type' => 'quotation',
+            'sale_number' => 'QUO-MIME-001',
+            'status' => 'draft',
+            'items' => [['name' => 'Quotation item', 'quantity' => 1, 'unit_price' => 100]],
+            'total' => 100,
+        ]);
+
+        $pdfGenerator = \Mockery::mock(InvoiceDeliveryService::class);
+        $pdfGenerator->shouldReceive('generateInvoicePdf')->once()->with($invoice)->andReturn('%PDF-invoice');
+        $pdfGenerator->shouldReceive('generateQuotationPdf')->once()->with($quotation)->andReturn('%PDF-quotation');
+        $this->app->instance(InvoiceDeliveryService::class, $pdfGenerator);
+
+        $mailables = [
+            [new InvoiceMailable($invoice, $company), 'Invoice-INV-MIME-001.pdf'],
+            [new QuotationMailable($quotation, $company), 'Quotation-QUO-MIME-001.pdf'],
+        ];
+
+        foreach ($mailables as [$mailable, $expectedFileName]) {
+            $transport->flush();
+            $this->assertCount(1, $mailable->attachments());
+            $this->assertCount(1, $mailable->attachments());
+            $mailer->to('recipient@example.test')->send($mailable);
+
+            $this->assertCount(1, $transport->messages());
+            $message = $transport->messages()->sole()->getOriginalMessage();
+            $attachments = $message->getAttachments();
+
+            $this->assertCount(1, $attachments);
+            $this->assertSame($expectedFileName, $attachments[0]->getFilename());
+            $this->assertSame('application', $attachments[0]->getMediaType());
+            $this->assertSame('pdf', $attachments[0]->getMediaSubtype());
+        }
+    }
+
     public function test_whatsapp_url_generator_and_placeholders_for_quotes_and_invoices(): void
     {
         [$company, $user] = $this->actingAsTenantAdmin();

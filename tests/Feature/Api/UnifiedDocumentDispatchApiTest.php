@@ -761,6 +761,45 @@ class UnifiedDocumentDispatchApiTest extends TestCase
         $this->assertSame(0, MessageQueue::where('type', 'whatsapp')->count());
     }
 
+    public function test_unified_email_dispatch_sends_each_document_once_without_pre_hydrating_attachments(): void
+    {
+        $invoice = $this->mixedChannelInvoice();
+        $quotation = Sale::create([
+            'company_id' => $this->company->id,
+            'customer_id' => $this->customer->id,
+            'sale_number' => 'QUO-MULTI-001',
+            'operation_type' => 'quotation',
+            'status' => 'draft',
+            'items' => [['name' => 'Estimate', 'quantity' => 1, 'unit_price' => 125]],
+            'total' => 125,
+        ]);
+
+        foreach ([['invoice', $invoice], ['quotation', $quotation]] as [$type, $document]) {
+            $this->withToken($this->token)->postJson('/api/v1/documents/dispatch', [
+                'document_type' => $type,
+                'document_id' => $document->id,
+                'channels' => ['email', 'email'],
+                'api_only' => true,
+            ])->assertOk()->assertJsonPath('results.email.status', 'sent');
+        }
+
+        Mail::assertSent(\App\Mail\InvoiceMailable::class, function ($mail) {
+            $this->assertSame([], $mail->rawAttachments);
+            $this->assertCount(1, $mail->attachments());
+
+            return true;
+        });
+        Mail::assertSent(\App\Mail\InvoiceMailable::class, 1);
+
+        Mail::assertSent(\App\Mail\QuotationMailable::class, function ($mail) {
+            $this->assertSame([], $mail->rawAttachments);
+            $this->assertCount(1, $mail->attachments());
+
+            return true;
+        });
+        Mail::assertSent(\App\Mail\QuotationMailable::class, 1);
+    }
+
     public function test_stale_disabled_channel_is_skipped_while_enabled_channels_are_sent(): void
     {
         $sale = $this->mixedChannelInvoice();

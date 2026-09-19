@@ -59,10 +59,10 @@ class QuotationMailable extends Mailable
             return [];
         }
 
-        $pdfData = $this->pdfBinary;
-        if (empty($pdfData)) {
-            $pdfData = app(InvoiceDeliveryService::class)->generateQuotationPdf($this->quote);
+        if (empty($this->pdfBinary)) {
+            $this->pdfBinary = app(InvoiceDeliveryService::class)->generateQuotationPdf($this->quote);
         }
+        $pdfData = $this->pdfBinary;
 
         $fileName = "Quotation-{$this->quote->sale_number}.pdf";
 

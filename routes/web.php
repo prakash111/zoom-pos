@@ -52,11 +52,13 @@ $serveDemoBranding = function (string $asset) {
             return response($contents, 200, [
                 'Content-Type' => 'image/svg+xml',
                 'Cache-Control' => 'public, max-age=86400',
+                'Access-Control-Allow-Origin' => '*',
             ]);
         }
 
         return response()->file($path, [
             'Cache-Control' => 'public, max-age=86400',
+            'Access-Control-Allow-Origin' => '*',
         ]);
 };
 
@@ -65,6 +67,27 @@ foreach (['/tenant/demo-branding/{asset}', '/demo-branding/{asset}'] as $demoBra
         ->get($demoBrandingPath, $serveDemoBranding)
         ->where('asset', '[A-Za-z0-9_.-]+');
 }
+
+// Storage assets fallback with explicit permissive CORS headers
+Route::options('/storage/{path}', function () {
+    return response('', 204, [
+        'Access-Control-Allow-Origin' => '*',
+        'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+        'Access-Control-Allow-Headers' => 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range',
+    ]);
+})->where('path', '.*');
+
+Route::get('/storage/{path}', function ($path) {
+    $filePath = storage_path('app/public/'.$path);
+    abort_unless(is_file($filePath), 404);
+
+    return response()->file($filePath, [
+        'Access-Control-Allow-Origin' => '*',
+        'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+        'Access-Control-Allow-Headers' => 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range',
+        'Cache-Control' => 'public, max-age=86400',
+    ]);
+})->where('path', '.*');
 
 // 1-click demo sign-in (web panel). Disabled entirely unless DEMO_MODE=true.
 if (config('app.demo_mode')) {

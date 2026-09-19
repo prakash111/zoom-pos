@@ -41,12 +41,16 @@ class DocumentDispatchService
         if (! filter_var(trim($recipientEmail), FILTER_VALIDATE_EMAIL)) {
             return ['success' => false, 'status' => 'error', 'message' => 'A valid recipient email address is required.'];
         }
-        $html = is_string($mailable) ? $mailable : $mailable->render();
         if (! DispatchChannelService::isEmailConfigured($tenant->id)) {
+            // Rendering hydrates declarative attachments. Only render a clone
+            // for device fallback so a later SMTP send never reuses a mailable
+            // whose generated PDF attachment was already hydrated.
+            $html = is_string($mailable) ? $mailable : (clone $mailable)->render();
+
             return DeviceMessageService::prepare('email', $recipientEmail, DeviceMessageService::plainText($html), $subject);
         }
         if (is_string($mailable)) {
-            return $this->platformDispatcher->dispatchEmail($tenant, $recipientEmail, $subject, $html);
+            return $this->platformDispatcher->dispatchEmail($tenant, $recipientEmail, $subject, $mailable);
         }
 
         $smtp = app(InvoiceDeliveryService::class)->getSmtpConfig($tenant);
