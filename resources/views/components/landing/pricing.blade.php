@@ -142,7 +142,7 @@
                        class="mt-8 block text-center px-5 py-3.5 rounded-full font-black text-xs transition active:scale-95
                            {{ $card['popular']
                                 ? 'bg-brand-lime hover:bg-brand-lime-dark text-slate-950 shadow-lg shadow-brand-lime/25'
-                                : 'bg-white/10 hover:bg-white/20 text-white border border-white/10' }}">
+                                : 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-white/10 dark:hover:bg-white/20 dark:text-white border border-slate-900 dark:border-white/10' }}">
                         {{ __('Select') }} {{ $plan->display_name }}
                     </a>
                 </div>

@@ -16,9 +16,8 @@
     // themes still need the full app.css for their richer markup.
     $publicTheme = $appearance['theme'] ?? setting('landing_page_theme', 'theme_fast');
     $publicCssBundle = $publicTheme === 'theme_fast' ? 'resources/css/public.css' : 'resources/css/app.css';
-    // Only the fast theme has a light palette; the four legacy themes are
-    // dark-committed, so pin them to dark regardless of the viewer toggle.
-    $publicForceDark = $publicTheme !== 'theme_fast';
+    // All 5 themes support dark/light color matching patterns.
+    $publicForceDark = false;
     $landingSectionCss = '';
     foreach ($publicBranding->landingSectionOrder() as $landingSectionIndex => $landingSectionKey) {
         $landingMeta = $publicBranding->sectionMeta($landingSectionKey);
@@ -28,17 +27,13 @@
             default => $landingSectionKey,
         };
         if ($landingMeta['background'] !== 'transparent') {
-            if ($publicForceDark) {
-                $landingSectionCss .= "#{$selector}{background-color:{$landingMeta['background']};}";
-            } else {
-                $landingSectionCss .= "html.dark #{$selector}{background-color:{$landingMeta['background']};}";
-            }
+            $landingSectionCss .= "html.dark #{$selector}{background-color:{$landingMeta['background']};}";
         }
         $landingSectionCss .= "#{$selector}{--landing-section-accent:{$landingMeta['accent']};order:".($landingSectionIndex + 1).";}";
     }
 @endphp
 <!DOCTYPE html>
-<html lang="{{ $publicActiveLang?->code ?? 'en' }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="scroll-smooth {{ $publicForceDark ? 'dark' : '' }}" x-data="{ dark: document.documentElement.classList.contains('dark') }" x-init="$watch('dark', v => { try { localStorage.setItem('theme', v ? 'dark' : 'light') } catch (e) {}; document.documentElement.classList.toggle('dark', v) })">
+<html lang="{{ $publicActiveLang?->code ?? 'en' }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="scroll-smooth" x-data="{ dark: document.documentElement.classList.contains('dark') }" x-init="$watch('dark', v => { try { localStorage.setItem('theme', v ? 'dark' : 'light') } catch (e) {}; document.documentElement.classList.toggle('dark', v) })">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -50,9 +45,8 @@
         <link rel="icon" href="{{ $publicBranding->favicon_url }}">
     @endif
 
-    {{-- Set the saved theme before CSS is requested, preventing a light/dark flash. --}}
-    <script>try{document.documentElement.classList.toggle('dark',localStorage.getItem('theme')==='dark')}catch(e){}</script>
-    @if ($publicForceDark)<script>document.documentElement.classList.add('dark')</script>@endif
+    {{-- Set the saved theme before CSS is requested, preventing a light/dark flash. Default to dark for dark_studio if no saved preference. --}}
+    <script>try{var savedTheme=localStorage.getItem('theme');if(savedTheme==='dark'||(!savedTheme&&('{{ $publicTheme }}'==='theme_dark_studio'||window.matchMedia('(prefers-color-scheme: dark)').matches))){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}</script>
 
     {{-- Critical above-the-fold CSS: paints the page background and sticky
          header before the (render-blocking but small) public stylesheet
@@ -264,21 +258,21 @@
       .landing-sec-faq h1, .landing-sec-faq h2, .landing-sec-faq h3, .landing-sec-faq summary,
       .landing-sec-cta h1, .landing-sec-cta h2, .landing-sec-cta h3,
       .landing-sec-contact h1, .landing-sec-contact h2, .landing-sec-contact h3 {
-          color: inherit !important;
+          color: inherit;
       }
 
-      .landing-sec-hero p, .landing-sec-hero .landing-muted-text { color: var(--landing-hero-muted) !important; }
-      .landing-sec-trust p, .landing-sec-trust .landing-muted-text { color: var(--landing-trust-muted) !important; }
-      .landing-sec-features p, .landing-sec-features .landing-muted-text { color: var(--landing-features-muted) !important; }
-      .landing-sec-solutions p, .landing-sec-solutions .landing-muted-text { color: var(--landing-solutions-muted) !important; }
-      .landing-sec-downloads p, .landing-sec-downloads .landing-muted-text { color: var(--landing-downloads-muted) !important; }
-      .landing-sec-stats p, .landing-sec-stats .landing-muted-text { color: var(--landing-stats-muted) !important; }
-      .landing-sec-mission p, .landing-sec-about p, .landing-sec-mission .landing-muted-text, .landing-sec-about .landing-muted-text { color: var(--landing-mission-muted) !important; }
-      .landing-sec-testimonials p, .landing-sec-testimonials .landing-muted-text { color: var(--landing-testimonials-muted) !important; }
-      .landing-sec-pricing p, .landing-sec-pricing .landing-muted-text { color: var(--landing-pricing-muted) !important; }
-      .landing-sec-faq p, .landing-sec-faq .landing-muted-text { color: var(--landing-faq-muted) !important; }
-      .landing-sec-cta p, .landing-sec-cta .landing-muted-text { color: var(--landing-cta-muted) !important; }
-      .landing-sec-contact p, .landing-sec-contact .landing-muted-text { color: var(--landing-contact-muted) !important; }
+      .landing-sec-hero p, .landing-sec-hero .landing-muted-text { color: var(--landing-hero-muted); }
+      .landing-sec-trust p, .landing-sec-trust .landing-muted-text { color: var(--landing-trust-muted); }
+      .landing-sec-features p, .landing-sec-features .landing-muted-text { color: var(--landing-features-muted); }
+      .landing-sec-solutions p, .landing-sec-solutions .landing-muted-text { color: var(--landing-solutions-muted); }
+      .landing-sec-downloads p, .landing-sec-downloads .landing-muted-text { color: var(--landing-downloads-muted); }
+      .landing-sec-stats p, .landing-sec-stats .landing-muted-text { color: var(--landing-stats-muted); }
+      .landing-sec-mission p, .landing-sec-about p, .landing-sec-mission .landing-muted-text, .landing-sec-about .landing-muted-text { color: var(--landing-mission-muted); }
+      .landing-sec-testimonials p, .landing-sec-testimonials .landing-muted-text { color: var(--landing-testimonials-muted); }
+      .landing-sec-pricing p, .landing-sec-pricing .landing-muted-text { color: var(--landing-pricing-muted); }
+      .landing-sec-faq p, .landing-sec-faq .landing-muted-text { color: var(--landing-faq-muted); }
+      .landing-sec-cta p, .landing-sec-cta .landing-muted-text { color: var(--landing-cta-muted); }
+      .landing-sec-contact p, .landing-sec-contact .landing-muted-text { color: var(--landing-contact-muted); }
     </style>
 
     {{-- Public stylesheet (scoped ~9 KB gzip for the fast theme, full app.css
@@ -639,7 +633,7 @@
                                     <span>▾</span>
                                 </button>
                                 <div x-show="openFootLang" x-cloak x-transition class="absolute bottom-full left-0 mb-2 w-52 rounded-2xl bg-white dark:bg-slate-950/95 backdrop-blur-2xl border border-slate-200 dark:border-white/15 shadow-2xl p-2 z-50 space-y-0.5">
-                                    <div class="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Choose Language') }}</div>
+                                    <div class="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Select Language') }}</div>
                                     <div class="max-h-48 overflow-y-auto no-scrollbar space-y-0.5">
                                         @foreach ($publicLanguages as $lang)
                                             <a href="{{ route('locale.switch', $lang->code) }}"

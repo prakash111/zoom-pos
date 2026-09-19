@@ -403,10 +403,10 @@
                                 @foreach ($faqs as $faq)
                                     <details class="group p-5 {{ $card }}">
                                         <summary class="flex items-center justify-between gap-4 cursor-pointer list-none text-sm font-black text-slate-900 dark:text-white">
-                                            {{ $faq['q'] }}
+                                            {{ $faq['q'] ?? ($faq['question'] ?? '') }}
                                             <span class="shrink-0 text-slate-400 transition-transform group-open:rotate-45 text-lg leading-none">+</span>
                                         </summary>
-                                        <p class="mt-3 text-sm {{ $muted }} leading-relaxed">{{ $faq['a'] }}</p>
+                                        <p class="mt-3 text-sm {{ $muted }} leading-relaxed">{{ $faq['a'] ?? ($faq['answer'] ?? '') }}</p>
                                     </details>
                                 @endforeach
                             </div>

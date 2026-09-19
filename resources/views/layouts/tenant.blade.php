@@ -290,10 +290,10 @@
                      x-ref="scrollNavContainer"
                      class="dockable-nav-container tab-scroll-container"
                      :class="{
-                         'w-full flex flex-col items-center gap-4 sm:gap-5 my-auto': position === 'left' || position === 'right',
-                         'flex-1 flex flex-row items-center justify-start sm:justify-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar py-1 scroll-smooth': position === 'top' || position === 'bottom',
-                         'flex flex-row sm:flex-col items-center gap-2': position === 'floating'
-                     }">
+                        'w-full flex flex-col items-center gap-2 sm:gap-2.5 my-auto overflow-y-auto no-scrollbar py-2': position === 'left' || position === 'right',
+                        'flex-1 flex flex-row items-center justify-start sm:justify-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar py-1 scroll-smooth': position === 'top' || position === 'bottom',
+                        'flex flex-row sm:flex-col items-center gap-2': position === 'floating'
+                    }">
                 
                 <x-nav.rail-item :route="route('tenant.dashboard')" :active="$isHome" item-key="home" variant="white" label-size="text-[11px] sm:text-xs" label="{{ __('Home') }}">
                     <x-ui.icon name="home" class="w-5 h-5 group-hover:scale-110 transition-transform" />

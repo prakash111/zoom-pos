@@ -16,20 +16,18 @@
     // Same source of truth as LandingPageController: the branding column, not
     // the (never-written) `landing_page_enabled` global-setting key.
     $guestLandingEnabled = (bool) ($branding?->landing_page_enabled ?? false);
-    // Auth screens follow the selected landing theme: light for theme_fast,
-    // dark for the four legacy (dark-committed) themes.
-    $guestForceDark = setting('landing_page_theme', 'theme_fast') !== 'theme_fast';
-    $guestIsLogin = request()->routeIs('tenant.login', 'superadmin.login');
-    $guestIsRegister = request()->routeIs('tenant.register');
-    $guestAuthBannerEnabled = (bool) \App\Models\DynamicSetting::get('show_auth_banner', true);
     $guestNavLinks = $guestLandingEnabled ? [
         ['label' => __('Features'), 'url' => url('/') . '#features'],
         ['label' => __('Pricing'), 'url' => url('/') . '#pricing'],
         ['label' => __('Contact'), 'url' => url('/') . '#contact'],
     ] : [];
+
+    $guestIsLogin = request()->routeIs('tenant.login', 'superadmin.login');
+    $guestIsRegister = request()->routeIs('tenant.register');
+    $guestAuthBannerEnabled = (bool) \App\Models\DynamicSetting::get('show_auth_banner', true);
 @endphp
 <!DOCTYPE html>
-<html lang="{{ $guestActiveLang?->code ?? 'en' }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="{{ $guestForceDark ? 'dark' : '' }}" x-data="{ dark: document.documentElement.classList.contains('dark') }" x-init="$watch('dark', v => { try { localStorage.setItem('theme', v ? 'dark' : 'light') } catch (e) {}; document.documentElement.classList.toggle('dark', v) }); document.documentElement.classList.toggle('dark', dark)">
+<html lang="{{ $guestActiveLang?->code ?? 'en' }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="scroll-smooth" x-data="{ dark: document.documentElement.classList.contains('dark') }" x-init="$watch('dark', v => { try { localStorage.setItem('theme', v ? 'dark' : 'light') } catch (e) {}; document.documentElement.classList.toggle('dark', v) }); document.documentElement.classList.toggle('dark', dark)">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -39,8 +37,7 @@
     @endif
 
     {{-- Set the saved theme before CSS loads, preventing a light/dark flash. --}}
-    <script>try{document.documentElement.classList.toggle('dark',localStorage.getItem('theme')==='dark')}catch(e){}</script>
-    @if ($guestForceDark)<script>document.documentElement.classList.add('dark')</script>@endif
+    <script>try{var savedTheme=localStorage.getItem('theme');if(savedTheme==='dark'||(!savedTheme&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}</script>
 
     <style>
         :root {

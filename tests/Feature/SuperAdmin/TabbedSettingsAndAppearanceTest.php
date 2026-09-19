@@ -219,7 +219,7 @@ class TabbedSettingsAndAppearanceTest extends TestCase
 
         Livewire::test(SettingsIndex::class)
             ->set('activeTab', 'appearance')
-            ->assertSee('Navigation, Theme & Layout Customization')
+            ->assertSee('Navigation & Layout Customization')
             ->assertSee('Menu Layout Structure')
             ->assertSee('Navigation Menu Item Text Colors & Typography')
             ->assertSee('Default Inactive Text Color')
@@ -251,8 +251,8 @@ class TabbedSettingsAndAppearanceTest extends TestCase
         $this->actingAsSuperAdmin();
 
         Livewire::test(SettingsIndex::class)
-            ->set('activeTab', 'appearance')
-            ->assertSee('1. Public Landing Page Theme & Layout', false)
+            ->set('activeTab', 'whitelabel')
+            ->assertSee('Landing Page Theme')
             ->assertSee('Modern Cloud POS')
             ->assertSee('Enterprise Showcase')
             ->assertSee('Minimal Conversion')
@@ -264,6 +264,11 @@ class TabbedSettingsAndAppearanceTest extends TestCase
 
         $this->assertSame('theme_enterprise', setting('landing_page_theme'));
         $this->assertNull(cache()->get('app_landing_page_theme'));
+
+        // Theme selection is omitted from Appearance tab (consolidated in White-label & Branding)
+        Livewire::test(SettingsIndex::class)
+            ->set('activeTab', 'appearance')
+            ->assertDontSee('1. Public Landing Page Theme & Layout', false);
     }
 
     public function test_superadmin_can_save_platform_wide_appearance_defaults(): void

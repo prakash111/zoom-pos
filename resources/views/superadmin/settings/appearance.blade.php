@@ -255,10 +255,10 @@
     <div class="border-b border-slate-100 dark:border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <span>🎨</span> {{ __('Navigation, Theme & Layout Customization') }}
+                <span>🎨</span> {{ __('Navigation & Layout Customization') }}
             </h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {{ __('Configure public landing page themes, menu structures, typography text colors, UI accent highlights, dock backgrounds, and item pinning in real time.') }}
+                {{ __('Configure menu structures, typography text colors, UI accent highlights, dock backgrounds, and item pinning in real time.') }}
             </p>
         </div>
 
@@ -288,121 +288,10 @@
         </div>
     </div>
 
-    <!-- 1. PUBLIC LANDING PAGE THEME & LAYOUT -->
-    <div class="space-y-3 pb-6 border-b border-slate-150 dark:border-slate-800">
-        <div class="flex items-center justify-between">
-            <div>
-                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                    1. Public Landing Page Theme & Layout
-                </h4>
-                <p class="text-[11px] text-slate-400">
-                    Select the global landing page design and conversion structure shown on the root domain (<code>/</code>).
-                </p>
-            </div>
-            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                Live Switcher
-            </span>
-        </div>
-
-        <!-- Theme Grid Selector Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 pt-1">
-
-            <!-- Theme 0: Fast / Lightweight (Default) -->
-            <div wire:click="setLandingTheme('theme_fast')"
-                 class="cursor-pointer relative p-3.5 rounded-2xl border-2 transition-all duration-150 flex flex-col justify-between
-                 {{ $landingTheme === 'theme_fast'
-                     ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm ring-2 ring-blue-500/20'
-                     : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700' }}">
-                <div class="flex items-start justify-between">
-                    <div class="p-2 rounded-xl bg-lime-100/60 dark:bg-lime-900/40 text-lime-600 text-lg">⚡</div>
-                    @if($landingTheme === 'theme_fast')
-                        <span class="text-blue-600 dark:text-blue-400 font-bold text-sm">✓</span>
-                    @endif
-                </div>
-                <div class="mt-3">
-                    <div class="text-xs font-bold text-slate-800 dark:text-slate-100">Fast &amp; Lightweight</div>
-                    <div class="text-[10px] text-slate-400 mt-0.5">Flat design, ~30&nbsp;KB CSS, no framework JS — best load speed</div>
-                </div>
-            </div>
-
-            <!-- Theme 1: Modern SaaS / Cloud POS -->
-            <div wire:click="setLandingTheme('theme_modern')"
-                 class="cursor-pointer relative p-3.5 rounded-2xl border-2 transition-all duration-150 flex flex-col justify-between
-                 {{ $landingTheme === 'theme_modern' 
-                     ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm ring-2 ring-blue-500/20' 
-                     : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700' }}">
-                <div class="flex items-start justify-between">
-                    <div class="p-2 rounded-xl bg-blue-100/60 dark:bg-blue-900/40 text-blue-600 text-lg">🚀</div>
-                    @if($landingTheme === 'theme_modern')
-                        <span class="text-blue-600 dark:text-blue-400 font-bold text-sm">✓</span>
-                    @endif
-                </div>
-                <div class="mt-3">
-                    <div class="text-xs font-bold text-slate-800 dark:text-slate-100">Modern Cloud POS</div>
-                    <div class="text-[10px] text-slate-400 mt-0.5">Vibrant SaaS gradients & interactive product features</div>
-                </div>
-            </div>
-
-            <!-- Theme 2: Enterprise Retail & Hardware Showcase (From /read Specs) -->
-            <div wire:click="setLandingTheme('theme_enterprise')"
-                 class="cursor-pointer relative p-3.5 rounded-2xl border-2 transition-all duration-150 flex flex-col justify-between
-                 {{ $landingTheme === 'theme_enterprise' 
-                     ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm ring-2 ring-blue-500/20' 
-                     : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700' }}">
-                <div class="flex items-start justify-between">
-                    <div class="p-2 rounded-xl bg-emerald-100/60 dark:bg-emerald-900/40 text-emerald-600 text-lg">🏪</div>
-                    @if($landingTheme === 'theme_enterprise')
-                        <span class="text-blue-600 dark:text-blue-400 font-bold text-sm">✓</span>
-                    @endif
-                </div>
-                <div class="mt-3">
-                    <div class="text-xs font-bold text-slate-800 dark:text-slate-100">Enterprise Showcase</div>
-                    <div class="text-[10px] text-slate-400 mt-0.5">High-contrast retail structure based on video guide</div>
-                </div>
-            </div>
-
-            <!-- Theme 3: Minimal Funnel & Direct Register -->
-            <div wire:click="setLandingTheme('theme_minimal')"
-                 class="cursor-pointer relative p-3.5 rounded-2xl border-2 transition-all duration-150 flex flex-col justify-between
-                 {{ $landingTheme === 'theme_minimal' 
-                     ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm ring-2 ring-blue-500/20' 
-                     : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700' }}">
-                <div class="flex items-start justify-between">
-                    <div class="p-2 rounded-xl bg-amber-100/60 dark:bg-amber-900/40 text-amber-600 text-lg">⚡</div>
-                    @if($landingTheme === 'theme_minimal')
-                        <span class="text-blue-600 dark:text-blue-400 font-bold text-sm">✓</span>
-                    @endif
-                </div>
-                <div class="mt-3">
-                    <div class="text-xs font-bold text-slate-800 dark:text-slate-100">Minimal Conversion</div>
-                    <div class="text-[10px] text-slate-400 mt-0.5">Focused single-page funnel for quick tenant signups</div>
-                </div>
-            </div>
-
-            <!-- Theme 4: Dark Studio / Tech POS -->
-            <div wire:click="setLandingTheme('theme_dark_studio')"
-                 class="cursor-pointer relative p-3.5 rounded-2xl border-2 transition-all duration-150 flex flex-col justify-between
-                 {{ $landingTheme === 'theme_dark_studio' 
-                 ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm ring-2 ring-blue-500/20' 
-                 : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700' }}">
-                <div class="flex items-start justify-between">
-                    <div class="p-2 rounded-xl bg-purple-100/60 dark:bg-purple-900/40 text-purple-600 text-lg">✨</div>
-                    @if($landingTheme === 'theme_dark_studio')
-                        <span class="text-blue-600 dark:text-blue-400 font-bold text-sm">✓</span>
-                    @endif
-                </div>
-                <div class="mt-3">
-                    <div class="text-xs font-bold text-slate-800 dark:text-slate-100">Dark Studio POS</div>
-                    <div class="text-[10px] text-slate-400 mt-0.5">Sleek, dark-mode native interface showcase</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 2. Menu Layout Structure -->
+    <!-- 1. Menu Layout Structure -->
     <div class="space-y-3">
         <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
-            2. {{ __('Menu Layout Structure') }}
+            1. {{ __('Menu Layout Structure') }}
         </label>
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <button type="button"
@@ -463,11 +352,11 @@
         </div>
     </div>
 
-    <!-- 3. Menu Item Typography & Text Colors -->
+    <!-- 2. Menu Item Typography & Text Colors -->
     <div class="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
         <div>
             <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
-                3. {{ __('Navigation Menu Item Text Colors & Typography') }}
+                2. {{ __('Navigation Menu Item Text Colors & Typography') }}
             </label>
             <p class="text-[11px] text-slate-400 mt-0.5">
                 {{ __('Customize font colors for default inactive links and active highlight states across all dock and top-bar navigation bars.') }}
@@ -525,57 +414,14 @@
                 </div>
             </div>
         </div>
-
-        <!-- Real-time Live Preview Badge -->
-        <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
-            <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">{{ __('Live Dock Menu Preview') }}</span>
-                <span class="text-[10px] text-slate-400">({{ __('Instant SVG icon & text color inheritance') }})</span>
-            </div>
-
-            <div class="flex items-center gap-3 bg-slate-950/80 px-4 py-2 rounded-xl border border-slate-800/80 shadow-xs">
-                <!-- Inactive Item Preview -->
-                <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-transparent transition-colors"
-                     :style="'color: ' + (navTextColor || '#ffffff')">
-                    <svg class="w-4 h-4 shrink-0 transition-colors"
-                         :style="'color: ' + (navTextColor || '#ffffff') + '; stroke: ' + (navTextColor || '#ffffff') + '; fill: none;'"
-                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                        <polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
-                    <span class="text-xs font-semibold" :style="'color: ' + (navTextColor || '#ffffff')">
-                        {{ __('Tenants') }} ({{ __('Inactive') }})
-                    </span>
-                </div>
-
-                <div class="h-4 w-px bg-slate-800"></div>
-
-                <!-- Active Highlight Item Preview -->
-                <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors"
-                     :style="'color: ' + (navTextActiveColor || '#60a5fa') + '; border-color: ' + (navTextActiveColor || '#60a5fa') + '40; background-color: ' + (navTextActiveColor || '#60a5fa') + '15;'">
-                    <svg class="w-4 h-4 shrink-0 transition-colors"
-                         :style="'color: ' + (navTextActiveColor || '#60a5fa') + '; stroke: ' + (navTextActiveColor || '#60a5fa') + '; fill: none;'"
-                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="7" height="7"/>
-                        <rect x="14" y="3" width="7" height="7"/>
-                        <rect x="14" y="14" width="7" height="7"/>
-                        <rect x="3" y="14" width="7" height="7"/>
-                    </svg>
-                    <span class="text-xs font-bold" :style="'color: ' + (navTextActiveColor || '#60a5fa')">
-                        {{ __('Dashboard') }} ({{ __('Active') }})
-                    </span>
-                </div>
-            </div>
-        </div>
     </div>
 
-    <!-- 4. Primary UI Accent Color -->
+    <!-- 3. Primary UI Accent Color -->
     <div class="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
         <div class="flex items-center justify-between">
             <div>
                 <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
-                    4. {{ __('Dashboard Hero & UI Accent Color') }}
+                    3. {{ __('Dashboard Hero & UI Accent Color') }}
                 </label>
                 <p class="text-[11px] text-slate-400 mt-0.5">{{ __('Primary color of dashboard cards, action buttons, and active highlight pills') }}</p>
             </div>
@@ -610,12 +456,12 @@
         </div>
     </div>
 
-    <!-- 5. Dock Navigation Custom Background -->
+    <!-- 4. Dock Navigation Custom Background -->
     <div class="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
         <div class="flex items-center justify-between">
             <div>
                 <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
-                    5. {{ __('Dock Navigation Background') }}
+                    4. {{ __('Dock Navigation Background') }}
                 </label>
                 <p class="text-[11px] text-slate-400 mt-0.5">{{ __('Set an independent background color or gradient for the navigation bar') }}</p>
             </div>

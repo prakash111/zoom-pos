@@ -260,12 +260,12 @@
                         <label class="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
                             {{ __('Landing Page Theme') }}
                         </label>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             <label class="p-4 rounded-2xl border-2 flex items-center justify-between gap-3 cursor-pointer transition {{ $landingTheme === 'theme_fast' ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300' }}">
                                 <div class="flex items-center gap-3">
                                     <input type="radio" wire:model="landingTheme" value="theme_fast" class="text-emerald-600 focus:ring-emerald-500">
                                     <div>
-                                        <span class="text-xs font-bold text-slate-900 dark:text-white block">{{ __('Fast High-Converting Theme') }}</span>
+                                        <span class="text-xs font-bold text-slate-900 dark:text-white block">{{ __('Fast & Lightweight') }}</span>
                                         <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ __('Clean white / slate modern layout with high speed') }}</span>
                                     </div>
                                 </div>
@@ -276,11 +276,44 @@
                                 <div class="flex items-center gap-3">
                                     <input type="radio" wire:model="landingTheme" value="theme_modern" class="text-emerald-600 focus:ring-emerald-500">
                                     <div>
-                                        <span class="text-xs font-bold text-slate-900 dark:text-white block">{{ __('Modern Aurora Theme') }}</span>
-                                        <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ __('Dynamic ambient glow with dark tech aesthetic') }}</span>
+                                        <span class="text-xs font-bold text-slate-900 dark:text-white block">{{ __('Modern Cloud POS') }}</span>
+                                        <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ __('Dynamic ambient glow with SaaS gradients') }}</span>
                                     </div>
                                 </div>
-                                <span class="text-base">🌌</span>
+                                <span class="text-base">🚀</span>
+                            </label>
+
+                            <label class="p-4 rounded-2xl border-2 flex items-center justify-between gap-3 cursor-pointer transition {{ $landingTheme === 'theme_enterprise' ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300' }}">
+                                <div class="flex items-center gap-3">
+                                    <input type="radio" wire:model="landingTheme" value="theme_enterprise" class="text-emerald-600 focus:ring-emerald-500">
+                                    <div>
+                                        <span class="text-xs font-bold text-slate-900 dark:text-white block">{{ __('Enterprise Showcase') }}</span>
+                                        <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ __('High-contrast retail structure based on video guide') }}</span>
+                                    </div>
+                                </div>
+                                <span class="text-base">🏪</span>
+                            </label>
+
+                            <label class="p-4 rounded-2xl border-2 flex items-center justify-between gap-3 cursor-pointer transition {{ $landingTheme === 'theme_minimal' ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300' }}">
+                                <div class="flex items-center gap-3">
+                                    <input type="radio" wire:model="landingTheme" value="theme_minimal" class="text-emerald-600 focus:ring-emerald-500">
+                                    <div>
+                                        <span class="text-xs font-bold text-slate-900 dark:text-white block">{{ __('Minimal Conversion') }}</span>
+                                        <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ __('Focused single-page funnel for quick tenant signups') }}</span>
+                                    </div>
+                                </div>
+                                <span class="text-base">⚡</span>
+                            </label>
+
+                            <label class="p-4 rounded-2xl border-2 flex items-center justify-between gap-3 cursor-pointer transition {{ $landingTheme === 'theme_dark_studio' ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300' }}">
+                                <div class="flex items-center gap-3">
+                                    <input type="radio" wire:model="landingTheme" value="theme_dark_studio" class="text-emerald-600 focus:ring-emerald-500">
+                                    <div>
+                                        <span class="text-xs font-bold text-slate-900 dark:text-white block">{{ __('Dark Studio POS') }}</span>
+                                        <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ __('Sleek, dark-mode native interface showcase') }}</span>
+                                    </div>
+                                </div>
+                                <span class="text-base">✨</span>
                             </label>
                         </div>
                     </div>

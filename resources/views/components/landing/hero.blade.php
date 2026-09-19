@@ -26,62 +26,6 @@
         <div class="absolute -top-32 -right-32 w-[600px] h-[600px] bg-gradient-to-bl from-[#bef264]/40 via-[#86efac]/25 to-transparent rounded-full blur-3xl pointer-events-none -z-0"></div>
         <div class="absolute -top-10 -left-10 w-[400px] h-[400px] bg-gradient-to-br from-teal-300/20 via-cyan-200/10 to-transparent rounded-full blur-2xl pointer-events-none -z-0"></div>
 
-        <!-- Integrated Top Nav Bar -->
-        <div class="relative z-10 px-6 sm:px-10 lg:px-12 pt-6 sm:pt-8 pb-4 hidden md:flex items-center justify-between border-b border-slate-100/80 dark:border-slate-800/60">
-            <!-- Brand Logo -->
-            <a href="{{ url('/') }}" class="inline-flex items-center gap-2.5 group">
-                @php
-                    $heroLogo = \App\Models\DynamicSetting::get('platform_logo_url') ?: $branding->getLogoPublicUrl();
-                    $heroMonogram = mb_strtoupper(mb_substr(trim($branding->platform_name ?: 'S'), 0, 1)) ?: 'S';
-                @endphp
-                @if ($heroLogo)
-                    <img src="{{ $heroLogo }}" alt="{{ $branding->platform_name }}" class="h-8 w-auto object-contain" decoding="async" fetchpriority="high">
-                @else
-                    <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-lime to-emerald-400 p-1 flex items-center justify-center shadow-sm shadow-emerald-400/30 group-hover:scale-105 transition-transform text-slate-950 font-black text-sm uppercase">
-                        {{ $heroMonogram }}
-                    </div>
-                @endif
-                <span class="text-lg font-black tracking-tight text-slate-900 dark:text-white">{{ $branding->platform_name }}</span>
-            </a>
-
-            <!-- Center Nav Links -->
-            <nav class="hidden md:flex items-center gap-6 lg:gap-8 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                @php
-                    $heroNavMenu = \App\Models\MenuItem::getMenu('header');
-                @endphp
-                @if (!empty($heroNavMenu))
-                    @foreach ($heroNavMenu as $navItem)
-                        @php
-                            $nUrl = is_array($navItem) ? $navItem['url'] : $navItem->url;
-                            $nTitle = is_array($navItem) ? $navItem['title'] : $navItem->title;
-                            $nTarget = is_array($navItem) ? ($navItem['target'] ?? '_self') : ($navItem->target ?? '_self');
-                            if (str_starts_with($nUrl, '#')) {
-                                $nUrl = request()->is('/') ? $nUrl : url('/' . $nUrl);
-                            } elseif (!str_starts_with($nUrl, 'http://') && !str_starts_with($nUrl, 'https://') && !str_starts_with($nUrl, '/')) {
-                                $nUrl = url($nUrl);
-                            }
-                        @endphp
-                        <a href="{{ $nUrl }}" target="{{ $nTarget }}" class="hover:text-slate-950 dark:hover:text-white transition">{{ $nTitle }}</a>
-                    @endforeach
-                @else
-                    <a href="#showcase" class="hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.platform', __('Platform')) }}</a>
-                    <a href="#features" class="hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.products', __('Products')) }}</a>
-                    <a href="#solutions" class="hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.solutions', __('Solutions')) }}</a>
-                    <a href="#pricing" class="hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.pricing', __('Pricing')) }}</a>
-                    <a href="#about" class="hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.company', __('Company')) }}</a>
-                @endif
-            </nav>
-
-            <!-- Right Actions -->
-            <div class="flex items-center gap-4 text-xs font-bold">
-                <a href="#contact" class="hidden sm:inline-block text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.documentation', __('Documentation')) }}</a>
-                <a href="{{ route('tenant.login') }}" class="text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white transition">{{ $branding->landingText('nav.sign_in', __('Sign in')) }}</a>
-                <a href="{{ $ctaPrimaryUrl }}" class="px-5 py-2.5 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 hover:bg-slate-800 dark:hover:bg-slate-100 transition shadow-md shadow-slate-900/10 active:scale-95">
-                    {{ $ctaPrimaryText }}
-                </a>
-            </div>
-        </div>
-
         <!-- Main Hero Grid Content -->
         <div class="relative z-10 px-6 sm:px-10 lg:px-12 pt-8 sm:pt-16 pb-12 sm:pb-16 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
             

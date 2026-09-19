@@ -9,16 +9,16 @@
 @endphp
 
 @if ($hasDownloads)
-    <div id="download" class="scroll-mt-20 border-y border-white/10 bg-slate-900/50 py-16 sm:py-24 relative overflow-hidden">
+    <div id="download" class="scroll-mt-20 border-y border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-slate-900/50 py-16 sm:py-24 relative overflow-hidden">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 text-center relative z-10">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-lime/10 border border-brand-lime/20 text-brand-lime text-xs font-bold uppercase tracking-wider mb-3">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-lime/10 border border-brand-lime/20 text-emerald-700 dark:text-brand-lime text-xs font-bold uppercase tracking-wider mb-3">
                 {{ $badge }}
             </span>
-            <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-white">
+            <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
                 {{ $title }}
             </h2>
             @if ($subtitle)
-                <p class="mt-3 text-sm sm:text-base text-slate-400 max-w-xl mx-auto">
+                <p class="mt-3 text-sm sm:text-base text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
                     {{ $subtitle }}
                 </p>
             @endif

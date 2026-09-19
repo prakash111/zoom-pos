@@ -26,24 +26,24 @@
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-14 items-center">
         <!-- Floating Visual Card Composition -->
         <div class="lg:col-span-5 relative mx-auto max-w-sm lg:max-w-none w-full">
-            <div class="rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 shadow-2xl p-6 sm:p-7 relative overflow-hidden">
+            <div class="rounded-3xl bg-white dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/15 shadow-2xl p-6 sm:p-7 relative overflow-hidden">
                 <div class="absolute -top-12 -right-12 w-48 h-48 bg-emerald-500/20 rounded-full blur-2xl"></div>
                 
                 <div class="flex items-center justify-between mb-4">
-                    <span class="text-xs font-black uppercase tracking-widest text-slate-400">{{ __('Total Net Cashflow') }}</span>
-                    <span class="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px] flex items-center gap-1">
+                    <span class="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">{{ __('Total Net Cashflow') }}</span>
+                    <span class="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] flex items-center gap-1">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                         {{ __('Live Sync') }}
                     </span>
                 </div>
 
                 <div class="flex items-baseline gap-2 mb-6">
-                    <span class="text-3xl sm:text-4xl font-black text-white">$128,490.50</span>
-                    <span class="text-xs font-bold text-emerald-400">+24.8% {{ __('vs last month') }}</span>
+                    <span class="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">$128,490.50</span>
+                    <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">+24.8% {{ __('vs last month') }}</span>
                 </div>
 
                 <!-- Animated Bar Chart -->
-                <div class="h-28 flex items-end gap-1.5 pt-4 border-t border-white/10">
+                <div class="h-28 flex items-end gap-1.5 pt-4 border-t border-slate-200 dark:border-white/10">
                     @foreach ([35, 55, 45, 75, 60, 90, 70, 95, 80, 100, 85, 92] as $h)
                         <div class="flex-1 rounded-t bg-gradient-to-t from-emerald-600 to-brand-lime transition-all hover:brightness-125" style="height: {{ $h }}%"></div>
                     @endforeach
@@ -51,23 +51,23 @@
             </div>
 
             <!-- Floating Mini Card 1 -->
-            <div class="absolute -right-4 -bottom-6 w-48 rounded-2xl bg-slate-950/95 border border-white/20 shadow-2xl p-4 hidden sm:block animate-float-slow">
+            <div class="absolute -right-4 -bottom-6 w-48 rounded-2xl bg-white dark:bg-slate-950/95 border border-slate-200 dark:border-white/20 shadow-2xl p-4 hidden sm:block animate-float-slow">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-xl bg-brand-lime/20 text-brand-lime flex items-center justify-center text-lg">🛡️</div>
                     <div class="leading-tight">
-                        <div class="text-xs font-black text-white">{{ __('Encrypted Ledger') }}</div>
-                        <div class="text-[10px] text-emerald-400 font-bold">100% {{ __('Reconciled') }}</div>
+                        <div class="text-xs font-black text-slate-900 dark:text-white">{{ __('Encrypted Ledger') }}</div>
+                        <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">100% {{ __('Reconciled') }}</div>
                     </div>
                 </div>
             </div>
 
             <!-- Floating Mini Card 2 -->
-            <div class="absolute -left-4 -top-6 w-44 rounded-2xl bg-slate-950/95 border border-white/20 shadow-2xl p-3.5 hidden sm:block animate-float-slow" style="animation-delay: 1.5s;">
+            <div class="absolute -left-4 -top-6 w-44 rounded-2xl bg-white dark:bg-slate-950/95 border border-slate-200 dark:border-white/20 shadow-2xl p-3.5 hidden sm:block animate-float-slow" style="animation-delay: 1.5s;">
                 <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm">⚡</div>
+                    <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm">⚡</div>
                     <div class="leading-tight">
-                        <div class="text-[11px] font-black text-white">{{ __('Offline Engine') }}</div>
-                        <div class="text-[9px] text-slate-400 font-mono">{{ __('Zero downtime') }}</div>
+                        <div class="text-[11px] font-black text-slate-900 dark:text-white">{{ __('Offline Engine') }}</div>
+                        <div class="text-[9px] text-slate-500 dark:text-slate-400 font-mono">{{ __('Zero downtime') }}</div>
                     </div>
                 </div>
             </div>
@@ -75,24 +75,24 @@
 
         <!-- 2x2 Value Pillars -->
         <div class="lg:col-span-7">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-lime/10 border border-brand-lime/20 text-brand-lime text-xs font-bold uppercase tracking-wider mb-3">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-lime/10 border border-brand-lime/20 text-emerald-700 dark:text-brand-lime text-xs font-bold uppercase tracking-wider mb-3">
                 {{ $solutionsBadge }}
             </span>
-            <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
+            <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
                 {{ $solutionsTitle }}
             </h2>
             @if ($solutionsSubtitle)
-                <p class="mt-3 text-sm sm:text-base text-slate-400 leading-relaxed">{{ $solutionsSubtitle }}</p>
+                <p class="mt-3 text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed">{{ $solutionsSubtitle }}</p>
             @endif
 
             <div class="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
                 @foreach ($pillars as $pillar)
-                    <div class="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/30 hover:bg-white/[0.07] transition-all group">
+                    <div class="p-6 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:border-emerald-500/30 hover:bg-slate-50 dark:hover:bg-white/[0.07] transition-all group shadow-sm">
                         <div class="w-12 h-12 rounded-xl {{ $pillar['tint'] }} flex items-center justify-center text-xl shrink-0 mb-4 group-hover:scale-110 transition-transform">
                             {{ $pillar['icon'] }}
                         </div>
-                        <h3 class="text-base font-black tracking-tight text-white">{{ $pillar['title'] }}</h3>
-                        <p class="mt-2 text-xs sm:text-sm text-slate-400 leading-relaxed">{{ $pillar['body'] }}</p>
+                        <h3 class="text-base font-black tracking-tight text-slate-900 dark:text-white">{{ $pillar['title'] }}</h3>
+                        <p class="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{{ $pillar['body'] }}</p>
                     </div>
                 @endforeach
             </div>

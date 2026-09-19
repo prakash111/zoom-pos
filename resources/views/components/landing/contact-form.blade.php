@@ -57,7 +57,7 @@
             <label>Company website<input type="text" name="company_website" tabindex="-1" autocomplete="off"></label>
         </div>
 
-        @if ($errors->any())
+        @if (isset($errors) && $errors->any())
             <div class="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-4 py-3 text-xs font-semibold text-rose-700 dark:text-rose-300">
                 {{ __('Please check the highlighted fields and try again.') }}
             </div>

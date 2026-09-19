@@ -242,10 +242,12 @@ body {
 }
 
 .vertical-rail-label {
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
-    text-orientation: mixed;
-    letter-spacing: 0.05em;
+    writing-mode: horizontal-tb;
+    transform: none;
+    text-orientation: initial;
+    letter-spacing: normal;
+    text-align: center;
+    max-width: 100%;
 }
 
 /* Anti-flicker initial dock layout rules: applied from a data attribute set

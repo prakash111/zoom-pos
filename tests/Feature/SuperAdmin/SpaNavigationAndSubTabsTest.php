@@ -63,7 +63,7 @@ class SpaNavigationAndSubTabsTest extends TestCase
 
         $responseAppearance = $this->get(route('superadmin.settings.index', ['tab' => 'appearance']));
         $responseAppearance->assertOk();
-        $responseAppearance->assertSee('Navigation, Theme & Layout Customization');
+        $responseAppearance->assertSee('Navigation & Layout Customization');
 
         $responseSmtp = $this->get(route('superadmin.settings.index', ['tab' => 'smtp']));
         $responseSmtp->assertOk();
@@ -97,7 +97,7 @@ class SpaNavigationAndSubTabsTest extends TestCase
             ->assertSee('Global Platform SMTP Email Configuration')
             ->assertSee('Platform Identity & Logos')
             ->assertSee('Custom Public Pages & CMS')
-            ->assertSee('Navigation, Theme & Layout Customization');
+            ->assertSee('Navigation & Layout Customization');
     }
 
     public function test_global_spa_interceptor_code_is_bundled_in_app_js(): void

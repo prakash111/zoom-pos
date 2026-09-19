@@ -219,12 +219,14 @@
             display: none; /* Chrome, Safari */
         }
         
-        /* Vertical rotated text matching tenant POS rail design */
+        /* Horizontal label styling for dock navigation rail */
         .vertical-rail-label {
-            writing-mode: vertical-rl;
-            transform: rotate(180deg);
-            text-orientation: mixed;
-            letter-spacing: 0.05em;
+            writing-mode: horizontal-tb;
+            transform: none;
+            text-orientation: initial;
+            letter-spacing: normal;
+            text-align: center;
+            max-width: 100%;
         }
 
         /* Anti-flicker initial dock layout rules */
@@ -434,11 +436,12 @@
             </div>
 
             <!-- Navigation Links Container (Slim Mode) -->
-            <div data-dock-scroll-container
+            <div x-show="layout === 'slim'"
+                 data-dock-scroll-container
                  x-ref="scrollNavContainer"
                  class="dockable-nav-container tab-scroll-container"
                  :class="{
-                     'w-full flex flex-col items-center gap-4 sm:gap-5 my-auto': position === 'left' || position === 'right',
+                     'w-full flex flex-col items-center gap-2 sm:gap-2.5 my-auto overflow-y-auto no-scrollbar py-2': position === 'left' || position === 'right',
                      'flex-1 flex flex-row items-center justify-start sm:justify-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar mx-2 py-1 scroll-smooth': position === 'top' || position === 'bottom',
                      'flex flex-row sm:flex-col items-center gap-2': position === 'floating'
                  }">
@@ -450,7 +453,7 @@
                    :aria-selected="isCurrentRoute('{{ route('superadmin.dashboard') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isHome ? 'true' : 'false' }}"
                    :class="{
-                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'w-full max-w-[58px] sm:max-w-[66px] py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
                        'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
                        'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.dashboard') }}'),
@@ -465,7 +468,7 @@
                     <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                     </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[11px] sm:text-xs' : 'text-xs whitespace-nowrap font-bold'">{{ __('Overview') }}</span>
+                    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold'">{{ __('Overview') }}</span>
                 </a>
 
                 <!-- 2. Tenant Stores -->
@@ -475,7 +478,7 @@
                    :aria-selected="isCurrentRoute('{{ route('superadmin.tenants.index') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isTenants ? 'true' : 'false' }}"
                    :class="{
-                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'w-full max-w-[58px] sm:max-w-[66px] py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
                        'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
                        'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.tenants.index') }}'),
@@ -490,7 +493,7 @@
                     <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Tenants') }}</span>
+                    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold'">{{ __('Tenants') }}</span>
                 </a>
 
                 <!-- 3. SaaS Plans & Pricing -->
@@ -500,7 +503,7 @@
                    :aria-selected="isCurrentRoute('{{ route('superadmin.plans.index') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isPlans ? 'true' : 'false' }}"
                    :class="{
-                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'w-full max-w-[58px] sm:max-w-[66px] py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
                        'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
                        'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.plans.index') }}'),
@@ -515,7 +518,7 @@
                     <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                     </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Plans') }}</span>
+                    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold'">{{ __('Plans') }}</span>
                 </a>
 
                 <!-- 4. Global Tax Engine -->
@@ -525,7 +528,7 @@
                    :aria-selected="isCurrentRoute('{{ route('superadmin.tax.index') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isTaxes ? 'true' : 'false' }}"
                    :class="{
-                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'w-full max-w-[58px] sm:max-w-[66px] py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
                        'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
                        'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.tax.index') }}'),
@@ -540,7 +543,7 @@
                     <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
                     </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Taxes') }}</span>
+                    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold'">{{ __('Taxes') }}</span>
                 </a>
 
                 <!-- 5. Menu Builder -->
@@ -550,7 +553,7 @@
                    :aria-selected="isCurrentRoute('{{ route('superadmin.menus.index') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isMenus ? 'true' : 'false' }}"
                    :class="{
-                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'w-full max-w-[58px] sm:max-w-[66px] py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
                        'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
                        'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.menus.index') }}'),
@@ -565,7 +568,7 @@
                     <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Menus') }}</span>
+                    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold'">{{ __('Menus') }}</span>
                 </a>
 
                 <!-- 6. CMS Custom Pages -->
@@ -575,7 +578,7 @@
                    :aria-selected="isCurrentRoute('{{ route('superadmin.pages.index') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isPages ? 'true' : 'false' }}"
                    :class="{
-                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'w-full max-w-[58px] sm:max-w-[66px] py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
                        'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
                        'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.pages.index') }}'),
@@ -590,7 +593,7 @@
                     <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Pages') }}</span>
+                    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold'">{{ __('Pages') }}</span>
                 </a>
 
                 <!-- 7. Platform Settings -->
@@ -600,7 +603,7 @@
                    :aria-selected="isCurrentRoute('{{ route('superadmin.settings.index') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isSettings ? 'true' : 'false' }}"
                    :class="{
-                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'w-full max-w-[58px] sm:max-w-[66px] py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
                        'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
                        'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.settings.index') }}'),
@@ -616,7 +619,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Settings') }}</span>
+                    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold'">{{ __('Settings') }}</span>
                 </a>
 
                 <!-- 8. SMTP & Mail Config -->
@@ -626,7 +629,7 @@
                    :aria-selected="isCurrentRoute('{{ route('superadmin.smtp.index') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isSmtp ? 'true' : 'false' }}"
                    :class="{
-                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'w-full max-w-[58px] sm:max-w-[66px] py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
                        'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
                        'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.smtp.index') }}'),
@@ -641,7 +644,7 @@
                     <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('SMTP') }}</span>
+                    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold'">{{ __('SMTP') }}</span>
                 </a>
 
                 <!-- 9. Activation Codes / Licensing (Optional) -->
@@ -651,7 +654,7 @@
                    :aria-selected="isCurrentRoute('{{ route('superadmin.activation-codes.index') }}') ? 'true' : 'false'"
                    aria-selected="{{ $isCodes ? 'true' : 'false' }}"
                    :class="{
-                       'w-full py-3.5 sm:py-4 px-1 rounded-2xl sm:rounded-3xl flex flex-col items-center gap-1.5': position === 'left' || position === 'right',
+                       'w-full max-w-[58px] sm:max-w-[66px] py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center': position === 'left' || position === 'right',
                        'px-3 sm:px-3.5 py-2 rounded-2xl flex flex-row items-center gap-2 shrink-0': position === 'top' || position === 'bottom',
                        'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0': position === 'floating',
                        'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.activation-codes.index') }}'),
@@ -666,7 +669,7 @@
                     <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                     </svg>
-                    <span :class="(position === 'left' || position === 'right') ? 'vertical-rail-label text-[10px] sm:text-[11px]' : 'text-xs whitespace-nowrap font-bold'">{{ __('Licensing') }}</span>
+                    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold'">{{ __('Licensing') }}</span>
                 </a>
             </div>
 
