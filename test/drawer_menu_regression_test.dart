@@ -507,10 +507,10 @@ void main() {
           findsOneWidget);
       expect(find.byType(ExpansionTile), findsNothing);
 
-      // 4. Verify user avatar and logout button are rendered
+      // 4. Verify user avatar and Help & Support button are rendered
       expect(find.text('prakash'), findsOneWidget);
       expect(find.text('prakash@example.com'), findsOneWidget);
-      expect(find.widgetWithText(ListTile, 'Log Out'), findsOneWidget);
+      expect(find.widgetWithText(ListTile, 'Help & Support'), findsOneWidget);
     });
 
     testWidgets(
