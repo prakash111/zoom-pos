@@ -120,6 +120,65 @@ class StorefrontEngineTest extends TestCase
         $this->assertEquals('+15551234567', $customer->phone);
     }
 
+    public function test_storefront_order_without_customer_email_succeeds_with_fallback_placeholder_email(): void
+    {
+        // Explicitly omit customer_email key to replicate the reported error
+        $payload = [
+            'customer_name' => 'Alice WithoutEmail',
+            'customer_phone' => '+15559876543',
+            'delivery_address' => '456 Tech Ave',
+            'city' => 'Austin',
+            'payment_method' => 'cod',
+            'items' => [
+                [
+                    'id' => $this->product->id,
+                    'name' => $this->product->name,
+                    'quantity' => 1,
+                    'price' => 15.99,
+                ]
+            ],
+        ];
+
+        $response = $this->withServerVariables([
+            'HTTP_HOST' => 'pk-digital-test.saas.zoomnearby.com',
+        ])->postJson('/store/order', $payload);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'total' => 15.99,
+        ]);
+
+        $sale = Sale::withoutGlobalScopes()->where('customer_name', 'Alice WithoutEmail')->first();
+        $this->assertNotNull($sale);
+        $this->assertEquals('pending', $sale->status);
+        $this->assertEquals('storefront', $sale->service_type);
+
+        $customer = Customer::withoutGlobalScopes()->find($sale->customer_id);
+        $this->assertNotNull($customer);
+        $this->assertEquals('+15559876543@guest.zoomnearby.com', $customer->email);
+    }
+
+    public function test_storefront_home_omits_static_placeholder_when_product_has_no_description(): void
+    {
+        // Create product with null/empty description
+        Product::withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'name' => 'No Description Gadget',
+            'sale_price' => 9.99,
+            'price' => 9.99,
+            'current_stock' => 10,
+            'description' => '',
+            'active' => true,
+        ]);
+
+        $response = $this->get('http://pk-digital-test.saas.zoomnearby.com/');
+
+        $response->assertStatus(200);
+        $response->assertSee('No Description Gadget');
+        $response->assertDontSee('High-grade authentic product backed by full');
+    }
+
     public function test_storefront_arabic_locale_renders_rtl_with_clean_assets(): void
     {
         $response = $this->withSession(['locale' => 'ar'])

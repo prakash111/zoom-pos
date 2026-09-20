@@ -343,18 +343,20 @@
                             </div>
 
                             <!-- Stepper & Remove -->
-                            <div class="flex items-center gap-2 shrink-0">
-                                <button type="button"
-                                        x-on:click="decreaseQty(item.id)"
-                                        class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:border-emerald-500 text-slate-700 flex items-center justify-center font-black text-xs hover:bg-emerald-50 transition cursor-pointer">
-                                    -
-                                </button>
-                                <span class="font-extrabold text-xs min-w-4 text-center" x-text="item.quantity"></span>
-                                <button type="button"
-                                        x-on:click="increaseQty(item.id)"
-                                        class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:border-emerald-500 text-slate-700 flex items-center justify-center font-black text-xs hover:bg-emerald-50 transition cursor-pointer">
-                                    +
-                                </button>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <div class="flex items-center border border-slate-200 dark:border-slate-700 rounded-lg bg-white overflow-hidden shadow-2xs">
+                                    <button type="button"
+                                            x-on:click="decreaseQty(item.id)"
+                                            class="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-emerald-700 hover:bg-slate-50 transition cursor-pointer text-xs font-black select-none">
+                                        &minus;
+                                    </button>
+                                    <span class="px-2 font-mono font-extrabold text-xs text-slate-800 text-center select-none min-w-[1.5rem]" x-text="item.quantity"></span>
+                                    <button type="button"
+                                            x-on:click="increaseQty(item.id)"
+                                            class="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-emerald-700 hover:bg-slate-50 transition cursor-pointer text-xs font-black select-none">
+                                        +
+                                    </button>
+                                </div>
                                 <button type="button"
                                         x-on:click="removeItem(item.id)"
                                         class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center text-xs transition cursor-pointer"
@@ -382,7 +384,7 @@
                 </div>
 
                 <!-- Checkout Form & Totals Accordion -->
-                <div class="p-5 border-t border-slate-100 bg-slate-50/50 space-y-4">
+                <div class="px-4 sm:px-6 py-5 border-t border-slate-100 bg-slate-50/50 space-y-4">
                     
                     <template x-if="cart.length > 0">
                         <div class="space-y-3">
@@ -391,6 +393,7 @@
                                 <label class="block text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
                                     {{ __('Customer & Delivery Details') }}
                                 </label>
+                                <!-- Row 1: Full Name * | Phone / WhatsApp * -->
                                 <div class="grid grid-cols-2 gap-2">
                                     <input type="text"
                                            x-model="customerName"
@@ -401,14 +404,22 @@
                                            placeholder="{{ __('Phone / WhatsApp *') }}"
                                            class="w-full rounded-xl border-slate-200 bg-white text-xs font-medium focus:ring-2 focus:ring-emerald-500 py-2">
                                 </div>
+                                <!-- Row 2: Email Address (Optional) | City * -->
                                 <div class="grid grid-cols-2 gap-2">
-                                    <input type="text"
-                                           x-model="deliveryAddress"
-                                           placeholder="{{ __('Street Address') }}"
+                                    <input type="email"
+                                           x-model="customerEmail"
+                                           placeholder="{{ __('Email Address (Optional)') }}"
                                            class="w-full rounded-xl border-slate-200 bg-white text-xs font-medium focus:ring-2 focus:ring-emerald-500 py-2">
                                     <input type="text"
                                            x-model="deliveryCity"
-                                           placeholder="{{ __('City') }}"
+                                           placeholder="{{ __('City *') }}"
+                                           class="w-full rounded-xl border-slate-200 bg-white text-xs font-medium focus:ring-2 focus:ring-emerald-500 py-2">
+                                </div>
+                                <!-- Row 3: Street Address * -->
+                                <div class="w-full">
+                                    <input type="text"
+                                           x-model="deliveryAddress"
+                                           placeholder="{{ __('Street Address *') }}"
                                            class="w-full rounded-xl border-slate-200 bg-white text-xs font-medium focus:ring-2 focus:ring-emerald-500 py-2">
                                 </div>
 
@@ -440,19 +451,19 @@
                                 </div>
                             </div>
 
-                            <!-- Totals Breakdown -->
-                            <div class="space-y-1.5 pt-2 border-t border-slate-200 text-xs">
-                                <div class="flex justify-between text-slate-500">
-                                    <span>{{ __('Subtotal:') }}</span>
-                                    <span class="font-mono font-bold text-slate-800">$<span x-text="cartTotalPrice.toFixed(2)"></span></span>
+                            <!-- Totals Breakdown (Full flex, zero horizontal text clipping) -->
+                            <div class="space-y-2 pt-3 border-t border-slate-200 text-xs">
+                                <div class="flex items-center justify-between text-slate-600">
+                                    <span class="font-medium">{{ __('Subtotal:') }}</span>
+                                    <span class="font-mono font-bold text-slate-800 text-right shrink-0 whitespace-nowrap">$<span x-text="cartTotalPrice.toFixed(2)"></span></span>
                                 </div>
-                                <div class="flex justify-between text-slate-500">
-                                    <span>{{ __('Estimated Delivery:') }}</span>
-                                    <span class="font-bold text-emerald-600">{{ __('FREE') }}</span>
+                                <div class="flex items-center justify-between text-slate-600">
+                                    <span class="font-medium">{{ __('Estimated Delivery:') }}</span>
+                                    <span class="font-bold text-emerald-600 text-right shrink-0 uppercase tracking-wide">{{ __('FREE') }}</span>
                                 </div>
-                                <div class="flex justify-between text-sm font-extrabold text-slate-900 pt-1 border-t border-slate-200">
+                                <div class="flex items-center justify-between text-sm font-extrabold text-slate-900 pt-2 border-t border-slate-200">
                                     <span>{{ __('Total Order Amount:') }}</span>
-                                    <span class="text-base text-emerald-600 font-mono font-black">$<span x-text="cartTotalPrice.toFixed(2)"></span></span>
+                                    <span class="text-base text-emerald-600 font-mono font-black text-right shrink-0 whitespace-nowrap">$<span x-text="cartTotalPrice.toFixed(2)"></span></span>
                                 </div>
                             </div>
 
@@ -641,6 +652,7 @@
                 // Checkout fields
                 customerName: '',
                 customerPhone: '',
+                customerEmail: '',
                 deliveryAddress: '',
                 deliveryCity: '',
                 paymentMethod: 'cod',
@@ -755,6 +767,14 @@
                         alert('{{ __('Please enter your phone number.') }}');
                         return;
                     }
+                    if (!this.deliveryCity.trim()) {
+                        alert('{{ __('Please enter your city.') }}');
+                        return;
+                    }
+                    if (!this.deliveryAddress.trim()) {
+                        alert('{{ __('Please enter your delivery street address.') }}');
+                        return;
+                    }
 
                     this.isSubmitting = true;
                     try {
@@ -767,10 +787,12 @@
                                 'X-CSRF-TOKEN': token || ''
                             },
                             body: JSON.stringify({
-                                customer_name: this.customerName,
-                                customer_phone: this.customerPhone,
-                                address: this.deliveryAddress,
-                                city: this.deliveryCity,
+                                customer_name: this.customerName.trim(),
+                                customer_phone: this.customerPhone.trim(),
+                                customer_email: this.customerEmail.trim() || null,
+                                delivery_address: this.deliveryAddress.trim(),
+                                address: this.deliveryAddress.trim(),
+                                city: this.deliveryCity.trim(),
                                 payment_method: this.paymentMethod,
                                 items: this.cart
                             })
@@ -809,11 +831,12 @@
 
                     const clientName = this.customerName.trim() || 'Guest Customer';
                     const clientPhone = this.customerPhone.trim() ? `\n*Phone:* ${this.customerPhone.trim()}` : '';
+                    const clientEmail = this.customerEmail.trim() ? `\n*Email:* ${this.customerEmail.trim()}` : '';
                     const clientAddr = this.deliveryAddress.trim() ? `\n*Address:* ${this.deliveryAddress.trim()}, ${this.deliveryCity.trim()}` : '';
 
                     const message = `🛒 *NEW ORDER FROM STORE*\n`
                         + `*Store:* ${this.storeName}\n`
-                        + `*Customer:* ${clientName}${clientPhone}${clientAddr}\n`
+                        + `*Customer:* ${clientName}${clientPhone}${clientEmail}${clientAddr}\n`
                         + `*Payment Method:* ${this.paymentMethod.toUpperCase()}\n\n`
                         + `*Order Items:*\n${itemsSummary}\n`
                         + `----------------------------\n`

@@ -224,10 +224,12 @@
                             {{ $product->name }}
                         </h3>
 
-                        <!-- Product Rich Description -->
-                        <p class="text-[11px] text-slate-500 line-clamp-2 leading-relaxed h-8">
-                            {{ $product->description ?: __('High-grade authentic product backed by full store warranty and same-day handling.') }}
-                        </p>
+                        @if (trim($product->description ?? ''))
+                            <!-- Product Rich Description -->
+                            <p class="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+                                {{ $product->description }}
+                            </p>
+                        @endif
 
                         <!-- 5 Green Stars Rating (★★★★★) with count (121) from store-idea.mp4 -->
                         <div class="flex items-center gap-1.5 pt-1">
@@ -417,8 +419,10 @@
                                     </span>
                                 </div>
 
-                                <!-- Full Description -->
-                                <div class="text-xs text-slate-600 leading-relaxed pt-1" x-text="modalProduct.description || '{{ __('Premium grade item sourced and verified directly by the store. Comes with standard guarantee.') }}'"></div>
+                                <!-- Full Description (Only when populated) -->
+                                <template x-if="modalProduct.description && modalProduct.description.trim()">
+                                    <div class="text-xs text-slate-600 leading-relaxed pt-1" x-text="modalProduct.description"></div>
+                                </template>
 
                                 <!-- Specifications Key-Value Table -->
                                 <div class="border-t border-slate-100 pt-3 space-y-1.5 text-xs">

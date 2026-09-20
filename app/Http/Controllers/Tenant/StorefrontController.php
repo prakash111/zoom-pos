@@ -97,14 +97,23 @@ class StorefrontController extends Controller
         $company = $this->resolveCompany($request);
         abort_if(! $company, 404, 'Store tenant not found.');
 
+        // Normalize field aliases before validation
+        if (! $request->has('delivery_address') && $request->has('address')) {
+            $request->merge(['delivery_address' => $request->input('address')]);
+        }
+        if (! $request->has('customer_email') && $request->has('email')) {
+            $request->merge(['customer_email' => $request->input('email')]);
+        }
+
         $validated = $request->validate([
-            'customer_name' => ['required', 'string', 'max:100'],
+            'customer_name' => ['required', 'string', 'max:150'],
             'customer_phone' => ['required', 'string', 'max:50'],
-            'customer_email' => ['nullable', 'email', 'max:100'],
+            'customer_email' => ['nullable', 'email', 'max:150'],
+            'delivery_address' => ['required', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:100'],
+            'city' => ['required', 'string', 'max:100'],
             'postal_code' => ['nullable', 'string', 'max:30'],
-            'payment_method' => ['nullable', 'string', 'in:cod,counter,online,card,unpaid'],
+            'payment_method' => ['required', 'string'],
             'customer_notes' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['nullable'],
@@ -112,6 +121,14 @@ class StorefrontController extends Controller
             'items.*.quantity' => ['required', 'numeric', 'min:1'],
             'items.*.price' => ['required', 'numeric', 'min:0'],
         ]);
+
+        $customerEmail = $request->input('customer_email')
+            ?? $request->input('email')
+            ?? null;
+
+        $deliveryAddress = $request->input('delivery_address')
+            ?? $request->input('address')
+            ?? null;
 
         $subtotal = 0;
         $formattedItems = [];
@@ -137,7 +154,7 @@ class StorefrontController extends Controller
         $saleNumber = 'WEB-'.$codePart.'-'.sprintf('%04d', $saleCount + 1);
 
         $deliveryAddressParts = array_filter([
-            $validated['address'] ?? null,
+            $deliveryAddress,
             $validated['city'] ?? null,
             $validated['postal_code'] ?? null,
         ]);
@@ -145,10 +162,12 @@ class StorefrontController extends Controller
 
         $paymentMethod = $validated['payment_method'] ?? 'cod';
 
-        $notes = trim(($validated['customer_notes'] ?? '').' | Phone: '.$validated['customer_phone'].($validated['customer_email'] ? ' | Email: '.$validated['customer_email'] : ''));
+        $emailNote = $customerEmail ? ' | Email: '.$customerEmail : '';
+        $notes = trim(($validated['customer_notes'] ?? '').' | Phone: '.$validated['customer_phone'].$emailNote);
 
         $customerId = null;
         if (! empty($validated['customer_phone'])) {
+            $email = $customerEmail ?? ($validated['customer_phone'].'@guest.zoomnearby.com');
             $customer = \App\Models\Customer::withoutGlobalScopes()->firstOrCreate(
                 [
                     'company_id' => $company->id,
@@ -156,8 +175,8 @@ class StorefrontController extends Controller
                 ],
                 [
                     'name' => $validated['customer_name'] ?: 'Online Customer',
-                    'email' => $validated['customer_email'] ?? null,
-                    'address' => $validated['address'] ?? null,
+                    'email' => $email,
+                    'address' => $deliveryAddress,
                     'city' => $validated['city'] ?? null,
                     'source' => 'storefront',
                 ]

@@ -66,10 +66,20 @@ class CatalogViewController extends Controller
         $company = $catalog->company ?? Company::find($catalog->company_id);
         abort_if(! $company, 404, 'Store tenant not found.');
 
+        // Normalize field aliases before validation
+        if (! $request->has('delivery_address') && $request->has('address')) {
+            $request->merge(['delivery_address' => $request->input('address')]);
+        }
+        if (! $request->has('customer_email') && $request->has('email')) {
+            $request->merge(['customer_email' => $request->input('email')]);
+        }
+
         $validated = $request->validate([
-            'customer_name' => ['nullable', 'string', 'max:100'],
+            'customer_name' => ['nullable', 'string', 'max:150'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
+            'customer_email' => ['nullable', 'email', 'max:150'],
             'customer_notes' => ['nullable', 'string', 'max:500'],
+            'delivery_address' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:100'],
             'payment_method' => ['nullable', 'string', 'max:50'],
@@ -79,6 +89,14 @@ class CatalogViewController extends Controller
             'items.*.quantity' => ['required', 'numeric', 'min:1'],
             'items.*.price' => ['required', 'numeric', 'min:0'],
         ]);
+
+        $customerEmail = $request->input('customer_email')
+            ?? $request->input('email')
+            ?? null;
+
+        $deliveryAddress = $request->input('delivery_address')
+            ?? $request->input('address')
+            ?? null;
 
         $subtotal = 0;
         $formattedItems = [];
@@ -98,11 +116,12 @@ class CatalogViewController extends Controller
         $saleCount = Sale::withoutGlobalScopes()->where('company_id', $company->id)->count();
         $saleNumber = 'WEB-'.strtoupper(substr($catalog->id, 0, 4)).'-'.sprintf('%04d', $saleCount + 1);
 
-        $addressParts = array_filter([$validated['address'] ?? null, $validated['city'] ?? null]);
+        $addressParts = array_filter([$deliveryAddress, $validated['city'] ?? null]);
         $fullAddress = implode(', ', $addressParts);
 
         $customerId = null;
         if (! empty($validated['customer_phone'])) {
+            $fallbackEmail = $customerEmail ?: ($validated['customer_phone'].'@guest.zoomnearby.com');
             $customer = \App\Models\Customer::withoutGlobalScopes()->firstOrCreate(
                 [
                     'company_id' => $company->id,
@@ -110,7 +129,8 @@ class CatalogViewController extends Controller
                 ],
                 [
                     'name' => $validated['customer_name'] ?: 'Online Storefront Guest',
-                    'address' => $validated['address'] ?? null,
+                    'email' => $fallbackEmail,
+                    'address' => $deliveryAddress,
                     'city' => $validated['city'] ?? null,
                     'source' => 'storefront',
                 ]
