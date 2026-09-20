@@ -23,15 +23,120 @@ use Illuminate\Support\Str;
 class AuthApiController extends Controller
 {
     /**
+     * Check if a store subdomain is available.
+     * GET /api/v1/public/check-subdomain?subdomain={slug}
+     */
+    public function checkSubdomain(Request $request): JsonResponse
+    {
+        $raw = trim((string) ($request->query('subdomain') ?: $request->query('slug') ?: $request->input('subdomain') ?: $request->input('slug') ?: ''));
+        $subdomain = strtolower($raw);
+        $subdomain = preg_replace('#^https?://#i', '', $subdomain);
+        $subdomain = preg_replace('#\.saas\.zoomnearby\.com.*$#i', '', $subdomain);
+        $subdomain = preg_replace('#[^a-z0-9-]#', '-', $subdomain);
+        $subdomain = trim($subdomain, '-');
+
+        $baseHost = 'saas.zoomnearby.com';
+        if (config('app.url')) {
+            $parsedHost = parse_url(config('app.url'), PHP_URL_HOST);
+            if ($parsedHost && ! in_array($parsedHost, ['localhost', '127.0.0.1'], true)) {
+                $baseHost = $parsedHost;
+            }
+        }
+
+        if (empty($subdomain)) {
+            return response()->json([
+                'success' => false,
+                'available' => false,
+                'subdomain' => '',
+                'error' => 'Subdomain is required.',
+            ], 422);
+        }
+
+        if (strlen($subdomain) < 3) {
+            return response()->json([
+                'success' => false,
+                'available' => false,
+                'subdomain' => $subdomain,
+                'error' => 'Subdomain must be at least 3 characters.',
+            ], 422);
+        }
+
+        if (strlen($subdomain) > 60) {
+            return response()->json([
+                'success' => false,
+                'available' => false,
+                'subdomain' => $subdomain,
+                'error' => 'Subdomain cannot exceed 60 characters.',
+            ], 422);
+        }
+
+        if (in_array($subdomain, Company::RESERVED_SLUGS, true)) {
+            return response()->json([
+                'success' => true,
+                'available' => false,
+                'subdomain' => $subdomain,
+                'message' => "The subdomain '{$subdomain}' is reserved for platform infrastructure.",
+                'suggestion' => $subdomain . '-store',
+            ]);
+        }
+
+        $exists = Company::where('slug', $subdomain)->exists();
+        $url = "https://{$subdomain}.{$baseHost}";
+
+        if ($exists) {
+            $suggestion = $subdomain . '-' . random_int(100, 999);
+            while (Company::where('slug', $suggestion)->exists()) {
+                $suggestion = $subdomain . '-' . random_int(100, 999);
+            }
+
+            return response()->json([
+                'success' => true,
+                'available' => false,
+                'subdomain' => $subdomain,
+                'url' => $url,
+                'message' => "The subdomain '{$subdomain}' is already taken.",
+                'suggestion' => $suggestion,
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'available' => true,
+            'subdomain' => $subdomain,
+            'url' => $url,
+            'message' => "The subdomain '{$subdomain}' is available!",
+        ]);
+    }
+
+    /**
      * Handle public tenant & user registration with optional email OTP verification.
      * POST /api/auth/register
      */
     public function register(Request $request, TenantProvisioningService $provisioner): JsonResponse
     {
+        $incomingSlug = $request->input('subdomain') ?: $request->input('slug');
+        if ($incomingSlug) {
+            $slugNorm = strtolower(trim((string) $incomingSlug));
+            $slugNorm = preg_replace('#^https?://#i', '', $slugNorm);
+            $slugNorm = preg_replace('#\.saas\.zoomnearby\.com.*$#i', '', $slugNorm);
+            $slugNorm = preg_replace('#[^a-z0-9-]#', '-', $slugNorm);
+            $slugNorm = trim($slugNorm, '-');
+            $request->merge(['slug' => $slugNorm]);
+        }
+
         $validator = Validator::make($request->all(), [
             'store_name' => ['required', 'string', 'max:150'],
             'name' => ['required', 'string', 'max:150'],
-            'slug' => ['nullable', 'string', 'max:60', 'regex:/^[a-z0-9-]+$/', 'unique:companies,slug'],
+            'slug' => [
+                'nullable', 'string', 'max:60', 'regex:/^[a-z0-9-]+$/',
+                'unique:companies,slug',
+                function ($attribute, $value, $fail) {
+                    if ($value && in_array(strtolower($value), Company::RESERVED_SLUGS, true)) {
+                        $fail("The subdomain '{$value}' is reserved for platform infrastructure.");
+                    }
+                },
+            ],
+            'subdomain' => ['nullable', 'string', 'max:60'],
             'custom_domain' => ['nullable', 'string', 'max:100', 'unique:companies,custom_domain'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],

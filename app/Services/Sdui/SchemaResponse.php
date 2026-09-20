@@ -1655,17 +1655,141 @@ class SchemaResponse
         ]);
     }
 
+    public static function storefrontBannerAuthView(Company $company): array
+    {
+        return self::screen('Storefront Banner & Auth', [
+            self::card([
+                self::row([
+                    self::column([
+                        self::text('Storefront Banner & Hero Section', 'title_medium', ['bold' => true]),
+                        self::text('Configure the promotional banner and customer authentication rules for your online store.', 'body_small', ['color' => '#6b7280']),
+                    ]),
+                    self::badge($company->store_banner_is_active ? 'BANNER ACTIVE' : 'BANNER DISABLED', $company->store_banner_is_active ? '#059669' : '#64748b', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+            ]),
+            self::card([
+                self::text('Hero Banner Content', 'title_small', ['bold' => true]),
+                self::divider(),
+                self::textInput('store_banner_tag', 'Banner Badge Tag', $company->store_banner_tag ?: 'SPECIAL STORE DEALS', ['placeholder' => 'e.g. SPECIAL STORE DEALS']),
+                self::textInput('store_banner_title', 'Hero Headline Title', $company->store_banner_title ?: 'Grab Up To 50% Off On Selected Products', ['placeholder' => 'Enter main banner headline']),
+                self::textInput('store_banner_subtitle', 'Hero Subtitle Description', $company->store_banner_subtitle ?: 'Explore our curated selection of high-quality products.', ['placeholder' => 'Enter marketing subtitle']),
+                self::textInput('store_banner_cta_text', 'Call-to-Action Button Label', $company->store_banner_cta_text ?: 'Shop Now', ['placeholder' => 'e.g. Shop Now']),
+                self::textInput('store_banner_cta_link', 'Button Target Link / Anchor', $company->store_banner_cta_link ?: '#products', ['placeholder' => 'e.g. #products']),
+                self::textInput('store_banner_image_url', 'Banner Background Image URL', $company->store_banner_image_url ?: '', ['placeholder' => 'https://...']),
+                self::toggleSwitch('store_banner_is_active', 'Display Banner on Storefront', (bool) ($company->store_banner_is_active ?? true)),
+            ]),
+            self::card([
+                self::text('Customer Authentication & Social Login', 'title_small', ['bold' => true]),
+                self::divider(),
+                self::toggleSwitch('enable_google_login', 'Enable Google Single Sign-On (SSO)', (bool) ($company->enable_google_login ?? false)),
+                self::textInput('google_client_id', 'Google OAuth Client ID', $company->google_client_id ?: '', ['placeholder' => 'e.g. 123456.apps.googleusercontent.com']),
+                self::textInput('google_client_secret', 'Google OAuth Client Secret', '', ['placeholder' => ! empty($company->google_client_secret) ? '•••••••• (Stored — leave blank to keep)' : 'Enter client secret']),
+                self::toggleSwitch('require_auth_before_checkout', 'Require Customer Verification / Login Before Checkout', (bool) ($company->require_customer_verification ?? false)),
+            ]),
+            self::buttonPrimary('Save Banner & Auth Settings', self::formSubmitAction('/api/v1/tenant/storefront/banner-auth', 'POST', 'Storefront banner & auth settings saved successfully', false, true)),
+        ]);
+    }
+
+    public static function storefrontPaymentGatewaysView(Company $company): array
+    {
+        $gateways = (array) ($company->storefront_payment_gateways ?? []);
+        $cod = (array) ($gateways['cod'] ?? []);
+        $storePickup = (array) ($gateways['store_pickup'] ?? []);
+        $razorpay = (array) ($gateways['razorpay'] ?? []);
+        $stripe = (array) ($gateways['stripe'] ?? []);
+
+        return self::screen('Storefront Payment Gateways', [
+            self::card([
+                self::column([
+                    self::text('Storefront Payment Gateways', 'title_medium', ['bold' => true]),
+                    self::text('Configure checkout payment methods for online orders (Cash on Delivery, Store Pickup, Razorpay, Stripe).', 'body_small', ['color' => '#6b7280']),
+                ]),
+            ]),
+            self::card([
+                self::row([
+                    self::text('Cash on Delivery (COD)', 'title_small', ['bold' => true]),
+                    self::badge(($cod['enabled'] ?? $cod['is_enabled'] ?? true) ? 'ENABLED' : 'DISABLED', ($cod['enabled'] ?? $cod['is_enabled'] ?? true) ? '#059669' : '#64748b', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::toggleSwitch('cod_enabled', 'Enable Cash on Delivery', (bool) ($cod['enabled'] ?? $cod['is_enabled'] ?? true)),
+                self::textInput('cod_instructions', 'Delivery Instructions', (string) ($cod['instructions'] ?? 'Pay in cash upon physical delivery to the driver or courier.')),
+            ]),
+            self::card([
+                self::row([
+                    self::text('Pay at Counter / Store Pickup', 'title_small', ['bold' => true]),
+                    self::badge(($storePickup['enabled'] ?? $storePickup['is_enabled'] ?? true) ? 'ENABLED' : 'DISABLED', ($storePickup['enabled'] ?? $storePickup['is_enabled'] ?? true) ? '#059669' : '#64748b', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::toggleSwitch('store_pickup_enabled', 'Enable Pay at Counter', (bool) ($storePickup['enabled'] ?? $storePickup['is_enabled'] ?? true)),
+                self::textInput('store_pickup_instructions', 'Pickup Instructions', (string) ($storePickup['instructions'] ?? 'Collect your items at our counter and pay via any store payment method.')),
+            ]),
+            self::card([
+                self::row([
+                    self::text('Razorpay (Cards / UPI / Netbanking)', 'title_small', ['bold' => true]),
+                    self::badge(($razorpay['enabled'] ?? $razorpay['is_enabled'] ?? false) ? 'ENABLED' : 'DISABLED', ($razorpay['enabled'] ?? $razorpay['is_enabled'] ?? false) ? '#059669' : '#64748b', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::toggleSwitch('razorpay_enabled', 'Enable Razorpay Payments', (bool) ($razorpay['enabled'] ?? $razorpay['is_enabled'] ?? false)),
+                self::textInput('razorpay_key_id', 'Razorpay Key ID', (string) ($razorpay['key_id'] ?? ''), ['placeholder' => 'rzp_live_... or rzp_test_...']),
+                self::textInput('razorpay_key_secret', 'Razorpay Key Secret', '', ['placeholder' => ! empty($razorpay['key_secret']) ? '•••••••• (Stored — leave blank to keep)' : 'Enter Key Secret']),
+            ]),
+            self::card([
+                self::row([
+                    self::text('Stripe (Global Cards & Wallets)', 'title_small', ['bold' => true]),
+                    self::badge(($stripe['enabled'] ?? $stripe['is_enabled'] ?? false) ? 'ENABLED' : 'DISABLED', ($stripe['enabled'] ?? $stripe['is_enabled'] ?? false) ? '#059669' : '#64748b', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::toggleSwitch('stripe_enabled', 'Enable Stripe Payments', (bool) ($stripe['enabled'] ?? $stripe['is_enabled'] ?? false)),
+                self::textInput('stripe_publishable_key', 'Stripe Publishable Key', (string) ($stripe['publishable_key'] ?? $stripe['key_id'] ?? ''), ['placeholder' => 'pk_live_... or pk_test_...']),
+                self::textInput('stripe_secret_key', 'Stripe Secret Key', '', ['placeholder' => (! empty($stripe['secret_key']) || ! empty($stripe['key_secret'])) ? '•••••••• (Stored — leave blank to keep)' : 'Enter Secret Key']),
+            ]),
+            self::buttonPrimary('Save Payment Gateways', self::formSubmitAction('/api/v1/tenant/storefront/payment-gateways', 'POST', 'Storefront payment gateways saved successfully', false, true)),
+        ]);
+    }
+
     public static function couponsView(Company $company): array
     {
         $coupons = Coupon::where('company_id', $company->id)->orderByDesc('id')->get();
         $activeCount = $coupons->where('is_active', true)->count();
         $totalCount = $coupons->count();
 
+        $createCouponModal = self::openModalAction('Create New Coupon', [
+            self::textInput('code', 'Coupon Code (e.g. SAVE20)', ''),
+            self::dropdownSelect('discount_type', 'Discount Type', [
+                ['value' => 'percentage', 'label' => 'Percentage (%)'],
+                ['value' => 'fixed', 'label' => 'Fixed Amount (' . ($company->currency_symbol ?: '$') . ')'],
+            ], 'percentage'),
+            self::textInput('discount_value', 'Discount Value (e.g. 15)', ''),
+            self::textInput('min_order_amount', 'Minimum Order Amount', '0'),
+            self::textInput('max_discount_amount', 'Maximum Discount Cap (optional)', ''),
+            self::textInput('usage_limit_total', 'Total Usage Limit (optional)', ''),
+            self::textInput('usage_limit_per_customer', 'Limit Per Customer', '1'),
+            self::textInput('description', 'Description / Promotional Headline', ''),
+            self::toggleSwitch('is_active', 'Active and Available for Customers', true),
+            self::buttonPrimary('Save Coupon', self::formSubmitAction('/api/v1/tenant/coupons', 'POST', 'Coupon created successfully', true, true)),
+        ]);
+
         $couponCards = [];
         foreach ($coupons as $coupon) {
             $discountText = $coupon->discount_type === 'percentage'
                 ? "{$coupon->discount_value}% OFF"
                 : "{$company->currency_symbol}{$coupon->discount_value} OFF";
+
+            $editCouponModal = self::openModalAction("Edit Coupon: {$coupon->code}", [
+                self::textInput('code', 'Coupon Code', $coupon->code),
+                self::dropdownSelect('discount_type', 'Discount Type', [
+                    ['value' => 'percentage', 'label' => 'Percentage (%)'],
+                    ['value' => 'fixed', 'label' => 'Fixed Amount (' . ($company->currency_symbol ?: '$') . ')'],
+                ], $coupon->discount_type),
+                self::textInput('discount_value', 'Discount Value', (string) $coupon->discount_value),
+                self::textInput('min_order_amount', 'Minimum Order Amount', (string) $coupon->min_order_amount),
+                self::textInput('max_discount_amount', 'Maximum Discount Cap', (string) ($coupon->max_discount_amount ?? '')),
+                self::textInput('usage_limit_total', 'Total Usage Limit', (string) ($coupon->usage_limit_total ?? '')),
+                self::textInput('usage_limit_per_customer', 'Limit Per Customer', (string) ($coupon->usage_limit_per_customer ?? 1)),
+                self::textInput('description', 'Description', $coupon->description ?? ''),
+                self::toggleSwitch('is_active', 'Active and Available for Customers', (bool) $coupon->is_active),
+                self::buttonPrimary('Update Coupon', self::formSubmitAction("/api/v1/tenant/coupons/{$coupon->id}", 'POST', 'Coupon updated successfully', true, true, ['_method' => 'PUT'])),
+            ]);
 
             $couponCards[] = self::card([
                 self::row([
@@ -1679,6 +1803,11 @@ class SchemaResponse
                     self::text("Min Spend: {$company->currency_symbol}" . number_format((float) $coupon->min_order_amount, 2) . ($coupon->max_discount_amount ? " • Cap: {$company->currency_symbol}" . number_format((float) $coupon->max_discount_amount, 2) : ''), 'body_small', ['color' => '#64748b']),
                     self::text("Usage: {$coupon->used_count}" . ($coupon->usage_limit_total ? " / {$coupon->usage_limit_total}" : ' (Unlimited)') . " • Per Customer: {$coupon->usage_limit_per_customer}", 'body_small', ['color' => '#64748b']),
                 ]),
+                self::divider(),
+                self::row([
+                    self::buttonOutlined('Edit', $editCouponModal, 'edit', ['full_width' => false]),
+                    self::buttonDanger('Delete', self::apiPostAction("/api/v1/tenant/coupons/{$coupon->id}/delete", [], 'Coupon deleted successfully', true), 'delete', ['full_width' => false]),
+                ], ['main_axis_alignment' => 'end', 'spacing' => 8]),
             ]);
         }
 
@@ -1702,6 +1831,8 @@ class SchemaResponse
                 ], ['main_axis_alignment' => 'space_between']),
             ]),
             ...$couponCards,
+        ], 'scroll_view', [
+            'fab' => self::fab('add', $createCouponModal, 'Add Coupon', ['background_color' => '#059669', 'foreground_color' => '#ffffff']),
         ]);
     }
 
@@ -1713,8 +1844,38 @@ class SchemaResponse
             $faqs = Faq::where('company_id', $company->id)->ordered()->get();
         }
 
+        $createFaqModal = self::openModalAction('Create Store FAQ', [
+            self::textInput('question', 'Question', ''),
+            self::textInput('answer', 'Answer', '', ['multiline' => true, 'max_lines' => 5]),
+            self::dropdownSelect('category', 'Category', [
+                ['value' => 'General', 'label' => 'General'],
+                ['value' => 'Delivery', 'label' => 'Delivery & Shipping'],
+                ['value' => 'Payments', 'label' => 'Payments & Billing'],
+                ['value' => 'Returns', 'label' => 'Returns & Refunds'],
+                ['value' => 'Orders', 'label' => 'Order Tracking'],
+            ], 'General'),
+            self::textInput('sort_order', 'Sort / Display Order', '0'),
+            self::toggleSwitch('is_active', 'Active on Storefront', true),
+            self::buttonPrimary('Save FAQ', self::formSubmitAction('/api/v1/tenant/faqs', 'POST', 'Store FAQ created successfully', true, true)),
+        ]);
+
         $faqCards = [];
         foreach ($faqs as $faq) {
+            $editFaqModal = self::openModalAction("Edit FAQ", [
+                self::textInput('question', 'Question', $faq->question),
+                self::textInput('answer', 'Answer', $faq->answer, ['multiline' => true, 'max_lines' => 5]),
+                self::dropdownSelect('category', 'Category', [
+                    ['value' => 'General', 'label' => 'General'],
+                    ['value' => 'Delivery', 'label' => 'Delivery & Shipping'],
+                    ['value' => 'Payments', 'label' => 'Payments & Billing'],
+                    ['value' => 'Returns', 'label' => 'Returns & Refunds'],
+                    ['value' => 'Orders', 'label' => 'Order Tracking'],
+                ], $faq->category ?: 'General'),
+                self::textInput('sort_order', 'Sort / Display Order', (string) ($faq->sort_order ?? 0)),
+                self::toggleSwitch('is_active', 'Active on Storefront', (bool) $faq->is_active),
+                self::buttonPrimary('Update FAQ', self::formSubmitAction("/api/v1/tenant/faqs/{$faq->id}", 'POST', 'Store FAQ updated successfully', true, true, ['_method' => 'PUT'])),
+            ]);
+
             $faqCards[] = self::card([
                 self::row([
                     self::badge($faq->category ?: 'General', '#059669', 'subtle'),
@@ -1725,6 +1886,11 @@ class SchemaResponse
                     self::text($faq->question, 'title_small', ['bold' => true]),
                     self::text($faq->answer, 'body_small', ['color' => '#475569']),
                 ]),
+                self::divider(),
+                self::row([
+                    self::buttonOutlined('Edit', $editFaqModal, 'edit', ['full_width' => false]),
+                    self::buttonDanger('Delete', self::apiPostAction("/api/v1/tenant/faqs/{$faq->id}/delete", [], 'Store FAQ deleted successfully', true), 'delete', ['full_width' => false]),
+                ], ['main_axis_alignment' => 'end', 'spacing' => 8]),
             ]);
         }
 
@@ -1739,6 +1905,8 @@ class SchemaResponse
                 ], ['main_axis_alignment' => 'space_between']),
             ]),
             ...$faqCards,
+        ], 'scroll_view', [
+            'fab' => self::fab('add', $createFaqModal, 'Add FAQ', ['background_color' => '#059669', 'foreground_color' => '#ffffff']),
         ]);
     }
 
@@ -7096,6 +7264,8 @@ class SchemaResponse
             'settings-advanced', 'advanced', 'danger-zone' => self::advancedView($company),
             'settings-coupons', 'coupons' => self::couponsView($company),
             'settings-faqs', 'faqs' => self::faqsView($company),
+            'settings-storefront', 'storefront-settings', 'storefront-banner-auth', 'settings_storefront', 'storefront-banner' => self::storefrontBannerAuthView($company),
+            'settings-payments', 'storefront-payments', 'storefront-payment-gateways', 'settings_payments', 'storefront-gateway' => self::storefrontPaymentGatewaysView($company),
             'restaurant-tables', 'tables', 'floor-plan' => self::restaurantTablesView($company),
             'restaurant-kds', 'kds', 'kitchen-display' => self::restaurantKdsView($company),
             'restaurant-pos' => self::restaurantPosView($company),

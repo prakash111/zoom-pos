@@ -103,6 +103,8 @@ class SettingsApiController extends Controller
             // `updateBranding()`.
             'primary_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'accent_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'custom_domain' => ['nullable', 'string', 'max:150'],
+            'subdomain' => ['nullable', 'string', 'max:60', 'regex:/^[a-z0-9-]+$/'],
         ]);
 
         if ($validator->fails()) {
@@ -148,6 +150,21 @@ class SettingsApiController extends Controller
 
         if (isset($data['country'])) {
             $data['country'] = strtoupper($data['country']);
+        }
+        if ($request->has('custom_domain')) {
+            $cd = trim((string) $request->input('custom_domain', ''));
+            $cd = preg_replace('#^https?://#i', '', $cd);
+            $cd = rtrim($cd, '/');
+            $data['custom_domain'] = $cd !== '' ? strtolower($cd) : null;
+        }
+        if ($request->has('subdomain') && ! empty($request->input('subdomain'))) {
+            $sub = strtolower(trim((string) $request->input('subdomain')));
+            if (! in_array($sub, Company::RESERVED_SLUGS, true)) {
+                $exists = Company::where('slug', $sub)->where('id', '!=', $company->id)->exists();
+                if (! $exists) {
+                    $data['slug'] = $sub;
+                }
+            }
         }
         if (isset($data['default_locale'])) {
             $data['default_locale'] = strtolower(trim($data['default_locale']));
@@ -882,6 +899,27 @@ class SettingsApiController extends Controller
         $effectiveTrade = $company->getEffectiveTradeName();
         $drawerHeader = $company->getDrawerHeaderPayload();
 
+        $subdomain = $company->slug ?: \Illuminate\Support\Str::slug($company->name ?: 'store');
+        $baseHost = 'saas.zoomnearby.com';
+        if (config('app.url')) {
+            $parsedHost = parse_url(config('app.url'), PHP_URL_HOST);
+            if ($parsedHost && ! in_array($parsedHost, ['localhost', '127.0.0.1'], true)) {
+                $baseHost = $parsedHost;
+            }
+        }
+        $subdomainUrl = "https://{$subdomain}.{$baseHost}";
+        $customDomain = trim((string) ($company->custom_domain ?? ''));
+        $effectiveStoreWebsite = ! empty($customDomain)
+            ? 'https://'.ltrim($customDomain, 'https://http://')
+            : $subdomainUrl;
+
+        $storedWebsite = trim((string) ($company->website ?? ''));
+        if ($storedWebsite === '' || str_contains($storedWebsite, '.demo') || str_contains($storedWebsite, 'metromart')) {
+            $effectiveWebsite = $effectiveStoreWebsite;
+        } else {
+            $effectiveWebsite = $storedWebsite;
+        }
+
         return [
             'name' => $company->display_name,
             'business_name' => $company->display_name,
@@ -889,10 +927,16 @@ class SettingsApiController extends Controller
             'trading_name' => $effectiveTrade,
             'store_name' => $company->display_name,
             'display_name' => $company->display_name,
+            'subdomain' => $subdomain,
+            'store_website' => $effectiveStoreWebsite,
+            'storefront_url' => $effectiveStoreWebsite,
+            'custom_domain' => $customDomain,
+            'cname_target' => 'cname.saas.zoomnearby.com',
+            'ssl_status' => ! empty($customDomain) ? 'active' : 'not_configured',
             'tax_id' => $company->tax_id ?? '',
             'email' => $company->email ?? '',
             'phone' => $company->phone ?? '',
-            'website' => $company->website ?? '',
+            'website' => $effectiveWebsite,
             'address' => $company->address ?? '',
             'city' => $company->city ?? '',
             'state' => $company->state ?? '',

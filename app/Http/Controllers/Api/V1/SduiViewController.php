@@ -239,6 +239,19 @@ class SduiViewController extends Controller
             case 'custom-notifications':
                 return $settingsController->testNotificationChannel($request, app(CustomChannelDispatcherService::class));
 
+            case 'storefront':
+            case 'storefront-banner-auth':
+            case 'settings-storefront':
+            case 'storefront-banner':
+                return app(\App\Http\Controllers\Api\Tenant\StorefrontSettingsController::class)->updateBannerAuth($request);
+
+            case 'payments':
+            case 'storefront-payments':
+            case 'settings-payments':
+            case 'payment-gateways':
+            case 'storefront-gateway':
+                return app(\App\Http\Controllers\Api\Tenant\StorefrontSettingsController::class)->updatePaymentGateways($request);
+
             case 'mode':
                 return response()->json([
                     'success' => false,

@@ -19,6 +19,9 @@ use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\TenantSettingsController;
 use App\Http\Controllers\Api\UnifiedDispatchController;
 use App\Http\Controllers\SuperAdmin\TenantController as SuperAdminTenantController;
+use App\Http\Controllers\Api\Tenant\CouponApiController;
+use App\Http\Controllers\Api\Tenant\FaqApiController;
+use App\Http\Controllers\Api\Tenant\StorefrontSettingsController;
 use App\Http\Controllers\Api\V1\AiImageApiController;
 use App\Http\Controllers\Api\V1\ApiIntegrationsController;
 use App\Http\Controllers\Api\V1\AppBootstrapController;
@@ -78,6 +81,10 @@ Route::post('/license/activate', [LicenseActivationController::class, 'activate'
 Route::get('/public/landing', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
 Route::get('/public/landing-config', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
 Route::get('/v1/public/landing-config', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
+Route::get('/public/check-subdomain', [AuthApiController::class, 'checkSubdomain']);
+Route::get('/v1/public/check-subdomain', [AuthApiController::class, 'checkSubdomain']);
+Route::get('/auth/check-subdomain', [AuthApiController::class, 'checkSubdomain']);
+Route::get('/v1/auth/check-subdomain', [AuthApiController::class, 'checkSubdomain']);
 Route::get('/subscription/plans', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'plans']);
 Route::get('/v1/subscription/plans', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'plans']);
 Route::post('/public/contact-us', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
@@ -602,6 +609,47 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
         Route::post('/test', [SettingsApiController::class, 'testNotificationChannel']);
     });
 
+    // Storefront Banner, Auth & Payment Gateway settings
+    Route::get('/tenant/storefront/banner-auth', [StorefrontSettingsController::class, 'getBannerAuth']);
+    Route::match(['post', 'put'], '/tenant/storefront/banner-auth', [StorefrontSettingsController::class, 'updateBannerAuth']);
+    Route::get('/v1/tenant/storefront/banner-auth', [StorefrontSettingsController::class, 'getBannerAuth']);
+    Route::match(['post', 'put'], '/v1/tenant/storefront/banner-auth', [StorefrontSettingsController::class, 'updateBannerAuth']);
+
+    Route::get('/tenant/storefront/payment-gateways', [StorefrontSettingsController::class, 'getPaymentGateways']);
+    Route::match(['post', 'put'], '/tenant/storefront/payment-gateways', [StorefrontSettingsController::class, 'updatePaymentGateways']);
+    Route::get('/v1/tenant/storefront/payment-gateways', [StorefrontSettingsController::class, 'getPaymentGateways']);
+    Route::match(['post', 'put'], '/v1/tenant/storefront/payment-gateways', [StorefrontSettingsController::class, 'updatePaymentGateways']);
+
+    // Tenant Promotional Coupons & Discounts CRUD
+    Route::get('/tenant/coupons', [CouponApiController::class, 'index']);
+    Route::post('/tenant/coupons', [CouponApiController::class, 'store']);
+    Route::get('/tenant/coupons/{id}', [CouponApiController::class, 'show']);
+    Route::match(['put', 'post'], '/tenant/coupons/{id}', [CouponApiController::class, 'update']);
+    Route::delete('/tenant/coupons/{id}', [CouponApiController::class, 'destroy']);
+    Route::post('/tenant/coupons/{id}/delete', [CouponApiController::class, 'destroy']);
+
+    Route::get('/v1/tenant/coupons', [CouponApiController::class, 'index']);
+    Route::post('/v1/tenant/coupons', [CouponApiController::class, 'store']);
+    Route::get('/v1/tenant/coupons/{id}', [CouponApiController::class, 'show']);
+    Route::match(['put', 'post'], '/v1/tenant/coupons/{id}', [CouponApiController::class, 'update']);
+    Route::delete('/v1/tenant/coupons/{id}', [CouponApiController::class, 'destroy']);
+    Route::post('/v1/tenant/coupons/{id}/delete', [CouponApiController::class, 'destroy']);
+
+    // Tenant Store FAQs & Help Center CRUD
+    Route::get('/tenant/faqs', [FaqApiController::class, 'index']);
+    Route::post('/tenant/faqs', [FaqApiController::class, 'store']);
+    Route::get('/tenant/faqs/{id}', [FaqApiController::class, 'show']);
+    Route::match(['put', 'post'], '/tenant/faqs/{id}', [FaqApiController::class, 'update']);
+    Route::delete('/tenant/faqs/{id}', [FaqApiController::class, 'destroy']);
+    Route::post('/tenant/faqs/{id}/delete', [FaqApiController::class, 'destroy']);
+
+    Route::get('/v1/tenant/faqs', [FaqApiController::class, 'index']);
+    Route::post('/v1/tenant/faqs', [FaqApiController::class, 'store']);
+    Route::get('/v1/tenant/faqs/{id}', [FaqApiController::class, 'show']);
+    Route::match(['put', 'post'], '/v1/tenant/faqs/{id}', [FaqApiController::class, 'update']);
+    Route::delete('/v1/tenant/faqs/{id}', [FaqApiController::class, 'destroy']);
+    Route::post('/v1/tenant/faqs/{id}/delete', [FaqApiController::class, 'destroy']);
+
     // Secure tenant file uploads (non-executable image/PDF whitelist) — backs
     // the SDUI `file_picker` component (e.g. prescription attachments).
     Route::prefix('tenant/uploads')->group(function () {
@@ -903,6 +951,9 @@ Route::prefix('v1/pos')->group(function () {
     Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback']);
     Route::post('/auth/{provider}/mobile-token', [SocialAuthController::class, 'mobileToken']);
     Route::get('/auth/registration-config', [PosSyncApiController::class, 'registrationConfig']);
+    Route::get('/auth/check-subdomain', [AuthApiController::class, 'checkSubdomain']);
+    Route::get('/public/check-subdomain', [AuthApiController::class, 'checkSubdomain']);
+    Route::get('/check-subdomain', [AuthApiController::class, 'checkSubdomain']);
     Route::get('/auth/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
     Route::get('/app/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
     Route::get('/auth/branding', [PosSyncApiController::class, 'branding']);
@@ -1102,6 +1153,22 @@ Route::prefix('v1/pos')->group(function () {
         Route::match(['post', 'put'], '/settings/app-preferences', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/app-preferences/notifications/upload-audio', [TenantAppPreferencesController::class, 'uploadAudio'])->middleware('tenant.api.permission:settings,edit');
         Route::delete('/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/storefront/banner-auth', [StorefrontSettingsController::class, 'getBannerAuth'])->middleware('tenant.api.permission:settings,view');
+        Route::match(['post', 'put'], '/storefront/banner-auth', [StorefrontSettingsController::class, 'updateBannerAuth'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/storefront/payment-gateways', [StorefrontSettingsController::class, 'getPaymentGateways'])->middleware('tenant.api.permission:settings,view');
+        Route::match(['post', 'put'], '/storefront/payment-gateways', [StorefrontSettingsController::class, 'updatePaymentGateways'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/coupons', [CouponApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
+        Route::post('/coupons', [CouponApiController::class, 'store'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/coupons/{id}', [CouponApiController::class, 'show'])->middleware('tenant.api.permission:settings,view');
+        Route::match(['put', 'post'], '/coupons/{id}', [CouponApiController::class, 'update'])->middleware('tenant.api.permission:settings,edit');
+        Route::delete('/coupons/{id}', [CouponApiController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/coupons/{id}/delete', [CouponApiController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/faqs', [FaqApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
+        Route::post('/faqs', [FaqApiController::class, 'store'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/faqs/{id}', [FaqApiController::class, 'show'])->middleware('tenant.api.permission:settings,view');
+        Route::match(['put', 'post'], '/faqs/{id}', [FaqApiController::class, 'update'])->middleware('tenant.api.permission:settings,edit');
+        Route::delete('/faqs/{id}', [FaqApiController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
+        Route::post('/faqs/{id}/delete', [FaqApiController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
 
         // Consignments (draft -> dispatched -> reconciled -> finalized)
         Route::get('/consignments', [ConsignmentApiController::class, 'index'])->middleware('tenant.api.permission:consignments,view');
