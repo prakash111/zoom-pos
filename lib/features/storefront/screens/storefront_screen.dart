@@ -46,6 +46,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   // Checkout form controllers
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
   String _paymentMethod = 'cod';
@@ -61,6 +62,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     _addressController.dispose();
     _cityController.dispose();
     super.dispose();
@@ -675,13 +677,16 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
                   ),
                   const SizedBox(height: 2),
 
-                  // Rich Description
-                  Text(
-                    product.description ?? 'High-grade verified product.',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: Colors.grey, height: 1.2),
-                  ),
+                  // Rich Description (Only when populated)
+                  if ((product.description ?? '').trim().isNotEmpty) ...[
+                    Text(
+                      product.description!.trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11, color: Colors.grey, height: 1.2),
+                    ),
+                    const SizedBox(height: 2),
+                  ],
                   const Spacer(),
 
                   // 5 Green Stars (★★★★★) with (121) from store-idea.mp4
@@ -842,11 +847,13 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Full Rich Description
-                    const Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(height: 4),
-                    Text(product.description ?? 'High-quality authentic product with direct store warranty.', style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.4)),
-                    const SizedBox(height: 16),
+                    // Full Rich Description (Only when populated)
+                    if ((product.description ?? '').trim().isNotEmpty) ...[
+                      const Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 4),
+                      Text(product.description!.trim(), style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.4)),
+                      const SizedBox(height: 16),
+                    ],
 
                     // Specs Table
                     Container(
@@ -999,21 +1006,53 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
                                         ],
                                       ),
                                     ),
-                                    IconButton(
-                                      icon: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.grey),
-                                      onPressed: () {
-                                        _decreaseQty(item.product.id);
-                                        setCartState(() {});
-                                        setState(() {});
-                                      },
+                                    // Cart Stepper
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        border: Border.all(color: Colors.grey.shade300),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          InkWell(
+                                            onTap: () {
+                                              _decreaseQty(item.product.id);
+                                              setCartState(() {});
+                                              setState(() {});
+                                            },
+                                            child: const Padding(
+                                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              child: Text('−', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                                            child: Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                          ),
+                                          InkWell(
+                                            onTap: () {
+                                              _addToCart(item.product);
+                                              setCartState(() {});
+                                              setState(() {});
+                                            },
+                                            child: const Padding(
+                                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              child: Text('+', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    const SizedBox(width: 6),
                                     IconButton(
-                                      icon: const Icon(Icons.add_circle_outline, size: 18, color: Color(0xFF059669)),
+                                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.grey),
                                       onPressed: () {
-                                        _addToCart(item.product);
+                                        setState(() {
+                                          _cart.removeWhere((i) => i.product.id == item.product.id);
+                                        });
                                         setCartState(() {});
-                                        setState(() {});
                                       },
                                     ),
                                   ],
@@ -1025,8 +1064,9 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
 
                         // Delivery & Checkout Form
                         const SizedBox(height: 12),
-                        const Text('Delivery Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const Text('Customer & Delivery Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         const SizedBox(height: 6),
+                        // Row 1: Full Name * | Phone / WhatsApp *
                         Row(
                           children: [
                             Expanded(
@@ -1045,17 +1085,53 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
                           ],
                         ),
                         const SizedBox(height: 6),
+                        // Row 2: Email Address (Optional) | City *
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _emailController,
+                                decoration: const InputDecoration(labelText: 'Email Address (Optional)', isDense: true),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _cityController,
+                                decoration: const InputDecoration(labelText: 'City *', isDense: true),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        // Row 3: Street Address *
                         TextField(
                           controller: _addressController,
-                          decoration: const InputDecoration(labelText: 'Delivery Address', isDense: true),
+                          decoration: const InputDecoration(labelText: 'Street Address *', isDense: true),
                         ),
                         const SizedBox(height: 12),
 
-                        // Total & CTAs
+                        // Totals Breakdown (Full flex, zero horizontal text clipping)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Total Amount:', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                            const Text('Subtotal:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            Text('\$${_cartTotalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        const Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Estimated Delivery:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            Text('FREE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Total Order Amount:', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
                             Text('\$${_cartTotalPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF059669))),
                           ],
                         ),
@@ -1096,14 +1172,30 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
       );
       return;
     }
+    if (_cityController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your city.')),
+      );
+      return;
+    }
+    if (_addressController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your delivery street address.')),
+      );
+      return;
+    }
 
     setState(() => _isSubmittingOrder = true);
 
     try {
       final client = context.read<ApiClient>();
+      final emailVal = _emailController.text.trim();
       final payload = {
         'customer_name': _nameController.text.trim(),
         'customer_phone': _phoneController.text.trim(),
+        'customer_email': emailVal.isNotEmpty ? emailVal : null,
+        'email': emailVal.isNotEmpty ? emailVal : null,
+        'delivery_address': _addressController.text.trim(),
         'address': _addressController.text.trim(),
         'city': _cityController.text.trim(),
         'payment_method': _paymentMethod,
