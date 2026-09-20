@@ -396,3 +396,6 @@ extension StatusPalette on ColorScheme {
   Color get dangerAccent =>
       _isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626);
 }
+
+typedef ThemeTokens = AppTheme;
+

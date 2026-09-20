@@ -103,6 +103,21 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
               .toSet()
               .toList();
         }
+
+        // Attempt to load server-persisted wishlist
+        try {
+          final wishUri = widget.storeSlug != null
+              ? '/api/storefront/customer/wishlist?store=${widget.storeSlug}'
+              : '/api/storefront/customer/wishlist';
+          final wishRes = await client.get(wishUri);
+          if (wishRes['wishlist'] is List) {
+            for (final item in wishRes['wishlist']) {
+              if (item is Map && item['id'] != null) {
+                _wishlist.add(item['id'].toString());
+              }
+            }
+          }
+        } catch (_) {}
       }
     } catch (e) {
       if (kDebugMode) print('Error loading storefront catalog: $e');
@@ -593,6 +608,27 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
     );
   }
 
+  Future<void> _toggleWishlist(ProductModel product) async {
+    final isFav = _wishlist.contains(product.id);
+    setState(() {
+      if (isFav) {
+        _wishlist.remove(product.id);
+      } else {
+        _wishlist.add(product.id);
+      }
+    });
+
+    try {
+      final client = context.read<ApiClient>();
+      final uri = widget.storeSlug != null
+          ? '/api/storefront/customer/wishlist/toggle?store=${widget.storeSlug}'
+          : '/api/storefront/customer/wishlist/toggle';
+      await client.post(uri, data: {'product_id': int.tryParse(product.id) ?? product.id});
+    } catch (_) {
+      // Optimistic local state preserved
+    }
+  }
+
   Widget _buildProductCard(ProductModel product, bool isFav, int inCartQty) {
     return Container(
       decoration: BoxDecoration(
@@ -628,15 +664,7 @@ class _StorefrontScreenState extends State<StorefrontScreen> {
                 top: 8,
                 right: 8,
                 child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      if (isFav) {
-                        _wishlist.remove(product.id);
-                      } else {
-                        _wishlist.add(product.id);
-                      }
-                    });
-                  },
+                  onTap: () => _toggleWishlist(product),
                   child: CircleAvatar(
                     radius: 14,
                     backgroundColor: Colors.white.withValues(alpha: 0.9),
