@@ -204,4 +204,43 @@ class StorefrontEngineTest extends TestCase
             'name' => 'Fast USB-C Cable 2m',
         ]);
     }
+
+    public function test_storefront_renders_responsive_mobile_and_desktop_search_bars(): void
+    {
+        $response = $this->get('http://pk-digital-test.saas.zoomnearby.com/');
+
+        $response->assertStatus(200);
+        // Dedicated mobile search bar
+        $response->assertSee('md:hidden px-4 pb-3 pt-0', false);
+        // Desktop search bar
+        $response->assertSee('hidden md:block flex-1 max-w-sm mx-4 relative', false);
+        // Live auto-scroll on input
+        $response->assertSee('if (search.trim().length > 0) scrollToProducts()', false);
+    }
+
+    public function test_storefront_renders_dynamic_empty_state_and_horizontal_filter_pills(): void
+    {
+        $response = $this->get('http://pk-digital-test.saas.zoomnearby.com/');
+
+        $response->assertStatus(200);
+        // Dynamic Alpine empty state
+        $response->assertSee('filteredProductsCount === 0', false);
+        $response->assertSee('No products found');
+        $response->assertSee('Reset Filters');
+        // Horizontal scrollable category pills
+        $response->assertSee('overflow-x-auto no-scrollbar', false);
+    }
+
+    public function test_storefront_renders_portuguese_translations_for_empty_state_and_badges(): void
+    {
+        $response = $this->withSession(['locale' => 'pt'])
+            ->get('http://pk-digital-test.saas.zoomnearby.com/');
+
+        $response->assertStatus(200);
+        $response->assertSee('Nenhum produto encontrado');
+        $response->assertSee('Redefinir Filtros');
+        $response->assertSee('Checkout 100% Seguro');
+        $response->assertSee('Envio Rápido');
+    }
 }
+

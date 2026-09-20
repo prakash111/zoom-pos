@@ -226,6 +226,10 @@ class Show extends Component
 
         app(FinancialAnalyticsService::class)->clearCache($this->sale->company_id);
 
+        try {
+            app(\App\Services\Notifications\StorefrontOrderNotificationService::class)->notifyOrderStatusChanged($this->sale, 'completed');
+        } catch (\Throwable $e) {}
+
         session()->flash('status', 'Order accepted, marked as completed, and stock deducted.');
     }
 
@@ -253,6 +257,10 @@ class Show extends Component
         ]);
 
         app(FinancialAnalyticsService::class)->clearCache($this->sale->company_id);
+
+        try {
+            app(\App\Services\Notifications\StorefrontOrderNotificationService::class)->notifyOrderStatusChanged($this->sale, 'cancelled');
+        } catch (\Throwable $e) {}
 
         session()->flash('status', 'Sale cancelled and stock restored.');
     }

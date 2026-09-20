@@ -16,6 +16,27 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(EnsureAppIsInstalled::class)->get('/', [LandingPageController::class, 'index'])->name('home');
 Route::middleware(EnsureAppIsInstalled::class)->get('/store', [\App\Http\Controllers\Tenant\StorefrontController::class, 'index'])->name('tenant.store');
 Route::middleware(EnsureAppIsInstalled::class)->post('/store/order', [\App\Http\Controllers\Tenant\StorefrontController::class, 'placeOrder'])->name('tenant.store.order');
+Route::middleware(EnsureAppIsInstalled::class)->get('/store/account', [\App\Http\Controllers\Tenant\StorefrontController::class, 'account'])->name('tenant.store.account');
+Route::middleware(EnsureAppIsInstalled::class)->get('/store/track/{code}', [\App\Http\Controllers\Tenant\StorefrontController::class, 'trackOrder'])->name('tenant.store.track');
+Route::middleware(EnsureAppIsInstalled::class)->get('/store/payment-methods', [\App\Http\Controllers\Tenant\StorefrontController::class, 'paymentMethods'])->name('tenant.store.payment_methods');
+Route::middleware(EnsureAppIsInstalled::class)->post('/store/coupons/validate', [\App\Http\Controllers\Tenant\StorefrontController::class, 'validateCoupon'])->name('tenant.store.coupon.validate');
+Route::middleware(EnsureAppIsInstalled::class)->get('/store/faqs', [\App\Http\Controllers\Tenant\StorefrontController::class, 'faqsPage'])->name('tenant.store.faqs');
+Route::middleware(EnsureAppIsInstalled::class)->get('/store/api/faqs', [\App\Http\Controllers\Tenant\StorefrontController::class, 'apiFaqs'])->name('tenant.store.api.faqs');
+Route::middleware(EnsureAppIsInstalled::class)->post('/store/auth/send-verification', [\App\Http\Controllers\Tenant\StorefrontController::class, 'sendVerification'])->name('tenant.store.auth.send_verification');
+Route::middleware(EnsureAppIsInstalled::class)->post('/store/auth/verify-code', [\App\Http\Controllers\Tenant\StorefrontController::class, 'verifyCode'])->name('tenant.store.auth.verify_code');
+
+// Storefront Online Payment Gateway Handlers (Razorpay / Stripe)
+Route::middleware(EnsureAppIsInstalled::class)->post('/store/payment/initiate', [\App\Http\Controllers\Tenant\StorefrontController::class, 'initiateGatewayPayment'])->name('tenant.store.payment.initiate');
+Route::middleware(EnsureAppIsInstalled::class)->post('/store/payment/verify', [\App\Http\Controllers\Tenant\StorefrontController::class, 'verifyGatewayPayment'])->name('tenant.store.payment.verify');
+
+// Storefront Product Ratings & Customer Reviews
+Route::middleware(EnsureAppIsInstalled::class)->get('/store/products/{id}/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'index'])->name('tenant.store.reviews.index');
+Route::middleware(EnsureAppIsInstalled::class)->post('/store/products/{id}/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'store'])->name('tenant.store.reviews.store');
+Route::middleware(EnsureAppIsInstalled::class)->get('/store/customer/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'customerReviews'])->name('tenant.store.customer.reviews');
+
+// Social Login Routes for Storefront
+Route::get('/store/auth/{provider}/redirect', [\App\Http\Controllers\Tenant\StorefrontAuthController::class, 'redirectToProvider'])->name('tenant.store.auth.redirect');
+Route::get('/store/auth/{provider}/callback', [\App\Http\Controllers\Tenant\StorefrontAuthController::class, 'handleProviderCallback'])->name('tenant.store.auth.callback');
 
 Route::middleware(EnsureAppIsInstalled::class)->get('/login', function () {
     return redirect()->route('tenant.login');

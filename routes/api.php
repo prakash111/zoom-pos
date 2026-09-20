@@ -93,14 +93,32 @@ Route::get('/storefront/catalog', [\App\Http\Controllers\Tenant\StorefrontContro
 Route::get('/v1/storefront/catalog', [\App\Http\Controllers\Tenant\StorefrontController::class, 'apiCatalog']);
 Route::post('/storefront/order', [\App\Http\Controllers\Tenant\StorefrontController::class, 'placeOrder']);
 Route::post('/v1/storefront/order', [\App\Http\Controllers\Tenant\StorefrontController::class, 'placeOrder']);
+Route::get('/storefront/payment-methods', [\App\Http\Controllers\Tenant\StorefrontController::class, 'paymentMethods']);
+Route::get('/v1/storefront/payment-methods', [\App\Http\Controllers\Tenant\StorefrontController::class, 'paymentMethods']);
+Route::post('/storefront/coupons/validate', [\App\Http\Controllers\Tenant\StorefrontController::class, 'validateCoupon']);
+Route::post('/v1/storefront/coupons/validate', [\App\Http\Controllers\Tenant\StorefrontController::class, 'validateCoupon']);
+Route::get('/storefront/faqs', [\App\Http\Controllers\Tenant\StorefrontController::class, 'apiFaqs']);
+Route::get('/v1/storefront/faqs', [\App\Http\Controllers\Tenant\StorefrontController::class, 'apiFaqs']);
+
+Route::post('/storefront/payment/initiate', [\App\Http\Controllers\Tenant\StorefrontController::class, 'initiateGatewayPayment']);
+Route::post('/v1/storefront/payment/initiate', [\App\Http\Controllers\Tenant\StorefrontController::class, 'initiateGatewayPayment']);
+Route::post('/storefront/payment/verify', [\App\Http\Controllers\Tenant\StorefrontController::class, 'verifyGatewayPayment']);
+Route::post('/v1/storefront/payment/verify', [\App\Http\Controllers\Tenant\StorefrontController::class, 'verifyGatewayPayment']);
+
+Route::get('/storefront/products/{id}/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'index']);
+Route::get('/v1/storefront/products/{id}/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'index']);
+Route::post('/storefront/products/{id}/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'store']);
+Route::post('/v1/storefront/products/{id}/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'store']);
+Route::get('/storefront/customer/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'customerReviews']);
+Route::get('/v1/storefront/customer/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'customerReviews']);
 
 // Storefront Customer Auth, Profile, Wishlist, Addresses, & Authoritative Cart Calculation
-Route::prefix('storefront')->group(function () {
+$storefrontCustomerRoutes = function () {
     Route::post('/customer/register', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'register']);
     Route::post('/customer/login', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'login']);
     Route::post('/customer/logout', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'logout']);
     Route::get('/customer/profile', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'profile']);
-    Route::put('/customer/profile', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'updateProfile']);
+    Route::match(['put', 'post'], '/customer/profile', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'updateProfile']);
     Route::get('/customer/addresses', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'addresses']);
     Route::post('/customer/addresses', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'storeAddress']);
     Route::put('/customer/addresses/{id}', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'updateAddress']);
@@ -110,7 +128,12 @@ Route::prefix('storefront')->group(function () {
     Route::delete('/customer/wishlist/{productId}', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'removeWishlist']);
     Route::get('/customer/orders', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'orders']);
     Route::post('/cart/calculate', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'calculateCart']);
-});
+    Route::post('/customer/send-verification', [\App\Http\Controllers\Tenant\StorefrontController::class, 'sendVerification']);
+    Route::post('/customer/verify-code', [\App\Http\Controllers\Tenant\StorefrontController::class, 'verifyCode']);
+};
+Route::prefix('storefront')->group($storefrontCustomerRoutes);
+Route::prefix('v1/storefront')->group($storefrontCustomerRoutes);
+
 
 // Convenient root aliases for storefront customer features
 Route::get('/addresses', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'addresses']);

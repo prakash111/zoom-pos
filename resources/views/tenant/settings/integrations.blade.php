@@ -51,6 +51,17 @@
         </button>
 
         <button type="button"
+                @click="integrationsTab = 'notifications'"
+                :class="integrationsTab === 'notifications' ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20 font-black' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold border border-slate-200/80 dark:border-slate-800'"
+                class="px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+            <span class="text-sm">🔔</span>
+            <span>{{ __('Verification & Notifications') }}</span>
+            @if($requireCustomerVerification || $enableOrderNotifications)
+                <span class="w-2 h-2 rounded-full bg-rose-300 animate-pulse"></span>
+            @endif
+        </button>
+
+        <button type="button"
                 @click="integrationsTab = 'api_keys'"
                 :class="integrationsTab === 'api_keys' ? 'bg-slate-900 text-white dark:bg-slate-700 shadow-md font-black' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold border border-slate-200/80 dark:border-slate-800'"
                 class="px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
@@ -862,6 +873,272 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Verification & Automated Notifications Panel -->
+    <div x-show="integrationsTab === 'notifications'" x-cloak class="space-y-6">
+
+        <!-- Header Card / System Gateway Status -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center text-2xl font-bold">
+                        🔔
+                    </div>
+                    <div>
+                        <h3 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                            <span>{{ __('Verification & Order Notifications') }}</span>
+                            @if($requireCustomerVerification || $enableOrderNotifications)
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">{{ __('ACTIVE') }}</span>
+                            @else
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 dark:bg-slate-800 text-slate-500">{{ __('OPTIONAL') }}</span>
+                            @endif
+                        </h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            {{ __('Enforce OTP account verification before customers place orders, and automate order status alerts across your configured communication channels.') }}
+                        </p>
+                    </div>
+                </div>
+
+                <button type="button"
+                        wire:click="saveNotificationPreferences"
+                        wire:loading.attr="disabled"
+                        class="px-5 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-black shadow-md shadow-rose-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50">
+                    <span wire:loading.remove wire:target="saveNotificationPreferences">💾</span>
+                    <span wire:loading wire:target="saveNotificationPreferences" class="inline-block animate-spin">⏳</span>
+                    <span>{{ __('Save Preferences') }}</span>
+                </button>
+            </div>
+
+            <!-- Active Channels Banner -->
+            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                <div class="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+                    <span>📡</span>
+                    <span>{{ __('Available Notification Gateways') }}</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">✉️</span>
+                            <div>
+                                <div class="text-xs font-bold text-slate-900 dark:text-white">{{ __('Email (SMTP)') }}</div>
+                                <div class="text-[10px] text-slate-500">{{ $smtpEnabled ? __('Configured & Ready') : __('Disabled in SMTP tab') }}</div>
+                            </div>
+                        </div>
+                        @if($smtpEnabled)
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">ONLINE</span>
+                        @else
+                            <button type="button" @click="integrationsTab = 'smtp'" class="text-[10px] text-rose-600 underline font-bold">Configure</button>
+                        @endif
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">💬</span>
+                            <div>
+                                <div class="text-xs font-bold text-slate-900 dark:text-white">{{ __('SMS') }}</div>
+                                <div class="text-[10px] text-slate-500">{{ $smsEnabled ? __('Configured & Ready') : __('Disabled in SMS tab') }}</div>
+                            </div>
+                        </div>
+                        @if($smsEnabled)
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">ONLINE</span>
+                        @else
+                            <button type="button" @click="integrationsTab = 'sms'" class="text-[10px] text-rose-600 underline font-bold">Configure</button>
+                        @endif
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">🟢</span>
+                            <div>
+                                <div class="text-xs font-bold text-slate-900 dark:text-white">{{ __('WhatsApp') }}</div>
+                                <div class="text-[10px] text-slate-500">{{ $whatsappEnabled ? __('Configured & Ready') : __('Disabled in WhatsApp tab') }}</div>
+                            </div>
+                        </div>
+                        @if($whatsappEnabled)
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">ONLINE</span>
+                        @else
+                            <button type="button" @click="integrationsTab = 'whatsapp'" class="text-[10px] text-rose-600 underline font-bold">Configure</button>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1. Mandatory Customer Verification Before Checkout -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center text-xl font-bold">
+                        🔐
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                            <span>{{ __('Customer Account Verification Before Order Placement') }}</span>
+                            @if($requireCustomerVerification)
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300">{{ __('MANDATORY') }}</span>
+                            @else
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 dark:bg-slate-800 text-slate-500">{{ __('DISABLED') }}</span>
+                            @endif
+                        </h4>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            {{ __('Require customers to verify their identity via a 6-digit OTP passcode before submitting their order.') }}
+                        </p>
+                    </div>
+                </div>
+
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" wire:model.live="requireCustomerVerification" class="sr-only peer">
+                    <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-600"></div>
+                    <span class="ml-2.5 text-xs font-bold text-slate-800 dark:text-slate-200">{{ __('Require Verification') }}</span>
+                </label>
+            </div>
+
+            <div class="space-y-4">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    {{ __('Dispatch Verification Codes via Channels:') }}
+                </label>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <label class="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all">
+                        <input type="checkbox" wire:model="verificationChannels" value="email" class="rounded border-slate-300 text-rose-600 focus:ring-rose-500 mt-0.5">
+                        <div class="text-xs">
+                            <span class="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <span>✉️</span> {{ __('Email (SMTP)') }}
+                            </span>
+                            <span class="text-[11px] text-slate-500 block mt-0.5">{{ __('Dispatches OTP to customer email address.') }}</span>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all">
+                        <input type="checkbox" wire:model="verificationChannels" value="sms" class="rounded border-slate-300 text-rose-600 focus:ring-rose-500 mt-0.5">
+                        <div class="text-xs">
+                            <span class="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <span>💬</span> {{ __('SMS Gateway') }}
+                            </span>
+                            <span class="text-[11px] text-slate-500 block mt-0.5">{{ __('Sends SMS with OTP code to phone number.') }}</span>
+                        </div>
+                    </label>
+
+                    <label class="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all">
+                        <input type="checkbox" wire:model="verificationChannels" value="whatsapp" class="rounded border-slate-300 text-rose-600 focus:ring-rose-500 mt-0.5">
+                        <div class="text-xs">
+                            <span class="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <span>🟢</span> {{ __('WhatsApp') }}
+                            </span>
+                            <span class="text-[11px] text-slate-500 block mt-0.5">{{ __('Sends instant OTP message via WhatsApp.') }}</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-800/40 text-[11px] text-blue-800 dark:text-blue-300 flex items-start gap-2">
+                    <span class="text-sm">ℹ️</span>
+                    <span>{{ __('Verification OTP is automatically routed through enabled gateways. If the customer supplies a phone number, SMS or WhatsApp is used; if an email is provided and SMTP is enabled, an email verification code is dispatched.') }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Automated Order Status Notifications -->
+        <div class="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-xl font-bold">
+                        📦
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                            <span>{{ __('Automated Order Status Notifications') }}</span>
+                            @if($enableOrderNotifications)
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">{{ __('ENABLED') }}</span>
+                            @else
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 dark:bg-slate-800 text-slate-500">{{ __('DISABLED') }}</span>
+                            @endif
+                        </h4>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            {{ __('Automatically dispatch order status updates to your customers via active API gateways.') }}
+                        </p>
+                    </div>
+                </div>
+
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" wire:model.live="enableOrderNotifications" class="sr-only peer">
+                    <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-600"></div>
+                    <span class="ml-2.5 text-xs font-bold text-slate-800 dark:text-slate-200">{{ __('Enable Notifications') }}</span>
+                </label>
+            </div>
+
+            <!-- Channels & Events -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Channels -->
+                <div class="space-y-3">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {{ __('Active Notification Channels:') }}
+                    </label>
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer">
+                            <input type="checkbox" wire:model="orderNotificationChannels" value="email" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                <span>✉️</span> {{ __('Email (Custom SMTP)') }}
+                            </span>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer">
+                            <input type="checkbox" wire:model="orderNotificationChannels" value="sms" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                <span>💬</span> {{ __('SMS') }}
+                            </span>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer">
+                            <input type="checkbox" wire:model="orderNotificationChannels" value="whatsapp" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                <span>🟢</span> {{ __('WhatsApp') }}
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Events -->
+                <div class="space-y-3">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {{ __('Trigger Notifications for Events:') }}
+                    </label>
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer">
+                            <input type="checkbox" wire:model="orderNotificationEvents" value="placed" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-slate-200">🛒 {{ __('Order Placed / Confirmed') }}</span>
+                                <span class="text-[11px] text-slate-500 block">{{ __('Sent immediately when a storefront order is created.') }}</span>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer">
+                            <input type="checkbox" wire:model="orderNotificationEvents" value="completed" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-slate-200">✅ {{ __('Order Completed / Delivered') }}</span>
+                                <span class="text-[11px] text-slate-500 block">{{ __('Sent when the merchant marks the sale as completed.') }}</span>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer">
+                            <input type="checkbox" wire:model="orderNotificationEvents" value="cancelled" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-slate-200">❌ {{ __('Order Cancelled') }}</span>
+                                <span class="text-[11px] text-slate-500 block">{{ __('Sent if an order is cancelled or refunded.') }}</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save Button at bottom -->
+            <div class="pt-4 flex justify-end">
+                <button type="button"
+                        wire:click="saveNotificationPreferences"
+                        wire:loading.attr="disabled"
+                        class="px-6 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-black shadow-md shadow-rose-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50">
+                    <span wire:loading.remove wire:target="saveNotificationPreferences">💾</span>
+                    <span wire:loading wire:target="saveNotificationPreferences" class="inline-block animate-spin">⏳</span>
+                    <span>{{ __('Save Notification Preferences') }}</span>
+                </button>
+            </div>
+        </div>
+
     </div>
 
 </div>

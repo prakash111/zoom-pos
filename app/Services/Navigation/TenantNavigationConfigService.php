@@ -31,6 +31,11 @@ class TenantNavigationConfigService
         'settings_taxes' => 'settings',
         'settings_api' => 'settings',
         'settings_navigation' => 'settings',
+        'settings_storefront' => 'settings',
+        'settings_payments' => 'settings',
+        'settings_coupons' => 'settings',
+        'settings_faqs' => 'settings',
+        'settings_reviews' => 'settings',
     ];
 
     /**

@@ -229,6 +229,13 @@ class Index extends Component
     public string $webhookTestResult = '';
     public string $webhookTestStatus = '';
 
+    // 5. Customer Verification & Order Notifications State
+    public bool $requireCustomerVerification = false;
+    public array $verificationChannels = ['email', 'sms', 'whatsapp'];
+    public bool $enableOrderNotifications = false;
+    public array $orderNotificationChannels = ['email', 'sms', 'whatsapp'];
+    public array $orderNotificationEvents = ['placed', 'completed', 'cancelled'];
+
     // Payment Methods Management Modal State
     public bool $showPaymentMethodModal = false;
 
@@ -330,6 +337,41 @@ class Index extends Component
 
     public bool $hasClaudeApiKey = false;
 
+    // Storefront Promo Banner Settings
+    public bool $storeBannerIsActive = true;
+
+    public string $storeBannerTag = 'SPECIAL STORE DEALS';
+
+    public string $storeBannerTitle = 'Grab Up To 50% Off On Selected Products';
+
+    public string $storeBannerSubtitle = 'Order authentic items online with direct-to-door verified dispatch and real-time inventory.';
+
+    public string $storeBannerCtaText = 'Shop Now';
+
+    public string $storeBannerCtaLink = '#products-section';
+
+    public string $storeBannerImageUrl = '';
+
+    public $storeBannerImageFile = null;
+
+    // Storefront Social Auth Settings (Google OAuth)
+    public bool $enableGoogleLogin = false;
+
+    public string $googleClientId = '';
+
+    public string $googleClientSecret = '';
+
+    // Product Reviews & Ratings Settings
+    public bool $enableProductReviews = true;
+
+    public bool $requireReviewApproval = false;
+
+    public bool $hasStoredGoogleClientSecret = false;
+
+    // Storefront Multi-Gateway Payment Configuration
+    /** @var array<string, array<string, mixed>> */
+    public array $storefrontGateways = [];
+
     public string $activeSection = 'overview';
 
     public function mount(): void
@@ -349,9 +391,13 @@ class Index extends Component
             $this->activeSection = 'integrations';
         } elseif (str_ends_with($routeName, '.navigation') || request()->query('section') === 'navigation') {
             $this->activeSection = 'navigation';
+        } elseif (str_ends_with($routeName, '.storefront') || request()->query('section') === 'storefront') {
+            $this->activeSection = 'storefront';
+        } elseif (str_ends_with($routeName, '.payments') || request()->query('section') === 'payments') {
+            $this->activeSection = 'payments';
         } else {
             $this->activeSection = request()->query('section', 'overview');
-            if (! in_array($this->activeSection, ['overview', 'mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'integrations', 'navigation'])) {
+            if (! in_array($this->activeSection, ['overview', 'mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'integrations', 'navigation', 'storefront', 'payments'])) {
                 $this->activeSection = 'overview';
             }
         }
@@ -516,6 +562,83 @@ class Index extends Component
         $this->webhookSecret = (string) ($webhookCreds['secret'] ?? '');
         $this->webhookEvents = (array) ($webhookCreds['event_types'] ?? ['receipt_generated', 'invoice_created', 'quotation_sent', 'due_reminder']);
 
+        // Storefront Banner & Social Login
+        $this->storeBannerIsActive = (bool) ($this->company->store_banner_is_active ?? true);
+        $this->storeBannerTag = (string) ($this->company->store_banner_tag ?: 'SPECIAL STORE DEALS');
+        $this->storeBannerTitle = (string) ($this->company->store_banner_title ?: 'Grab Up To 50% Off On Selected Products');
+        $this->storeBannerSubtitle = (string) ($this->company->store_banner_subtitle ?: 'Order authentic items online with direct-to-door verified dispatch and real-time inventory.');
+        $this->storeBannerCtaText = (string) ($this->company->store_banner_cta_text ?: 'Shop Now');
+        $this->storeBannerCtaLink = (string) ($this->company->store_banner_cta_link ?: '#products-section');
+        $this->storeBannerImageUrl = (string) ($this->company->store_banner_image_url ?: '');
+
+        $this->enableGoogleLogin = (bool) ($this->company->enable_google_login ?? false);
+        $this->googleClientId = (string) ($this->company->google_client_id ?? '');
+        $this->hasStoredGoogleClientSecret = filled($this->company->google_client_secret ?? null);
+
+        $this->enableProductReviews = (bool) ($this->company->enable_product_reviews ?? true);
+        $this->requireReviewApproval = (bool) ($this->company->require_review_approval ?? false);
+
+        // Customer Verification & Order Notifications
+        $this->requireCustomerVerification = (bool) ($this->company->require_customer_verification ?? false);
+        $this->verificationChannels = (array) ($this->company->verification_channels ?? ['email', 'sms', 'whatsapp']);
+        $this->enableOrderNotifications = (bool) ($this->company->enable_order_notifications ?? false);
+        $this->orderNotificationChannels = (array) ($this->company->order_notification_channels ?? ['email', 'sms', 'whatsapp']);
+        $this->orderNotificationEvents = (array) ($this->company->order_notification_events ?? ['placed', 'completed', 'cancelled']);
+
+        // Storefront Payment Gateways Configuration
+        $existingGateways = (array) ($this->company->storefront_payment_gateways ?? []);
+        $defaultGateways = [
+            'cod' => [
+                'enabled' => true,
+                'name' => 'Cash on Delivery',
+                'instructions' => 'Pay in cash upon physical delivery to the driver or courier.',
+            ],
+            'store_pickup' => [
+                'enabled' => true,
+                'name' => 'Pay at Counter / Store Pickup',
+                'instructions' => 'Collect your items at our counter and pay via any store payment method.',
+            ],
+            'razorpay' => [
+                'enabled' => false,
+                'name' => 'Razorpay (Cards, UPI, NetBanking)',
+                'key_id' => '',
+                'key_secret' => '',
+                'instructions' => 'Fast and secure instant payment via Razorpay checkout.',
+            ],
+            'stripe' => [
+                'enabled' => false,
+                'name' => 'Stripe (Credit / Debit Card)',
+                'publishable_key' => '',
+                'secret_key' => '',
+                'instructions' => 'Pay with Visa, Mastercard, AMEX or digital wallet.',
+            ],
+            'paypal' => [
+                'enabled' => false,
+                'name' => 'PayPal',
+                'client_id' => '',
+                'client_secret' => '',
+                'mode' => 'live',
+                'instructions' => 'Pay safely via your PayPal balance or international credit card.',
+            ],
+            'upi' => [
+                'enabled' => false,
+                'name' => 'Direct UPI / QR Code',
+                'upi_id' => '',
+                'instructions' => 'Scan the merchant UPI QR code or pay to the VPA.',
+            ],
+        ];
+
+        foreach ($defaultGateways as $gwKey => $defaults) {
+            $configured = (array) ($existingGateways[$gwKey] ?? []);
+            $merged = array_merge($defaults, $configured);
+            if (! empty($merged['key_secret']) || ! empty($merged['secret_key']) || ! empty($merged['client_secret'])) {
+                $merged['has_secret'] = true;
+            } else {
+                $merged['has_secret'] = false;
+            }
+            $this->storefrontGateways[$gwKey] = $merged;
+        }
+
         // Ensure default payment methods exist
         PaymentMethod::getForCompany($this->company->id);
     }
@@ -561,6 +684,19 @@ class Index extends Component
             'openaiApiKey' => ['nullable', 'string', 'max:500'],
             'geminiApiKey' => ['nullable', 'string', 'max:500'],
             'claudeApiKey' => ['nullable', 'string', 'max:500'],
+            'storeBannerIsActive' => ['boolean'],
+            'storeBannerTag' => ['nullable', 'string', 'max:100'],
+            'storeBannerTitle' => ['nullable', 'string', 'max:255'],
+            'storeBannerSubtitle' => ['nullable', 'string', 'max:1000'],
+            'storeBannerCtaText' => ['nullable', 'string', 'max:100'],
+            'storeBannerCtaLink' => ['nullable', 'string', 'max:255'],
+            'storeBannerImageUrl' => ['nullable', 'string', 'max:1000'],
+            'storeBannerImageFile' => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp,svg', 'max:3072'],
+            'enableGoogleLogin' => ['boolean'],
+            'googleClientId' => ['nullable', 'string', 'max:255'],
+            'googleClientSecret' => ['nullable', 'string', 'max:255'],
+            'enableProductReviews' => ['boolean'],
+            'requireReviewApproval' => ['boolean'],
         ];
     }
 
@@ -674,6 +810,31 @@ class Index extends Component
         session()->flash('status', 'Favicon removed successfully.');
     }
 
+    public function removeStoreBannerImage(): void
+    {
+        if ($this->company->store_banner_image_url && ! filter_var($this->company->store_banner_image_url, FILTER_VALIDATE_URL)) {
+            $cleanPath = preg_replace('#^/?storage/#', '', $this->company->store_banner_image_url);
+            Storage::disk('public')->delete($cleanPath);
+        }
+
+        $this->company->update(['store_banner_image_url' => null]);
+        $this->storeBannerImageUrl = '';
+        $this->storeBannerImageFile = null;
+        session()->flash('status', 'Storefront banner image removed successfully.');
+    }
+
+    public function resetStoreBannerToDefault(): void
+    {
+        $this->storeBannerTag = 'SPECIAL STORE DEALS';
+        $this->storeBannerTitle = 'Grab Up To 50% Off On Selected Products';
+        $this->storeBannerSubtitle = 'Order authentic items online with direct-to-door verified dispatch and real-time inventory.';
+        $this->storeBannerCtaText = 'Shop Now';
+        $this->storeBannerCtaLink = '#products-section';
+        $this->storeBannerImageUrl = '';
+        $this->storeBannerIsActive = true;
+        session()->flash('status', 'Storefront banner reset to default settings.');
+    }
+
     public function addOtherCurrency(): void
     {
         $this->otherCurrencies[] = ['code' => '', 'name' => '', 'symbol' => '', 'exchange_rate' => 1];
@@ -706,6 +867,40 @@ class Index extends Component
             $path = $this->faviconFile->store('tenant-favicons', 'public');
             $this->favicon = Storage::url($path);
             $this->faviconFile = null;
+        }
+
+        // Handle Storefront Banner Image Upload
+        if ($this->storeBannerImageFile) {
+            $path = $this->storeBannerImageFile->store('tenant-banners', 'public');
+            $this->storeBannerImageUrl = Storage::url($path);
+            $this->storeBannerImageFile = null;
+        }
+
+        // Prepare updated storefront gateways, preserving secrets if blank
+        $currentGateways = (array) ($this->company->storefront_payment_gateways ?? []);
+        $gatewaysToSave = [];
+        foreach ($this->storefrontGateways as $gwKey => $gwData) {
+            $gatewaysToSave[$gwKey] = [
+                'enabled' => (bool) ($gwData['enabled'] ?? false),
+                'name' => (string) ($gwData['name'] ?? ''),
+                'instructions' => (string) ($gwData['instructions'] ?? ''),
+            ];
+            if ($gwKey === 'razorpay') {
+                $gatewaysToSave[$gwKey]['key_id'] = (string) ($gwData['key_id'] ?? '');
+                $newSec = trim((string) ($gwData['key_secret'] ?? ''));
+                $gatewaysToSave[$gwKey]['key_secret'] = $newSec !== '' ? $newSec : (string) ($currentGateways['razorpay']['key_secret'] ?? '');
+            } elseif ($gwKey === 'stripe') {
+                $gatewaysToSave[$gwKey]['publishable_key'] = (string) ($gwData['publishable_key'] ?? '');
+                $newSec = trim((string) ($gwData['secret_key'] ?? ''));
+                $gatewaysToSave[$gwKey]['secret_key'] = $newSec !== '' ? $newSec : (string) ($currentGateways['stripe']['secret_key'] ?? '');
+            } elseif ($gwKey === 'paypal') {
+                $gatewaysToSave[$gwKey]['client_id'] = (string) ($gwData['client_id'] ?? '');
+                $gatewaysToSave[$gwKey]['mode'] = (string) ($gwData['mode'] ?? 'live');
+                $newSec = trim((string) ($gwData['client_secret'] ?? ''));
+                $gatewaysToSave[$gwKey]['client_secret'] = $newSec !== '' ? $newSec : (string) ($currentGateways['paypal']['client_secret'] ?? '');
+            } elseif ($gwKey === 'upi') {
+                $gatewaysToSave[$gwKey]['upi_id'] = (string) ($gwData['upi_id'] ?? '');
+            }
         }
 
         $effectiveTrade = trim((string) $this->tradeName);
@@ -767,7 +962,27 @@ class Index extends Component
             'card_fee_credit_installments' => $this->cardFeeCreditInstallments,
             'barcode_scale_prefix' => $this->barcodeScalePrefix ?: '2',
             'barcode_scale_type' => $this->barcodeScaleType ?: 'weight',
+            'store_banner_is_active' => $this->storeBannerIsActive,
+            'store_banner_tag' => $this->storeBannerTag ?: null,
+            'store_banner_title' => $this->storeBannerTitle ?: null,
+            'store_banner_subtitle' => $this->storeBannerSubtitle ?: null,
+            'store_banner_cta_text' => $this->storeBannerCtaText ?: null,
+            'store_banner_cta_link' => $this->storeBannerCtaLink ?: null,
+            'store_banner_image_url' => $this->storeBannerImageUrl ?: null,
+            'enable_google_login' => $this->enableGoogleLogin,
+            'google_client_id' => $this->googleClientId ?: null,
+            'enable_product_reviews' => $this->enableProductReviews,
+            'require_review_approval' => $this->requireReviewApproval,
+            'storefront_payment_gateways' => $gatewaysToSave,
         ]);
+
+        if (filled($this->googleClientSecret)) {
+            $this->company->update([
+                'google_client_secret' => trim($this->googleClientSecret),
+            ]);
+            $this->hasStoredGoogleClientSecret = true;
+            $this->googleClientSecret = '';
+        }
 
         $this->dispatch('set-ui-accent-color', color: $this->primaryColor ?: '#2563eb');
 
@@ -1029,6 +1244,28 @@ class Index extends Component
 
         session()->flash('status', __('Custom webhook dispatcher configuration saved successfully.'));
         $this->dispatch('toast', ['type' => 'success', 'message' => __('Custom webhook dispatcher configuration saved.')]);
+    }
+
+    public function saveNotificationPreferences(): void
+    {
+        $this->company->update([
+            'require_customer_verification' => $this->requireCustomerVerification,
+            'verification_channels' => array_values(array_filter($this->verificationChannels)),
+            'enable_order_notifications' => $this->enableOrderNotifications,
+            'order_notification_channels' => array_values(array_filter($this->orderNotificationChannels)),
+            'order_notification_events' => array_values(array_filter($this->orderNotificationEvents)),
+        ]);
+
+        Configuration::setForCompany($this->company->id, 'require_customer_verification', $this->requireCustomerVerification ? '1' : '0');
+        Configuration::setForCompany($this->company->id, 'enable_order_notifications', $this->enableOrderNotifications ? '1' : '0');
+
+        AuditLog::record('settings.notifications_updated', $this->company->id, auth('web')->id(), [
+            'require_customer_verification' => $this->requireCustomerVerification,
+            'enable_order_notifications' => $this->enableOrderNotifications,
+        ]);
+
+        session()->flash('status', __('Customer verification and notification preferences saved successfully.'));
+        $this->dispatch('toast', ['type' => 'success', 'message' => __('Notification preferences saved.')]);
     }
 
     public function toggleGateway(string $channel): void

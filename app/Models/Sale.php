@@ -12,7 +12,7 @@ class Sale extends Model
     use TracksSyncState;
 
     protected $fillable = [
-        'company_id', 'external_id', 'sale_number', 'customer_id', 'lead_id', 'customer_name', 'user_id', 'cash_register_id',
+        'company_id', 'external_id', 'sale_number', 'tracking_code', 'customer_id', 'lead_id', 'customer_name', 'user_id', 'cash_register_id',
         'total', 'net_amount', 'discount', 'payment_method', 'agreed_payment_method', 'installments', 'status', 'is_demo', 'items', 'operation_type', 'gst_invoice',
         'service_type', 'dining_table_id', 'table_name', 'guest_count', 'pickup_time',
         'delivery_address', 'driver_name', 'driver_phone', 'dispatch_status', 'kot_status',
@@ -228,6 +228,52 @@ class Sale extends Model
     public function getQuotationNumberAttribute(): ?string
     {
         return $this->sale_number ?: (string) $this->id;
+    }
+
+    public function couponUsage(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(CouponUsage::class, 'sale_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Sale $sale) {
+            if (empty($sale->tracking_code)) {
+                $sale->tracking_code = 'TRK-' . strtoupper(\Illuminate\Support\Str::random(8));
+            }
+        });
+    }
+
+    /**
+     * Map sale status to normalized tracking stages:
+     * Placed -> Confirmed -> Preparing -> Out for Delivery -> Delivered (or Cancelled)
+     */
+    public function getTrackingStatus(): string
+    {
+        $status = strtolower($this->status ?? 'pending');
+        $dispatch = strtolower($this->dispatch_status ?? '');
+
+        if (in_array($status, ['cancelled', 'canceled', 'void', 'refunded'], true)) {
+            return 'Cancelled';
+        }
+
+        if (in_array($dispatch, ['delivered', 'completed'], true) || in_array($status, ['delivered', 'completed'], true)) {
+            return 'Delivered';
+        }
+
+        if (in_array($dispatch, ['out_for_delivery', 'dispatched', 'in_transit', 'on_way'], true)) {
+            return 'Out for Delivery';
+        }
+
+        if (in_array($dispatch, ['preparing', 'packing', 'processing', 'in_kitchen'], true) || in_array($status, ['processing', 'preparing'], true)) {
+            return 'Preparing';
+        }
+
+        if (in_array($status, ['confirmed', 'accepted', 'approved'], true) || in_array($dispatch, ['confirmed', 'assigned'], true)) {
+            return 'Confirmed';
+        }
+
+        return 'Placed';
     }
 }
 

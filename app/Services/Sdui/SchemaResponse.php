@@ -12,8 +12,10 @@ use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\Configuration;
+use App\Models\Coupon;
 use App\Models\Customer;
 use App\Models\CustomNotificationChannel;
+use App\Models\Faq;
 use App\Models\DiningFloor;
 use App\Models\DiningTable;
 use App\Models\KitchenTicket;
@@ -1650,6 +1652,93 @@ class SchemaResponse
                     'reload' => true,
                 ], 'delete_forever'),
             ], ['color' => '#fef2f2', 'border_color' => '#fecaca']),
+        ]);
+    }
+
+    public static function couponsView(Company $company): array
+    {
+        $coupons = Coupon::where('company_id', $company->id)->orderByDesc('id')->get();
+        $activeCount = $coupons->where('is_active', true)->count();
+        $totalCount = $coupons->count();
+
+        $couponCards = [];
+        foreach ($coupons as $coupon) {
+            $discountText = $coupon->discount_type === 'percentage'
+                ? "{$coupon->discount_value}% OFF"
+                : "{$company->currency_symbol}{$coupon->discount_value} OFF";
+
+            $couponCards[] = self::card([
+                self::row([
+                    self::badge($coupon->code, '#059669', 'solid'),
+                    self::badge($discountText, '#2563eb', 'subtle'),
+                    self::badge($coupon->is_active ? 'ACTIVE' : 'INACTIVE', $coupon->is_active ? '#10b981' : '#ef4444', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::column([
+                    self::text($coupon->description ?: 'Discount coupon', 'body_medium'),
+                    self::text("Min Spend: {$company->currency_symbol}" . number_format((float) $coupon->min_order_amount, 2) . ($coupon->max_discount_amount ? " • Cap: {$company->currency_symbol}" . number_format((float) $coupon->max_discount_amount, 2) : ''), 'body_small', ['color' => '#64748b']),
+                    self::text("Usage: {$coupon->used_count}" . ($coupon->usage_limit_total ? " / {$coupon->usage_limit_total}" : ' (Unlimited)') . " • Per Customer: {$coupon->usage_limit_per_customer}", 'body_small', ['color' => '#64748b']),
+                ]),
+            ]);
+        }
+
+        if (empty($couponCards)) {
+            $couponCards[] = self::card([
+                self::column([
+                    self::text('No Coupons Configured', 'title_medium', ['bold' => true]),
+                    self::text('Create coupon codes to offer promotions and discounts to your customers.', 'body_small', ['color' => '#6b7280']),
+                ]),
+            ]);
+        }
+
+        return self::screen('Coupons & Discounts', [
+            self::card([
+                self::row([
+                    self::column([
+                        self::text('Promotional Coupons & Discounts', 'title_medium', ['bold' => true]),
+                        self::text('Manage coupon codes, percentage/fixed discounts, and usage limits.', 'body_small', ['color' => '#6b7280']),
+                    ]),
+                    self::badge("{$activeCount} Active / {$totalCount} Total", '#059669', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+            ]),
+            ...$couponCards,
+        ]);
+    }
+
+    public static function faqsView(Company $company): array
+    {
+        $faqs = Faq::where('company_id', $company->id)->ordered()->get();
+        if ($faqs->isEmpty()) {
+            Faq::seedDefaultsForCompany($company->id);
+            $faqs = Faq::where('company_id', $company->id)->ordered()->get();
+        }
+
+        $faqCards = [];
+        foreach ($faqs as $faq) {
+            $faqCards[] = self::card([
+                self::row([
+                    self::badge($faq->category ?: 'General', '#059669', 'subtle'),
+                    self::badge($faq->is_active ? 'ACTIVE' : 'INACTIVE', $faq->is_active ? '#10b981' : '#ef4444', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::column([
+                    self::text($faq->question, 'title_small', ['bold' => true]),
+                    self::text($faq->answer, 'body_small', ['color' => '#475569']),
+                ]),
+            ]);
+        }
+
+        return self::screen('Store FAQs & Help Center', [
+            self::card([
+                self::row([
+                    self::column([
+                        self::text('Frequently Asked Questions', 'title_medium', ['bold' => true]),
+                        self::text('Manage questions and answers displayed to your storefront customers.', 'body_small', ['color' => '#6b7280']),
+                    ]),
+                    self::badge($faqs->count() . ' FAQs', '#059669', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+            ]),
+            ...$faqCards,
         ]);
     }
 
@@ -7005,6 +7094,8 @@ class SchemaResponse
             'settings-form-labels', 'form-labels', 'custom-form-fields' => self::formLabelsView($company),
             'settings-notifications', 'notifications', 'custom-notifications' => self::notificationsView($company),
             'settings-advanced', 'advanced', 'danger-zone' => self::advancedView($company),
+            'settings-coupons', 'coupons' => self::couponsView($company),
+            'settings-faqs', 'faqs' => self::faqsView($company),
             'restaurant-tables', 'tables', 'floor-plan' => self::restaurantTablesView($company),
             'restaurant-kds', 'kds', 'kitchen-display' => self::restaurantKdsView($company),
             'restaurant-pos' => self::restaurantPosView($company),

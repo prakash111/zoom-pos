@@ -38,7 +38,6 @@ class TenantNavigationComposer
         $isRestaurantMode = $company->isRestaurantMode();
         $type = strtoupper((string) ($company->business_type ?? $company->store_type ?? ''));
         $hasRestaurant = $company->hasModule('restaurant') || $type === 'RESTAURANT';
-        $hasRetail = $company->hasModule('retail') || ! $isRestaurantMode;
         $isPharmacy = $company->hasModule('pharmacy') || $type === 'PHARMACY';
         $isSalon = $company->hasModule('service_booking') || $company->hasModule('salon')
             || in_array($activeVertical, ['salon', 'salon_bookings', 'beauty'], true) || $type === 'SALON';
@@ -50,6 +49,12 @@ class TenantNavigationComposer
                 'demo@zoomnearby.com',
                 'allmodules.demo@zoomnearby.com',
             ], true);
+
+        $isVerticalOnly = in_array($type, ['SALON', 'PHARMACY', 'RESTAURANT', 'REPAIR', 'REPAIRS'], true)
+            && ! (is_array($company->licensed_modules) && in_array('retail', $company->licensed_modules, true))
+            && ! in_array($company->pos_mode, ['retail', 'general', 'general_retail'], true);
+
+        $hasRetail = ! $isVerticalOnly && ($company->hasModule('retail') || $company->isGeneralMode() || (! $isRestaurantMode && ! $isPharmacy && ! $isSalon && ! $isRepair));
 
         $isQuotes = $this->request->routeIs('tenant.quotes.*') || $this->request->routeIs('tenant.quotations.*');
         $isSalesTargets = $this->request->routeIs('tenant.sales-targets.*');

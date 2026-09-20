@@ -39,17 +39,45 @@ class Index extends Component
 
     public int $invoiceLimit = -1;
 
+    public int $productsLimit = -1;
+
     public int $deviceLimit = 3;
 
     public int $staffLimit = 5;
 
     public array $extensions = [];
 
+    public string $customExtensionInput = '';
+
     public string $customFeaturesText = '';
 
     public bool $featureMultiLocation = false;
 
     public bool $featureAutomaticBackup = false;
+
+    public bool $featureOnlineStore = true;
+
+    public bool $featureQuotations = true;
+
+    public bool $featureConsignments = true;
+
+    public bool $featureCashRegister = true;
+
+    public bool $featureCustomerCrm = true;
+
+    public bool $featureAnalyticsReports = true;
+
+    public bool $featureRestaurantMode = false;
+
+    public bool $featureServiceBooking = false;
+
+    public bool $featureRepairWorkbench = false;
+
+    public bool $featurePharmacyBatches = false;
+
+    public bool $featureThermalPrinting = true;
+
+    public bool $featureApiAccess = true;
 
     protected function rules(): array
     {
@@ -65,6 +93,7 @@ class Index extends Component
             'limitStorageMb' => ['required', 'integer', 'min:0'],
             'limitBranches' => ['required', 'integer', 'min:0'],
             'invoiceLimit' => ['required', 'integer', 'min:-1'],
+            'productsLimit' => ['required', 'integer', 'min:-1'],
             'deviceLimit' => ['required', 'integer', 'min:-1'],
             'staffLimit' => ['required', 'integer', 'min:-1'],
             'extensions' => ['nullable', 'array'],
@@ -72,13 +101,27 @@ class Index extends Component
         ];
     }
 
+    public function addCustomExtension(): void
+    {
+        $slug = strtolower(trim(preg_replace('/[^a-zA-Z0-9_-]/', '', $this->customExtensionInput)));
+        if (! empty($slug)) {
+            if (! in_array($slug, $this->extensions, true)) {
+                $this->extensions[] = $slug;
+            }
+            $this->customExtensionInput = '';
+        }
+    }
+
     public function newPlan(): void
     {
         $this->reset([
             'editingName', 'name', 'displayName', 'billingCycle', 'durationDays', 'price', 'currency',
             'active', 'limitUsers', 'limitDevices', 'limitStorageMb', 'limitBranches',
-            'invoiceLimit', 'deviceLimit', 'staffLimit', 'extensions', 'customFeaturesText',
-            'featureMultiLocation', 'featureAutomaticBackup',
+            'invoiceLimit', 'productsLimit', 'deviceLimit', 'staffLimit', 'extensions', 'customFeaturesText',
+            'featureMultiLocation', 'featureAutomaticBackup', 'featureOnlineStore', 'featureQuotations',
+            'featureConsignments', 'featureCashRegister', 'featureCustomerCrm', 'featureAnalyticsReports',
+            'featureRestaurantMode', 'featureServiceBooking', 'featureRepairWorkbench',
+            'featurePharmacyBatches', 'featureThermalPrinting', 'featureApiAccess',
         ]);
         $this->billingCycle = 'monthly';
         $this->durationDays = 30;
@@ -89,10 +132,20 @@ class Index extends Component
         $this->limitStorageMb = 1024;
         $this->limitBranches = 1;
         $this->invoiceLimit = -1;
+        $this->productsLimit = -1;
         $this->deviceLimit = 3;
         $this->staffLimit = 5;
         $this->extensions = [];
+        $this->customExtensionInput = '';
         $this->customFeaturesText = '';
+        $this->featureOnlineStore = true;
+        $this->featureQuotations = true;
+        $this->featureConsignments = true;
+        $this->featureCashRegister = true;
+        $this->featureCustomerCrm = true;
+        $this->featureAnalyticsReports = true;
+        $this->featureThermalPrinting = true;
+        $this->featureApiAccess = true;
         $this->showForm = true;
     }
 
@@ -110,18 +163,38 @@ class Index extends Component
         $this->staffLimit = $plan->staff_limit ?? ($plan->limits['usuarios'] ?? 5);
         $this->deviceLimit = $plan->device_limit ?? ($plan->limits['dispositivos'] ?? 3);
         $this->invoiceLimit = $plan->invoice_limit ?? ($plan->limits['invoices'] ?? -1);
+        $this->productsLimit = $plan->products_limit ?? ($plan->limits['products'] ?? -1);
         $this->limitUsers = $this->staffLimit;
         $this->limitDevices = $this->deviceLimit;
         $this->limitStorageMb = $plan->limits['armazenamento_mb'] ?? 1024;
         $this->limitBranches = $plan->limits['filiais'] ?? 1;
         $this->extensions = is_array($plan->extensions) ? $plan->extensions : [];
+        $this->customExtensionInput = '';
         $this->featureMultiLocation = (bool) ($plan->features['multi_location'] ?? false);
         $this->featureAutomaticBackup = (bool) ($plan->features['automatic_backup'] ?? false);
+        $this->featureOnlineStore = (bool) ($plan->features['online_store'] ?? true);
+        $this->featureQuotations = (bool) ($plan->features['quotations'] ?? true);
+        $this->featureConsignments = (bool) ($plan->features['consignments'] ?? true);
+        $this->featureCashRegister = (bool) ($plan->features['cash_register'] ?? true);
+        $this->featureCustomerCrm = (bool) ($plan->features['customer_crm'] ?? true);
+        $this->featureAnalyticsReports = (bool) ($plan->features['analytics_reports'] ?? true);
+        $this->featureRestaurantMode = (bool) ($plan->features['restaurant_mode'] ?? false);
+        $this->featureServiceBooking = (bool) ($plan->features['service_booking'] ?? false);
+        $this->featureRepairWorkbench = (bool) ($plan->features['repair_workbench'] ?? false);
+        $this->featurePharmacyBatches = (bool) ($plan->features['pharmacy_batches'] ?? false);
+        $this->featureThermalPrinting = (bool) ($plan->features['thermal_printing'] ?? true);
+        $this->featureApiAccess = (bool) ($plan->features['api_access'] ?? true);
+
+        $knownFeatureKeys = [
+            'multi_location', 'automatic_backup', 'online_store', 'quotations', 'consignments',
+            'cash_register', 'customer_crm', 'analytics_reports', 'restaurant_mode',
+            'service_booking', 'repair_workbench', 'pharmacy_batches', 'thermal_printing', 'api_access',
+        ];
 
         $custom = [];
         if (is_array($plan->features)) {
             foreach ($plan->features as $k => $v) {
-                if ($k === 'multi_location' || $k === 'automatic_backup') {
+                if (in_array($k, $knownFeatureKeys, true)) {
                     continue;
                 }
                 if (is_string($v) && is_numeric($k)) {
@@ -144,6 +217,18 @@ class Index extends Component
         $features = [
             'multi_location' => $this->featureMultiLocation,
             'automatic_backup' => $this->featureAutomaticBackup,
+            'online_store' => $this->featureOnlineStore,
+            'quotations' => $this->featureQuotations,
+            'consignments' => $this->featureConsignments,
+            'cash_register' => $this->featureCashRegister,
+            'customer_crm' => $this->featureCustomerCrm,
+            'analytics_reports' => $this->featureAnalyticsReports,
+            'restaurant_mode' => $this->featureRestaurantMode,
+            'service_booking' => $this->featureServiceBooking,
+            'repair_workbench' => $this->featureRepairWorkbench,
+            'pharmacy_batches' => $this->featurePharmacyBatches,
+            'thermal_printing' => $this->featureThermalPrinting,
+            'api_access' => $this->featureApiAccess,
         ];
 
         if (! empty(trim($this->customFeaturesText))) {
@@ -164,6 +249,7 @@ class Index extends Component
                 'currency' => strtoupper($data['currency']),
                 'active' => $this->active,
                 'invoice_limit' => $this->invoiceLimit,
+                'products_limit' => $this->productsLimit,
                 'device_limit' => $this->limitDevices !== 3 ? $this->limitDevices : $this->deviceLimit,
                 'staff_limit' => $this->limitUsers !== 5 ? $this->limitUsers : $this->staffLimit,
                 'extensions' => array_values(array_unique(array_filter($this->extensions))),
@@ -171,6 +257,7 @@ class Index extends Component
                     'usuarios' => $this->limitUsers !== 5 ? $this->limitUsers : $this->staffLimit,
                     'dispositivos' => $this->limitDevices !== 3 ? $this->limitDevices : $this->deviceLimit,
                     'invoices' => $this->invoiceLimit,
+                    'products' => $this->productsLimit,
                     'armazenamento_mb' => $this->limitStorageMb,
                     'filiais' => $this->limitBranches,
                 ],
@@ -202,7 +289,7 @@ class Index extends Component
     {
         $keys = \App\Services\Modular\ModuleRegistry::extensionKeys();
         $fromConfig = (array) config('modules.extensions', []);
-        $allKeys = array_values(array_unique(array_merge($keys, $fromConfig)));
+        $allKeys = array_values(array_unique(array_merge($keys, $fromConfig, $this->extensions)));
 
         $catalog = collect(config('modules.catalog', []))->keyBy('slug');
         $allModules = \App\Services\Modular\ModuleRegistry::allModules();

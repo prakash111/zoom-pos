@@ -40,3 +40,4 @@ docker-compose.override.yml
 /nativephp_debug.json
 /public/*.apk
 /public/cart.png
+/.claude

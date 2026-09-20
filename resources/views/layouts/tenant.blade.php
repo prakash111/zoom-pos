@@ -841,9 +841,9 @@
                             </div>
                         </div>
 
-                    @elseif ($isAllModulesDemo || (! $isPharmacy && ! $isSalon && ! $isRepair)
+                    @elseif ($hasRetail || $isAllModulesDemo || (! $isPharmacy && ! $isSalon && ! $isRepair
                         && ! in_array(strtoupper((string) (auth()->user()?->company?->business_type
-                            ?? auth()->user()?->company?->store_type ?? '')), ['SALON', 'PHARMACY', 'RESTAURANT', 'REPAIR', 'REPAIRS'], true))
+                            ?? auth()->user()?->company?->store_type ?? '')), ['SALON', 'PHARMACY', 'RESTAURANT', 'REPAIR', 'REPAIRS'], true)))
                         <!-- GENERAL RETAIL DRAWER ITEMS -->
                         <div data-section-key="cashier_sales">
                             <div class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 px-3">{{ __('Cashier & Sales') }}</div>
@@ -949,6 +949,9 @@
                                     <x-nav.drawer-link item-key="settings_taxes" :route="route('tenant.settings.taxes')" :title="__('Taxes & Compliance')" />
                                     <x-nav.drawer-link item-key="settings_api" :route="route('tenant.settings.integrations')" :title="__('API & Integrations')" />
                                     <x-nav.drawer-link item-key="settings_navigation" :route="route('tenant.settings.navigation')" :title="__('Navigation Menu')" />
+                                    <x-nav.drawer-link item-key="settings_coupons" :route="route('tenant.settings.coupons')" :title="__('Coupons & Discounts')" />
+                                    <x-nav.drawer-link item-key="settings_faqs" :route="route('tenant.settings.faqs')" :title="__('Store FAQs')" />
+                                    <x-nav.drawer-link item-key="settings_reviews" :route="route('tenant.settings.reviews')" :title="__('Product Reviews')" />
                                 </div>
                             @endif
 
@@ -1279,7 +1282,7 @@
                             <a wire:navigate.hover x-show="isItemVisible('pos')" href="{{ route('tenant.sales.create') }}"
                                class="hidden sm:inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white font-bold text-xs transition shadow-xs">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                                <span>{{ __("Casier POS") }}</span>
+                                <span>{{ __("Cashier POS") }}</span>
                             </a>
                         @endunless
                     @endif

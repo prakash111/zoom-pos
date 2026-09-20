@@ -79,8 +79,13 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Invoice Limit (-1 = Unlimited)</label>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Monthly Invoice Limit (-1 = Unlimited)</label>
                     <input type="number" wire:model="invoiceLimit" placeholder="-1" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Catalog Products Limit (-1 = Unlimited)</label>
+                    <input type="number" wire:model="productsLimit" placeholder="-1" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
                 </div>
 
                 <div>
@@ -88,13 +93,30 @@
                     <input type="number" wire:model="limitStorageMb" placeholder="2048" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
                 </div>
 
-                <div class="sm:col-span-2">
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Bundled Extensions & Add-ons</label>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Max Branches / Locations</label>
+                    <input type="number" wire:model="limitBranches" placeholder="1" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500">
+                </div>
+
+                <!-- Bundled Extensions & Future Extension Adder -->
+                <div class="sm:col-span-2 lg:col-span-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 space-y-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <label class="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-200">Bundled Extensions & Add-ons</label>
+                            <p class="text-[11px] text-slate-400">Select pre-registered extensions or dynamically attach any future extension</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="text" wire:model="customExtensionInput" wire:keydown.enter.prevent="addCustomExtension" placeholder="Extension slug (e.g. crm_pro)" class="rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-900 text-xs py-1.5 px-3 focus:ring-indigo-500">
+                            <button type="button" wire:click="addCustomExtension" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shrink-0 cursor-pointer">+ Add Extension</button>
+                        </div>
+                    </div>
+
                     <div class="flex flex-wrap gap-4 pt-1">
                         @forelse ($this->availableExtensions as $extKey => $extLabel)
-                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <label class="inline-flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xs hover:border-indigo-400 transition">
                                 <input type="checkbox" wire:model="extensions" value="{{ $extKey }}" class="rounded-md text-indigo-600 focus:ring-indigo-500">
-                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $extLabel }}</span>
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-200">{{ $extLabel }}</span>
+                                <span class="text-[10px] font-mono text-slate-400">({{ $extKey }})</span>
                             </label>
                         @empty
                             <span class="text-xs text-slate-400">No extensions registered in catalog.</span>
@@ -102,8 +124,114 @@
                     </div>
                 </div>
 
+                <!-- Tenant Feature Toggles -->
+                <div class="sm:col-span-2 lg:col-span-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 space-y-3">
+                    <div>
+                        <label class="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-200">Included Tenant Features & Modules</label>
+                        <p class="text-[11px] text-slate-400">Toggle all native business features provided to tenants on this plan</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition">
+                            <input type="checkbox" wire:model="featureOnlineStore" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-white block">🛒 Online Store & Catalog</span>
+                                <span class="text-[10px] text-slate-400 block">Public storefront with live POS sync</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition">
+                            <input type="checkbox" wire:model="featureCustomerCrm" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-white block">👥 Customer CRM & Loyalty</span>
+                                <span class="text-[10px] text-slate-400 block">Ledgers, credit limits, points</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition">
+                            <input type="checkbox" wire:model="featureQuotations" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-white block">📄 Quotations & Proposals</span>
+                                <span class="text-[10px] text-slate-400 block">Convert quotes directly into sales</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition">
+                            <input type="checkbox" wire:model="featureConsignments" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-white block">🚚 Consignments Management</span>
+                                <span class="text-[10px] text-slate-400 block">Third-party stock & settlements</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition">
+                            <input type="checkbox" wire:model="featureCashRegister" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-white block">💵 Cash Register & Shifts</span>
+                                <span class="text-[10px] text-slate-400 block">Open/close shifts, cash movements</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition">
+                            <input type="checkbox" wire:model="featureAnalyticsReports" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-white block">📊 Advanced Analytics & Reports</span>
+                                <span class="text-[10px] text-slate-400 block">Revenue, tax, & staff profit audits</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition">
+                            <input type="checkbox" wire:model="featureRestaurantMode" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-white block">🍽️ Restaurant & KDS Mode</span>
+                                <span class="text-[10px] text-slate-400 block">Tables, KOT slips, kitchen dispatch</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition">
+                            <input type="checkbox" wire:model="featureServiceBooking" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-white block">✂️ Salon & Service Bookings</span>
+                                <span class="text-[10px] text-slate-400 block">Specialists & appointment scheduling</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition">
+                            <input type="checkbox" wire:model="featureRepairWorkbench" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-white block">🔧 Repair & Service Workbench</span>
+                                <span class="text-[10px] text-slate-400 block">Device intake, parts & diagnosis</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition">
+                            <input type="checkbox" wire:model="featurePharmacyBatches" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-white block">💊 Pharmacy Batch Tracking</span>
+                                <span class="text-[10px] text-slate-400 block">Expiry dates & prescription dispensing</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition">
+                            <input type="checkbox" wire:model="featureThermalPrinting" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-white block">🖨️ Thermal & Barcode Setup</span>
+                                <span class="text-[10px] text-slate-400 block">58/80mm ESC/POS, Bluetooth, USB</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-400 transition">
+                            <input type="checkbox" wire:model="featureApiAccess" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-800 dark:text-white block">⚡ API & Webhooks Access</span>
+                                <span class="text-[10px] text-slate-400 block">Developer endpoints & integrations</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="sm:col-span-3">
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Marketing Features & Badges (One per line)</label>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Additional Marketing Highlights (One per line)</label>
                     <textarea wire:model="customFeaturesText" rows="3" placeholder="Real-time Inventory Sync&#10;Thermal Receipt & Barcode Printing&#10;Advanced Sales Analytics" class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-medium focus:ring-indigo-500"></textarea>
                 </div>
 
@@ -169,12 +297,22 @@
                         </li>
                         <li class="flex items-center gap-2">
                             <span class="text-emerald-500 font-bold">✓</span>
+                            <span>{{ ($plan->products_limit ?? -1) === -1 ? 'Unlimited' : number_format($plan->products_limit) }} Catalog Products</span>
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-emerald-500 font-bold">✓</span>
                             <span>{{ ($plan->staff_limit ?? -1) === -1 ? 'Unlimited' : ($plan->staff_limit ?? $plan->limits['usuarios'] ?? '∞') }} Staff Users &middot; {{ ($plan->device_limit ?? -1) === -1 ? 'Unlimited' : ($plan->device_limit ?? $plan->limits['dispositivos'] ?? '∞') }} POS Devices</span>
                         </li>
                         <li class="flex items-center gap-2">
                             <span class="text-emerald-500 font-bold">✓</span>
                             <span>{{ $plan->limits['armazenamento_mb'] ?? '∞' }} MB Cloud Storage</span>
                         </li>
+                        @if (!empty($plan->features['online_store']))
+                            <li class="flex items-center gap-2">
+                                <span class="text-emerald-500 font-bold">✓</span>
+                                <span>Online Storefront & Digital Menu</span>
+                            </li>
+                        @endif
                         @if (!empty($plan->features['multi_location']))
                             <li class="flex items-center gap-2">
                                 <span class="text-emerald-500 font-bold">✓</span>

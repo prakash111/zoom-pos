@@ -1,7 +1,7 @@
 <div class="w-full space-y-6"
      x-data="{
          activeTab: @js($activeSection),
-         validTabs: ['overview', 'mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'integrations', 'navigation']
+         validTabs: ['overview', 'mode', 'profile', 'receipts', 'financial', 'taxes', 'api', 'integrations', 'navigation', 'storefront', 'payments', 'coupons', 'faqs', 'reviews']
      }"
      x-init="
          if (window.location.hash && validTabs.includes(window.location.hash.substring(1))) {
@@ -43,7 +43,12 @@
                 'taxes': '{{ __('Taxes & Compliance') }}',
                 'api': '{{ __('API & Integrations') }}',
                 'integrations': '{{ __('API & Integrations') }}',
-                'navigation': '{{ __('Navigation Menu') }}'
+                'navigation': '{{ __('Navigation Menu') }}',
+                'storefront': '{{ __('Storefront Promo Banner & Auth') }}',
+                'payments': '{{ __('Storefront Payment Gateways') }}',
+                'coupons': '{{ __('Coupons & Discounts') }}',
+                'faqs': '{{ __('Store FAQs & Help Center') }}',
+                'reviews': '{{ __('Product Ratings & Reviews') }}'
             }[activeTab] || '{{ __('Settings') }}'"></span>
         </div>
         <a href="{{ route('tenant.settings.index') }}" wire:navigate class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-extrabold text-slate-700 dark:text-slate-200 transition active:scale-95 shadow-2xs">
@@ -134,6 +139,56 @@
            class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
             <span class="text-sm">🧭</span>
             <span>{{ __('Navigation Menu') }}</span>
+        </a>
+
+        <!-- Tab 8: Storefront Promo & Auth -->
+        <a href="{{ route('tenant.settings.storefront') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'storefront' ? 'true' : 'false'"
+           :class="activeTab === 'storefront' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+            <span class="text-sm">🛍️</span>
+            <span>{{ __('Storefront Banner & Auth') }}</span>
+        </a>
+
+        <!-- Tab 9: Storefront Payments -->
+        <a href="{{ route('tenant.settings.payments') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'payments' ? 'true' : 'false'"
+           :class="activeTab === 'payments' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+            <span class="text-sm">💳</span>
+            <span>{{ __('Payment Gateways') }}</span>
+        </a>
+
+        <!-- Tab 10: Coupons & Discounts -->
+        <a href="{{ route('tenant.coupons.index') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'coupons' ? 'true' : 'false'"
+           :class="activeTab === 'coupons' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+            <span class="text-sm">🏷️</span>
+            <span>{{ __('Coupons & Discounts') }}</span>
+        </a>
+
+        <!-- Tab 11: Store FAQs -->
+        <a href="{{ route('tenant.faqs.index') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'faqs' ? 'true' : 'false'"
+           :class="activeTab === 'faqs' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+            <span class="text-sm">❓</span>
+            <span>{{ __('Store FAQs & Help') }}</span>
+        </a>
+
+        <!-- Tab 12: Product Reviews & Ratings -->
+        <a href="{{ route('tenant.reviews.index') }}"
+           wire:navigate
+           :aria-selected="activeTab === 'reviews' ? 'true' : 'false'"
+           :class="activeTab === 'reviews' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black active' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold'"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer">
+            <span class="text-sm">⭐</span>
+            <span>{{ __('Ratings & Reviews') }}</span>
         </a>
     </div>
 
@@ -279,6 +334,91 @@
                 </div>
                 <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
                     <span>{{ __('Customize Navigation') }}</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+            </a>
+
+            <!-- Card 8: Storefront Promo Banner & Auth -->
+            <a href="{{ route('tenant.settings.storefront') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-2xl font-bold">
+                        🛍️
+                    </div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{{ __('Storefront Banner & Auth') }}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {{ __('Customize the hero promo banner tag, title, CTA link, active state, and Google Social Login credentials.') }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
+                    <span>{{ __('Customize Storefront') }}</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+            </a>
+
+            <!-- Card 9: Storefront Payment Gateways -->
+            <a href="{{ route('tenant.settings.payments') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl font-bold">
+                        💳
+                    </div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{{ __('Storefront Payment Gateways') }}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {{ __('Configure COD, Counter Pickup, Razorpay, Stripe, PayPal, and UPI for your online storefront checkout.') }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
+                    <span>{{ __('Configure Gateways') }}</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+            </a>
+
+            <!-- Card 10: Coupon Management & Discounts -->
+            <a href="{{ route('tenant.settings.coupons') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-2xl font-bold">
+                        🏷️
+                    </div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{{ __('Coupons & Discounts') }}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {{ __('Create discount promo codes, percentage or fixed reductions, minimum order limits, usage quotas, and expiration dates.') }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
+                    <span>{{ __('Manage Coupons') }}</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+            </a>
+
+            <!-- Card 11: Store FAQs & Help Center -->
+            <a href="{{ route('tenant.settings.faqs') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center text-2xl font-bold">
+                        ❓
+                    </div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{{ __('Store FAQs & Help Center') }}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {{ __('Add and organize customer FAQs, delivery information, payment guidance, and return policies displayed directly on your public store.') }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
+                    <span>{{ __('Manage Store FAQs') }}</span>
+                    <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+            </a>
+
+            <!-- Card 12: Product Ratings & Reviews -->
+            <a href="{{ route('tenant.settings.reviews') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-amber-500 dark:hover:border-amber-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-2xl font-bold">
+                        ⭐
+                    </div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition">{{ __('Product Ratings & Reviews') }}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {{ __('Enable or disable storefront product reviews, set approval requirements, and moderate customer ratings and comments.') }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-black text-amber-600 dark:text-amber-400">
+                    <span>{{ __('Manage Reviews') }}</span>
                     <span class="group-hover:translate-x-1 transition-transform">→</span>
                 </div>
             </a>
@@ -1543,6 +1683,12 @@
 
     <!-- TAB 6: DEVELOPER API & INTEGRATIONS -->
     @include('livewire.tenant.settings.partials.api-tab')
+
+    <!-- TAB 8: STOREFRONT PROMO BANNER & CUSTOMER SOCIAL AUTH -->
+    @include('livewire.tenant.settings.partials.storefront-tab')
+
+    <!-- TAB 9: STOREFRONT PAYMENT GATEWAYS -->
+    @include('livewire.tenant.settings.partials.payments-tab')
 
     <!-- Unified Bottom Save Action Bar -->
     <div class="flex justify-end items-center pt-2">

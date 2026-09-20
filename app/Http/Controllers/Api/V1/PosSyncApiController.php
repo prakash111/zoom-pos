@@ -3639,9 +3639,19 @@ class PosSyncApiController extends Controller
 
         $plan = Plan::find($company->plan_name) ?? Plan::first();
         $availablePlans = Plan::where('active', true)->get()->map(function (Plan $p) {
-            $features = is_array($p->features) ? $p->features : (is_string($p->features) ? (json_decode($p->features, true) ?: []) : []);
-            $limits = is_array($p->limits) ? $p->limits : (is_string($p->limits) ? (json_decode($p->limits, true) ?: []) : []);
+            $rawFeatures = is_array($p->features) ? $p->features : (is_string($p->features) ? (json_decode($p->features, true) ?: []) : []);
+            $featureList = [];
+            foreach ($rawFeatures as $k => $v) {
+                if (is_numeric($k) && is_string($v)) {
+                    $featureList[] = $v;
+                } elseif ($v === true || $v === 1 || $v === '1') {
+                    $featureList[] = is_string($k) ? str_replace('_', ' ', ucfirst($k)) : (string) $v;
+                } elseif (is_string($v) && ! empty($v)) {
+                    $featureList[] = "$k: $v";
+                }
+            }
 
+            $limits = is_array($p->limits) ? $p->limits : (is_string($p->limits) ? (json_decode($p->limits, true) ?: []) : []);
             $extensions = is_array($p->extensions) ? $p->extensions : [];
 
             return [
@@ -3652,10 +3662,11 @@ class PosSyncApiController extends Controller
                 'billing_cycle' => $p->billing_cycle,
                 'duration_days' => (int) ($p->duration_days ?? 30),
                 'invoice_limit' => (int) ($p->invoice_limit ?? ($limits['invoices'] ?? -1)),
+                'products_limit' => (int) ($p->products_limit ?? ($limits['products'] ?? -1)),
                 'device_limit' => (int) ($p->device_limit ?? ($limits['dispositivos'] ?? -1)),
                 'staff_limit' => (int) ($p->staff_limit ?? ($limits['usuarios'] ?? -1)),
                 'extensions' => array_values($extensions),
-                'features' => array_values($features),
+                'features' => array_values(array_unique($featureList)),
                 'limits' => $limits,
             ];
         })->values()->all();

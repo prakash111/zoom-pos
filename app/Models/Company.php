@@ -44,6 +44,11 @@ class Company extends Model
         'pix_key_type', 'pix_key', 'pix_merchant_name', 'pix_merchant_city', 'pix_qr_image',
         'card_fee_debit', 'card_fee_credit_1x', 'card_fee_credit_installments',
         'barcode_scale_prefix', 'barcode_scale_type',
+        'store_banner_tag', 'store_banner_title', 'store_banner_subtitle', 'store_banner_cta_text', 'store_banner_cta_link', 'store_banner_image_url', 'store_banner_is_active',
+        'enable_google_login', 'google_client_id', 'google_client_secret', 'storefront_payment_gateways',
+        'enable_product_reviews', 'require_review_approval',
+        'require_customer_verification', 'verification_channels',
+        'enable_order_notifications', 'order_notification_channels', 'order_notification_events',
     ];
 
     protected $appends = [
@@ -61,6 +66,17 @@ class Company extends Model
             'is_profile_completed' => 'boolean',
             'is_demo' => 'boolean',
             'drawer_gradient_enabled' => 'boolean',
+            'store_banner_is_active' => 'boolean',
+            'enable_product_reviews' => 'boolean',
+            'require_review_approval' => 'boolean',
+            'enable_google_login' => 'boolean',
+            'require_customer_verification' => 'boolean',
+            'verification_channels' => 'array',
+            'enable_order_notifications' => 'boolean',
+            'order_notification_channels' => 'array',
+            'order_notification_events' => 'array',
+            'storefront_payment_gateways' => 'array',
+            'google_client_secret' => SafeEncryptedString::class,
             'tax_settings' => 'array',
             'tax_api_key' => SafeEncryptedString::class,
             'currency_decimals' => 'integer',
@@ -484,7 +500,7 @@ class Company extends Model
 
     public function isGeneralMode(): bool
     {
-        return empty($this->pos_mode) || in_array($this->pos_mode, ['general', 'general_retail'], true);
+        return empty($this->pos_mode) || in_array($this->pos_mode, ['general', 'general_retail', 'retail'], true);
     }
 
     /**
@@ -893,5 +909,110 @@ class Company extends Model
         Cache::forget("tenant_store_profile_{$tenantId}");
         Cache::forget("drawer_menu_{$tenantId}");
         Cache::forget("tenant_{$tenantId}_menu");
+    }
+
+    public function coupons(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Coupon::class);
+    }
+
+    public function faqs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Faq::class);
+    }
+
+    public function reviews(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
+    public function reviewsEnabled(): bool
+    {
+        return (bool) ($this->enable_product_reviews ?? true);
+    }
+
+    public function getStoreBanner(): array
+    {
+        return [
+            'is_active' => $this->store_banner_is_active ?? true,
+            'tag' => $this->store_banner_tag ?: 'SPECIAL STORE DEALS',
+            'title' => $this->store_banner_title ?: 'Grab Up To 50% Off On Selected Products',
+            'subtitle' => $this->store_banner_subtitle ?: 'Order authentic items online with direct-to-door verified dispatch and real-time inventory.',
+            'cta_text' => $this->store_banner_cta_text ?: 'Shop Now',
+            'cta_link' => $this->store_banner_cta_link ?: '#products-section',
+            'image_url' => $this->store_banner_image_url ? (str_starts_with($this->store_banner_image_url, 'http') ? $this->store_banner_image_url : asset($this->store_banner_image_url)) : null,
+        ];
+    }
+
+    public function getStorefrontPaymentMethods(): array
+    {
+        $gateways = (array) ($this->storefront_payment_gateways ?? []);
+
+        // Default local payment options if not set
+        if (! isset($gateways['cod'])) {
+            $gateways['cod'] = ['enabled' => true, 'name' => 'Cash on Delivery', 'instructions' => 'Pay in cash upon physical delivery.'];
+        }
+        if (! isset($gateways['store_pickup'])) {
+            $gateways['store_pickup'] = ['enabled' => true, 'name' => 'Pay at Counter / Pickup', 'instructions' => 'Pay when collecting items at our store counter.'];
+        }
+
+        // Platform-level inheritance: if superadmin enabled gateways globally and tenant hasn't explicitly disabled them
+        try {
+            $platformGateways = \Illuminate\Support\Facades\DB::table('payment_gateway_settings')->where('enabled', 1)->get();
+            foreach ($platformGateways as $pg) {
+                if ($pg->gateway === 'razorpay' && ! empty($pg->public_key)) {
+                    $tenantExplicitDisabled = isset($gateways['razorpay']) && empty($gateways['razorpay']['enabled']);
+                    if (! $tenantExplicitDisabled) {
+                        $gateways['razorpay'] = array_merge([
+                            'enabled' => true,
+                            'name' => 'Razorpay (Cards, UPI, NetBanking)',
+                            'instructions' => 'Fast and secure instant payment via Razorpay checkout.',
+                        ], (array) ($gateways['razorpay'] ?? []));
+                        $gateways['razorpay']['enabled'] = true;
+                    }
+                } elseif ($pg->gateway === 'stripe' && ! empty($pg->public_key)) {
+                    $tenantExplicitDisabled = isset($gateways['stripe']) && empty($gateways['stripe']['enabled']);
+                    if (! $tenantExplicitDisabled) {
+                        $gateways['stripe'] = array_merge([
+                            'enabled' => true,
+                            'name' => 'Credit / Debit Card (Stripe)',
+                            'instructions' => 'Secure card payment powered by Stripe.',
+                        ], (array) ($gateways['stripe'] ?? []));
+                        $gateways['stripe']['enabled'] = true;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        $active = [];
+        $masterDefinitions = [
+            'cod' => ['name' => 'Cash on Delivery', 'icon' => 'truck', 'instructions' => 'Pay in cash upon physical delivery'],
+            'store_pickup' => ['name' => 'Pay at Counter', 'icon' => 'store', 'instructions' => 'Pay at store counter upon pickup'],
+            'razorpay' => ['name' => 'Razorpay (Cards, UPI, NetBanking)', 'icon' => 'credit-card', 'instructions' => 'Fast and secure payment via Razorpay'],
+            'stripe' => ['name' => 'Credit / Debit Card', 'icon' => 'credit-card', 'instructions' => 'Secure card payment powered by Stripe'],
+            'paypal' => ['name' => 'PayPal', 'icon' => 'paypal', 'instructions' => 'Safe online payment with your PayPal balance or card'],
+            'upi' => ['name' => 'Direct UPI / QR', 'icon' => 'qr-code', 'instructions' => 'Scan QR or pay directly via any UPI app'],
+        ];
+
+        foreach ($gateways as $gwId => $cfg) {
+            $isEnabled = ! empty($cfg['enabled']) && ($cfg['enabled'] === true || $cfg['enabled'] === 'true' || $cfg['enabled'] == 1);
+            if ($isEnabled) {
+                $master = $masterDefinitions[$gwId] ?? ['name' => ucfirst($gwId), 'icon' => 'credit-card', 'instructions' => ''];
+                $active[] = [
+                    'id' => $gwId,
+                    'name' => ! empty($cfg['name']) ? $cfg['name'] : $master['name'],
+                    'icon' => ! empty($cfg['icon']) ? $cfg['icon'] : $master['icon'],
+                    'instructions' => ! empty($cfg['instructions']) ? $cfg['instructions'] : $master['instructions'],
+                    'enabled' => true,
+                    'upi_id' => $cfg['upi_id'] ?? null,
+                ];
+            }
+        }
+
+        if (empty($active)) {
+            $active[] = ['id' => 'cod', 'name' => 'Cash on Delivery', 'icon' => 'truck', 'enabled' => true, 'instructions' => 'Pay in cash upon delivery.'];
+        }
+
+        return $active;
     }
 }

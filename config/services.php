@@ -57,6 +57,12 @@ return [
         'token' => env('PLATFORM_WHATSAPP_TOKEN'),
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL') . '/store/auth/google/callback'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | License Server

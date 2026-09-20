@@ -77,6 +77,27 @@ class Product extends Model
         return $this->belongsTo(Brand::class);
     }
 
+    public function reviews()
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
+    public function approvedReviews()
+    {
+        return $this->hasMany(ProductReview::class)->where('is_approved', true);
+    }
+
+    public function getAverageRatingAttribute(): float
+    {
+        $avg = $this->approvedReviews()->avg('rating');
+        return $avg ? round((float) $avg, 1) : 0.0;
+    }
+
+    public function getReviewsCountAttribute(): int
+    {
+        return (int) $this->approvedReviews()->count();
+    }
+
     public function pharmacyBatches()
     {
         return $this->hasMany(PharmacyBatch::class);

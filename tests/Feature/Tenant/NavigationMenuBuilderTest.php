@@ -67,6 +67,7 @@ class NavigationMenuBuilderTest extends TestCase
                 return $childKeys === [
                     'settings_mode', 'settings_profile', 'settings_branding', 'settings_receipts', 'settings_financial',
                     'settings_taxes', 'settings_api', 'settings_navigation', 'app_preferences', 'settings_audio_notifications',
+                    'settings_storefront', 'settings_payments', 'settings_coupons', 'settings_faqs', 'settings_reviews',
                 ] && ! in_array('settings_mode', $rootKeys, true);
             });
     }
@@ -549,8 +550,9 @@ class NavigationMenuBuilderTest extends TestCase
         $settings = collect($administration['items'])->firstWhere('key', 'settings');
         $childKeys = collect($settings['children'])->pluck('key')->sort()->values()->all();
         $this->assertSame([
-            'app_preferences', 'settings_api', 'settings_audio_notifications', 'settings_branding', 'settings_financial', 'settings_mode',
-            'settings_navigation', 'settings_profile', 'settings_receipts', 'settings_taxes',
+            'app_preferences', 'settings_api', 'settings_audio_notifications', 'settings_branding', 'settings_coupons',
+            'settings_faqs', 'settings_financial', 'settings_mode', 'settings_navigation', 'settings_payments',
+            'settings_profile', 'settings_receipts', 'settings_reviews', 'settings_storefront', 'settings_taxes',
         ], $childKeys);
     }
 }

@@ -34,9 +34,11 @@ use App\Livewire\Tenant\Categories;
 use App\Livewire\Tenant\Consignments\Create;
 use App\Livewire\Tenant\Consignments\Index;
 use App\Livewire\Tenant\Consignments\Show;
+use App\Livewire\Tenant\Coupons;
 use App\Livewire\Tenant\Customers;
 use App\Livewire\Tenant\Dashboard;
 use App\Livewire\Tenant\Devices;
+use App\Livewire\Tenant\Faqs;
 use App\Livewire\Tenant\Financials;
 use App\Livewire\Tenant\Languages;
 use App\Livewire\Tenant\Pharmacy\Batches;
@@ -47,6 +49,7 @@ use App\Livewire\Tenant\Repair\TicketDetail;
 use App\Livewire\Tenant\Repair\Tickets;
 use App\Livewire\Tenant\Reports;
 use App\Livewire\Tenant\Restaurant;
+use App\Livewire\Tenant\Reviews;
 use App\Livewire\Tenant\Sales;
 use App\Livewire\Tenant\Salon\Calendar;
 use App\Livewire\Tenant\Salon\ServiceCatalog;
@@ -115,6 +118,14 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         Route::get('/settings/api', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.api');
         Route::get('/settings/integrations', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.integrations');
         Route::get('/settings/navigation', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.navigation');
+        Route::get('/settings/storefront', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.storefront');
+        Route::get('/settings/payments', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.payments');
+        Route::get('/settings/coupons', Coupons\Index::class)->middleware('tenant.permission:settings,view')->name('settings.coupons');
+        Route::get('/coupons', Coupons\Index::class)->middleware('tenant.permission:settings,view')->name('coupons.index');
+        Route::get('/settings/faqs', Faqs\Index::class)->middleware('tenant.permission:settings,view')->name('settings.faqs');
+        Route::get('/faqs', Faqs\Index::class)->middleware('tenant.permission:settings,view')->name('faqs.index');
+        Route::get('/settings/reviews', Reviews\Index::class)->middleware('tenant.permission:settings,view')->name('settings.reviews');
+        Route::get('/reviews', Reviews\Index::class)->middleware('tenant.permission:settings,view')->name('reviews.index');
         Route::post('/settings/navigation-menu', [NavigationMenuController::class, 'store'])
             ->middleware('tenant.permission:settings,edit')
             ->name('settings.navigation-menu.store');
@@ -195,6 +206,9 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
             Route::get('/invoices/{sale}', Sales\Show::class)->middleware('tenant.permission:sales,view')->name('invoices.show');
             Route::get('/invoices/{sale}/pdf', [InvoiceController::class, 'pdf'])->middleware('tenant.permission:sales,view')->name('invoices.pdf');
             Route::post('/invoices/{sale}/send', [InvoiceController::class, 'send'])->middleware('tenant.permission:sales,export')->name('invoices.send');
+
+            // Storefront Coupons & Promotional Discounts
+            Route::get('/coupons', Coupons\Index::class)->middleware('tenant.permission:sales,view')->name('coupons.index');
 
             Route::get('/quotes', Quotes\Index::class)->middleware(['tenant.permission:quotes,view', 'tenant.pos_mode:general'])->name('quotes.index');
             Route::get('/quotes/create', Quotes\Create::class)->middleware(['tenant.permission:quotes,create', 'tenant.pos_mode:general'])->name('quotes.create');

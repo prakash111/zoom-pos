@@ -334,6 +334,11 @@ class StorefrontCustomerApiController extends Controller
                 'address' => $customer->address,
                 'city' => $customer->city,
                 'state' => $customer->state,
+                'gender' => $customer->gender ?: 'Male',
+                'date_of_birth' => $customer->date_of_birth instanceof \DateTimeInterface
+                    ? $customer->date_of_birth->format('Y-m-d')
+                    : ($customer->date_of_birth ?: ($customer->custom_fields['dob'] ?? null)),
+                'avatar_url' => $customer->avatar_url ?: ($customer->custom_fields['avatar_url'] ?? null),
                 'due_balance' => (float) $customer->due_balance,
                 'loyalty_points' => (int) $customer->loyalty_points,
             ],
@@ -365,6 +370,9 @@ class StorefrontCustomerApiController extends Controller
             'address' => ['nullable', 'string', 'max:500'],
             'city' => ['nullable', 'string', 'max:100'],
             'state' => ['nullable', 'string', 'max:100'],
+            'gender' => ['nullable', 'string', 'max:20'],
+            'date_of_birth' => ['nullable', 'string', 'max:30'],
+            'avatar_url' => ['nullable', 'string', 'max:500'],
             'current_password' => ['nullable', 'string'],
             'new_password' => ['nullable', 'string', 'min:6'],
         ]);
@@ -402,6 +410,23 @@ class StorefrontCustomerApiController extends Controller
         if ($request->has('state')) {
             $customer->state = $request->input('state');
         }
+        if ($request->has('gender')) {
+            $customer->gender = $request->input('gender');
+        }
+        if ($request->filled('date_of_birth')) {
+            try {
+                $rawDob = $request->input('date_of_birth');
+                $parsedDob = \Carbon\Carbon::parse(str_replace('/', '-', $rawDob))->format('Y-m-d');
+                $customer->date_of_birth = $parsedDob;
+            } catch (\Throwable $e) {
+                $cf = (array) ($customer->custom_fields ?? []);
+                $cf['dob'] = $request->input('date_of_birth');
+                $customer->custom_fields = $cf;
+            }
+        }
+        if ($request->has('avatar_url')) {
+            $customer->avatar_url = $request->input('avatar_url');
+        }
 
         $customer->save();
 
@@ -416,6 +441,11 @@ class StorefrontCustomerApiController extends Controller
                 'address' => $customer->address,
                 'city' => $customer->city,
                 'state' => $customer->state,
+                'gender' => $customer->gender,
+                'date_of_birth' => $customer->date_of_birth instanceof \DateTimeInterface
+                    ? $customer->date_of_birth->format('Y-m-d')
+                    : ($customer->date_of_birth ?: ($customer->custom_fields['dob'] ?? null)),
+                'avatar_url' => $customer->avatar_url,
             ],
         ]);
     }

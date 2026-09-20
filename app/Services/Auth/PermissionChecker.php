@@ -35,6 +35,9 @@ class PermissionChecker
         'restaurant' => 'Restaurant POS Terminal',
         'pharmacy' => 'Pharmacy POS & Checkout',
         'salon' => 'Salon POS & Checkout',
+        'coupons' => 'Coupons & Discounts',
+        'faqs' => 'Store FAQs & Help Center',
+        'reviews' => 'Product Ratings & Reviews',
     ];
 
     public const ACTIONS = [
@@ -222,6 +225,24 @@ class PermissionChecker
             'checkout' => 'Process salon checkout, tips & commission splits',
             'export' => 'Export appointments & stylist commission reports',
         ],
+        'coupons' => [
+            'view' => 'View coupon lists and usage statistics',
+            'create' => 'Create new discount coupons and promo codes',
+            'edit' => 'Update coupon discount rates, limits, and expiration',
+            'delete' => 'Delete promotional coupons',
+        ],
+        'faqs' => [
+            'view' => 'View store frequently asked questions',
+            'create' => 'Add new storefront FAQs',
+            'edit' => 'Update FAQ questions, answers, and sort order',
+            'delete' => 'Delete store FAQs',
+        ],
+        'reviews' => [
+            'view' => 'View product ratings and customer feedback',
+            'create' => 'Submit reviews or write responses',
+            'edit' => 'Approve or moderate customer reviews',
+            'delete' => 'Delete customer reviews',
+        ],
     ];
 
     public static function canonicalModuleSlug(string $module): string
@@ -383,6 +404,9 @@ class PermissionChecker
                     'restaurant' => ['view', 'create', 'edit', 'delete', 'manage_tables', 'manage_kot', 'settle', 'export'],
                     'pharmacy' => ['view', 'create', 'edit', 'delete', 'manage_batches', 'verify_rx', 'export'],
                     'salon' => ['view', 'create', 'edit', 'delete', 'manage_stylists', 'checkout', 'export'],
+                    'coupons' => ['view', 'create', 'edit', 'delete'],
+                    'faqs' => ['view', 'create', 'edit', 'delete'],
+                    'reviews' => ['view', 'create', 'edit', 'delete'],
                 ];
 
             case User::ROLE_SALESPERSON:

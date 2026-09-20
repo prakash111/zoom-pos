@@ -16,21 +16,42 @@ class Customer extends Model
         'address', 'city', 'state', 'loyalty_points', 'due_balance', 'state_code', 'gstin', 'taxpayer_type', 'tax_id_label',
         'tax_id', 'is_tax_exempt', 'is_demo',
         'age', 'gender', 'allergies', 'prescribing_doctor', 'doctor_registration_no',
+        'date_of_birth', 'avatar_url',
         'custom_fields',
+        'is_verified', 'verification_code', 'verification_code_expires_at', 'verified_at',
     ];
 
     protected $hidden = [
         'password',
         'auth_token',
+        'verification_code',
     ];
 
     protected $casts = [
         'is_tax_exempt' => 'boolean',
         'is_demo' => 'boolean',
+        'is_verified' => 'boolean',
         'due_balance' => 'decimal:2',
         'age' => 'integer',
+        'date_of_birth' => 'date',
+        'verification_code_expires_at' => 'datetime',
+        'verified_at' => 'datetime',
         'custom_fields' => 'array',
     ];
+
+    public function isVerified(): bool
+    {
+        return (bool) $this->is_verified;
+    }
+
+    public function markVerified(): void
+    {
+        $this->is_verified = true;
+        $this->verified_at = now();
+        $this->verification_code = null;
+        $this->verification_code_expires_at = null;
+        $this->save();
+    }
 
     public function addresses()
     {
