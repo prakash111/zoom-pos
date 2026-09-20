@@ -72,6 +72,20 @@ class AuthRepository {
     return _authOutcome(response, email);
   }
 
+  Future<Map<String, dynamic>> checkSubdomain(String subdomain) async {
+    try {
+      return await _client.get(
+        ApiEndpoints.checkSubdomain,
+        query: {'subdomain': subdomain},
+      );
+    } catch (_) {
+      return await _client.getAbsolute(
+        ApiEndpoints.checkSubdomainAbsolute,
+        query: {'subdomain': subdomain},
+      );
+    }
+  }
+
   Future<RegisterResult> register({
     required String storeName,
     required String ownerName,
@@ -82,6 +96,8 @@ class AuthRepository {
     String? country,
     String? timezone,
     String posMode = 'general',
+    String? subdomain,
+    String? customDomain,
   }) async {
     final response = await _client.post(ApiEndpoints.register, data: {
       'store_name': storeName,
@@ -93,6 +109,8 @@ class AuthRepository {
       if (country != null && country.isNotEmpty) 'country': country,
       if (timezone != null && timezone.isNotEmpty) 'timezone': timezone,
       'pos_mode': posMode,
+      if (subdomain != null && subdomain.isNotEmpty) 'subdomain': subdomain,
+      if (customDomain != null && customDomain.isNotEmpty) 'custom_domain': customDomain,
     });
 
     return _authOutcome(response, email);

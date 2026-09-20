@@ -22,6 +22,12 @@ class ProfileSettings {
     this.timezone = '',
     this.resolvedTimezone = 'UTC',
     this.defaultTimezoneForCountry = 'UTC',
+    this.subdomain = '',
+    this.storeWebsite = '',
+    this.storefrontUrl = '',
+    this.customDomain = '',
+    this.cnameTarget = 'cname.saas.zoomnearby.com',
+    this.sslStatus = 'not_configured',
   });
 
   factory ProfileSettings.fromJson(Map<String, dynamic> json) {
@@ -49,6 +55,12 @@ class ProfileSettings {
       resolvedTimezone: json['resolved_timezone'] as String? ?? 'UTC',
       defaultTimezoneForCountry:
           json['default_timezone_for_country'] as String? ?? 'UTC',
+      subdomain: json['subdomain'] as String? ?? '',
+      storeWebsite: json['store_website'] as String? ?? '',
+      storefrontUrl: json['storefront_url'] as String? ?? '',
+      customDomain: json['custom_domain'] as String? ?? '',
+      cnameTarget: json['cname_target'] as String? ?? 'cname.saas.zoomnearby.com',
+      sslStatus: json['ssl_status'] as String? ?? 'not_configured',
     );
   }
 
@@ -81,6 +93,24 @@ class ProfileSettings {
   /// What [timezone] would default to if cleared, for the "Use country
   /// default (Xxx/Yyy)" hint next to the manual-override picker.
   final String defaultTimezoneForCountry;
+
+  /// Subdomain of the tenant storefront (e.g. 'mystore')
+  final String subdomain;
+
+  /// Live storefront URL (e.g. 'https://mystore.saas.zoomnearby.com')
+  final String storeWebsite;
+
+  /// Storefront URL alias
+  final String storefrontUrl;
+
+  /// Tenant custom domain (e.g. 'store.mybrand.com')
+  final String customDomain;
+
+  /// CNAME target host for custom domain setup
+  final String cnameTarget;
+
+  /// SSL certificate status ('active' or 'not_configured')
+  final String sslStatus;
 }
 
 class ReceiptSettings {

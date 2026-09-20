@@ -97,6 +97,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _storeNameController = TextEditingController();
+  final _subdomainController = TextEditingController();
+
+  bool _userEditedSubdomain = false;
+  bool? _subdomainAvailable;
+  String? _subdomainStatusText;
+  bool _checkingSubdomain = false;
+  int _subdomainCheckSeq = 0;
 
   bool _obscurePassword = true;
   int _step = 0;
@@ -111,9 +118,77 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _timezone = 'UTC';
   late final List<String> _timezones;
 
+  String _slugify(String text) {
+    return text
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+  }
+
+  void _onStoreNameChanged() {
+    if (!_userEditedSubdomain) {
+      final slug = _slugify(_storeNameController.text);
+      if (_subdomainController.text != slug) {
+        _subdomainController.text = slug;
+        if (slug.length >= 3) {
+          _checkSubdomain(slug);
+        } else {
+          setState(() {
+            _subdomainAvailable = null;
+            _subdomainStatusText = null;
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> _checkSubdomain(String slug) async {
+    final clean = _slugify(slug);
+    if (clean.length < 3) {
+      setState(() {
+        _subdomainAvailable = false;
+        _subdomainStatusText = 'Subdomain must be at least 3 characters';
+      });
+      return;
+    }
+    final seq = ++_subdomainCheckSeq;
+    setState(() {
+      _checkingSubdomain = true;
+      _subdomainStatusText = 'Checking availability...';
+    });
+    try {
+      final auth = context.read<AuthProvider>();
+      final res = await auth.checkSubdomain(clean);
+      if (!mounted || seq != _subdomainCheckSeq) return;
+      final avail = res['available'] == true;
+      setState(() {
+        _checkingSubdomain = false;
+        _subdomainAvailable = avail;
+        if (avail) {
+          _subdomainStatusText = 'https://$clean.saas.zoomnearby.com is available!';
+        } else {
+          final suggestion = res['suggestion']?.toString() ?? '';
+          _subdomainStatusText = suggestion.isNotEmpty
+              ? 'Subdomain taken. Try: $suggestion'
+              : 'Subdomain is not available';
+        }
+      });
+    } catch (_) {
+      if (!mounted || seq != _subdomainCheckSeq) return;
+      setState(() {
+        _checkingSubdomain = false;
+        _subdomainAvailable = null;
+        _subdomainStatusText = null;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+
+    _storeNameController.addListener(_onStoreNameChanged);
 
     tzdata.initializeTimeZones();
     final zones = tz.timeZoneDatabase.locations.keys.toList()..sort();
@@ -173,11 +248,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
+    _storeNameController.removeListener(_onStoreNameChanged);
     _ownerNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _phoneController.dispose();
     _storeNameController.dispose();
+    _subdomainController.dispose();
     super.dispose();
   }
 
@@ -224,6 +301,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_validateCurrentStep()) return;
 
     final auth = context.read<AuthProvider>();
+    final rawSub = _subdomainController.text.trim();
+    final slug = _slugify(rawSub.isNotEmpty ? rawSub : _storeNameController.text);
     final result = await auth.register(
       storeName: _storeNameController.text.trim(),
       ownerName: _ownerNameController.text.trim(),
@@ -234,6 +313,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       currency: _currency,
       country: _countryCode,
       timezone: _timezone,
+      subdomain: slug,
     );
 
     if (!mounted) return;
@@ -466,6 +546,96 @@ class _RegisterScreenState extends State<RegisterScreen> {
             validator: (value) =>
                 (value == null || value.trim().isEmpty) ? 'Required' : null,
           ),
+          const SizedBox(height: 16),
+          const AuthFieldLabel('Store Subdomain'),
+          TextFormField(
+            controller: _subdomainController,
+            textInputAction: TextInputAction.next,
+            decoration: authInputDecoration(
+              hint: 'e.g. my-store',
+              icon: Icons.link,
+              suffixIcon: Padding(
+                padding: const EdgeInsets.only(right: 12.0),
+                child: Center(
+                  widthFactor: 1.0,
+                  child: Text(
+                    '.saas.zoomnearby.com',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            onChanged: (val) {
+              _userEditedSubdomain = true;
+              if (val.trim().isNotEmpty) {
+                _checkSubdomain(val.trim());
+              } else {
+                setState(() {
+                  _subdomainAvailable = null;
+                  _subdomainStatusText = null;
+                });
+              }
+            },
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) return 'Required';
+              final clean = _slugify(value);
+              if (clean.length < 3) return 'At least 3 characters';
+              return null;
+            },
+          ),
+          if (_subdomainStatusText != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                if (_checkingSubdomain)
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  Icon(
+                    _subdomainAvailable == true
+                        ? Icons.check_circle_outline
+                        : Icons.info_outline,
+                    size: 14,
+                    color: _subdomainAvailable == true
+                        ? Colors.green
+                        : (_subdomainAvailable == false
+                            ? Colors.red
+                            : Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.6)),
+                  ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _subdomainStatusText!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: _subdomainAvailable == true
+                          ? Colors.green
+                          : (_subdomainAvailable == false
+                              ? Colors.red
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.7)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 18),
           const AuthFieldLabel('Store type'),
           const SizedBox(height: 2),

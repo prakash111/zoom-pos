@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
@@ -203,6 +205,8 @@ class _ProfileTabState extends State<_ProfileTab> {
   late final TextEditingController _email;
   late final TextEditingController _phone;
   late final TextEditingController _website;
+  late final TextEditingController _subdomain;
+  late final TextEditingController _customDomain;
   late final TextEditingController _address;
   late final TextEditingController _city;
   late final TextEditingController _state;
@@ -213,6 +217,9 @@ class _ProfileTabState extends State<_ProfileTab> {
   late String _commissionType;
   late String _countryCode;
   late Color _primaryColor;
+  late String _storefrontUrl;
+  late String _cnameTarget;
+  late String _sslStatus;
 
   /// Null means "no manual override — follow the country default".
   String? _timezoneOverride;
@@ -245,6 +252,8 @@ class _ProfileTabState extends State<_ProfileTab> {
     _email = TextEditingController(text: p.email);
     _phone = TextEditingController(text: p.phone);
     _website = TextEditingController(text: p.website);
+    _subdomain = TextEditingController(text: p.subdomain);
+    _customDomain = TextEditingController(text: p.customDomain);
     _address = TextEditingController(text: p.address);
     _city = TextEditingController(text: p.city);
     _state = TextEditingController(text: p.state);
@@ -262,6 +271,10 @@ class _ProfileTabState extends State<_ProfileTab> {
     _primaryColor = parseHexColor(p.primaryColor) ?? AppTheme.primary;
     _colorHex = TextEditingController(text: toHexColor(_primaryColor));
 
+    _storefrontUrl = p.storefrontUrl.isNotEmpty ? p.storefrontUrl : p.storeWebsite;
+    _cnameTarget = p.cnameTarget.isNotEmpty ? p.cnameTarget : 'cname.saas.zoomnearby.com';
+    _sslStatus = p.sslStatus.isNotEmpty ? p.sslStatus : 'not_configured';
+
     _logoUrl = p.logoUrl;
     _faviconUrl = p.faviconUrl;
     _drawerCoverUrl = p.drawerCoverUrl;
@@ -276,6 +289,8 @@ class _ProfileTabState extends State<_ProfileTab> {
       _email,
       _phone,
       _website,
+      _subdomain,
+      _customDomain,
       _address,
       _city,
       _state,
@@ -436,7 +451,7 @@ class _ProfileTabState extends State<_ProfileTab> {
 
     setState(() => _saving = true);
     try {
-      await widget.repository.updateProfile(
+      final updated = await widget.repository.updateProfile(
         name: _name.text.trim(),
         tradeName: _tradeName.text.trim(),
         taxId: _taxId.text.trim(),
@@ -454,8 +469,17 @@ class _ProfileTabState extends State<_ProfileTab> {
         primaryColor: toHexColor(_primaryColor),
         defaultCommissionRate: double.tryParse(_commissionRate.text) ?? 0,
         defaultCommissionType: _commissionType,
+        subdomain: _subdomain.text.trim(),
+        customDomain: _customDomain.text.trim(),
       );
       if (mounted) {
+        setState(() {
+          _storefrontUrl = updated.storefrontUrl.isNotEmpty
+              ? updated.storefrontUrl
+              : updated.storeWebsite;
+          _cnameTarget = updated.cnameTarget;
+          _sslStatus = updated.sslStatus;
+        });
         // Keep the live theme locked to what was just persisted, so a
         // background bootstrap sync can't roll it back to the previous colour.
         context.read<ThemeProvider>().setColor(_primaryColor);
@@ -518,6 +542,140 @@ class _ProfileTabState extends State<_ProfileTab> {
         TextField(
             controller: _website,
             decoration: InputDecoration(labelText: l10n.website)),
+        const SizedBox(height: 16),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+          ),
+          color: Theme.of(context).cardColor.withValues(alpha: 0.5),
+          child: Padding(
+            padding: const EdgeInsets.all(14.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.storefront,
+                        size: 20, color: AppTheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Storefront & Domain',
+                      style:
+                          Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _sslStatus == 'active'
+                            ? Colors.green.withValues(alpha: 0.15)
+                            : Colors.amber.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _sslStatus == 'active'
+                              ? Colors.green
+                              : Colors.amber,
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        _sslStatus == 'active'
+                            ? 'SSL Active'
+                            : 'Pending SSL / CNAME',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _sslStatus == 'active'
+                              ? Colors.green.shade800
+                              : Colors.amber.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (_storefrontUrl.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _storefrontUrl,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy, size: 18),
+                        tooltip: 'Copy Storefront URL',
+                        onPressed: () {
+                          Clipboard.setData(
+                              ClipboardData(text: _storefrontUrl));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content:
+                                    Text('Storefront URL copied to clipboard')),
+                          );
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.open_in_new, size: 18),
+                        tooltip: 'Open in browser',
+                        onPressed: () async {
+                          final uri = Uri.tryParse(_storefrontUrl);
+                          if (uri != null && await canLaunchUrl(uri)) {
+                            await launchUrl(uri,
+                                mode: LaunchMode.externalApplication);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                TextField(
+                  controller: _subdomain,
+                  decoration: const InputDecoration(
+                    labelText: 'Store Subdomain',
+                    helperText:
+                        'Subdomain for your free SaaS storefront (e.g. your-store)',
+                    suffixText: '.saas.zoomnearby.com',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _customDomain,
+                  decoration: const InputDecoration(
+                    labelText: 'Custom Domain (optional)',
+                    hintText: 'shop.yourbrand.com',
+                    helperText: 'Enter domain without https://',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'DNS Setup: To connect your custom domain, point its CNAME record to: $_cnameTarget',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.65),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
         const SizedBox(height: 12),
         TextField(
             controller: _address,

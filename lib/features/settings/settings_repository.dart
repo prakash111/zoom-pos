@@ -64,6 +64,8 @@ class SettingsRepository {
     String? primaryColor,
     double? defaultCommissionRate,
     String? defaultCommissionType,
+    String? subdomain,
+    String? customDomain,
   }) async {
     final response = await _client.put(ApiEndpoints.settingsProfile, data: {
       'name': name,
@@ -83,6 +85,8 @@ class SettingsRepository {
         'default_commission_rate': defaultCommissionRate,
       if (defaultCommissionType != null)
         'default_commission_type': defaultCommissionType,
+      if (subdomain != null && subdomain.isNotEmpty) 'subdomain': subdomain,
+      if (customDomain != null) 'custom_domain': customDomain,
     });
     final profile = ProfileSettings.fromJson(
         response['profile'] as Map<String, dynamic>? ?? const {});

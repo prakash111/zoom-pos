@@ -36,6 +36,8 @@ class ApiEndpoints {
   static const String login = '/auth/login';
   static const String register = '/auth/register';
   static const String registrationConfig = '/auth/registration-config';
+  static const String checkSubdomain = '/auth/check-subdomain';
+  static const String checkSubdomainAbsolute = '/api/v1/public/check-subdomain';
   static const String registrationMeta = '/app/registration-meta';
   static const String registrationMetaAbsolute = '/api/app/registration-meta';
   static const String appTranslationsAbsolute = '/api/app/translations';

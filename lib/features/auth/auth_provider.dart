@@ -251,7 +251,9 @@ class AuthProvider extends ChangeNotifier {
   }
 
   RegisterResult? _lastRegisterResult;
-  RegisterResult? get lastRegisterResult => _lastRegisterResult;
+  Future<Map<String, dynamic>> checkSubdomain(String subdomain) async {
+    return await _authRepository.checkSubdomain(subdomain);
+  }
 
   Future<RegisterResult?> register({
     required String storeName,
@@ -263,6 +265,8 @@ class AuthProvider extends ChangeNotifier {
     String? country,
     String? timezone,
     String posMode = 'general',
+    String? subdomain,
+    String? customDomain,
   }) async {
     _status = AuthStatus.authenticating;
     _errorMessage = null;
@@ -279,6 +283,8 @@ class AuthProvider extends ChangeNotifier {
         country: country,
         timezone: timezone,
         posMode: posMode,
+        subdomain: subdomain,
+        customDomain: customDomain,
       );
 
       _lastRegisterResult = result;
