@@ -73,6 +73,7 @@ class SubscriptionPlan {
     required this.billingCycle,
     required this.features,
     this.invoiceLimit = -1,
+    this.productsLimit = -1,
     this.deviceLimit = -1,
     this.staffLimit = -1,
     this.extensions = const [],
@@ -116,6 +117,7 @@ class SubscriptionPlan {
       billingCycle: json['billing_cycle']?.toString() ?? json['billing_period']?.toString(),
       features: featuresList,
       invoiceLimit: (json['invoice_limit'] as num?)?.toInt() ?? (rawLimits['invoices'] as num?)?.toInt() ?? -1,
+      productsLimit: (json['products_limit'] as num?)?.toInt() ?? (rawLimits['products'] as num?)?.toInt() ?? -1,
       deviceLimit: (json['device_limit'] as num?)?.toInt() ?? (rawLimits['dispositivos'] as num?)?.toInt() ?? -1,
       staffLimit: (json['staff_limit'] as num?)?.toInt() ?? (rawLimits['usuarios'] as num?)?.toInt() ?? -1,
       extensions: extensionList,
@@ -130,6 +132,7 @@ class SubscriptionPlan {
   final String? billingCycle;
   final List<String> features;
   final int invoiceLimit;
+  final int productsLimit;
   final int deviceLimit;
   final int staffLimit;
   final List<String> extensions;

@@ -309,6 +309,11 @@ class ApiClient {
 
       final json = body is Map ? Map<String, dynamic>.from(body) : null;
 
+      // When account verification is required before order placement, let the structured payload through
+      if (json != null && json['verification_required'] == true && status < 400) {
+        return json;
+      }
+
       if (status >= 400 || json?['success'] == false) {
         throw ApiException(
           json != null
@@ -316,6 +321,7 @@ class ApiClient {
               : 'Request failed (HTTP $status).',
           statusCode: status,
           details: json == null ? null : _asStringMap(json['details']),
+          responseData: json,
         );
       }
 

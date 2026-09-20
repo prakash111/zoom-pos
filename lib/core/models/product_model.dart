@@ -22,6 +22,8 @@ class ProductModel {
     this.variants = const [],
     this.modifiers = const [],
     this.spiceLevels = const [],
+    this.averageRating = 5.0,
+    this.reviewsCount = 0,
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
@@ -58,6 +60,8 @@ class ProductModel {
       variants: _parseOptions(json['variants']),
       modifiers: _parseOptions(json['modifiers']),
       spiceLevels: _parseOptions(json['spice_levels']),
+      averageRating: (json['average_rating'] as num?)?.toDouble() ?? 5.0,
+      reviewsCount: (json['reviews_count'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -88,6 +92,8 @@ class ProductModel {
   final List<Map<String, dynamic>> variants;
   final List<Map<String, dynamic>> modifiers;
   final List<Map<String, dynamic>> spiceLevels;
+  final double averageRating;
+  final int reviewsCount;
 
   bool get isOutOfStock => currentStock <= 0;
 

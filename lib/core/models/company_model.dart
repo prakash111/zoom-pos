@@ -17,10 +17,15 @@ class CompanyModel {
     this.posMode = 'general',
     this.businessType,
     this.planFeatures = const [],
+    this.licensedModules = const [],
     this.restaurantModeLocked = false,
+    this.requireCustomerVerification = false,
+    this.enableOrderNotifications = false,
+    this.enableProductReviews = true,
     this.drawerCoverUrl,
     this.logoUrl,
     this.faviconUrl,
+    this.slug,
     this.timezone = 'UTC',
   });
 
@@ -44,6 +49,24 @@ class CompanyModel {
       resolvedFeatures = const [];
     }
 
+    final rawModules = json['licensed_modules'] ?? json['modules'] ?? json['enabled_modules'];
+    final List<String> resolvedModules;
+    if (rawModules is List) {
+      resolvedModules = rawModules.map((e) => e.toString().toLowerCase().trim()).toList();
+    } else {
+      resolvedModules = const [];
+    }
+
+    final reqVer = json['require_customer_verification'] == true ||
+        json['require_customer_verification'] == 1 ||
+        json['require_customer_verification'] == '1';
+    final notifOn = json['enable_order_notifications'] == true ||
+        json['enable_order_notifications'] == 1 ||
+        json['enable_order_notifications'] == '1';
+    final revOn = json['enable_product_reviews'] != false &&
+        json['enable_product_reviews'] != 0 &&
+        json['enable_product_reviews'] != '0';
+
     return CompanyModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
@@ -62,10 +85,15 @@ class CompanyModel {
       posMode: rawPosMode,
       businessType: resolvedBusinessType,
       planFeatures: resolvedFeatures,
+      licensedModules: resolvedModules,
       restaurantModeLocked: json['restaurant_mode_locked'] as bool? ?? false,
+      requireCustomerVerification: reqVer,
+      enableOrderNotifications: notifOn,
+      enableProductReviews: revOn,
       drawerCoverUrl: json['drawer_cover_url']?.toString(),
       logoUrl: (json['logo_url'] ?? json['logo'])?.toString(),
       faviconUrl: (json['favicon_url'] ?? json['favicon'])?.toString(),
+      slug: json['slug']?.toString(),
       timezone: json['timezone']?.toString().isNotEmpty == true ? json['timezone'].toString() : 'UTC',
     );
   }
@@ -87,10 +115,15 @@ class CompanyModel {
   final String posMode;
   final String? businessType;
   final List<String> planFeatures;
+  final List<String> licensedModules;
   final bool restaurantModeLocked;
+  final bool requireCustomerVerification;
+  final bool enableOrderNotifications;
+  final bool enableProductReviews;
   final String? drawerCoverUrl;
   final String? logoUrl;
   final String? faviconUrl;
+  final String? slug;
   final String timezone;
 
   CompanyModel copyWith({
@@ -111,13 +144,19 @@ class CompanyModel {
     String? posMode,
     String? businessType,
     List<String>? planFeatures,
+    List<String>? licensedModules,
     bool? restaurantModeLocked,
+    bool? requireCustomerVerification,
+    bool? enableOrderNotifications,
+    bool? enableProductReviews,
     String? drawerCoverUrl,
     bool clearDrawerCoverUrl = false,
     String? logoUrl,
     bool clearLogoUrl = false,
     String? faviconUrl,
     bool clearFaviconUrl = false,
+    String? slug,
+    bool clearSlug = false,
     String? timezone,
   }) {
     return CompanyModel(
@@ -138,10 +177,15 @@ class CompanyModel {
       posMode: posMode ?? this.posMode,
       businessType: businessType ?? this.businessType,
       planFeatures: planFeatures ?? this.planFeatures,
+      licensedModules: licensedModules ?? this.licensedModules,
       restaurantModeLocked: restaurantModeLocked ?? this.restaurantModeLocked,
+      requireCustomerVerification: requireCustomerVerification ?? this.requireCustomerVerification,
+      enableOrderNotifications: enableOrderNotifications ?? this.enableOrderNotifications,
+      enableProductReviews: enableProductReviews ?? this.enableProductReviews,
       drawerCoverUrl: clearDrawerCoverUrl ? null : (drawerCoverUrl ?? this.drawerCoverUrl),
       logoUrl: clearLogoUrl ? null : (logoUrl ?? this.logoUrl),
       faviconUrl: clearFaviconUrl ? null : (faviconUrl ?? this.faviconUrl),
+      slug: clearSlug ? null : (slug ?? this.slug),
       timezone: timezone ?? this.timezone,
     );
   }
@@ -166,12 +210,25 @@ class CompanyModel {
         'pos_mode': posMode,
         if (businessType != null) 'business_type': businessType,
         'plan_features': planFeatures,
+        'licensed_modules': licensedModules,
         'restaurant_mode_locked': restaurantModeLocked,
+        'require_customer_verification': requireCustomerVerification,
+        'enable_order_notifications': enableOrderNotifications,
+        'enable_product_reviews': enableProductReviews,
         'drawer_cover_url': drawerCoverUrl,
         'logo_url': logoUrl,
         'favicon_url': faviconUrl,
+        if (slug != null) 'slug': slug,
         'timezone': timezone,
       };
+
+  bool isModuleEnabled(String module) {
+    if (licensedModules.isEmpty) {
+      return true;
+    }
+    final mod = module.toLowerCase().trim();
+    return licensedModules.contains(mod);
+  }
 
   /// True when this tenant should see the restaurant POS (table
   /// management + KOT) instead of the standard retail POS. Mirrors

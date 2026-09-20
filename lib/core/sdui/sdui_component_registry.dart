@@ -27,6 +27,7 @@ import '../../features/settings/screens/global_printer_setup_screen.dart';
 import 'components/navigation_tree_builder.dart';
 import '../../features/settings/screens/tenant_settings_screen.dart';
 import '../../features/staff/screens/staff_screen.dart';
+import '../../features/storefront/screens/storefront_screen.dart';
 import '../../features/subscription/screens/subscription_screen.dart';
 import '../../features/taxes/screens/taxes_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
@@ -199,6 +200,21 @@ class SduiComponentRegistry {
     'printer-setup': (_) => const GlobalPrinterSetupScreen(),
     'hardware_printer': (_) => const GlobalPrinterSetupScreen(),
     'hardware_settings': (_) => const GlobalPrinterSetupScreen(),
+    'settings_coupons': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-coupons', initialTitle: 'Coupons & Discounts'),
+    'settings-coupons': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-coupons', initialTitle: 'Coupons & Discounts'),
+    'coupons': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-coupons', initialTitle: 'Coupons & Discounts'),
+    'settings_faqs': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-faqs', initialTitle: 'Store FAQs & Help Center'),
+    'settings-faqs': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-faqs', initialTitle: 'Store FAQs & Help Center'),
+    'faqs': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-faqs', initialTitle: 'Store FAQs & Help Center'),
+    'settings_reviews': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-reviews', initialTitle: 'Product Ratings & Reviews'),
+    'settings-reviews': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-reviews', initialTitle: 'Product Ratings & Reviews'),
+    'reviews': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-reviews', initialTitle: 'Product Ratings & Reviews'),
+    'settings_notifications': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-notifications', initialTitle: 'Verification & Notifications'),
+    'settings-notifications': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-notifications', initialTitle: 'Verification & Notifications'),
+    'verification_notifications': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-notifications', initialTitle: 'Verification & Notifications'),
+    'settings_integrations': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-integrations', initialTitle: 'API & Integrations'),
+    'integrations': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-integrations', initialTitle: 'API & Integrations'),
+    'storefront': (_) => const StorefrontScreen(),
     'dynamic_page': (_) => const DynamicSchemaPage(),
   };
 

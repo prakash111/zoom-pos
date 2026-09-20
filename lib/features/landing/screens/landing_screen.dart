@@ -107,6 +107,11 @@ class _LandingScreenState extends State<LandingScreen> {
     {'code': 'pt', 'label': 'Português', 'flag': '🇧🇷'},
     {'code': 'de', 'label': 'Deutsch', 'flag': '🇩🇪'},
     {'code': 'zh', 'label': '中文', 'flag': '🇨🇳'},
+    {'code': 'ja', 'label': '日本語', 'flag': '🇯🇵'},
+    {'code': 'ru', 'label': 'Русский', 'flag': '🇷🇺'},
+    {'code': 'it', 'label': 'Italiano', 'flag': '🇮🇹'},
+    {'code': 'id', 'label': 'Bahasa Indonesia', 'flag': '🇮🇩'},
+    {'code': 'tr', 'label': 'Türkçe', 'flag': '🇹🇷'},
   ];
 
   @override
@@ -299,37 +304,56 @@ class _LandingScreenState extends State<LandingScreen> {
             themeProvider: themeProvider,
           );
 
-          return Scaffold(
-            backgroundColor: tokens.scaffoldBg,
-            appBar: _buildTopNav(
-                context, data, tokens, themeProvider, localeProvider),
-            endDrawer: _buildMobileDrawer(
-                context, data, tokens, themeProvider, localeProvider),
-            body: RefreshIndicator(
-              color: tokens.primaryColor,
-              backgroundColor: tokens.surfaceCard,
-              onRefresh: () =>
-                  _landingProvider.refresh(context.read<ApiClient>()),
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                child: Column(
-                  children: [
-                    _buildHeroSection(context, hero, branding, tokens),
-                    _buildHardwareBar(context, data.hardware, tokens),
-                    _buildStatsSection(context, data.stats, tokens),
-                    _buildSolutionsSection(context, data.solutions, tokens),
-                    _buildFeaturesSection(context, data.features, tokens),
-                    _buildPricingSection(context, data.plans, tokens),
-                    if (data.testimonials.isNotEmpty)
-                      _buildTestimonialsSection(
-                          context, data.testimonials, tokens),
-                    _buildFaqSection(context, data.faqs, tokens),
-                    if (data.downloads.playstoreEnabled ||
-                        data.downloads.windowsEnabled)
-                      _buildDownloadsSection(context, data.downloads, tokens),
-                    _buildContactSection(context, data.contact, tokens),
-                    _buildFooter(context, branding, tokens),
-                  ],
+          if (!data.landingPageEnabled) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              }
+            });
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final isRtl = localeProvider.locale.languageCode == 'ar' ||
+              localeProvider.locale.languageCode == 'ur';
+
+          return Directionality(
+            textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+            child: Scaffold(
+              backgroundColor: tokens.scaffoldBg,
+              appBar: _buildTopNav(
+                  context, data, tokens, themeProvider, localeProvider),
+              endDrawer: _buildMobileDrawer(
+                  context, data, tokens, themeProvider, localeProvider),
+              body: RefreshIndicator(
+                color: tokens.primaryColor,
+                backgroundColor: tokens.surfaceCard,
+                onRefresh: () =>
+                    _landingProvider.refresh(context.read<ApiClient>()),
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  child: Column(
+                    children: [
+                      _buildHeroSection(context, hero, branding, tokens),
+                      _buildHardwareBar(context, data.hardware, tokens),
+                      _buildStatsSection(context, data.stats, tokens),
+                      _buildSolutionsSection(context, data.solutions, tokens),
+                      _buildFeaturesSection(context, data.features, tokens),
+                      _buildPricingSection(context, data.plans, tokens),
+                      if (data.testimonials.isNotEmpty)
+                        _buildTestimonialsSection(
+                            context, data.testimonials, tokens),
+                      _buildFaqSection(context, data.faqs, tokens),
+                      if (data.downloads.playstoreEnabled ||
+                          data.downloads.windowsEnabled)
+                        _buildDownloadsSection(context, data.downloads, tokens),
+                      _buildContactSection(context, data.contact, tokens),
+                      _buildFooter(context, branding, tokens),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1428,7 +1452,7 @@ class _LandingScreenState extends State<LandingScreen> {
                               textBaseline: TextBaseline.alphabetic,
                               children: [
                                 Text(
-                                  '\$${plan.price.toStringAsFixed(plan.price.truncateToDouble() == plan.price ? 0 : 2)}',
+                                  '${plan.currency == 'INR' ? '₹' : (plan.currency == 'EUR' ? '€' : (plan.currency == 'GBP' ? '£' : '\$'))}${plan.price.toStringAsFixed(plan.price.truncateToDouble() == plan.price ? 0 : 2)}',
                                   style: TextStyle(
                                     color: tokens.textPrimary,
                                     fontSize: 36,
@@ -1455,6 +1479,13 @@ class _LandingScreenState extends State<LandingScreen> {
                                   label: plan.invoiceLimit == -1
                                       ? 'Unlimited Invoices'
                                       : '${plan.invoiceLimit} Invoices/mo',
+                                  tokens: tokens,
+                                ),
+                                _buildLimitChip(
+                                  icon: Icons.inventory_2_outlined,
+                                  label: plan.productsLimit == -1
+                                      ? 'Unlimited Products'
+                                      : '${plan.productsLimit} Products',
                                   tokens: tokens,
                                 ),
                                 _buildLimitChip(

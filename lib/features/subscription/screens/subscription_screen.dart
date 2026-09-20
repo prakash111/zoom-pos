@@ -538,6 +538,11 @@ class _PlanOptionCard extends StatelessWidget {
                 ),
                 _badgeChip(
                   context,
+                  plan.productsLimit == -1 ? 'Unlimited Products' : '${plan.productsLimit} Products',
+                  Icons.inventory_2_outlined,
+                ),
+                _badgeChip(
+                  context,
                   plan.deviceLimit == -1 ? 'Unlimited POS' : '${plan.deviceLimit} Devices',
                   Icons.point_of_sale,
                 ),
@@ -564,13 +569,20 @@ class _PlanOptionCard extends StatelessWidget {
                           color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
                         ),
                       ),
-                      child: Text(
-                        ext.replaceAll('_', ' ').toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.extension_outlined, size: 10, color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            ext.replaceAll('_', ' ').toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                 ],
@@ -581,7 +593,7 @@ class _PlanOptionCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final feat in plan.features.take(5))
+                  for (final feat in plan.features)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Row(

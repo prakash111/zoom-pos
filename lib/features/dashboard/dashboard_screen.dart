@@ -270,11 +270,12 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
   }
 
   final activeMode = BootstrapCache.instance.activeMode.toLowerCase().trim();
+  final hasRetailLicensed = company?.isModuleEnabled('retail') ?? true;
   final isSpecialized = activeMode != 'retail' &&
       activeMode != 'general' &&
       activeMode.isNotEmpty;
 
-  if (!isSpecialized && !sectionMetaByKey.containsKey('cashier_sales')) {
+  if ((!isSpecialized || hasRetailLicensed) && !sectionMetaByKey.containsKey('cashier_sales')) {
     sectionMetaByKey['cashier_sales'] = _NavSection(
       'cashier_sales',
       (l10n) => BootstrapCache.instance.resolveNavigationLabel(
@@ -287,8 +288,8 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
   }
 
   // Specialized vertical tenants maintain POS and commerce inside their vertical block;
-  // do not append or retain a redundant generic cashier_sales section.
-  if (isSpecialized) {
+  // only remove cashier_sales if retail is NOT licensed for this company.
+  if (isSpecialized && !hasRetailLicensed) {
     tilesBySection.remove('cashier_sales');
   }
 

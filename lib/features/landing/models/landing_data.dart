@@ -12,9 +12,11 @@ class LandingData {
     required this.faqs,
     required this.downloads,
     required this.contact,
+    this.landingPageEnabled = true,
   });
 
   final String theme;
+  final bool landingPageEnabled;
   final LandingBranding branding;
   final LandingHero hero;
   final List<LandingHardwareItem> hardware;
@@ -41,8 +43,11 @@ class LandingData {
         ? json['contact'] as Map<String, dynamic>
         : <String, dynamic>{};
 
+    final isEnabled = json['landing_page_enabled'] ?? brandingMap['landing_page_enabled'];
+
     return LandingData(
       theme: json['theme']?.toString() ?? 'theme_fast',
+      landingPageEnabled: isEnabled != null ? (isEnabled == true || isEnabled == 1 || isEnabled == '1') : true,
       branding: LandingBranding.fromJson(brandingMap),
       hero: LandingHero.fromJson(heroMap),
       hardware: (json['hardware'] as List<dynamic>?)
@@ -483,7 +488,9 @@ class LandingPlanItem {
     this.description,
     required this.features,
     required this.isFeatured,
+    this.currency = 'USD',
     this.invoiceLimit = -1,
+    this.productsLimit = -1,
     this.deviceLimit = -1,
     this.staffLimit = -1,
     this.extensions = const [],
@@ -492,11 +499,13 @@ class LandingPlanItem {
   final dynamic id;
   final String name;
   final double price;
+  final String currency;
   final String billingPeriod;
   final String? description;
   final List<String> features;
   final bool isFeatured;
   final int invoiceLimit;
+  final int productsLimit;
   final int deviceLimit;
   final int staffLimit;
   final List<String> extensions;
@@ -531,11 +540,13 @@ class LandingPlanItem {
       id: json['id'],
       name: json['name']?.toString() ?? 'Standard',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      currency: json['currency']?.toString() ?? 'USD',
       billingPeriod: json['billing_period']?.toString() ?? json['billing_cycle']?.toString() ?? 'monthly',
       description: json['description']?.toString(),
       features: featureList,
       isFeatured: json['is_featured'] == true,
       invoiceLimit: (json['invoice_limit'] as num?)?.toInt() ?? (rawLimits['invoices'] as num?)?.toInt() ?? -1,
+      productsLimit: (json['products_limit'] as num?)?.toInt() ?? (rawLimits['products'] as num?)?.toInt() ?? -1,
       deviceLimit: (json['device_limit'] as num?)?.toInt() ?? (rawLimits['dispositivos'] as num?)?.toInt() ?? -1,
       staffLimit: (json['staff_limit'] as num?)?.toInt() ?? (rawLimits['usuarios'] as num?)?.toInt() ?? -1,
       extensions: extensionList,
