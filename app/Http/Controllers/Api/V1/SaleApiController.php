@@ -430,6 +430,13 @@ class SaleApiController extends Controller
                     }
                 }
 
+                if (! app(\App\Services\Subscription\SubscriptionEntitlementService::class)->canCreateInvoice($company->id)) {
+                    return response()->json([
+                        'error' => 'Invoice limit reached',
+                        'message' => 'You have reached the invoice limit for your subscription plan. Please upgrade your plan to create more invoices.',
+                    ], 403);
+                }
+
                 $cashRegister = CashRegister::openFor($company->id);
 
                 $prefix = $company->invoice_prefix ?: 'INV-';

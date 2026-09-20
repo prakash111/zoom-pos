@@ -91,18 +91,14 @@
                 <div class="sm:col-span-2">
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Bundled Extensions & Add-ons</label>
                     <div class="flex flex-wrap gap-4 pt-1">
-                        <label class="inline-flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" wire:model="extensions" value="leadmanagement" class="rounded-md text-indigo-600 focus:ring-indigo-500">
-                            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Lead Management CRM</span>
-                        </label>
-                        <label class="inline-flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" wire:model="extensions" value="whatsapp_api" class="rounded-md text-indigo-600 focus:ring-indigo-500">
-                            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">WhatsApp Cloud API</span>
-                        </label>
-                        <label class="inline-flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" wire:model="extensions" value="custom_domain" class="rounded-md text-indigo-600 focus:ring-indigo-500">
-                            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Custom Domain</span>
-                        </label>
+                        @forelse ($this->availableExtensions as $extKey => $extLabel)
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" wire:model="extensions" value="{{ $extKey }}" class="rounded-md text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $extLabel }}</span>
+                            </label>
+                        @empty
+                            <span class="text-xs text-slate-400">No extensions registered in catalog.</span>
+                        @endforelse
                     </div>
                 </div>
 

@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Company;
+use App\Services\Subscription\SubscriptionEntitlementService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,7 +17,8 @@ class EnsureTenantExtension
             : ($request->attributes->get('company_id') ?: $request->user()?->company_id);
         $company = $companyId ? Company::find($companyId) : null;
 
-        abort_unless($company && $company->hasModule($extension), 403,
+        $entitlementService = app(SubscriptionEntitlementService::class);
+        abort_unless($company && $entitlementService->tenantCanUseExtension($company, $extension), 403,
             'This extension is not activated for your store by Super Admin.');
 
         return $next($request);

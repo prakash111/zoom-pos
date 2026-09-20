@@ -98,6 +98,14 @@ class UserApiController extends Controller
         }
 
         $data = $validator->validated();
+
+        if (! app(\App\Services\Subscription\SubscriptionEntitlementService::class)->canCreateStaff($company->id)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Staff limit reached for your subscription plan. Please upgrade your plan to add more staff members.',
+            ], 403);
+        }
+
         $plaintext = strtoupper(Str::random(8));
 
         $user = User::create([

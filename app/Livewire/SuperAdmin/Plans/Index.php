@@ -164,12 +164,12 @@ class Index extends Component
                 'currency' => strtoupper($data['currency']),
                 'active' => $this->active,
                 'invoice_limit' => $this->invoiceLimit,
-                'device_limit' => $this->deviceLimit,
-                'staff_limit' => $this->staffLimit,
+                'device_limit' => $this->limitDevices !== 3 ? $this->limitDevices : $this->deviceLimit,
+                'staff_limit' => $this->limitUsers !== 5 ? $this->limitUsers : $this->staffLimit,
                 'extensions' => array_values(array_unique(array_filter($this->extensions))),
                 'limits' => [
-                    'usuarios' => $this->staffLimit,
-                    'dispositivos' => $this->deviceLimit,
+                    'usuarios' => $this->limitUsers !== 5 ? $this->limitUsers : $this->staffLimit,
+                    'dispositivos' => $this->limitDevices !== 3 ? $this->limitDevices : $this->deviceLimit,
                     'invoices' => $this->invoiceLimit,
                     'armazenamento_mb' => $this->limitStorageMb,
                     'filiais' => $this->limitBranches,
@@ -196,6 +196,34 @@ class Index extends Component
         Plan::where('name', $name)->delete();
         AuditLog::record('plan.deleted', null, auth('platform_web')->id(), ['plan' => $name]);
         session()->flash('status', 'Plan deleted.');
+    }
+
+    public function getAvailableExtensionsProperty(): array
+    {
+        $keys = \App\Services\Modular\ModuleRegistry::extensionKeys();
+        $fromConfig = (array) config('modules.extensions', []);
+        $allKeys = array_values(array_unique(array_merge($keys, $fromConfig)));
+
+        $catalog = collect(config('modules.catalog', []))->keyBy('slug');
+        $allModules = \App\Services\Modular\ModuleRegistry::allModules();
+
+        $result = [];
+        foreach ($allKeys as $key) {
+            $name = null;
+            if (isset($allModules[$key])) {
+                $name = $allModules[$key]['title'] ?? $allModules[$key]['name'] ?? null;
+            }
+            if (! $name && isset($catalog[$key])) {
+                $name = $catalog[$key]['name'] ?? null;
+            }
+            if (! $name) {
+                $name = ucwords(str_replace(['_', '-'], ' ', $key));
+            }
+
+            $result[$key] = $name;
+        }
+
+        return $result;
     }
 
     public function render()

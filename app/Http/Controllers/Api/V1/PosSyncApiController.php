@@ -34,6 +34,7 @@ use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Modular\ModuleRegistry;
 use App\Services\Notifications\TenantNotificationDispatcherService;
 use App\Services\Payment\SubscriptionPaymentGatewayService;
+use App\Services\Subscription\SubscriptionEntitlementService;
 use App\Services\Sdui\SchemaResponse;
 use App\Services\SmsGatewayService;
 use App\Services\TaxCalculationService;
@@ -1469,6 +1470,15 @@ class PosSyncApiController extends Controller
                     $rejected[] = [
                         'id' => $clientUuid,
                         'error' => 'A customer must be selected for due, partial, or credit sales.',
+                    ];
+
+                    continue;
+                }
+
+                if (! app(\App\Services\Subscription\SubscriptionEntitlementService::class)->canCreateInvoice($company->id)) {
+                    $rejected[] = [
+                        'id' => $clientUuid,
+                        'error' => 'Invoice limit reached for your subscription plan. Please upgrade your plan.',
                     ];
 
                     continue;
@@ -3677,6 +3687,43 @@ class PosSyncApiController extends Controller
             ],
             'available_plans' => $availablePlans,
             'enabled_gateways' => array_keys($gatewayService->getEnabledGateways()),
+        ]);
+    }
+
+    /**
+     * Subscription Features and Extensions
+     * GET /api/subscription/features
+     */
+    public function subscriptionFeatures(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $plan = Plan::find($company->plan_name) ?? $company->plan;
+
+        $bundledExtensions = is_array($plan?->extensions) ? $plan->extensions : [];
+        $licensedModules = $company->licensedModuleKeys();
+        $features = is_array($plan?->features) ? $plan->features : [];
+
+        return response()->json([
+            'success' => true,
+            'plan_name' => $company->plan_name,
+            'features' => $features,
+            'bundled_extensions' => $bundledExtensions,
+            'licensed_modules' => $licensedModules,
+        ]);
+    }
+
+    /**
+     * Subscription Entitlements & Quotas
+     * GET /api/subscription/entitlements
+     */
+    public function subscriptionEntitlements(Request $request, SubscriptionEntitlementService $entitlementService): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $entitlements = $entitlementService->getEntitlements($company);
+
+        return response()->json([
+            'success' => true,
+            'data' => $entitlements,
         ]);
     }
 

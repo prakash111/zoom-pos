@@ -134,6 +134,48 @@ class LandingApiController extends Controller
     }
 
     /**
+     * Public Subscription Plan detail.
+     * GET /api/pricing-plans/{id}
+     */
+    public function planDetail(string $id): JsonResponse
+    {
+        $all = collect($this->getNormalizedPlans())->keyBy('id');
+        $item = $all->get($id);
+
+        if (! $item) {
+            $p = Plan::where('name', $id)->first();
+            if (! $p) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Plan not found.',
+                ], 404);
+            }
+            $item = [
+                'id' => $p->name,
+                'name' => $p->display_name ?: ucfirst($p->name),
+                'display_name' => $p->display_name ?: ucfirst($p->name),
+                'price' => (float) ($p->price ?? 0),
+                'currency' => $p->currency ?: 'USD',
+                'billing_period' => $p->billing_cycle ?? 'monthly',
+                'billing_cycle' => $p->billing_cycle ?? 'monthly',
+                'duration_days' => (int) ($p->duration_days ?? 30),
+                'invoice_limit' => (int) ($p->invoice_limit ?? -1),
+                'device_limit' => (int) ($p->device_limit ?? -1),
+                'staff_limit' => (int) ($p->staff_limit ?? -1),
+                'extensions' => array_values(is_array($p->extensions) ? $p->extensions : []),
+                'features' => array_values(is_array($p->features) ? $p->features : []),
+                'limits' => is_array($p->limits) ? $p->limits : [],
+                'active' => (bool) $p->active,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'plan' => $item,
+        ]);
+    }
+
+    /**
      * Get normalized plan items with dynamic limits, extensions, and feature badges.
      */
     private function getNormalizedPlans(): array

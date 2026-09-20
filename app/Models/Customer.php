@@ -12,11 +12,16 @@ class Customer extends Model
     use TracksSyncState;
 
     protected $fillable = [
-        'company_id', 'external_id', 'name', 'document', 'person_type', 'email', 'phone', 'source',
+        'company_id', 'external_id', 'name', 'document', 'person_type', 'email', 'password', 'auth_token', 'phone', 'source',
         'address', 'city', 'state', 'loyalty_points', 'due_balance', 'state_code', 'gstin', 'taxpayer_type', 'tax_id_label',
         'tax_id', 'is_tax_exempt', 'is_demo',
         'age', 'gender', 'allergies', 'prescribing_doctor', 'doctor_registration_no',
         'custom_fields',
+    ];
+
+    protected $hidden = [
+        'password',
+        'auth_token',
     ];
 
     protected $casts = [
@@ -26,6 +31,21 @@ class Customer extends Model
         'age' => 'integer',
         'custom_fields' => 'array',
     ];
+
+    public function addresses()
+    {
+        return $this->hasMany(CustomerAddress::class);
+    }
+
+    public function wishlists()
+    {
+        return $this->hasMany(CustomerWishlist::class);
+    }
+
+    public function wishlistProducts()
+    {
+        return $this->belongsToMany(Product::class, 'customer_wishlists', 'customer_id', 'product_id')->withTimestamps();
+    }
 
     public function sales()
     {

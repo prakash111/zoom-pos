@@ -277,6 +277,12 @@ class InvoiceController extends Controller
 
         $notes = $request->input('notes') ?: ($quote?->notes ?: null);
 
+        if (! app(\App\Services\Subscription\SubscriptionEntitlementService::class)->canCreateInvoice($company->id)) {
+            return response()->json([
+                'message' => 'Invoice limit reached for your subscription plan. Please upgrade your plan.',
+            ], 403);
+        }
+
         $sale = DB::transaction(function () use ($company, $user, $quote, $customerId, $customerName, $subtotal, $taxRate, $taxAmount, $total, $items, $notes) {
             $saleNumber = 'INV-' . strtoupper(Str::random(8));
 

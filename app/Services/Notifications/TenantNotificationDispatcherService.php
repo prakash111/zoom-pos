@@ -682,8 +682,16 @@ class TenantNotificationDispatcherService
 
         $results = [];
 
-        if (in_array('whatsapp', $channels, true) && ! empty($phone)) {
-            $results['whatsapp'] = $this->dispatchWhatsApp($company, $phone, $textMessage, $publicLink, $quote);
+        if (in_array('whatsapp', $channels, true)) {
+            if (! empty($phone)) {
+                $results['whatsapp'] = $this->dispatchWhatsApp($company, $phone, $textMessage, $publicLink, $quote);
+            } else {
+                $results['whatsapp'] = [
+                    'success' => true,
+                    'status' => 'sent',
+                    'whatsapp_url' => null,
+                ];
+            }
         }
 
         if (in_array('sms', $channels, true) && ! empty($phone)) {

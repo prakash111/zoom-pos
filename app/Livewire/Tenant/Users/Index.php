@@ -121,6 +121,12 @@ class Index extends Component
             ? app('tenant.company_id')
             : auth('web')->user()?->company_id;
 
+        if (! app(\App\Services\Subscription\SubscriptionEntitlementService::class)->canCreateStaff($companyId)) {
+            $this->addError('inviteEmail', 'Staff limit reached for your subscription plan. Please upgrade your plan to add more staff members.');
+
+            return;
+        }
+
         $plaintext = strtoupper(Str::random(8));
 
         $user = User::create([

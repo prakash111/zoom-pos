@@ -84,10 +84,42 @@ Route::post('/public/contact-us', [\App\Http\Controllers\Api\V1\LandingApiContro
 Route::post('/v1/public/contact-us', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
 Route::post('/public/contact', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
 Route::post('/v1/public/contact', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
+Route::get('/pricing-plans', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'plans']);
+Route::get('/v1/pricing-plans', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'plans']);
+Route::get('/pricing-plans/{id}', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'planDetail']);
+Route::get('/v1/pricing-plans/{id}', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'planDetail']);
+
 Route::get('/storefront/catalog', [\App\Http\Controllers\Tenant\StorefrontController::class, 'apiCatalog']);
 Route::get('/v1/storefront/catalog', [\App\Http\Controllers\Tenant\StorefrontController::class, 'apiCatalog']);
 Route::post('/storefront/order', [\App\Http\Controllers\Tenant\StorefrontController::class, 'placeOrder']);
 Route::post('/v1/storefront/order', [\App\Http\Controllers\Tenant\StorefrontController::class, 'placeOrder']);
+
+// Storefront Customer Auth, Profile, Wishlist, Addresses, & Authoritative Cart Calculation
+Route::prefix('storefront')->group(function () {
+    Route::post('/customer/register', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'register']);
+    Route::post('/customer/login', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'login']);
+    Route::post('/customer/logout', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'logout']);
+    Route::get('/customer/profile', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'profile']);
+    Route::put('/customer/profile', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'updateProfile']);
+    Route::get('/customer/addresses', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'addresses']);
+    Route::post('/customer/addresses', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'storeAddress']);
+    Route::put('/customer/addresses/{id}', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'updateAddress']);
+    Route::delete('/customer/addresses/{id}', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'deleteAddress']);
+    Route::get('/customer/wishlist', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'wishlist']);
+    Route::post('/customer/wishlist/toggle', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'toggleWishlist']);
+    Route::delete('/customer/wishlist/{productId}', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'removeWishlist']);
+    Route::get('/customer/orders', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'orders']);
+    Route::post('/cart/calculate', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'calculateCart']);
+});
+
+// Convenient root aliases for storefront customer features
+Route::get('/addresses', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'addresses']);
+Route::post('/addresses', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'storeAddress']);
+Route::put('/addresses/{id}', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'updateAddress']);
+Route::delete('/addresses/{id}', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'deleteAddress']);
+Route::get('/wishlist', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'wishlist']);
+Route::post('/wishlist/toggle', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'toggleWishlist']);
+Route::delete('/wishlist/{productId}', [\App\Http\Controllers\Api\V1\StorefrontCustomerApiController::class, 'removeWishlist']);
 
 Route::prefix('v1/tax')->middleware([AuthenticateTenantApi::class, PreventDemoModifications::class])->group(function () {
     Route::post('/calculate', [TaxApiController::class, 'calculate']);
@@ -954,6 +986,8 @@ Route::prefix('v1/pos')->group(function () {
 
         // Subscription & Billing
         Route::get('/subscription', [PosSyncApiController::class, 'subscription']);
+        Route::get('/subscription/features', [PosSyncApiController::class, 'subscriptionFeatures']);
+        Route::get('/subscription/entitlements', [PosSyncApiController::class, 'subscriptionEntitlements']);
         Route::post('/subscription/redeem', [PosSyncApiController::class, 'subscriptionRedeem']);
         Route::post('/subscription/plans/{plan}/activate-free', [PosSyncApiController::class, 'subscriptionActivateFree']);
         Route::post('/subscription/plans/{plan}/razorpay/order', [PosSyncApiController::class, 'subscriptionRazorpayOrder']);
