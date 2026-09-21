@@ -159,6 +159,10 @@ class Tenant {
     this.drawerCoverUrl,
     this.faviconUrl,
     this.activeMode,
+    this.slug,
+    this.subdomain,
+    this.customDomain,
+    this.storefrontUrl,
   });
 
   final String id;
@@ -169,6 +173,10 @@ class Tenant {
   final String? drawerCoverUrl;
   final String? faviconUrl;
   final String? activeMode;
+  final String? slug;
+  final String? subdomain;
+  final String? customDomain;
+  final String? storefrontUrl;
 
   String get displayName =>
       (tradeName != null && tradeName!.trim().isNotEmpty)
@@ -180,6 +188,23 @@ class Tenant {
     return (t.isNotEmpty && t.toLowerCase() != 'general')
         ? t.toUpperCase()
         : 'RETAIL';
+  }
+
+  String resolveLiveStoreUrl({String fallbackHost = 'saas.zoomnearby.com'}) {
+    if (customDomain != null && customDomain!.trim().isNotEmpty) {
+      final cd = customDomain!.trim();
+      return cd.startsWith('http') ? cd : 'https://$cd';
+    }
+    if (storefrontUrl != null && storefrontUrl!.trim().isNotEmpty) {
+      final su = storefrontUrl!.trim();
+      if (!su.contains('://saas.zoomnearby.com') && !su.endsWith('://saas.zoomnearby.com/')) {
+        return su;
+      }
+    }
+    final sub = (subdomain != null && subdomain!.trim().isNotEmpty)
+        ? subdomain!.trim()
+        : ((slug != null && slug!.trim().isNotEmpty) ? slug!.trim() : 'store');
+    return 'https://$sub.$fallbackHost';
   }
 
   factory Tenant.fromJson(Map<String, dynamic> json) {
@@ -225,6 +250,19 @@ class Tenant {
     final rawFavicon = safe['favicon_url']?.toString() ??
         rawHeader['favicon_url']?.toString();
 
+    final rawSlug = safe['slug']?.toString() ??
+        rawHeader['slug']?.toString();
+
+    final rawSubdomain = safe['subdomain']?.toString() ??
+        rawSlug ??
+        rawHeader['subdomain']?.toString();
+
+    final rawCustomDomain = safe['custom_domain']?.toString() ??
+        rawHeader['custom_domain']?.toString();
+
+    final rawStorefrontUrl = safe['storefront_url']?.toString() ??
+        rawHeader['storefront_url']?.toString();
+
     return Tenant(
       id: safe['id']?.toString() ?? '',
       name: rawName,
@@ -234,6 +272,10 @@ class Tenant {
       drawerCoverUrl: rawCover,
       faviconUrl: rawFavicon,
       activeMode: safe['active_mode']?.toString(),
+      slug: rawSlug,
+      subdomain: rawSubdomain,
+      customDomain: rawCustomDomain,
+      storefrontUrl: rawStorefrontUrl,
     );
   }
 
@@ -246,6 +288,10 @@ class Tenant {
         if (drawerCoverUrl != null) 'drawer_cover_url': drawerCoverUrl,
         if (faviconUrl != null) 'favicon_url': faviconUrl,
         if (activeMode != null) 'active_mode': activeMode,
+        if (slug != null) 'slug': slug,
+        if (subdomain != null) 'subdomain': subdomain,
+        if (customDomain != null) 'custom_domain': customDomain,
+        if (storefrontUrl != null) 'storefront_url': storefrontUrl,
       };
 }
 

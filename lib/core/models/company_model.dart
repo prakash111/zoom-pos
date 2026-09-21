@@ -26,6 +26,9 @@ class CompanyModel {
     this.logoUrl,
     this.faviconUrl,
     this.slug,
+    this.subdomain,
+    this.customDomain,
+    this.storefrontUrl,
     this.timezone = 'UTC',
   });
 
@@ -94,6 +97,9 @@ class CompanyModel {
       logoUrl: (json['logo_url'] ?? json['logo'])?.toString(),
       faviconUrl: (json['favicon_url'] ?? json['favicon'])?.toString(),
       slug: json['slug']?.toString(),
+      subdomain: (json['subdomain'] ?? json['slug'])?.toString(),
+      customDomain: (json['custom_domain'] ?? json['customDomain'])?.toString(),
+      storefrontUrl: (json['storefront_url'] ?? json['storefrontUrl'])?.toString(),
       timezone: json['timezone']?.toString().isNotEmpty == true ? json['timezone'].toString() : 'UTC',
     );
   }
@@ -124,6 +130,9 @@ class CompanyModel {
   final String? logoUrl;
   final String? faviconUrl;
   final String? slug;
+  final String? subdomain;
+  final String? customDomain;
+  final String? storefrontUrl;
   final String timezone;
 
   CompanyModel copyWith({
@@ -157,6 +166,12 @@ class CompanyModel {
     bool clearFaviconUrl = false,
     String? slug,
     bool clearSlug = false,
+    String? subdomain,
+    bool clearSubdomain = false,
+    String? customDomain,
+    bool clearCustomDomain = false,
+    String? storefrontUrl,
+    bool clearStorefrontUrl = false,
     String? timezone,
   }) {
     return CompanyModel(
@@ -186,8 +201,30 @@ class CompanyModel {
       logoUrl: clearLogoUrl ? null : (logoUrl ?? this.logoUrl),
       faviconUrl: clearFaviconUrl ? null : (faviconUrl ?? this.faviconUrl),
       slug: clearSlug ? null : (slug ?? this.slug),
+      subdomain: clearSubdomain ? null : (subdomain ?? this.subdomain),
+      customDomain: clearCustomDomain ? null : (customDomain ?? this.customDomain),
+      storefrontUrl: clearStorefrontUrl ? null : (storefrontUrl ?? this.storefrontUrl),
       timezone: timezone ?? this.timezone,
     );
+  }
+
+  /// Resolve the live storefront URL for this tenant, prioritizing custom domain,
+  /// then storefront_url, and falling back to {subdomain}.saas.zoomnearby.com.
+  String resolveLiveStoreUrl({String fallbackHost = 'saas.zoomnearby.com'}) {
+    if (customDomain != null && customDomain!.trim().isNotEmpty) {
+      final cd = customDomain!.trim();
+      return cd.startsWith('http') ? cd : 'https://$cd';
+    }
+    if (storefrontUrl != null && storefrontUrl!.trim().isNotEmpty) {
+      final su = storefrontUrl!.trim();
+      if (!su.contains('://saas.zoomnearby.com') && !su.endsWith('://saas.zoomnearby.com/')) {
+        return su;
+      }
+    }
+    final sub = (subdomain != null && subdomain!.trim().isNotEmpty)
+        ? subdomain!.trim()
+        : ((slug != null && slug!.trim().isNotEmpty) ? slug!.trim() : 'store');
+    return 'https://$sub.$fallbackHost';
   }
 
   /// Snake-case shape [fromJson] round-trips — used to cache the signed-in
@@ -219,6 +256,9 @@ class CompanyModel {
         'logo_url': logoUrl,
         'favicon_url': faviconUrl,
         if (slug != null) 'slug': slug,
+        if (subdomain != null) 'subdomain': subdomain,
+        if (customDomain != null) 'custom_domain': customDomain,
+        if (storefrontUrl != null) 'storefront_url': storefrontUrl,
         'timezone': timezone,
       };
 

@@ -52,6 +52,8 @@ const Set<String> _forcedRootKeys = <String>{
   'salon_pos',
   'restaurant_pos',
   'consignments',
+  'nav_storefront_group',
+  'group_storefront',
 };
 
 class _FeatureTile {
@@ -811,6 +813,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  String _resolveLiveStoreUrl(
+    String? rawUrl,
+    CompanyModel? company,
+    BootstrapCache bootstrap,
+  ) {
+    var targetUrl = rawUrl?.trim() ?? '';
+    const centralHost = 'saas.zoomnearby.com';
+    final isGeneric = targetUrl.isEmpty ||
+        targetUrl == 'https://$centralHost' ||
+        targetUrl == 'https://$centralHost/' ||
+        targetUrl == 'http://$centralHost' ||
+        targetUrl == 'http://$centralHost/';
+    if (isGeneric) {
+      if (company != null) {
+        return company.resolveLiveStoreUrl(fallbackHost: centralHost);
+      }
+      final customDomain = bootstrap.tenant?.customDomain ??
+          bootstrap.config['custom_domain']?.toString();
+      if (customDomain != null && customDomain.trim().isNotEmpty) {
+        final cd = customDomain.trim();
+        return cd.startsWith('http') ? cd : 'https://$cd';
+      }
+      final sub = bootstrap.tenant?.subdomain ??
+          bootstrap.tenant?.slug ??
+          bootstrap.config['subdomain']?.toString() ??
+          bootstrap.config['slug']?.toString() ??
+          'store';
+      return 'https://${sub.trim()}.$centralHost';
+    }
+    return targetUrl;
+  }
+
   /// Shared tap handler for every dock rendering (drawer, rail, top bar,
   /// bottom bar) — none of them are a persistent multi-tab shell, they're a
   /// quick-launcher over the app's stack-based navigation, so selecting a
@@ -823,11 +857,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     setState(() => _dockIndex = index);
     final auth = context.read<AuthProvider>();
+    final bootstrap = context.read<BootstrapCache>();
     final feature = _featuresFor(auth.company, auth.user)[index - 1];
-    if (feature.isExternalUrl && feature.url != null && feature.url!.isNotEmpty) {
-      launchUrl(Uri.parse(feature.url!), mode: LaunchMode.externalApplication);
-      setState(() => _dockIndex = 0);
-      return;
+    if (feature.isExternalUrl || feature.key == 'nav_view_live_store') {
+      final targetUrl = _resolveLiveStoreUrl(feature.url, auth.company, bootstrap);
+      if (targetUrl.isNotEmpty) {
+        launchUrl(Uri.parse(targetUrl), mode: LaunchMode.externalApplication);
+        setState(() => _dockIndex = 0);
+        return;
+      }
     }
     final title = feature.titleOf(AppLocalizations.of(context));
     Navigator.of(context)
@@ -1053,10 +1091,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         void openTile(_FeatureTile tile) {
-          if (tile.isExternalUrl && tile.url != null && tile.url!.isNotEmpty) {
+          if (tile.isExternalUrl || tile.key == 'nav_view_live_store') {
             Navigator.of(context).pop();
-            launchUrl(Uri.parse(tile.url!), mode: LaunchMode.externalApplication);
-            return;
+            final targetUrl = _resolveLiveStoreUrl(tile.url, company, bootstrap);
+            if (targetUrl.isNotEmpty) {
+              launchUrl(Uri.parse(targetUrl), mode: LaunchMode.externalApplication);
+              return;
+            }
           }
           final index = indexByKey[tile.key];
           if (index == null) return;
@@ -1252,7 +1293,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ));
 
           final sectionTitle = section.header?.call(l10n) ?? '';
-          if (sectionTitle.isNotEmpty) {
+          final shouldShowSectionTitle = sectionTitle.isNotEmpty &&
+              !(rootItems.length == 1 &&
+                  rootItems.first.titleOf(l10n).trim().toLowerCase() ==
+                      sectionTitle.trim().toLowerCase());
+          if (shouldShowSectionTitle) {
             children.add(Padding(
               key: ValueKey('drawer-section-title-${section.key}'),
               padding: const EdgeInsets.fromLTRB(20, 4, 16, 4),
@@ -1615,7 +1660,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ));
 
       final sectionTitle = section.header?.call(l10n) ?? '';
-      if (sectionTitle.isNotEmpty) {
+      final shouldShowSectionTitle = sectionTitle.isNotEmpty &&
+          !(rootItems.length == 1 &&
+              rootItems.first.titleOf(l10n).trim().toLowerCase() ==
+                  sectionTitle.trim().toLowerCase());
+      if (shouldShowSectionTitle) {
         rows.add(Padding(
           key: ValueKey('rail-section-title-${section.key}'),
           padding: const EdgeInsets.fromLTRB(14, 2, 10, 4),

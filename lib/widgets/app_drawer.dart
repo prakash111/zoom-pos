@@ -370,7 +370,10 @@ class AppDrawer extends StatelessWidget {
                 children: [
                   if (sections != null)
                     for (final section in sections!) ...[
-                      if (section.title.isNotEmpty)
+                      if (section.title.isNotEmpty &&
+                          !(section.items.length == 1 &&
+                              section.items.first.title.trim().toLowerCase() ==
+                                  section.title.trim().toLowerCase()))
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                           child: Text(
@@ -390,6 +393,10 @@ class AppDrawer extends StatelessWidget {
                           activeColor: activeColor,
                           isSelected: item.key == selectedKey,
                           onTap: () => onItemTap?.call(item),
+                          onChildTap: (childMap) {
+                            final childItem = NavItem.fromJson(childMap);
+                            onItemTap?.call(childItem);
+                          },
                         ),
                     ],
                 ],

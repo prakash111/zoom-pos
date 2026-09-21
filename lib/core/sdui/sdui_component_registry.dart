@@ -230,6 +230,9 @@ class SduiComponentRegistry {
     'settings_integrations': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-integrations', initialTitle: 'API & Integrations'),
     'integrations': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-integrations', initialTitle: 'API & Integrations'),
     'storefront': (_) => const StorefrontScreen(),
+    'storefront_group': (_) => const StorefrontScreen(),
+    'nav_storefront_group': (_) => const StorefrontScreen(),
+    'group_storefront': (_) => const StorefrontScreen(),
     // Storefront Domain Setup
     'store_domain': (_) => const StoreDomainScreen(),
     'storefront_domain': (_) => const StoreDomainScreen(),

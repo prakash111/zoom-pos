@@ -10,6 +10,10 @@ class TenantSchema {
     this.businessType,
     this.planFeatures = const [],
     this.logoUrl,
+    this.slug,
+    this.subdomain,
+    this.customDomain,
+    this.storefrontUrl,
   });
 
   final String id;
@@ -19,6 +23,10 @@ class TenantSchema {
   final String? businessType;
   final List<String> planFeatures;
   final String? logoUrl;
+  final String? slug;
+  final String? subdomain;
+  final String? customDomain;
+  final String? storefrontUrl;
 
   factory TenantSchema.fromJson(Map<String, dynamic> json) {
     final rawFeatures = json['plan_features'] ?? json['features'];
@@ -66,7 +74,28 @@ class TenantSchema {
       businessType: resolvedType,
       planFeatures: resolvedFeatures,
       logoUrl: rawLogo,
+      slug: json['slug']?.toString(),
+      subdomain: (json['subdomain'] ?? json['slug'])?.toString(),
+      customDomain: (json['custom_domain'] ?? json['customDomain'])?.toString(),
+      storefrontUrl: (json['storefront_url'] ?? json['storefrontUrl'])?.toString(),
     );
+  }
+
+  String resolveLiveStoreUrl({String fallbackHost = 'saas.zoomnearby.com'}) {
+    if (customDomain != null && customDomain!.trim().isNotEmpty) {
+      final cd = customDomain!.trim();
+      return cd.startsWith('http') ? cd : 'https://$cd';
+    }
+    if (storefrontUrl != null && storefrontUrl!.trim().isNotEmpty) {
+      final su = storefrontUrl!.trim();
+      if (!su.contains('://saas.zoomnearby.com') && !su.endsWith('://saas.zoomnearby.com/')) {
+        return su;
+      }
+    }
+    final sub = (subdomain != null && subdomain!.trim().isNotEmpty)
+        ? subdomain!.trim()
+        : ((slug != null && slug!.trim().isNotEmpty) ? slug!.trim() : 'store');
+    return 'https://$sub.$fallbackHost';
   }
 
   Map<String, dynamic> toJson() => {
@@ -77,6 +106,10 @@ class TenantSchema {
         if (businessType != null) 'business_type': businessType,
         'plan_features': planFeatures,
         if (logoUrl != null) 'logo_url': logoUrl,
+        if (slug != null) 'slug': slug,
+        if (subdomain != null) 'subdomain': subdomain,
+        if (customDomain != null) 'custom_domain': customDomain,
+        if (storefrontUrl != null) 'storefront_url': storefrontUrl,
       };
 }
 

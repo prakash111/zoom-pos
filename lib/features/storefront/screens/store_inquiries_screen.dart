@@ -53,7 +53,7 @@ class _StoreInquiriesScreenState extends State<StoreInquiriesScreen> {
 
       if (!mounted) return;
 
-      if (res is Map && res['success'] == true) {
+      if (res['success'] == true) {
         final data = res['data'] as Map<String, dynamic>? ?? {};
         final rawList = data['inquiries'] as List? ?? [];
         setState(() {
@@ -84,7 +84,7 @@ class _StoreInquiriesScreenState extends State<StoreInquiriesScreen> {
 
       if (!mounted) return;
 
-      if (res is Map && res['success'] == true) {
+      if (res['success'] == true) {
         setState(() {
           final idx = _inquiries.indexWhere((item) => item['id']?.toString() == id);
           if (idx != -1) {

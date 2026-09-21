@@ -692,5 +692,38 @@ void main() {
       expect(
           staffTile.contentPadding, const EdgeInsets.only(left: 46, right: 12));
     });
+
+    test('CompanyModel and TenantSchema resolveLiveStoreUrl formats domain properly', () {
+      final companyWithSlug = CompanyModel(
+        id: '1',
+        name: 'Demo Mart',
+        tradeName: 'Demo Mart',
+        currency: 'USD',
+        currencySymbol: '\$',
+        planName: 'pro',
+        slug: 'metro-mart',
+      );
+      expect(companyWithSlug.resolveLiveStoreUrl(), 'https://metro-mart.saas.zoomnearby.com');
+
+      final companyWithCustomDomain = CompanyModel(
+        id: '2',
+        name: 'Custom Mart',
+        tradeName: 'Custom Mart',
+        currency: 'USD',
+        currencySymbol: '\$',
+        planName: 'pro',
+        slug: 'custom-mart',
+        customDomain: 'store.custommart.com',
+      );
+      expect(companyWithCustomDomain.resolveLiveStoreUrl(), 'https://store.custommart.com');
+
+      final tenantSchema = TenantSchema(
+        id: '1',
+        businessName: 'Test Business',
+        activeMode: 'retail',
+        subdomain: 'online-shop',
+      );
+      expect(tenantSchema.resolveLiveStoreUrl(), 'https://online-shop.saas.zoomnearby.com');
+    });
   });
 }
