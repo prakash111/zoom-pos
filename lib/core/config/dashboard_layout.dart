@@ -14,13 +14,14 @@ enum DashboardLayout {
   /// Redesigned Modern Metric layout with sparklines, sales area chart & receivables split.
   redesigned;
 
-  static DashboardLayout fromName(String? name) => DashboardLayout.values
-      .firstWhere((l) => l.name == name, orElse: () => DashboardLayout.posh);
+  static DashboardLayout fromName(String? name) =>
+      DashboardLayout.values.firstWhere((l) => l.name == name,
+          orElse: () => DashboardLayout.redesigned);
 
   String get label => switch (this) {
         DashboardLayout.posh => 'Cards (light)',
         DashboardLayout.oroit => 'Analytics board (dark)',
-        DashboardLayout.redesigned => 'Modern Metric (split)',
+        DashboardLayout.redesigned => 'Metro Retail (dark)',
       };
 
   String get description => switch (this) {

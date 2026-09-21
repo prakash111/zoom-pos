@@ -60,7 +60,11 @@ const Set<String> _forcedRootKeys = <String>{
 
 class _FeatureTile {
   _FeatureTile(this.key, this.titleOf, this.icon,
-      [this.builder, this.permissionModule, this.isExternalUrl = false, this.url, this.badge]);
+      [this.builder,
+      this.permissionModule,
+      this.isExternalUrl = false,
+      this.url,
+      this.badge]);
 
   /// Stable identifier for this destination, independent of locale/label and
   /// of [permissionModule] (several tiles share one backend module, e.g.
@@ -285,7 +289,8 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
       activeMode != 'general' &&
       activeMode.isNotEmpty;
 
-  if ((!isSpecialized || hasRetailLicensed) && !sectionMetaByKey.containsKey('cashier_sales')) {
+  if ((!isSpecialized || hasRetailLicensed) &&
+      !sectionMetaByKey.containsKey('cashier_sales')) {
     sectionMetaByKey['cashier_sales'] = _NavSection(
       'cashier_sales',
       (l10n) => BootstrapCache.instance.resolveNavigationLabel(
@@ -862,7 +867,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final bootstrap = context.read<BootstrapCache>();
     final feature = _featuresFor(auth.company, auth.user)[index - 1];
     if (feature.isExternalUrl || feature.key == 'nav_view_live_store') {
-      final targetUrl = _resolveLiveStoreUrl(feature.url, auth.company, bootstrap);
+      final targetUrl =
+          _resolveLiveStoreUrl(feature.url, auth.company, bootstrap);
       if (targetUrl.isNotEmpty) {
         launchUrl(Uri.parse(targetUrl), mode: LaunchMode.externalApplication);
         setState(() => _dockIndex = 0);
@@ -996,8 +1002,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ? NetworkImage(coverUrl,
                             webHtmlElementStrategy:
                                 WebHtmlElementStrategy.prefer)
-                        : CachedNetworkImageProvider(coverUrl)
-                            as ImageProvider,
+                        : CachedNetworkImageProvider(coverUrl) as ImageProvider,
                     fit: BoxFit.cover,
                   )
                 : null,
@@ -1095,9 +1100,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         void openTile(_FeatureTile tile) {
           if (tile.isExternalUrl || tile.key == 'nav_view_live_store') {
             Navigator.of(context).pop();
-            final targetUrl = _resolveLiveStoreUrl(tile.url, company, bootstrap);
+            final targetUrl =
+                _resolveLiveStoreUrl(tile.url, company, bootstrap);
             if (targetUrl.isNotEmpty) {
-              launchUrl(Uri.parse(targetUrl), mode: LaunchMode.externalApplication);
+              launchUrl(Uri.parse(targetUrl),
+                  mode: LaunchMode.externalApplication);
               return;
             }
           }
@@ -1208,17 +1215,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 selected: isSelected,
                 trailing: tile.isExternalUrl
-                    ? Icon(Icons.open_in_new, size: 15, color: unselectedIconColor.withValues(alpha: 0.7))
+                    ? Icon(Icons.open_in_new,
+                        size: 15,
+                        color: unselectedIconColor.withValues(alpha: 0.7))
                     : (tile.badge != null && tile.badge!.isNotEmpty
                         ? Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
                               color: const Color(0xFFDC2626),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
                               tile.badge!,
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold),
                             ),
                           )
                         : null),
@@ -1422,7 +1435,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           leading: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                              color: const Color(0xFF10B981)
+                                  .withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(Icons.support_agent,
@@ -1435,22 +1449,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               fontSize: 13,
                             ),
                           ),
-                              subtitle: Text(
-                                effectiveSupportPhone,
-                                style: TextStyle(
-                                  color: unselectedIconColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              trailing: const Icon(Icons.chevron_right, size: 16),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                              onTap: () => _launchHelpSupport(context, effectiveSupportPhone),
+                          subtitle: Text(
+                            effectiveSupportPhone,
+                            style: TextStyle(
+                              color: unselectedIconColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
+                          trailing: const Icon(Icons.chevron_right, size: 16),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          onTap: () => _launchHelpSupport(
+                              context, effectiveSupportPhone),
                         ),
-                      ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1498,7 +1513,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: IconButton(
                     tooltip: 'Help & Support',
-                    icon: const Icon(Icons.support_agent, color: Color(0xFF10B981)),
+                    icon: const Icon(Icons.support_agent,
+                        color: Color(0xFF10B981)),
                     onPressed: () {
                       final bootstrap = BootstrapCache.instance;
                       final branding = context.read<PlatformBrandingProvider>();
@@ -1507,7 +1523,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               branding.supportPhone)
                           .toString()
                           .trim();
-                      _launchHelpSupport(context, phone.isNotEmpty ? phone : '+918535075196');
+                      _launchHelpSupport(
+                          context, phone.isNotEmpty ? phone : '+918535075196');
                     },
                   ),
                 ),
@@ -2039,7 +2056,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildRedesignedFloatingBottomNav(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark ||
+        context.read<NavDockProvider>().dashboardLayout ==
+            DashboardLayout.redesigned;
 
     void openRoute(String key) => Navigator.of(context).push(
           MaterialPageRoute(
@@ -2064,9 +2083,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
             border: Border.all(
-              color: isDark
-                  ? const Color(0xFF334155)
-                  : const Color(0xFFE2E8F0),
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
               width: 1,
             ),
           ),
@@ -2236,7 +2253,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
+      backgroundColor:
+          layout == DashboardLayout.redesigned ? const Color(0xFF07172B) : null,
       appBar: AppBar(
+        backgroundColor: layout == DashboardLayout.redesigned
+            ? const Color(0xFF0B1F35)
+            : null,
+        foregroundColor:
+            layout == DashboardLayout.redesigned ? Colors.white : null,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -2680,12 +2704,29 @@ class _DashboardAnalytics extends StatelessWidget {
           onViewReports: () => open('reports'),
           onOpenTransactions: () => open('sales'),
           onOpenNotifications: onOpenNotifications,
-          isDemo: company?.isDemo == true || BootstrapCache.instance.isDemo,
+          isDemo: BootstrapCache.instance.config['demo_mode'] == true &&
+              company?.isDemo == true,
         ),
     };
 
     if (layout == DashboardLayout.redesigned) {
-      return layoutBody;
+      return Theme(
+        data: ThemeData.dark().copyWith(
+          scaffoldBackgroundColor: const Color(0xFF07172B),
+          cardColor: const Color(0xFF10253E),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF27E498),
+            brightness: Brightness.dark,
+          ),
+        ),
+        child: ColoredBox(
+          color: const Color(0xFF07172B),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: layoutBody,
+          ),
+        ),
+      );
     }
 
     return Column(

@@ -35,7 +35,7 @@ class NavDockProvider extends ChangeNotifier {
   AppPageTransition transition = AppPageTransition.slide;
 
   /// Which visual treatment the authenticated dashboard home renders.
-  DashboardLayout dashboardLayout = DashboardLayout.posh;
+  DashboardLayout dashboardLayout = DashboardLayout.redesigned;
 
   Future<void> load() async {
     final saved = await _preferences.readNavDockPosition();

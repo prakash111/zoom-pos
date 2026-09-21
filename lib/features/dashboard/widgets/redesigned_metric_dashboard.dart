@@ -237,7 +237,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
             height: 40,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF2563EB), Color(0xFF0284C7)],
+                colors: [Color(0xFF20D98A), Color(0xFF13AE70)],
               ),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -850,7 +850,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                           spots: spots,
                           isCurved: true,
                           curveSmoothness: 0.35,
-                          color: const Color(0xFF2563EB),
+                          color: const Color(0xFF27E498),
                           barWidth: 3,
                           isStrokeCapRound: true,
                           dotData: FlDotData(
@@ -859,7 +859,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                               radius: 3.5,
                               color: Colors.white,
                               strokeWidth: 2,
-                              strokeColor: const Color(0xFF2563EB),
+                              strokeColor: const Color(0xFF27E498),
                             ),
                           ),
                           belowBarData: BarAreaData(
@@ -868,8 +868,8 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                const Color(0xFF2563EB).withValues(alpha: 0.3),
-                                const Color(0xFF2563EB).withValues(alpha: 0.0),
+                                const Color(0xFF27E498).withValues(alpha: 0.3),
+                                const Color(0xFF27E498).withValues(alpha: 0.0),
                               ],
                             ),
                           ),

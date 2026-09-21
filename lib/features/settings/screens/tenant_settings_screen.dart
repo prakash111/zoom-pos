@@ -24,6 +24,7 @@ import '../../../core/sdui/screens/dynamic_schema_page.dart';
 import 'app_preferences_screen.dart';
 import 'payment_methods_screen.dart';
 import 'global_printer_setup_screen.dart';
+import 'document_templates_tab.dart';
 
 /// Preset brand-color swatches offered in the Profile tab — a fixed palette
 /// avoids pulling in a color-picker package for what's a fairly small need.
@@ -43,6 +44,7 @@ const List<Color> _brandColorSwatches = [
 const _tabs = [
   'Profile',
   'Receipts',
+  'Templates',
   'Financial',
   'Navigation Menu',
   'Appearance'
@@ -109,6 +111,7 @@ class _TenantSettingsScreenState extends State<TenantSettingsScreen>
     final tabLabels = [
       l10n.tabProfile,
       l10n.tabReceipts,
+      'Templates',
       l10n.tabFinancial,
       l10n.tabNavigationMenu,
       l10n.tabAppearance,
@@ -148,6 +151,7 @@ class _TenantSettingsScreenState extends State<TenantSettingsScreen>
                 timezones: bundle.timezones)),
             _serverTab((bundle) => _ReceiptsTab(
                 repository: _repository, initial: bundle.receipts)),
+            const DocumentTemplatesTab(),
             _serverTab((bundle) => _FinancialTab(
                 repository: _repository, initial: bundle.financial)),
             _serverTab((bundle) => NavMenuSettingsTab(
@@ -271,8 +275,10 @@ class _ProfileTabState extends State<_ProfileTab> {
     _primaryColor = parseHexColor(p.primaryColor) ?? AppTheme.primary;
     _colorHex = TextEditingController(text: toHexColor(_primaryColor));
 
-    _storefrontUrl = p.storefrontUrl.isNotEmpty ? p.storefrontUrl : p.storeWebsite;
-    _cnameTarget = p.cnameTarget.isNotEmpty ? p.cnameTarget : 'cname.saas.zoomnearby.com';
+    _storefrontUrl =
+        p.storefrontUrl.isNotEmpty ? p.storefrontUrl : p.storeWebsite;
+    _cnameTarget =
+        p.cnameTarget.isNotEmpty ? p.cnameTarget : 'cname.saas.zoomnearby.com';
     _sslStatus = p.sslStatus.isNotEmpty ? p.sslStatus : 'not_configured';
 
     _logoUrl = p.logoUrl;
@@ -330,7 +336,9 @@ class _ProfileTabState extends State<_ProfileTab> {
       final url = await widget.repository.uploadLogo(bytes, picked.name);
       if (mounted) {
         setState(() => _logoUrl = url);
-        context.read<AuthProvider>().updateCompany((c) => c.copyWith(logoUrl: url));
+        context
+            .read<AuthProvider>()
+            .updateCompany((c) => c.copyWith(logoUrl: url));
         context.read<AuthProvider>().reloadSession();
       }
     } on ApiException catch (e) {
@@ -348,7 +356,9 @@ class _ProfileTabState extends State<_ProfileTab> {
       await widget.repository.removeLogo();
       if (mounted) {
         setState(() => _logoUrl = null);
-        context.read<AuthProvider>().updateCompany((c) => c.copyWith(clearLogoUrl: true));
+        context
+            .read<AuthProvider>()
+            .updateCompany((c) => c.copyWith(clearLogoUrl: true));
         context.read<AuthProvider>().reloadSession();
       }
     } on ApiException catch (e) {
@@ -371,7 +381,9 @@ class _ProfileTabState extends State<_ProfileTab> {
       final url = await widget.repository.uploadFavicon(bytes, picked.name);
       if (mounted) {
         setState(() => _faviconUrl = url);
-        context.read<AuthProvider>().updateCompany((c) => c.copyWith(faviconUrl: url));
+        context
+            .read<AuthProvider>()
+            .updateCompany((c) => c.copyWith(faviconUrl: url));
         context.read<AuthProvider>().reloadSession();
       }
     } on ApiException catch (e) {
@@ -389,7 +401,9 @@ class _ProfileTabState extends State<_ProfileTab> {
       await widget.repository.removeFavicon();
       if (mounted) {
         setState(() => _faviconUrl = null);
-        context.read<AuthProvider>().updateCompany((c) => c.copyWith(clearFaviconUrl: true));
+        context
+            .read<AuthProvider>()
+            .updateCompany((c) => c.copyWith(clearFaviconUrl: true));
         context.read<AuthProvider>().reloadSession();
       }
     } on ApiException catch (e) {
@@ -412,7 +426,9 @@ class _ProfileTabState extends State<_ProfileTab> {
       final url = await widget.repository.uploadDrawerCover(bytes, picked.name);
       if (mounted) {
         setState(() => _drawerCoverUrl = url);
-        context.read<AuthProvider>().updateCompany((c) => c.copyWith(drawerCoverUrl: url));
+        context
+            .read<AuthProvider>()
+            .updateCompany((c) => c.copyWith(drawerCoverUrl: url));
         context.read<AuthProvider>().reloadSession();
       }
     } on ApiException catch (e) {
@@ -430,7 +446,9 @@ class _ProfileTabState extends State<_ProfileTab> {
       await widget.repository.removeDrawerCover();
       if (mounted) {
         setState(() => _drawerCoverUrl = null);
-        context.read<AuthProvider>().updateCompany((c) => c.copyWith(clearDrawerCoverUrl: true));
+        context
+            .read<AuthProvider>()
+            .updateCompany((c) => c.copyWith(clearDrawerCoverUrl: true));
         context.read<AuthProvider>().reloadSession();
       }
     } on ApiException catch (e) {
@@ -563,10 +581,9 @@ class _ProfileTabState extends State<_ProfileTab> {
                     const SizedBox(width: 8),
                     Text(
                       'Storefront & Domain',
-                      style:
-                          Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const Spacer(),
                     Container(

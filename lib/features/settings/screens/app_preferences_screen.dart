@@ -91,7 +91,7 @@ class AppPreferencesBody extends StatelessWidget {
         ),
         group(
           'Dashboard layout',
-          'Pick which design the home dashboard uses. Both show the same data.',
+          'Pick which design the home dashboard uses. All layouts show live store data.',
           RadioGroup<DashboardLayout>(
             groupValue: navDock.dashboardLayout,
             onChanged: (value) {
