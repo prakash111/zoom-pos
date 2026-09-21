@@ -81,7 +81,7 @@
     --landing-testimonials-muted: var(--landing-features-muted);
   }
 
-  /* Target all dark sections and mission/pricing wrappers in DARK mode ONLY */
+  /* Target unconfigured dark sections in DARK mode ONLY (fallback) */
   html.dark .landing-dark-section,
   [data-theme="dark"] .landing-dark-section,
   html.dark .bg-dark-hero,
@@ -92,7 +92,7 @@
   [data-theme="dark"] section[class*="bg-gray-900"],
   html.dark section[class*="bg-black"],
   [data-theme="dark"] section[class*="bg-black"] {
-      background-color: var(--landing-dark-bg) !important;
+      background-color: var(--landing-dark-bg);
   }
   html.dark .landing-dark-section h1,
   html.dark .landing-dark-section h2,
@@ -120,6 +120,20 @@
   .landing-sec-faq { background-color: var(--landing-faq-bg) !important; background-image: none !important; color: var(--landing-faq-text) !important; }
   .landing-sec-cta { background-color: var(--landing-cta-bg) !important; background-image: none !important; color: var(--landing-cta-text) !important; }
   .landing-sec-contact { background-color: var(--landing-contact-bg, #ffffff) !important; background-image: none !important; color: var(--landing-contact-text, #0f172a) !important; }
+
+  /* Scoped Isolated Section Rules in Dark Mode */
+  html.dark #showcase, html.dark #hero, html.dark .landing-sec-hero, [data-theme="dark"] #showcase, [data-theme="dark"] #hero, [data-theme="dark"] .landing-sec-hero { background-color: var(--landing-hero-bg) !important; }
+  html.dark #trust_bar, html.dark .landing-sec-trust, [data-theme="dark"] #trust_bar, [data-theme="dark"] .landing-sec-trust { background-color: var(--landing-trust-bg) !important; }
+  html.dark #features, html.dark .landing-sec-features, [data-theme="dark"] #features, [data-theme="dark"] .landing-sec-features { background-color: var(--landing-features-bg) !important; }
+  html.dark #solutions, html.dark .landing-sec-solutions, [data-theme="dark"] #solutions, [data-theme="dark"] .landing-sec-solutions { background-color: var(--landing-solutions-bg) !important; }
+  html.dark #download, html.dark .landing-sec-downloads, [data-theme="dark"] #download, [data-theme="dark"] .landing-sec-downloads { background-color: var(--landing-downloads-bg) !important; }
+  html.dark #stats, html.dark .landing-sec-stats, [data-theme="dark"] #stats, [data-theme="dark"] .landing-sec-stats { background-color: var(--landing-stats-bg) !important; }
+  html.dark #about, html.dark #mission, html.dark .landing-sec-mission, html.dark .landing-sec-about, [data-theme="dark"] #about, [data-theme="dark"] #mission, [data-theme="dark"] .landing-sec-mission, [data-theme="dark"] .landing-sec-about { background-color: var(--landing-mission-bg) !important; }
+  html.dark #testimonials, html.dark .landing-sec-testimonials, [data-theme="dark"] #testimonials, [data-theme="dark"] .landing-sec-testimonials { background-color: var(--landing-testimonials-bg) !important; }
+  html.dark #pricing, html.dark .landing-sec-pricing, [data-theme="dark"] #pricing, [data-theme="dark"] .landing-sec-pricing { background-color: var(--landing-pricing-bg) !important; }
+  html.dark #faq, html.dark .landing-sec-faq, [data-theme="dark"] #faq, [data-theme="dark"] .landing-sec-faq { background-color: var(--landing-faq-bg) !important; }
+  html.dark #cta, html.dark .landing-sec-cta, [data-theme="dark"] #cta, [data-theme="dark"] .landing-sec-cta { background-color: var(--landing-cta-bg) !important; }
+  html.dark #contact, html.dark .landing-sec-contact, [data-theme="dark"] #contact, [data-theme="dark"] .landing-sec-contact { background-color: var(--landing-contact-dark-bg, var(--landing-contact-bg)) !important; }
 
   .contact-form-card { background-color: var(--landing-contact-card-bg, #ffffff) !important; border-color: #e2e8f0 !important; }
   .contact-form-input {

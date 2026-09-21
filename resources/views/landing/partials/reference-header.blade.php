@@ -41,8 +41,14 @@
                 <span x-show="!dark">🌙</span>
                 <span x-show="dark">☀️</span>
             </button>
-            <a href="{{ route('tenant.login') }}" class="reference-button reference-button--login">{{ __('Sign in') }}</a>
-            <a href="{{ route('tenant.register') }}" class="reference-button reference-button--primary reference-register"><x-landing.icon name="user-plus" width="18" height="18" /> {{ __('Start Free Trial') }}</a>
+            @if (auth('platform_web')->check())
+                <a href="{{ url('/superadmin') }}" class="reference-button reference-button--primary reference-register"><x-landing.icon name="shield" width="18" height="18" /> {{ __('SuperAdmin') }}</a>
+            @elseif (auth('web')->check())
+                <a href="{{ url('/tenant') }}" class="reference-button reference-button--primary reference-register"><x-landing.icon name="dashboard" width="18" height="18" /> {{ __('Go to Dashboard') }}</a>
+            @else
+                <a href="{{ route('tenant.login') }}" class="reference-button reference-button--login">{{ __('Sign in') }}</a>
+                <a href="{{ route('tenant.register') }}" class="reference-button reference-button--primary reference-register"><x-landing.icon name="user-plus" width="18" height="18" /> {{ __('Start Free Trial') }}</a>
+            @endif
             <button type="button" class="reference-menu-toggle" x-on:click="mobileOpen = !mobileOpen" :aria-expanded="mobileOpen.toString()" aria-controls="reference-mobile-nav" title="{{ __('Menu') }}">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path x-show="!mobileOpen" d="M4 6h16M4 12h16M4 18h16"/><path x-show="mobileOpen" x-cloak d="m6 6 12 12M6 18 18 6"/></svg>
             </button>
@@ -52,6 +58,12 @@
         @foreach ($referenceNavigation as $item)
             <a href="{{ $item['url'] }}" target="{{ $item['target'] ?? '_self' }}" x-on:click="mobileOpen = false">{{ $item['title'] }}</a>
         @endforeach
-        <a href="{{ route('tenant.register') }}" class="reference-button reference-button--primary">{{ __('Start Free Trial') }}</a>
+        @if (auth('platform_web')->check())
+            <a href="{{ url('/superadmin') }}" class="reference-button reference-button--primary">{{ __('SuperAdmin') }}</a>
+        @elseif (auth('web')->check())
+            <a href="{{ url('/tenant') }}" class="reference-button reference-button--primary">{{ __('Go to Dashboard') }}</a>
+        @else
+            <a href="{{ route('tenant.register') }}" class="reference-button reference-button--primary">{{ __('Start Free Trial') }}</a>
+        @endif
     </nav>
 </header>

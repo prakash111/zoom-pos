@@ -209,4 +209,103 @@ class LandingPricingSyncTest extends TestCase
         $response->assertSee('MOST POPULAR');
         $response->assertSee('bg-[#101726]', false);
     }
+
+    public function test_pricing_plan_extension_badges_have_refined_padding_and_spacing(): void
+    {
+        $response = $this->get('/');
+        $response->assertOk();
+
+        // Verify comfortable padding, tracking, and styling on extension pills
+        $response->assertSee('px-2.5 py-1 text-xs font-semibold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-300 tracking-wide', false);
+        // Verify numerical limits container has comfortable margins
+        $response->assertSee('grid grid-cols-2 gap-2 mt-4 mb-3', false);
+        // Verify extension badges container spacing
+        $response->assertSee('flex flex-wrap items-center gap-2 my-3', false);
+    }
+
+    public function test_authenticated_platform_admin_can_view_landing_page_without_redirect(): void
+    {
+        $admin = \App\Models\PlatformAdmin::create([
+            'name' => 'Super Admin',
+            'email' => 'superadmin@zoompos.test',
+            'password' => \Illuminate\Support\Facades\Hash::make('password123'),
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+        $this->actingAs($admin, 'platform_web');
+
+        $response = $this->get('/');
+        $response->assertStatus(200);
+        $response->assertSee('SuperAdmin');
+        $response->assertSee(url('/superadmin'));
+        $response->assertDontSee('Sign in');
+    }
+
+    public function test_authenticated_tenant_user_can_view_landing_page_without_redirect(): void
+    {
+        $company = \App\Models\Company::create([
+            'name' => 'Acme Mart',
+            'status' => 'active',
+            'pos_mode' => 'general',
+        ]);
+        $user = \App\Models\User::create([
+            'company_id' => $company->id,
+            'name' => 'Jane Tenant',
+            'login' => 'janetenant',
+            'email' => 'jane@acmemart.test',
+            'password' => \Illuminate\Support\Facades\Hash::make('secret1234'),
+            'role' => 'administrator',
+            'status' => 'approved',
+            'email_verified_at' => now(),
+        ]);
+        $this->actingAs($user, 'web');
+
+        $response = $this->get('/');
+        $response->assertStatus(200);
+        $response->assertSee('Go to Dashboard');
+        $response->assertSee(url('/tenant'));
+        $response->assertDontSee('Sign in');
+    }
+
+    public function test_section_theme_tokens_are_isolated_per_section_slug(): void
+    {
+        $admin = \App\Models\PlatformAdmin::create([
+            'name' => 'Super Admin 2',
+            'email' => 'superadmin2@zoompos.test',
+            'password' => \Illuminate\Support\Facades\Hash::make('password123'),
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+        $this->actingAs($admin, 'platform_web');
+
+        $defaultPalette = default_landing_sections_palette();
+        $customPalette = $defaultPalette;
+        $customPalette['hero_showcase'] = [
+            'dark_bg' => '#123456',
+            'light_bg' => '#f12345',
+            'dark_text' => '#ffffff',
+            'light_text' => '#000000',
+            'dark_muted' => '#999999',
+            'light_muted' => '#666666',
+        ];
+
+        $response = $this->post(route('superadmin.theme.customizer.sections'), [
+            'palette' => $customPalette,
+        ]);
+        $response->assertRedirect();
+
+        $tokens = get_landing_theme_tokens();
+
+        // Hero showcase updated
+        $this->assertSame('#123456', $tokens['hero_showcase']['dark_bg']);
+        $this->assertSame('#123456', $tokens['hero']['dark_bg']);
+        $this->assertSame('#123456', $tokens['hero_showcase']['bg_dark']);
+
+        // Pricing, features, and mission remain strictly isolated at their defaults
+        $this->assertSame($defaultPalette['pricing']['dark_bg'], $tokens['pricing_plans']['dark_bg']);
+        $this->assertSame($defaultPalette['pricing']['dark_bg'], $tokens['pricing']['dark_bg']);
+        $this->assertSame($defaultPalette['features']['dark_bg'], $tokens['retail_features']['dark_bg']);
+        $this->assertSame($defaultPalette['mission']['dark_bg'], $tokens['our_mission']['dark_bg']);
+        $this->assertNotSame('#123456', $tokens['pricing_plans']['dark_bg']);
+    }
 }

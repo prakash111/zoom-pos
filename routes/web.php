@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(EnsureAppIsInstalled::class)->get('/', [LandingPageController::class, 'index'])->name('home');
+Route::middleware(EnsureAppIsInstalled::class)->get('/home', [LandingPageController::class, 'index'])->name('landing.home');
 Route::middleware(EnsureAppIsInstalled::class)->get('/store', [\App\Http\Controllers\Tenant\StorefrontController::class, 'index'])->name('tenant.store');
 Route::middleware(EnsureAppIsInstalled::class)->post('/store/order', [\App\Http\Controllers\Tenant\StorefrontController::class, 'placeOrder'])->name('tenant.store.order');
 Route::middleware(EnsureAppIsInstalled::class)->get('/store/account', [\App\Http\Controllers\Tenant\StorefrontController::class, 'account'])->name('tenant.store.account');

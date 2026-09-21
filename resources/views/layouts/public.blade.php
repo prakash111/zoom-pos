@@ -174,7 +174,7 @@
         --landing-testimonials-muted: var(--landing-features-muted);
       }
 
-      /* Target all dark sections and mission/pricing wrappers in DARK mode ONLY */
+      /* Target unconfigured dark sections in DARK mode ONLY (fallback) */
       html.dark .landing-dark-section,
       [data-theme="dark"] .landing-dark-section,
       html.dark .bg-dark-hero,
@@ -185,7 +185,7 @@
       [data-theme="dark"] section[class*="bg-gray-900"],
       html.dark section[class*="bg-black"],
       [data-theme="dark"] section[class*="bg-black"] {
-          background-color: var(--landing-dark-bg) !important;
+          background-color: var(--landing-dark-bg);
       }
       html.dark .landing-dark-section h1,
       html.dark .landing-dark-section h2,
@@ -213,6 +213,20 @@
       .landing-sec-faq { background-color: var(--landing-faq-bg) !important; background-image: none !important; color: var(--landing-faq-text) !important; }
       .landing-sec-cta { background-color: var(--landing-cta-bg) !important; background-image: none !important; color: var(--landing-cta-text) !important; }
       .landing-sec-contact { background-color: var(--landing-contact-bg, #ffffff) !important; background-image: none !important; color: var(--landing-contact-text, #0f172a) !important; }
+
+      /* Scoped Isolated Section Rules in Dark Mode */
+      html.dark #showcase, html.dark #hero, html.dark .landing-sec-hero, [data-theme="dark"] #showcase, [data-theme="dark"] #hero, [data-theme="dark"] .landing-sec-hero { background-color: var(--landing-hero-bg) !important; }
+      html.dark #trust_bar, html.dark .landing-sec-trust, [data-theme="dark"] #trust_bar, [data-theme="dark"] .landing-sec-trust { background-color: var(--landing-trust-bg) !important; }
+      html.dark #features, html.dark .landing-sec-features, [data-theme="dark"] #features, [data-theme="dark"] .landing-sec-features { background-color: var(--landing-features-bg) !important; }
+      html.dark #solutions, html.dark .landing-sec-solutions, [data-theme="dark"] #solutions, [data-theme="dark"] .landing-sec-solutions { background-color: var(--landing-solutions-bg) !important; }
+      html.dark #download, html.dark .landing-sec-downloads, [data-theme="dark"] #download, [data-theme="dark"] .landing-sec-downloads { background-color: var(--landing-downloads-bg) !important; }
+      html.dark #stats, html.dark .landing-sec-stats, [data-theme="dark"] #stats, [data-theme="dark"] .landing-sec-stats { background-color: var(--landing-stats-bg) !important; }
+      html.dark #about, html.dark #mission, html.dark .landing-sec-mission, html.dark .landing-sec-about, [data-theme="dark"] #about, [data-theme="dark"] #mission, [data-theme="dark"] .landing-sec-mission, [data-theme="dark"] .landing-sec-about { background-color: var(--landing-mission-bg) !important; }
+      html.dark #testimonials, html.dark .landing-sec-testimonials, [data-theme="dark"] #testimonials, [data-theme="dark"] .landing-sec-testimonials { background-color: var(--landing-testimonials-bg) !important; }
+      html.dark #pricing, html.dark .landing-sec-pricing, [data-theme="dark"] #pricing, [data-theme="dark"] .landing-sec-pricing { background-color: var(--landing-pricing-bg) !important; }
+      html.dark #faq, html.dark .landing-sec-faq, [data-theme="dark"] #faq, [data-theme="dark"] .landing-sec-faq { background-color: var(--landing-faq-bg) !important; }
+      html.dark #cta, html.dark .landing-sec-cta, [data-theme="dark"] #cta, [data-theme="dark"] .landing-sec-cta { background-color: var(--landing-cta-bg) !important; }
+      html.dark #contact, html.dark .landing-sec-contact, [data-theme="dark"] #contact, [data-theme="dark"] .landing-sec-contact { background-color: var(--landing-contact-dark-bg, var(--landing-contact-bg)) !important; }
 
       .contact-form-card { background-color: var(--landing-contact-card-bg, #ffffff) !important; border-color: #e2e8f0 !important; }
       .contact-form-input {
@@ -402,12 +416,22 @@
                     <span x-show="dark">☀️</span>
                 </button>
 
-                <a href="{{ route('tenant.login') }}" class="hidden sm:inline-block px-4 py-2 rounded-full text-xs font-bold text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition">
-                    {{ __('Sign in') }}
-                </a>
-                <a href="{{ route('tenant.register') }}" class="hidden sm:inline-flex px-5 py-2.5 rounded-full bg-brand-lime hover:bg-brand-lime-dark text-slate-950 text-sm font-black shadow-lg shadow-brand-lime/20 transition active:scale-95">
-                    {{ __('Start Free Trial') }}
-                </a>
+                @if (auth('platform_web')->check())
+                    <a href="{{ url('/superadmin') }}" class="hidden sm:inline-flex px-5 py-2.5 rounded-full bg-brand-lime hover:bg-brand-lime-dark text-slate-950 text-sm font-black shadow-lg shadow-brand-lime/20 transition active:scale-95">
+                        {{ __('SuperAdmin') }}
+                    </a>
+                @elseif (auth('web')->check())
+                    <a href="{{ url('/tenant') }}" class="hidden sm:inline-flex px-5 py-2.5 rounded-full bg-brand-lime hover:bg-brand-lime-dark text-slate-950 text-sm font-black shadow-lg shadow-brand-lime/20 transition active:scale-95">
+                        {{ __('Go to Dashboard') }}
+                    </a>
+                @else
+                    <a href="{{ route('tenant.login') }}" class="hidden sm:inline-block px-4 py-2 rounded-full text-xs font-bold text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition">
+                        {{ __('Sign in') }}
+                    </a>
+                    <a href="{{ route('tenant.register') }}" class="hidden sm:inline-flex px-5 py-2.5 rounded-full bg-brand-lime hover:bg-brand-lime-dark text-slate-950 text-sm font-black shadow-lg shadow-brand-lime/20 transition active:scale-95">
+                        {{ __('Start Free Trial') }}
+                    </a>
+                @endif
 
                 <!-- Mobile Menu Toggle -->
                 <button type="button" x-on:click="mobileOpen = !mobileOpen" :aria-expanded="mobileOpen.toString()" class="lg:hidden w-10 h-10 inline-flex items-center justify-center rounded-xl bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-white border border-slate-200 dark:border-white/10" title="{{ __('Menu') }}">
@@ -493,8 +517,14 @@
             @endif
 
             <div class="sticky bottom-0 mt-auto pt-4 pb-[max(0px,env(safe-area-inset-bottom))] border-t border-slate-200 dark:border-white/10 flex gap-2 bg-white dark:bg-slate-950">
-                <a href="{{ route('tenant.login') }}" class="flex-1 text-center px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-200 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 transition">{{ __('Sign in') }}</a>
-                <a href="{{ route('tenant.register') }}" class="flex-1 text-center px-4 py-2.5 rounded-xl text-sm font-black text-slate-950 bg-brand-lime hover:bg-brand-lime-dark transition">{{ __('Start Free Trial') }}</a>
+                @if (auth('platform_web')->check())
+                    <a href="{{ url('/superadmin') }}" class="flex-1 text-center px-4 py-2.5 rounded-xl text-sm font-black text-slate-950 bg-brand-lime hover:bg-brand-lime-dark transition">{{ __('SuperAdmin') }}</a>
+                @elseif (auth('web')->check())
+                    <a href="{{ url('/tenant') }}" class="flex-1 text-center px-4 py-2.5 rounded-xl text-sm font-black text-slate-950 bg-brand-lime hover:bg-brand-lime-dark transition">{{ __('Go to Dashboard') }}</a>
+                @else
+                    <a href="{{ route('tenant.login') }}" class="flex-1 text-center px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-200 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 transition">{{ __('Sign in') }}</a>
+                    <a href="{{ route('tenant.register') }}" class="flex-1 text-center px-4 py-2.5 rounded-xl text-sm font-black text-slate-950 bg-brand-lime hover:bg-brand-lime-dark transition">{{ __('Start Free Trial') }}</a>
+                @endif
             </div>
         </div>
     </header>

@@ -23,7 +23,7 @@
 
 @if ($sorted->isNotEmpty())
 <!-- Pricing Section Synchronized with Flutter Layout -->
-<section id="pricing" class="landing-sec-pricing landing-dark-section py-20 border-t border-slate-800/80 transition-colors duration-300 scroll-mt-20">
+<section id="pricing" class="landing-sec-pricing landing-dark-section py-20 border-t border-slate-800/80 transition-colors duration-300 scroll-mt-20" style="background-color: var(--landing-pricing-bg, #0b0f19);">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" x-data="{ annual: false }">
         <div class="text-center mb-10">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-wider mb-3">
@@ -91,7 +91,7 @@
                         </div>
 
                         <!-- Numerical Limits Badges (2x2 Grid) -->
-                        <div class="grid grid-cols-2 gap-2 my-4">
+                        <div class="grid grid-cols-2 gap-2 mt-4 mb-3">
                             <!-- Invoices Limit -->
                             <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-950/60 border border-blue-800/40 text-blue-300 text-xs font-medium">
                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -119,9 +119,9 @@
 
                         <!-- Modular Extension Badges -->
                         @if(!empty($plan->enabled_extensions))
-                            <div class="flex flex-wrap gap-2 mb-5">
+                            <div class="flex flex-wrap items-center gap-2 my-3">
                                 @foreach($plan->enabled_extensions as $ext)
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                    <span class="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-300 tracking-wide">
                                         {{ $extensionLabels[$ext] ?? ucwords(str_replace('_', ' ', $ext)) }}
                                     </span>
                                 @endforeach

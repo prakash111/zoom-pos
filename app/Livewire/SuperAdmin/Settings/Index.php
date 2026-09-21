@@ -798,12 +798,35 @@ class Index extends Component
                 $paletteInput = [];
             }
 
+            $slugMap = [
+                'hero_showcase' => 'hero',
+                'retail_features' => 'features',
+                'pricing_plans' => 'pricing',
+                'our_mission' => 'mission',
+                'faq' => 'faq',
+                'scale_cta' => 'cta',
+                'contact_form' => 'contact',
+                'about' => 'mission',
+            ];
+
+            foreach ($slugMap as $slug => $short) {
+                if (isset($paletteInput[$slug]) && is_array($paletteInput[$slug])) {
+                    $paletteInput[$short] = array_merge($paletteInput[$short] ?? [], $paletteInput[$slug]);
+                }
+            }
+
             $sanitizedPalette = [];
             foreach ($sections as $sec) {
                 $sanitizedPalette[$sec] = [];
                 $secKeys = array_keys($defaults[$sec] ?? []);
                 foreach ($secKeys as $k) {
-                    $val = trim((string) ($paletteInput[$sec][$k] ?? $defaults[$sec][$k] ?? ''));
+                    $val = $paletteInput[$sec][$k] ?? null;
+                    if ($val === null && $k === 'dark_bg') {
+                        $val = $paletteInput[$sec]['bg_dark'] ?? null;
+                    } elseif ($val === null && $k === 'light_bg') {
+                        $val = $paletteInput[$sec]['bg_light'] ?? null;
+                    }
+                    $val = trim((string) ($val ?? $defaults[$sec][$k] ?? ''));
                     if (! str_starts_with($val, '#') && ! empty($val)) {
                         $val = '#' . $val;
                     }
@@ -811,6 +834,23 @@ class Index extends Component
                         $val = $defaults[$sec][$k] ?? '#ffffff';
                     }
                     $sanitizedPalette[$sec][$k] = $val;
+                }
+            }
+
+            $themeTokens = [];
+            foreach ($sanitizedPalette as $sec => $props) {
+                $themeTokens[$sec] = array_merge($props, [
+                    'bg_dark' => $props['dark_bg'] ?? '#0b0f19',
+                    'bg_light' => $props['light_bg'] ?? '#ffffff',
+                    'text_dark' => $props['dark_text'] ?? '#f8fafc',
+                    'text_light' => $props['light_text'] ?? '#0f172a',
+                    'muted_dark' => $props['dark_muted'] ?? '#94a3b8',
+                    'muted_light' => $props['light_muted'] ?? '#64748b',
+                ]);
+            }
+            foreach ($slugMap as $slug => $short) {
+                if (isset($themeTokens[$short])) {
+                    $themeTokens[$slug] = $themeTokens[$short];
                 }
             }
 
@@ -822,9 +862,18 @@ class Index extends Component
                         'updated_at' => now(),
                     ]
                 );
+                \Illuminate\Support\Facades\DB::table('system_settings')->updateOrInsert(
+                    ['key' => 'landing_theme_tokens'],
+                    [
+                        'value'      => json_encode($themeTokens),
+                        'updated_at' => now(),
+                    ]
+                );
             }
             set_setting('landing_sections_theme_palette', json_encode($sanitizedPalette));
+            set_setting('landing_theme_tokens', json_encode($themeTokens));
             \Illuminate\Support\Facades\Cache::forget('landing_sections_theme_palette');
+            \Illuminate\Support\Facades\Cache::forget('landing_theme_tokens');
         }
 
         \Illuminate\Support\Facades\Cache::forget('superadmin_theme_settings');

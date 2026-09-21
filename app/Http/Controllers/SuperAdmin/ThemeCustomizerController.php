@@ -99,12 +99,37 @@ class ThemeCustomizerController extends Controller
             $inputPalette = [];
         }
 
+        $slugMap = [
+            'hero_showcase' => 'hero',
+            'retail_features' => 'features',
+            'pricing_plans' => 'pricing',
+            'our_mission' => 'mission',
+            'faq' => 'faq',
+            'scale_cta' => 'cta',
+            'contact_form' => 'contact',
+            'about' => 'mission',
+        ];
+
+        // Also normalize any full slug keys into short section keys
+        foreach ($slugMap as $slug => $short) {
+            if (isset($inputPalette[$slug]) && is_array($inputPalette[$slug])) {
+                $inputPalette[$short] = array_merge($inputPalette[$short] ?? [], $inputPalette[$slug]);
+            }
+        }
+
         $sanitized = [];
         foreach ($sections as $sec) {
             $sanitized[$sec] = [];
             $keys = array_keys($defaults[$sec] ?? []);
             foreach ($keys as $k) {
-                $val = trim((string) ($inputPalette[$sec][$k] ?? $defaults[$sec][$k] ?? ''));
+                // Support both dark_bg / bg_dark, light_bg / bg_light naming
+                $val = $inputPalette[$sec][$k] ?? null;
+                if ($val === null && $k === 'dark_bg') {
+                    $val = $inputPalette[$sec]['bg_dark'] ?? null;
+                } elseif ($val === null && $k === 'light_bg') {
+                    $val = $inputPalette[$sec]['bg_light'] ?? null;
+                }
+                $val = trim((string) ($val ?? $defaults[$sec][$k] ?? ''));
                 if (! str_starts_with($val, '#') && ! empty($val)) {
                     $val = '#' . $val;
                 }
@@ -112,6 +137,24 @@ class ThemeCustomizerController extends Controller
                     $val = $defaults[$sec][$k] ?? '#ffffff';
                 }
                 $sanitized[$sec][$k] = $val;
+            }
+        }
+
+        // Build token dictionary with both short keys and full slugs
+        $themeTokens = [];
+        foreach ($sanitized as $sec => $props) {
+            $themeTokens[$sec] = array_merge($props, [
+                'bg_dark' => $props['dark_bg'] ?? '#0b0f19',
+                'bg_light' => $props['light_bg'] ?? '#ffffff',
+                'text_dark' => $props['dark_text'] ?? '#f8fafc',
+                'text_light' => $props['light_text'] ?? '#0f172a',
+                'muted_dark' => $props['dark_muted'] ?? '#94a3b8',
+                'muted_light' => $props['light_muted'] ?? '#64748b',
+            ]);
+        }
+        foreach ($slugMap as $slug => $short) {
+            if (isset($themeTokens[$short])) {
+                $themeTokens[$slug] = $themeTokens[$short];
             }
         }
 
@@ -123,9 +166,17 @@ class ThemeCustomizerController extends Controller
                     'updated_at' => now(),
                 ]
             );
+            DB::table('system_settings')->updateOrInsert(
+                ['key' => 'landing_theme_tokens'],
+                [
+                    'value'      => json_encode($themeTokens),
+                    'updated_at' => now(),
+                ]
+            );
         }
 
         set_setting('landing_sections_theme_palette', json_encode($sanitized));
+        set_setting('landing_theme_tokens', json_encode($themeTokens));
 
         return $sanitized;
     }
@@ -133,6 +184,7 @@ class ThemeCustomizerController extends Controller
     private function flushThemeCaches(): void
     {
         Cache::forget('landing_sections_theme_palette');
+        Cache::forget('landing_theme_tokens');
         Cache::forget('superadmin_theme_settings');
         Cache::forget('landing_page_theme_config');
         Cache::forget('app_landing_page_theme');

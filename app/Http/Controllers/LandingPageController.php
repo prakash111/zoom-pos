@@ -30,13 +30,6 @@ class LandingPageController extends Controller
                 : redirect('/tenant/login');
         }
 
-        if (auth('platform_web')->check()) {
-            return redirect('/superadmin');
-        }
-        if (auth('web')->check()) {
-            return redirect('/tenant');
-        }
-
         // If visiting a tenant workspace domain/subdomain or tenant context is bound, serve Tenant E-Commerce Storefront
         $storefrontController = app(\App\Http\Controllers\Tenant\StorefrontController::class);
         $host = strtolower($request->getHost());
@@ -44,7 +37,7 @@ class LandingPageController extends Controller
         $isTenantHost = ($baseHost && str_ends_with($host, '.'.$baseHost) && $host !== $baseHost)
             || ($baseHost && $host !== $baseHost && $host !== 'localhost' && $host !== '127.0.0.1');
 
-        if (app()->bound('tenant.company_id') || $isTenantHost) {
+        if ($isTenantHost || (app()->bound('tenant.company_id') && ! auth('web')->check() && ! auth('platform_web')->check())) {
             $company = $storefrontController->resolveCompany($request);
             if ($company) {
                 return $storefrontController->index($request);
@@ -79,8 +72,10 @@ class LandingPageController extends Controller
         }
 
         // Don't serve (or populate) the shared cache for a render that carries
-        // per-visitor state: a contact-form validation bounce or success flash.
+        // per-visitor state: authenticated user, a contact-form validation bounce or success flash.
         $bypassCache = app()->environment('testing')
+            || auth('platform_web')->check()
+            || auth('web')->check()
             || $request->session()->hasOldInput()
             || $request->session()->has('contact_success')
             || $request->session()->has('errors');

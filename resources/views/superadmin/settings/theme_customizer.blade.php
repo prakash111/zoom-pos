@@ -42,9 +42,6 @@
                  if (this.activeSection === 'contact' && preset.dark_card_bg) {
                      this.palette[this.activeSection].dark_card_bg = preset.dark_card_bg;
                  }
-                 if (['mission', 'pricing', 'cta'].includes(this.activeSection)) {
-                     this.setLandingBg(preset.dark_bg);
-                 }
              } else {
                  this.palette[this.activeSection].light_bg = preset.light_bg;
                  this.palette[this.activeSection].light_text = preset.light_text;
@@ -60,17 +57,11 @@
              if (this.palette[sec]) {
                  this.palette[sec][token] = hex;
              }
-             if (sec === 'mission' && token === 'dark_bg') {
-                 this.setLandingBg(hex);
-             }
          },
          resetSectionPalette(sec) {
              var def = @js(default_landing_sections_palette());
              if (def[sec]) {
                  this.palette[sec] = Object.assign({}, def[sec]);
-                 if (sec === 'mission') {
-                     this.setLandingBg(def[sec].dark_bg);
-                 }
              }
          },
          setLandingBg(hex) {
@@ -79,9 +70,6 @@
              if (hexInput) hexInput.value = hex.replace('#', '');
              var picker = document.getElementById('landing_dark_bg_picker');
              if (picker) picker.value = hex;
-             if (this.palette && this.palette.mission) this.palette.mission.dark_bg = hex;
-             if (this.palette && this.palette.pricing) this.palette.pricing.dark_bg = hex;
-             if (this.palette && this.palette.cta) this.palette.cta.dark_bg = hex;
          }
      }">
 

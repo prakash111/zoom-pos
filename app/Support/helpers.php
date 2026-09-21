@@ -189,6 +189,53 @@ if (! function_exists('get_landing_sections_palette')) {
     }
 }
 
+if (! function_exists('get_landing_theme_tokens')) {
+    /**
+     * Retrieve isolated section theme tokens keyed by both full slugs and short keys.
+     * Full slugs: hero_showcase, retail_features, pricing_plans, our_mission, faq, scale_cta, contact_form
+     * Short keys: hero, features, pricing, mission, about, cta, contact
+     */
+    function get_landing_theme_tokens(): array
+    {
+        $palette = get_landing_sections_palette();
+
+        $slugMap = [
+            'hero_showcase' => 'hero',
+            'retail_features' => 'features',
+            'pricing_plans' => 'pricing',
+            'our_mission' => 'mission',
+            'faq' => 'faq',
+            'scale_cta' => 'cta',
+            'contact_form' => 'contact',
+        ];
+
+        $tokens = [];
+        foreach ($palette as $sec => $props) {
+            $entry = array_merge($props, [
+                'bg_dark' => $props['dark_bg'] ?? '#0b0f19',
+                'bg_light' => $props['light_bg'] ?? '#ffffff',
+                'text_dark' => $props['dark_text'] ?? '#f8fafc',
+                'text_light' => $props['light_text'] ?? '#0f172a',
+                'muted_dark' => $props['dark_muted'] ?? '#94a3b8',
+                'muted_light' => $props['light_muted'] ?? '#64748b',
+            ]);
+            $tokens[$sec] = $entry;
+        }
+
+        foreach ($slugMap as $slug => $secKey) {
+            if (isset($tokens[$secKey])) {
+                $tokens[$slug] = $tokens[$secKey];
+            }
+        }
+
+        if (isset($tokens['mission']) && ! isset($tokens['about'])) {
+            $tokens['about'] = $tokens['mission'];
+        }
+
+        return $tokens;
+    }
+}
+
 if (! function_exists('get_landing_matching_patterns')) {
     /**
      * Pre-defined harmonized matching color combination patterns for all landing page sections.
