@@ -162,20 +162,40 @@
                                 <span class="text-rose-500">*</span>
                             @endif
                         </label>
+                        @php
+                            $defaultDialCode = \App\Services\Localization\PlatformRegionalService::defaultDialCode();
+                            $selectedDialCode = old('phone_country', $defaultDialCode);
+                            $dialCodesList = [
+                                '+91' => '+91',
+                                '+1' => '+1',
+                                '+44' => '+44',
+                                '+971' => '+971',
+                                '+966' => '+966',
+                                '+61' => '+61',
+                                '+65' => '+65',
+                                '+60' => '+60',
+                                '+49' => '+49',
+                                '+33' => '+33',
+                                '+81' => '+81',
+                                '+55' => '+55',
+                                '+27' => '+27',
+                                '+234' => '+234',
+                                '+254' => '+254',
+                                '+880' => '+880',
+                                '+92' => '+92',
+                            ];
+                            if (! isset($dialCodesList[$defaultDialCode])) {
+                                $dialCodesList = [$defaultDialCode => $defaultDialCode] + $dialCodesList;
+                            }
+                        @endphp
                         <div class="contact-phone-wrapper flex rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900/60 overflow-hidden focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-colors">
                             <div class="relative flex items-center bg-slate-50 dark:bg-slate-800/80 border-r border-slate-200 dark:border-slate-700/80">
                                 <select name="phone_country"
-                                        aria-label="Country Code"
+                                        aria-label="{{ __('Country Code') }}"
                                         class="contact-phone-select appearance-none bg-transparent pl-3 pr-6 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer">
-                                    <option value="+1" selected>+1</option>
-                                    <option value="+44">+44</option>
-                                    <option value="+91">+91</option>
-                                    <option value="+61">+61</option>
-                                    <option value="+81">+81</option>
-                                    <option value="+49">+49</option>
-                                    <option value="+33">+33</option>
-                                    <option value="+55">+55</option>
-                                    <option value="+971">+971</option>
+                                    @foreach ($dialCodesList as $dCode => $dLabel)
+                                        <option value="{{ $dCode }}" {{ $selectedDialCode === $dCode ? 'selected' : '' }}>{{ $dLabel }}</option>
+                                    @endforeach
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-1.5 text-slate-400">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
@@ -186,6 +206,7 @@
                                    name="{{ $fieldName }}"
                                    {{ $isRequired ? 'required' : '' }}
                                    value="{{ old($fieldName) }}"
+                                   x-on:input="if ($event.target.value.startsWith('0')) $event.target.value = $event.target.value.replace(/^0+/, '')"
                                    placeholder="{{ $placeholder ?: __('Enter phone number') }}"
                                    class="contact-form-input flex-1 px-3.5 py-2.5 sm:py-3 bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none border-0 focus:ring-0">
                         </div>

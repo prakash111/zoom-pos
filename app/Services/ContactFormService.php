@@ -320,9 +320,10 @@ class ContactFormService
             $baseData['name'] = 'Visitor';
         }
 
-        // Format phone with country code if separate prefix was selected
-        if (! empty($baseData['phone']) && ! empty($validatedData['phone_country']) && ! str_starts_with($baseData['phone'], '+')) {
-            $baseData['phone'] = trim($validatedData['phone_country']) . ' ' . $baseData['phone'];
+        // Format and normalize phone with selected prefix or default platform dial code
+        if (! empty($baseData['phone'])) {
+            $selectedPrefix = ! empty($validatedData['phone_country']) ? trim((string) $validatedData['phone_country']) : null;
+            $baseData['phone'] = \App\Http\Requests\Traits\NormalizesPhoneNumber::normalizePhoneNumber($baseData['phone'], $selectedPrefix);
         }
 
         $baseData['custom_fields'] = ! empty($customFields) ? $customFields : null;

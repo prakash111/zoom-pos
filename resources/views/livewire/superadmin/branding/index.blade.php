@@ -742,6 +742,16 @@
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Public Support Phone / WhatsApp') }}</label>
                     <input type="text" wire:model="supportPhone" placeholder="+1 (555) 000-0000" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-medium">
                 </div>
+
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Head Office Physical Address') }}</label>
+                    <input type="text" wire:model="headOfficeAddress" placeholder="Metrotech Center, NY 11201" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-medium">
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Working Hours') }}</label>
+                    <input type="text" wire:model="workingHours" placeholder="Monday - Friday (07 am - 05 pm)" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-medium">
+                </div>
             </div>
 
         </div>

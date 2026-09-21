@@ -10,6 +10,7 @@ use App\Models\PlatformBranding;
 use App\Models\PlatformSystem;
 use App\Models\PushNotificationSetting;
 use App\Services\Localization\LocalizationService;
+use App\Services\Localization\PlatformRegionalService;
 use App\Services\Modular\ModuleRegistry;
 use App\Services\Navigation\NavigationSanitizerService;
 use App\Services\Navigation\TenantNavigationConfigService;
@@ -82,9 +83,25 @@ class AppBootstrapController extends Controller
             Log::warning("Bootstrap push config failure: {$e->getMessage()}");
         }
 
+        $defaultCountryIso = PlatformRegionalService::defaultCountryIso();
+        $defaultDialCode = PlatformRegionalService::defaultDialCode();
+        $defaultCurrency = PlatformRegionalService::defaultCurrency();
+        $defaultLanguage = PlatformRegionalService::defaultLanguage();
+        $defaultTimezone = PlatformRegionalService::defaultTimezone();
+
+        $localizationPayload = [
+            'default_currency' => $defaultCurrency,
+            'default_language' => $defaultLanguage,
+            'default_timezone' => $defaultTimezone,
+            'default_country_code' => $defaultDialCode,
+            'default_country_iso' => $defaultCountryIso,
+        ];
+
         return response()->json([
             'success' => true,
             'locale' => $locale,
+            'localization' => $localizationPayload,
+            'system_info' => $localizationPayload,
             'header' => $drawerHeader,
             'drawer_header' => $drawerHeader,
             'store_name' => $company->display_name,
@@ -109,6 +126,9 @@ class AppBootstrapController extends Controller
                 'subdomain' => (string) ($company->subdomain ?: $company->slug),
                 'custom_domain' => $company->custom_domain,
                 'storefront_url' => $company->getStorefrontUrl(),
+                'country' => $company->country ?? $defaultCountryIso,
+                'default_country_code' => $defaultDialCode,
+                'default_country_iso' => $defaultCountryIso,
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
                 'currency_decimals' => (int) ($company->currency_decimals ?? 2),
@@ -145,6 +165,9 @@ class AppBootstrapController extends Controller
                 'subdomain' => (string) ($company->subdomain ?: $company->slug),
                 'custom_domain' => $company->custom_domain,
                 'storefront_url' => $company->getStorefrontUrl(),
+                'country' => $company->country ?? $defaultCountryIso,
+                'default_country_code' => $defaultDialCode,
+                'default_country_iso' => $defaultCountryIso,
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
                 'currency_decimals' => (int) ($company->currency_decimals ?? 2),
@@ -208,7 +231,9 @@ class AppBootstrapController extends Controller
                 'trading_name' => $effectiveTradeName,
                 'store_name' => $company->display_name,
                 'display_name' => $company->display_name,
-                'country' => $company->country ?? 'US',
+                'country' => $company->country ?? $defaultCountryIso,
+                'default_country_code' => $defaultDialCode,
+                'default_country_iso' => $defaultCountryIso,
                 'currency' => $company->currency ?? 'USD',
                 'currency_symbol' => $company->currency_symbol ?? '$',
                 'currency_decimals' => (int) ($company->currency_decimals ?? 2),

@@ -98,6 +98,173 @@ class PlatformRegionalService
     ];
 
     /**
+     * ISO 3166-1 alpha-2 country codes mapped to international dialing codes.
+     *
+     * @var array<string, string>
+     */
+    public const COUNTRY_DIAL_CODES = [
+        'IN' => '+91',
+        'US' => '+1',
+        'CA' => '+1',
+        'GB' => '+44',
+        'AE' => '+971',
+        'SA' => '+966',
+        'AU' => '+61',
+        'NZ' => '+64',
+        'SG' => '+65',
+        'MY' => '+60',
+        'ID' => '+62',
+        'PH' => '+63',
+        'TH' => '+66',
+        'VN' => '+84',
+        'PK' => '+92',
+        'BD' => '+880',
+        'LK' => '+94',
+        'NP' => '+977',
+        'DE' => '+49',
+        'FR' => '+33',
+        'IT' => '+39',
+        'ES' => '+34',
+        'PT' => '+351',
+        'NL' => '+31',
+        'BE' => '+32',
+        'CH' => '+41',
+        'AT' => '+43',
+        'SE' => '+46',
+        'NO' => '+47',
+        'DK' => '+45',
+        'FI' => '+358',
+        'PL' => '+48',
+        'IE' => '+353',
+        'RU' => '+7',
+        'KZ' => '+7',
+        'TR' => '+90',
+        'ZA' => '+27',
+        'EG' => '+20',
+        'NG' => '+234',
+        'KE' => '+254',
+        'GH' => '+233',
+        'BR' => '+55',
+        'MX' => '+52',
+        'AR' => '+54',
+        'CO' => '+57',
+        'CL' => '+56',
+        'PE' => '+51',
+        'QA' => '+974',
+        'KW' => '+965',
+        'BH' => '+973',
+        'OM' => '+968',
+        'JO' => '+962',
+        'LB' => '+961',
+        'IL' => '+972',
+        'HK' => '+852',
+        'TW' => '+886',
+        'KR' => '+82',
+        'JP' => '+81',
+        'CN' => '+86',
+        'AF' => '+93',
+        'AL' => '+355',
+        'DZ' => '+213',
+        'AD' => '+376',
+        'AO' => '+244',
+        'AM' => '+374',
+        'AZ' => '+994',
+        'BY' => '+375',
+        'BZ' => '+501',
+        'BJ' => '+229',
+        'BT' => '+975',
+        'BO' => '+591',
+        'BA' => '+387',
+        'BW' => '+267',
+        'BN' => '+673',
+        'BG' => '+359',
+        'BF' => '+226',
+        'BI' => '+257',
+        'KH' => '+855',
+        'CM' => '+237',
+        'CR' => '+506',
+        'HR' => '+385',
+        'CY' => '+357',
+        'CZ' => '+420',
+        'EC' => '+593',
+        'EE' => '+372',
+        'ET' => '+251',
+        'GE' => '+995',
+        'GT' => '+502',
+        'HU' => '+36',
+        'IS' => '+354',
+        'IQ' => '+964',
+        'JM' => '+1',
+        'KG' => '+996',
+        'LV' => '+371',
+        'LY' => '+218',
+        'LT' => '+370',
+        'LU' => '+352',
+        'MV' => '+960',
+        'MU' => '+230',
+        'MD' => '+373',
+        'MC' => '+377',
+        'MA' => '+212',
+        'PA' => '+507',
+        'PY' => '+595',
+        'RO' => '+40',
+        'RW' => '+250',
+        'SN' => '+221',
+        'RS' => '+381',
+        'SK' => '+421',
+        'SI' => '+386',
+        'TZ' => '+255',
+        'TN' => '+216',
+        'UG' => '+256',
+        'UA' => '+380',
+        'UY' => '+598',
+        'UZ' => '+998',
+        'VE' => '+58',
+        'YE' => '+967',
+        'ZM' => '+260',
+        'ZW' => '+263',
+    ];
+
+    /**
+     * Currency-to-default Country ISO mapping for smart auto-selection.
+     *
+     * @var array<string, string>
+     */
+    public const CURRENCY_DEFAULT_COUNTRIES = [
+        'INR' => 'IN',
+        'USD' => 'US',
+        'EUR' => 'DE',
+        'GBP' => 'GB',
+        'AED' => 'AE',
+        'SAR' => 'SA',
+        'CAD' => 'CA',
+        'AUD' => 'AU',
+        'SGD' => 'SG',
+        'MYR' => 'MY',
+        'IDR' => 'ID',
+        'JPY' => 'JP',
+        'BRL' => 'BR',
+        'ZAR' => 'ZA',
+        'NZD' => 'NZ',
+        'CHF' => 'CH',
+        'CNY' => 'CN',
+        'THB' => 'TH',
+        'PHP' => 'PH',
+        'PKR' => 'PK',
+        'BDT' => 'BD',
+        'NGN' => 'NG',
+        'KES' => 'KE',
+        'EGP' => 'EG',
+        'TRY' => 'TR',
+        'RUB' => 'RU',
+        'MXN' => 'MX',
+        'QAR' => 'QA',
+        'KWD' => 'KW',
+        'BHD' => 'BH',
+        'OMR' => 'OM',
+    ];
+
+    /**
      * Returns currency dropdown choices formatted as: 'INR' => 'INR (₹) - Indian Rupee'.
      *
      * @return array<string, string>
@@ -201,6 +368,56 @@ class PlatformRegionalService
     }
 
     /**
+     * Resolves the international dial code for a given ISO2 country code.
+     */
+    public static function dialCodeForCountry(string $iso): string
+    {
+        $upper = strtoupper(trim($iso));
+
+        return self::COUNTRY_DIAL_CODES[$upper] ?? '+91';
+    }
+
+    /**
+     * Resolves the default ISO2 country code for a given currency code.
+     */
+    public static function countryForCurrency(string $currency): string
+    {
+        $upper = strtoupper(trim($currency));
+
+        return self::CURRENCY_DEFAULT_COUNTRIES[$upper] ?? 'IN';
+    }
+
+    /**
+     * Formatted list of dial code options for dropdown selection.
+     *
+     * @return array<string, string>
+     */
+    public static function dialCodeOptions(): array
+    {
+        $options = [];
+        $countries = self::countryOptions();
+
+        // Priority / common countries first
+        $priorityIsos = ['IN', 'US', 'GB', 'AE', 'SA', 'CA', 'AU', 'SG', 'MY', 'DE', 'FR', 'ZA', 'NG', 'BR'];
+        foreach ($priorityIsos as $iso) {
+            if (isset(self::COUNTRY_DIAL_CODES[$iso])) {
+                $dial = self::COUNTRY_DIAL_CODES[$iso];
+                $name = $countries[$iso] ?? $iso;
+                $options[$dial] = "{$name} ({$dial})";
+            }
+        }
+
+        foreach (self::COUNTRY_DIAL_CODES as $iso => $dial) {
+            $name = $countries[$iso] ?? $iso;
+            if (! isset($options[$dial])) {
+                $options[$dial] = "{$name} ({$dial})";
+            }
+        }
+
+        return $options;
+    }
+
+    /**
      * Default Platform Currency set by SuperAdmin.
      */
     public static function defaultCurrency(): string
@@ -227,6 +444,41 @@ class PlatformRegionalService
     }
 
     /**
+     * Default Platform Country ISO code set by SuperAdmin.
+     */
+    public static function defaultCountryIso(): string
+    {
+        $saved = (string) PlatformSystem::get('platform_default_country_iso');
+        if (filled($saved)) {
+            return strtoupper(trim($saved));
+        }
+
+        $currency = self::defaultCurrency();
+        if (isset(self::CURRENCY_DEFAULT_COUNTRIES[$currency])) {
+            return self::CURRENCY_DEFAULT_COUNTRIES[$currency];
+        }
+
+        return (string) config('system.default_country_iso', 'IN');
+    }
+
+    /**
+     * Default Platform Dial Code set by SuperAdmin.
+     */
+    public static function defaultDialCode(): string
+    {
+        $saved = (string) PlatformSystem::get('platform_default_dial_code');
+        if (filled($saved)) {
+            $trimmed = trim($saved);
+
+            return str_starts_with($trimmed, '+') ? $trimmed : '+'.$trimmed;
+        }
+
+        $countryIso = self::defaultCountryIso();
+
+        return self::dialCodeForCountry($countryIso);
+    }
+
+    /**
      * Bundled platform regional defaults dictionary.
      *
      * @return array{
@@ -236,7 +488,11 @@ class PlatformRegionalService
      *     currency_symbol_position: string,
      *     language: string,
      *     default_locale: string,
-     *     timezone: string
+     *     timezone: string,
+     *     default_country_iso: string,
+     *     default_country_code: string,
+     *     country_iso: string,
+     *     dial_code: string
      * }
      */
     public static function getPlatformDefaults(): array
@@ -245,6 +501,8 @@ class PlatformRegionalService
         $currInfo = self::getCurrencyDetails($currency);
         $lang = self::defaultLanguage();
         $tz = self::defaultTimezone();
+        $countryIso = self::defaultCountryIso();
+        $dialCode = self::defaultDialCode();
 
         return [
             'currency' => $currency,
@@ -254,14 +512,23 @@ class PlatformRegionalService
             'language' => $lang,
             'default_locale' => $lang,
             'timezone' => $tz,
+            'default_country_iso' => $countryIso,
+            'default_country_code' => $dialCode,
+            'country_iso' => $countryIso,
+            'dial_code' => $dialCode,
         ];
     }
 
     /**
      * Persists platform regional defaults in SuperAdmin settings.
      */
-    public static function setPlatformDefaults(string $currency, string $language, string $timezone): void
-    {
+    public static function setPlatformDefaults(
+        string $currency,
+        string $language,
+        string $timezone,
+        ?string $countryIso = null,
+        ?string $dialCode = null
+    ): void {
         $currency = strtoupper(trim($currency));
         $language = strtolower(trim($language));
         $timezone = trim($timezone);
@@ -269,6 +536,22 @@ class PlatformRegionalService
         PlatformSystem::set('platform_default_currency', $currency);
         PlatformSystem::set('platform_default_language', $language);
         PlatformSystem::set('platform_default_timezone', $timezone);
+
+        if ($countryIso !== null && trim($countryIso) !== '') {
+            $countryIso = strtoupper(trim($countryIso));
+            PlatformSystem::set('platform_default_country_iso', $countryIso);
+        }
+
+        if ($dialCode !== null && trim($dialCode) !== '') {
+            $dialCode = trim($dialCode);
+            if (! str_starts_with($dialCode, '+')) {
+                $dialCode = '+'.$dialCode;
+            }
+            PlatformSystem::set('platform_default_dial_code', $dialCode);
+        } elseif ($countryIso !== null && trim($countryIso) !== '') {
+            $computedDial = self::dialCodeForCountry($countryIso);
+            PlatformSystem::set('platform_default_dial_code', $computedDial);
+        }
 
         // Keep legacy keys synchronized for backward compatibility
         PlatformSystem::set('app_currency', $currency);

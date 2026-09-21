@@ -67,13 +67,13 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 <!-- Default Platform Currency -->
                 <div class="space-y-2">
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
                         {{ __('Default Platform Currency') }} <span class="text-rose-500">*</span>
                     </label>
-                    <select wire:model="platformDefaultCurrency"
+                    <select wire:model.live="platformDefaultCurrency"
                             class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
                         @foreach ($currencyOptions as $code => $label)
                             <option value="{{ $code }}">{{ $label }}</option>
@@ -82,6 +82,40 @@
                     @error('platformDefaultCurrency') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
                     <p class="text-[11px] text-slate-400 dark:text-slate-500">
                         {{ __('Auto-sets currency symbol, decimal precision, and formatting for new stores.') }}
+                    </p>
+                </div>
+
+                <!-- Default Platform Country -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {{ __('Default Platform Country') }} <span class="text-rose-500">*</span>
+                    </label>
+                    <select wire:model.live="platformDefaultCountryIso"
+                            class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                        @foreach ($countryOptions as $iso => $name)
+                            <option value="{{ $iso }}">{{ $name }} ({{ $iso }})</option>
+                        @endforeach
+                    </select>
+                    @error('platformDefaultCountryIso') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">
+                        {{ __('Default operating country for region presets and contact forms.') }}
+                    </p>
+                </div>
+
+                <!-- Default Country Dial Code -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {{ __('Default Phone Country Dial Code') }} <span class="text-rose-500">*</span>
+                    </label>
+                    <select wire:model="platformDefaultDialCode"
+                            class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                        @foreach ($dialCodeOptions as $code => $label)
+                            <option value="{{ $code }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    @error('platformDefaultDialCode') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">
+                        {{ __('Pre-selected dial code (e.g. +91) on public forms, contact us, and phone inputs.') }}
                     </p>
                 </div>
 

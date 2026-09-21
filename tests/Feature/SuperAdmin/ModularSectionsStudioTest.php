@@ -152,4 +152,40 @@ class ModularSectionsStudioTest extends TestCase
         $response->assertSee('Is there any monthly contract?');
         $response->assertSee('SuperScanner 9000');
     }
+
+    public function test_superadmin_can_configure_head_office_address_and_working_hours_in_contact_studio(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        $test = Livewire::test(SettingsIndex::class)
+            ->set('activeTab', 'whitelabel')
+            ->set('homepageMode', 'modular')
+            ->assertSee('Head Office Physical Address')
+            ->assertSee('Working Hours')
+            ->set('headOfficeAddress', '123 Innovation Boulevard, Suite 500, Austin, TX 78701')
+            ->set('workingHours', 'Monday - Saturday (08:00 AM - 08:00 PM)')
+            ->call('saveBranding')
+            ->assertHasNoErrors()
+            ->assertDispatched('notify');
+
+        $branding = PlatformBranding::current();
+        $this->assertSame('123 Innovation Boulevard, Suite 500, Austin, TX 78701', $branding->head_office_address);
+        $this->assertSame('Monday - Saturday (08:00 AM - 08:00 PM)', $branding->working_hours);
+        $this->assertSame('123 Innovation Boulevard, Suite 500, Austin, TX 78701', $branding->getHeadOfficeAddress());
+        $this->assertSame('Monday - Saturday (08:00 AM - 08:00 PM)', $branding->getWorkingHours());
+
+        // Check public landing page rendering
+        $response = $this->get('/');
+        $response->assertOk()
+            ->assertSee('123 Innovation Boulevard, Suite 500, Austin, TX 78701')
+            ->assertSee('Monday - Saturday (08:00 AM - 08:00 PM)')
+            ->assertDontSee('Metrotech Center, NY 11201');
+
+        // Check public contact route rendering
+        $contactResponse = $this->get('/contact');
+        $contactResponse->assertOk()
+            ->assertSee('123 Innovation Boulevard, Suite 500, Austin, TX 78701')
+            ->assertSee('Monday - Saturday (08:00 AM - 08:00 PM)')
+            ->assertDontSee('Metrotech Center, NY 11201');
+    }
 }

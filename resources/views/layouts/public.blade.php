@@ -438,6 +438,13 @@
                     <span x-show="dark">☀️</span>
                 </button>
 
+                @if (config('app.demo_mode'))
+                    <a href="https://web.zoomnearby.com/demo" target="_blank" rel="noopener noreferrer" class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white text-xs font-black shadow-md shadow-sky-500/20 transition active:scale-95">
+                        <span>🚀</span>
+                        <span>{{ __('Try Flutter Web Demo') }}</span>
+                    </a>
+                @endif
+
                 @if (auth('platform_web')->check())
                     <a href="{{ url('/superadmin') }}" class="hidden sm:inline-flex px-5 py-2.5 rounded-full bg-brand-lime hover:bg-brand-lime-dark text-slate-950 text-sm font-black shadow-lg shadow-brand-lime/20 transition active:scale-95">
                         {{ __('SuperAdmin') }}
@@ -484,6 +491,12 @@
                     <span x-show="dark">☀️ {{ __('Light') }}</span>
                 </button>
             </div>
+            @if (config('app.demo_mode'))
+                <a href="https://web.zoomnearby.com/demo" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold text-xs shadow transition my-1">
+                    <span>🚀</span>
+                    <span>{{ __('Try Flutter Web Version (Live POS Demo)') }}</span>
+                </a>
+            @endif
             @if(!empty($publicHeaderMenu))
                 @foreach($publicHeaderMenu as $item)
                     @php

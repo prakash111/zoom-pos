@@ -48,6 +48,10 @@ class Index extends Component
 
     public string $platformDefaultTimezone = 'UTC';
 
+    public string $platformDefaultCountryIso = 'IN';
+
+    public string $platformDefaultDialCode = '+91';
+
     public bool $maintenanceMode = false;
 
     public string $maintenanceMessage = '';
@@ -185,6 +189,10 @@ class Index extends Component
 
     public string $supportPhone = '';
 
+    public string $headOfficeAddress = '';
+
+    public string $workingHours = '';
+
     public bool $otpRegistrationEnabled = false;
 
     public bool $landingPageEnabled = true;
@@ -312,6 +320,8 @@ class Index extends Component
         $this->platformDefaultCurrency = PlatformRegionalService::defaultCurrency();
         $this->platformDefaultLanguage = PlatformRegionalService::defaultLanguage();
         $this->platformDefaultTimezone = PlatformRegionalService::defaultTimezone();
+        $this->platformDefaultCountryIso = PlatformRegionalService::defaultCountryIso();
+        $this->platformDefaultDialCode = PlatformRegionalService::defaultDialCode();
         $this->appCurrency = $this->platformDefaultCurrency;
         $this->appTimezone = $this->platformDefaultTimezone;
         $this->maintenanceMode = filter_var(PlatformSystem::get('maintenance_mode', false), FILTER_VALIDATE_BOOLEAN);
@@ -346,6 +356,8 @@ class Index extends Component
         $this->landingAccentColor = $branding->landing_accent_color ?? '#d7f24e';
         $this->supportEmail = (string) $branding->support_email;
         $this->supportPhone = (string) $branding->support_phone;
+        $this->headOfficeAddress = (string) ($branding->head_office_address ?: (setting('contact_office_address') ?: (setting('head_office_address') ?: '')));
+        $this->workingHours = (string) ($branding->working_hours ?: (setting('contact_working_hours') ?: (setting('working_hours') ?: '')));
         $this->otpRegistrationEnabled = (bool) $branding->otp_registration_enabled;
         $this->landingPageEnabled = (bool) $branding->landing_page_enabled;
         $this->landingPageId = $branding->landing_page_id;
@@ -536,6 +548,14 @@ class Index extends Component
     public function updatedPlatformDefaultCurrency(string $value): void
     {
         $this->appCurrency = $value;
+        $suggestedIso = PlatformRegionalService::countryForCurrency($value);
+        $this->platformDefaultCountryIso = $suggestedIso;
+        $this->platformDefaultDialCode = PlatformRegionalService::dialCodeForCountry($suggestedIso);
+    }
+
+    public function updatedPlatformDefaultCountryIso(string $value): void
+    {
+        $this->platformDefaultDialCode = PlatformRegionalService::dialCodeForCountry($value);
     }
 
     public function updatedAppCurrency(string $value): void
@@ -940,6 +960,8 @@ class Index extends Component
             'platformDefaultCurrency' => ['required', 'string', 'max:10'],
             'platformDefaultLanguage' => ['required', 'string', 'max:10'],
             'platformDefaultTimezone' => ['required', 'string', 'max:100'],
+            'platformDefaultCountryIso' => ['required', 'string', 'size:2'],
+            'platformDefaultDialCode' => ['required', 'string', 'max:10'],
             'appCurrency' => ['nullable', 'string', 'max:10'],
             'appTimezone' => ['nullable', 'string', 'max:100'],
             'maintenanceMessage' => ['nullable', 'string', 'max:500'],
@@ -983,7 +1005,9 @@ class Index extends Component
         PlatformRegionalService::setPlatformDefaults(
             $this->platformDefaultCurrency,
             $this->platformDefaultLanguage,
-            $this->platformDefaultTimezone
+            $this->platformDefaultTimezone,
+            $this->platformDefaultCountryIso,
+            $this->platformDefaultDialCode
         );
         PlatformSystem::set('maintenance_mode', $this->maintenanceMode ? '1' : '0');
         PlatformSystem::set('maintenance_message', $this->maintenanceMessage);
@@ -1525,6 +1549,8 @@ class Index extends Component
             'landingTheme' => ['nullable', 'string', 'in:theme_fast,theme_modern,theme_enterprise,theme_minimal,theme_dark_studio'],
             'supportEmail' => ['nullable', 'email'],
             'supportPhone' => ['nullable', 'string', 'max:50'],
+            'headOfficeAddress' => ['nullable', 'string', 'max:255'],
+            'workingHours' => ['nullable', 'string', 'max:150'],
             'landingPageId' => ['nullable', 'exists:pages,id'],
             'landingHeroBadge' => ['nullable', 'string', 'max:255'],
             'landingHeroTitle' => ['nullable', 'string', 'max:255'],
@@ -1649,6 +1675,14 @@ class Index extends Component
         if (! empty($data['platformName'])) {
             \App\Models\DynamicSetting::put('platform_brand_name', $data['platformName']);
         }
+        if (array_key_exists('headOfficeAddress', $data)) {
+            \App\Models\DynamicSetting::put('contact_office_address', $data['headOfficeAddress'] ?? '');
+            \App\Models\DynamicSetting::put('head_office_address', $data['headOfficeAddress'] ?? '');
+        }
+        if (array_key_exists('workingHours', $data)) {
+            \App\Models\DynamicSetting::put('contact_working_hours', $data['workingHours'] ?? '');
+            \App\Models\DynamicSetting::put('working_hours', $data['workingHours'] ?? '');
+        }
 
         $sectionsConfig = [
             'hero' => $this->sectionHero,
@@ -1718,6 +1752,8 @@ class Index extends Component
             'landing_accent_color' => $data['landingAccentColor'] ?: '#d7f24e',
             'support_email' => $data['supportEmail'] ?: null,
             'support_phone' => $data['supportPhone'] ?: null,
+            'head_office_address' => $data['headOfficeAddress'] ?: null,
+            'working_hours' => $data['workingHours'] ?: null,
             'otp_registration_enabled' => $this->otpRegistrationEnabled,
             'landing_page_enabled' => $this->landingPageEnabled,
             'landing_page_id' => $data['landingPageId'] ?: null,
@@ -1747,6 +1783,7 @@ class Index extends Component
         }
 
         MenuItem::clearMenuCache();
+        \Illuminate\Support\Facades\Cache::forget('contact_form_settings');
         \Illuminate\Support\Facades\Cache::forget('public_settings');
         \Illuminate\Support\Facades\Cache::forget('platform_branding_settings');
         \Illuminate\Support\Facades\Cache::forget('app_landing_page_theme');
@@ -1811,6 +1848,8 @@ class Index extends Component
             'currencyOptions' => PlatformRegionalService::currencyOptions(),
             'languageOptions' => PlatformRegionalService::languageOptions(),
             'timezoneOptions' => PlatformRegionalService::timezoneOptions(),
+            'countryOptions' => PlatformRegionalService::countryOptions(),
+            'dialCodeOptions' => PlatformRegionalService::dialCodeOptions(),
             'moduleGuard' => $this->moduleGovernance(),
             'currentMenuItems' => MenuItem::where('location', $this->menuLocation)->orderBy('order_index')->get(),
             'selectedLandingPage' => $this->landingPageId ? Page::find($this->landingPageId) : null,

@@ -113,6 +113,15 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         Route::get('/settings/mode', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.mode');
         Route::get('/settings/profile', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.profile');
         Route::get('/settings/receipts', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.receipts');
+        Route::get('/settings/templates/{type}', [\App\Http\Controllers\Tenant\DocumentTemplateController::class, 'edit'])
+            ->where('type', 'invoices|quotations|invoice|quotation')
+            ->name('settings.templates.edit');
+        Route::match(['post', 'put'], '/settings/templates/{type}', [\App\Http\Controllers\Tenant\DocumentTemplateController::class, 'update'])
+            ->where('type', 'invoices|quotations|invoice|quotation')
+            ->name('settings.templates.update');
+        Route::get('/settings/templates/{type}/preview', [\App\Http\Controllers\Tenant\DocumentTemplateController::class, 'previewHtml'])
+            ->where('type', 'invoices|quotations|invoice|quotation')
+            ->name('settings.templates.preview');
         Route::get('/settings/financial', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.financial');
         Route::get('/settings/taxes', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.taxes');
         Route::get('/settings/api', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.api');

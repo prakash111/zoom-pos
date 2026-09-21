@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\Customer;
 use App\Models\MessageQueue;
 use App\Models\Sale;
+use App\Models\TenantDocumentTemplate;
 use App\Models\TenantNotificationGateway;
 use App\Services\DispatchChannelService;
 use App\Services\Invoice\InvoiceDeliveryService;
@@ -584,8 +585,19 @@ class TenantNotificationDispatcherService
         $publicLink = route('sales.public', $sale->sale_number);
         $storeName = $company->trade_name ?: $company->name;
         $customerName = $sale->customer?->name ?? $sale->customer_name ?? 'Valued Customer';
+        $dueDateFormatted = $sale->due_date ? $sale->due_date->format('d M Y') : date('d M Y');
 
-        $textMessage = "Hello {$customerName},\nThank you for shopping at {$storeName}! Your receipt #{$sale->sale_number} for {$totalFormatted} is ready.\nView online: {$publicLink}\nHave a wonderful day!";
+        $template = TenantDocumentTemplate::getForCompany($company->id, 'invoice');
+        $textMessage = $template->renderMessage([
+            'customer_name' => $customerName,
+            'invoice_number' => $sale->sale_number,
+            'order_id' => $sale->sale_number,
+            'amount' => $totalFormatted,
+            'total' => $totalFormatted,
+            'due_date' => $dueDateFormatted,
+            'document_link' => $publicLink,
+            'link' => $publicLink,
+        ]);
 
         $results = [];
 
@@ -603,18 +615,23 @@ class TenantNotificationDispatcherService
 
         if (in_array('email', $channels, true) && ! empty($email)) {
             $pdfData = null;
-            try {
-                $pdfData = DispatchChannelService::isEmailConfigured($company->id) ? $this->invoiceDeliveryService->generateInvoicePdf($sale) : null;
-            } catch (\Throwable $e) {
-                Log::warning("Could not generate PDF for email: ".$e->getMessage());
+            // Strictly check send_as_attachment: when disabled, skip heavy PDF generation
+            if ($template->send_as_attachment) {
+                try {
+                    $pdfData = DispatchChannelService::isEmailConfigured($company->id) ? $this->invoiceDeliveryService->generateInvoicePdf($sale) : null;
+                } catch (\Throwable $e) {
+                    Log::warning("Could not generate PDF for email: ".$e->getMessage());
+                }
             }
 
-            $subject = "Your Receipt #{$sale->sale_number} from {$storeName}";
+            $themeColor = $template->theme_color ?: '#166534';
+            $headerTitle = $template->header_title ?: 'Receipt';
+            $subject = "Your {$headerTitle} #{$sale->sale_number} from {$storeName}";
             $html = "<div style='font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #e2e8f0;border-radius:8px;'>"
-                ."<h2 style='color:#166534;'>{$storeName}</h2>"
+                ."<h2 style='color:{$themeColor};'>{$storeName}</h2>"
                 ."<p>Hello <strong>{$customerName}</strong>,</p>"
                 ."<p>Thank you for your purchase. Please find your official receipt #<strong>{$sale->sale_number}</strong> for <strong>{$totalFormatted}</strong>.</p>"
-                ."<p><a href='{$publicLink}' style='display:inline-block;padding:10px 20px;background:#166534;color:#ffffff;text-decoration:none;border-radius:6px;'>View Digital Receipt</a></p>"
+                ."<p><a href='{$publicLink}' style='display:inline-block;padding:10px 20px;background:{$themeColor};color:#ffffff;text-decoration:none;border-radius:6px;'>View Digital Receipt</a></p>"
                 ."<hr style='border:0;border-top:1px solid #e2e8f0;margin:20px 0;'>"
                 ."<p style='color:#64748b;font-size:12px;'>Payment Method: ".ucfirst($sale->payment_method ?? 'Cash')."</p>"
                 ."</div>";
@@ -678,7 +695,18 @@ class TenantNotificationDispatcherService
         $customerName = $quote->customer?->name ?? $quote->customer_name ?? 'Valued Client';
         $expiryDate = $quote->due_date ? $quote->due_date->format('d M Y') : now()->addDays(15)->format('d M Y');
 
-        $textMessage = "Hello {$customerName},\nPlease find quotation proposal #{$quote->sale_number} for {$totalFormatted} from {$storeName}. Valid until {$expiryDate}.\nReview online: {$publicLink}\nThank you!";
+        $template = TenantDocumentTemplate::getForCompany($company->id, 'quotation');
+        $textMessage = $template->renderMessage([
+            'customer_name' => $customerName,
+            'quotation_number' => $quote->sale_number,
+            'invoice_number' => $quote->sale_number,
+            'order_id' => $quote->sale_number,
+            'amount' => $totalFormatted,
+            'total' => $totalFormatted,
+            'due_date' => $expiryDate,
+            'document_link' => $publicLink,
+            'link' => $publicLink,
+        ]);
 
         $results = [];
 
@@ -704,18 +732,23 @@ class TenantNotificationDispatcherService
 
         if (in_array('email', $channels, true) && ! empty($email)) {
             $pdfData = null;
-            try {
-                $pdfData = DispatchChannelService::isEmailConfigured($company->id) ? $this->invoiceDeliveryService->generateQuotationPdf($quote) : null;
-            } catch (\Throwable $e) {
-                Log::warning("Could not generate Quotation PDF: ".$e->getMessage());
+            // Strictly check send_as_attachment: when disabled, skip heavy PDF generation
+            if ($template->send_as_attachment) {
+                try {
+                    $pdfData = DispatchChannelService::isEmailConfigured($company->id) ? $this->invoiceDeliveryService->generateQuotationPdf($quote) : null;
+                } catch (\Throwable $e) {
+                    Log::warning("Could not generate Quotation PDF: ".$e->getMessage());
+                }
             }
 
-            $subject = "Quotation Proposal #{$quote->sale_number} from {$storeName}";
+            $themeColor = $template->theme_color ?: '#0284c7';
+            $headerTitle = $template->header_title ?: 'Quotation Proposal';
+            $subject = "{$headerTitle} #{$quote->sale_number} from {$storeName}";
             $html = "<div style='font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #e2e8f0;border-radius:8px;'>"
-                ."<h2 style='color:#0284c7;'>{$storeName}</h2>"
+                ."<h2 style='color:{$themeColor};'>{$storeName}</h2>"
                 ."<p>Hello <strong>{$customerName}</strong>,</p>"
-                ."<p>Please find attached quotation proposal #<strong>{$quote->sale_number}</strong> for <strong>{$totalFormatted}</strong>. This estimate is valid until <strong>{$expiryDate}</strong>.</p>"
-                ."<p><a href='{$publicLink}' style='display:inline-block;padding:10px 20px;background:#0284c7;color:#ffffff;text-decoration:none;border-radius:6px;'>Review Proposal Online</a></p>"
+                ."<p>Please find quotation proposal #<strong>{$quote->sale_number}</strong> for <strong>{$totalFormatted}</strong>. This estimate is valid until <strong>{$expiryDate}</strong>.</p>"
+                ."<p><a href='{$publicLink}' style='display:inline-block;padding:10px 20px;background:{$themeColor};color:#ffffff;text-decoration:none;border-radius:6px;'>Review Proposal Online</a></p>"
                 ."</div>";
 
             $results['email'] = $this->dispatchEmail($company, $email, $subject, $html, $pdfData, "Quotation-{$quote->sale_number}.pdf");

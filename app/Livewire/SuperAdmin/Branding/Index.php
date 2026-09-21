@@ -35,6 +35,8 @@ class Index extends Component
 
     public string $supportEmail = '';
     public string $supportPhone = '';
+    public string $headOfficeAddress = '';
+    public string $workingHours = '';
     public bool $otpRegistrationEnabled = false;
 
     public bool $landingPageEnabled = true;
@@ -138,6 +140,8 @@ class Index extends Component
         $this->landingAccentColor = $branding->landing_accent_color ?? '#d7f24e';
         $this->supportEmail = (string) $branding->support_email;
         $this->supportPhone = (string) $branding->support_phone;
+        $this->headOfficeAddress = (string) ($branding->head_office_address ?: (setting('contact_office_address') ?: (setting('head_office_address') ?: '')));
+        $this->workingHours = (string) ($branding->working_hours ?: (setting('contact_working_hours') ?: (setting('working_hours') ?: '')));
         $this->otpRegistrationEnabled = (bool) $branding->otp_registration_enabled;
         $this->landingPageEnabled = (bool) $branding->landing_page_enabled;
         $this->landingPageId = $branding->landing_page_id;
@@ -679,6 +683,8 @@ class Index extends Component
             'landingAccentColor' => ['nullable', 'string', 'max:32'],
             'supportEmail' => ['nullable', 'email'],
             'supportPhone' => ['nullable', 'string', 'max:50'],
+            'headOfficeAddress' => ['nullable', 'string', 'max:255'],
+            'workingHours' => ['nullable', 'string', 'max:150'],
             'landingPageId' => ['nullable', 'exists:pages,id'],
             'landingTheme' => ['required', 'string', 'in:theme_fast,theme_modern,theme_minimal,theme_enterprise,theme_dark_studio'],
             'landingHeroBadge' => ['nullable', 'string', 'max:255'],
@@ -956,6 +962,15 @@ class Index extends Component
             $landingContent['html'] = $this->landingCustomHtml;
         }
 
+        if (array_key_exists('headOfficeAddress', $data)) {
+            \App\Models\DynamicSetting::put('contact_office_address', $data['headOfficeAddress'] ?? '');
+            \App\Models\DynamicSetting::put('head_office_address', $data['headOfficeAddress'] ?? '');
+        }
+        if (array_key_exists('workingHours', $data)) {
+            \App\Models\DynamicSetting::put('contact_working_hours', $data['workingHours'] ?? '');
+            \App\Models\DynamicSetting::put('working_hours', $data['workingHours'] ?? '');
+        }
+
         PlatformBranding::current()->update([
             'platform_name' => $data['platformName'],
             'logo_url' => $data['logoUrl'] ?: null,
@@ -966,6 +981,8 @@ class Index extends Component
             'landing_accent_color' => $data['landingAccentColor'] ?: '#d7f24e',
             'support_email' => $data['supportEmail'] ?: null,
             'support_phone' => $data['supportPhone'] ?: null,
+            'head_office_address' => $data['headOfficeAddress'] ?: null,
+            'working_hours' => $data['workingHours'] ?: null,
             'otp_registration_enabled' => $this->otpRegistrationEnabled,
             'landing_page_enabled' => $this->landingPageEnabled,
             'landing_page_id' => $data['landingPageId'] ?: null,
@@ -990,8 +1007,11 @@ class Index extends Component
         ]);
 
         MenuItem::clearMenuCache();
+        Cache::forget('contact_form_settings');
         Cache::forget('public_settings');
         Cache::forget('platform_branding_settings');
+        Cache::forget('app_landing_page_theme');
+        Cache::forget('landing_page_theme_config');
         if (Cache::has('landing_page_cache_version')) {
             Cache::increment('landing_page_cache_version');
         } else {

@@ -1249,7 +1249,22 @@
                  'w-full max-w-none ml-0 mr-0': position === 'top' || position === 'bottom' || position === 'floating' || layout === 'macos-dock' || layout === 'speed-dial',
                  'flex-1': position === 'left' || position === 'right'
              }">
-            
+
+            @if (config('app.demo_mode') || (auth('web')->user()?->company?->is_demo ?? false))
+                <!-- Demo Mode Notice & Flutter Web Version CTA -->
+                <div class="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm font-medium shadow-sm shrink-0 z-40">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] sm:text-xs font-black bg-white/20 text-white tracking-wide uppercase">Demo Workspace</span>
+                        <span>{{ __('Exploring demo store with sample inventory and transactions.') }}</span>
+                    </div>
+                    <a href="https://web.zoomnearby.com/demo" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white hover:bg-amber-50 text-amber-900 font-extrabold text-xs shadow transition active:scale-95">
+                        <span>🚀</span>
+                        <span>{{ __('Try Flutter Web Version (Live POS Demo)') }}</span>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    </a>
+                </div>
+            @endif
+
             <!-- Top Header Bar -->
             <header class="relative z-30 px-3 sm:px-6 py-2 sm:py-3.5 flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shrink-0">
                 

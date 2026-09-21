@@ -34,7 +34,7 @@ class PlatformBranding extends Model
         'secondary_color', 'accent_color', 'splash_bg_color', 'auth_bg_color',
         'auth_headline', 'auth_description',
         'superadmin_sidebar_color', 'landing_primary_color', 'landing_accent_color',
-        'support_email', 'support_phone', 'smtp_host', 'smtp_port',
+        'support_email', 'support_phone', 'head_office_address', 'working_hours', 'smtp_host', 'smtp_port',
         'smtp_username', 'smtp_password', 'smtp_encryption',
         'smtp_from_address', 'smtp_from_name',
         'expiration_reminder_thresholds', 'otp_registration_enabled',
@@ -179,6 +179,8 @@ class PlatformBranding extends Model
                 'support_phone' => $this->support_phone ?: '+918535075196',
                 'support_whatsapp' => $this->support_phone ?: '+918535075196',
                 'support_email' => $this->support_email ?: 'support@zoomnearby.com',
+                'head_office_address' => $this->getHeadOfficeAddress(),
+                'working_hours' => $this->getWorkingHours(),
                 'auth_banner_image_url' => \App\Models\DynamicSetting::get('auth_banner_image_url') ?: null,
                 'show_auth_banner' => (bool) \App\Models\DynamicSetting::get('show_auth_banner', false),
                 'landing_page_enabled' => (bool) $this->landing_page_enabled,
@@ -193,6 +195,16 @@ class PlatformBranding extends Model
                 'auth_bg_color' => $this->hexOr($this->auth_bg_color, '#F8FAFC'),
             ],
         ];
+    }
+
+    public function getHeadOfficeAddress(): string
+    {
+        return (string) ($this->head_office_address ?: (setting('contact_office_address') ?: (setting('head_office_address') ?: 'Metrotech Center, NY 11201')));
+    }
+
+    public function getWorkingHours(): string
+    {
+        return (string) ($this->working_hours ?: (setting('contact_working_hours') ?: (setting('working_hours') ?: 'Monday - Friday (07 am - 05 pm)')));
     }
 
     public function landingPage()

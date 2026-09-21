@@ -7,6 +7,7 @@ use App\Models\DynamicSetting;
 use App\Models\Plan;
 use App\Models\PlatformBranding;
 use App\Services\ContactFormService;
+use App\Services\Localization\PlatformRegionalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -37,6 +38,13 @@ class LandingApiController extends Controller
             'landing_page_enabled' => (bool) $branding->landing_page_enabled,
             'theme' => $theme,
             'appearance' => get_appearance_settings(),
+            'localization' => [
+                'default_currency' => PlatformRegionalService::defaultCurrency(),
+                'default_language' => PlatformRegionalService::defaultLanguage(),
+                'default_timezone' => PlatformRegionalService::defaultTimezone(),
+                'default_country_code' => PlatformRegionalService::defaultDialCode(),
+                'default_country_iso' => PlatformRegionalService::defaultCountryIso(),
+            ],
             'branding' => [
                 'platform_name' => $branding->platform_name ?: config('app.name', 'Smart Inventory & Sales'),
                 'logo_url' => $branding->getLogoPublicUrl(),
@@ -49,6 +57,8 @@ class LandingApiController extends Controller
                 'support_phone' => $branding->support_phone ?: '+918535075196',
                 'support_whatsapp' => $branding->support_phone ?: '+918535075196',
                 'support_email' => $branding->support_email ?: 'support@zoomnearby.com',
+                'head_office_address' => $branding->getHeadOfficeAddress(),
+                'working_hours' => $branding->getWorkingHours(),
                 'auth_banner_image_url' => $authBannerUrl,
                 'show_auth_banner' => $showAuthBanner,
             ],
@@ -78,6 +88,17 @@ class LandingApiController extends Controller
             'contact' => [
                 'fields' => get_contact_form_fields(),
                 'settings' => get_contact_form_settings(),
+                'default_country_code' => PlatformRegionalService::defaultDialCode(),
+                'default_country_iso' => PlatformRegionalService::defaultCountryIso(),
+                'support_phone' => $branding->support_phone ?: '+918535075196',
+                'support_whatsapp' => $branding->support_phone ?: '+918535075196',
+                'support_email' => $branding->support_email ?: 'support@zoomnearby.com',
+                'head_office_address' => $branding->getHeadOfficeAddress(),
+                'working_hours' => $branding->getWorkingHours(),
+            ],
+            'contact_info' => [
+                'head_office_address' => $branding->getHeadOfficeAddress(),
+                'working_hours' => $branding->getWorkingHours(),
                 'support_phone' => $branding->support_phone ?: '+918535075196',
                 'support_whatsapp' => $branding->support_phone ?: '+918535075196',
                 'support_email' => $branding->support_email ?: 'support@zoomnearby.com',

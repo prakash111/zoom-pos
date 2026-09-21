@@ -70,7 +70,27 @@ class LandingApiTest extends TestCase
                     'faqs',
                     'downloads',
                     'contact',
+                    'contact_info' => [
+                        'head_office_address',
+                        'working_hours',
+                        'support_phone',
+                        'support_whatsapp',
+                        'support_email',
+                    ],
+                    'localization' => [
+                        'default_currency',
+                        'default_language',
+                        'default_timezone',
+                        'default_country_code',
+                        'default_country_iso',
+                    ],
                 ]);
+
+            $this->assertNotEmpty($response->json('localization.default_country_code'));
+            $this->assertNotEmpty($response->json('localization.default_country_iso'));
+            $this->assertNotEmpty($response->json('contact.default_country_code'));
+            $this->assertNotEmpty($response->json('contact_info.head_office_address'));
+            $this->assertNotEmpty($response->json('contact_info.working_hours'));
         }
     }
 
@@ -192,6 +212,26 @@ class LandingApiTest extends TestCase
             'email' => 'alice@retailmart.com',
             'subject' => 'Hardware Compatibility',
         ]);
+    }
+
+    public function test_custom_head_office_address_and_working_hours_in_landing_api(): void
+    {
+        PlatformBranding::current()->update([
+            'head_office_address' => 'Floor 14, One World Trade Center, New York, NY 10007',
+            'working_hours' => 'Monday - Sunday (24 Hours Open)',
+            'support_phone' => '+1 (212) 555-0199',
+            'support_email' => 'contact@nyc-pos.com',
+        ]);
+
+        $response = $this->getJson('/api/v1/public/landing-config');
+
+        $response->assertOk()
+            ->assertJsonPath('contact_info.head_office_address', 'Floor 14, One World Trade Center, New York, NY 10007')
+            ->assertJsonPath('contact_info.working_hours', 'Monday - Sunday (24 Hours Open)')
+            ->assertJsonPath('contact.head_office_address', 'Floor 14, One World Trade Center, New York, NY 10007')
+            ->assertJsonPath('contact.working_hours', 'Monday - Sunday (24 Hours Open)')
+            ->assertJsonPath('branding.head_office_address', 'Floor 14, One World Trade Center, New York, NY 10007')
+            ->assertJsonPath('branding.working_hours', 'Monday - Sunday (24 Hours Open)');
     }
 }
 

@@ -785,6 +785,16 @@ Automated low-stock threshold alerts') }}" class="w-full px-3.5 py-2 rounded-xl 
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Support Phone / WhatsApp') }}</label>
                     <input type="text" wire:model="supportPhone" placeholder="+1 (555) 019-2834" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium">
                 </div>
+
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Head Office Physical Address') }}</label>
+                    <input type="text" wire:model="headOfficeAddress" placeholder="Metrotech Center, NY 11201" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium">
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Working Hours') }}</label>
+                    <input type="text" wire:model="workingHours" placeholder="Monday - Friday (07 am - 05 pm)" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium">
+                </div>
             </div>
 
             <div class="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">

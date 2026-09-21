@@ -82,6 +82,11 @@
                             <div class="reference-hero-actions">
                                 <a href="{{ $ctaPrimaryUrl }}" class="reference-button reference-button--primary"><x-landing.icon name="user-plus" width="20" height="20" /> {{ $ctaPrimaryText }} <x-landing.icon name="arrow" width="20" height="20" /></a>
                                 <a href="{{ $ctaSecondaryUrl }}" @if($ctaSecondaryUrl === '#demo') x-on:click.prevent="$refs.demo.showModal()" @endif class="reference-button reference-button--outline"><x-landing.icon name="play" width="22" height="22" /> {{ $ctaSecondaryText }}</a>
+                                @if (config('app.demo_mode'))
+                                    <a href="https://web.zoomnearby.com/demo" target="_blank" rel="noopener noreferrer" class="reference-button reference-button--flutter-demo" style="background: linear-gradient(135deg, #0284c7, #2563eb); color: #fff; border: 1px solid rgba(255,255,255,0.25); box-shadow: 0 4px 14px rgba(37,99,235,0.3);">
+                                        <span>🚀 {{ __('Try Flutter Web Version') }}</span>
+                                    </a>
+                                @endif
                             </div>
                             @if ($hasDownloads && !$referencePreset)
                                 <x-landing.download-buttons :branding="$branding" class="mt-5" />

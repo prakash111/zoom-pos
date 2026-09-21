@@ -244,6 +244,10 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::get('/tenant/views/dashboard', [DashboardController::class, 'show']);
     Route::get('/app/views/dashboard', [DashboardController::class, 'show']);
     Route::get('/v1/tenant/views/dashboard', [DashboardController::class, 'show']);
+    Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
+    Route::get('/tenant/dashboard/summary', [DashboardController::class, 'summary']);
+    Route::get('/v1/dashboard/summary', [DashboardController::class, 'summary']);
+    Route::get('/v1/tenant/dashboard/summary', [DashboardController::class, 'summary']);
     Route::get('/tenant/notifications/feed', [NotificationController::class, 'feed']);
     Route::get('/v1/tenant/notifications/feed', [NotificationController::class, 'feed']);
     Route::get('/tenant/notifications/unread-count', [NotificationController::class, 'unreadCount']);
@@ -272,6 +276,12 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::get('/v1/tenant/documents/{type}/{id}/preview-modal', [DocumentPreviewController::class, 'previewModal']);
     Route::get('/tenant/documents/{type}/{id}/render-html', [DocumentPreviewController::class, 'renderHtml']);
     Route::get('/v1/tenant/documents/{type}/{id}/render-html', [DocumentPreviewController::class, 'renderHtml']);
+
+    // Document template customization endpoints
+    Route::get('/tenant/templates/{type}', [\App\Http\Controllers\Tenant\DocumentTemplateController::class, 'apiShow'])->where('type', 'invoices|quotations|invoice|quotation');
+    Route::get('/v1/tenant/templates/{type}', [\App\Http\Controllers\Tenant\DocumentTemplateController::class, 'apiShow'])->where('type', 'invoices|quotations|invoice|quotation');
+    Route::match(['post', 'put'], '/tenant/templates/{type}', [\App\Http\Controllers\Tenant\DocumentTemplateController::class, 'apiUpdate'])->where('type', 'invoices|quotations|invoice|quotation');
+    Route::match(['post', 'put'], '/v1/tenant/templates/{type}', [\App\Http\Controllers\Tenant\DocumentTemplateController::class, 'apiUpdate'])->where('type', 'invoices|quotations|invoice|quotation');
 
     // Stable per-channel action endpoints consumed by SDUI channel tiles.
     Route::post('/tenant/dispatch/sms', [DispatchController::class, 'dispatchSms'])->middleware('tenant.api.permission:pos,create');
@@ -1102,6 +1112,7 @@ Route::prefix('v1/pos')->group(function () {
 
         // Analytics & Reports
         Route::get('/analytics', [PosSyncApiController::class, 'analytics'])->middleware('tenant.api.permission:reports,view');
+        Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
 
         // Outbound Delivery (WhatsApp / Email)
         Route::post('/send-delivery', [PosSyncApiController::class, 'sendDelivery'])->middleware('tenant.api.permission:pos,create');

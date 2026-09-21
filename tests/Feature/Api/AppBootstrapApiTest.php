@@ -495,11 +495,17 @@ class AppBootstrapApiTest extends TestCase
             'cashier_sales',
             'products_inventory',
             'financial_management',
+            'sec_storefront',
             'restaurant_operations',
             'pharmacy_management',
             'salon_bookings',
             'administration',
         ], $keys);
+
+        // Verify localization payload contains default country code and ISO
+        $this->assertNotEmpty($response->json('localization.default_country_code'));
+        $this->assertNotEmpty($response->json('localization.default_country_iso'));
+        $this->assertNotEmpty($response->json('system_info.default_country_code'));
 
         // Verify Administration anchored at the bottom with Change Password
         $adminItems = collect($menu['administration']['items'])->pluck('key')->all();

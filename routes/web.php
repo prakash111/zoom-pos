@@ -241,3 +241,15 @@ Route::middleware([\App\Http\Middleware\AuthenticateTenantApi::class])->group(fu
     Route::match(['post', 'put'], '/tenant/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'updateSettings']);
 });
 
+Route::middleware(['auth:web', \App\Http\Middleware\ResolveTenantContext::class])->group(function () {
+    Route::get('/settings/templates/{type}', [\App\Http\Controllers\Tenant\DocumentTemplateController::class, 'edit'])
+        ->where('type', 'invoices|quotations|invoice|quotation')
+        ->name('settings.templates.edit');
+    Route::match(['post', 'put'], '/settings/templates/{type}', [\App\Http\Controllers\Tenant\DocumentTemplateController::class, 'update'])
+        ->where('type', 'invoices|quotations|invoice|quotation')
+        ->name('settings.templates.update');
+    Route::get('/settings/templates/{type}/preview', [\App\Http\Controllers\Tenant\DocumentTemplateController::class, 'previewHtml'])
+        ->where('type', 'invoices|quotations|invoice|quotation')
+        ->name('settings.templates.preview');
+});
+

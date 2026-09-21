@@ -101,6 +101,13 @@
             <span>{{ __('Receipt Prefixes & Bank Terms') }}</span>
         </a>
 
+        <!-- Tab 3b: Document Templates -->
+        <a href="{{ route('settings.templates.edit', ['type' => 'invoices']) }}"
+           class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 transition-all cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold">
+            <span class="text-sm">🎨</span>
+            <span>{{ __('Document Templates') }}</span>
+        </a>
+
         <!-- Tab 4: Financial & Currency -->
         <a href="{{ route('tenant.settings.financial') }}"
            wire:navigate

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Auth;
 
+use App\Http\Requests\Traits\NormalizesPhoneNumber;
 use App\Models\Company;
 use App\Models\PendingRegistration;
 use App\Models\Plan;
@@ -193,7 +194,7 @@ class TenantRegister extends Component
             'pos_mode' => $this->posMode,
             'owner_name' => $this->ownerName,
             'email' => $this->email,
-            'phone' => $this->phone,
+            'phone' => NormalizesPhoneNumber::normalizePhoneNumber($this->phone),
             'tax_id' => $this->taxId,
             'password' => $this->password,
             'plan_name' => $this->planName,

@@ -31,10 +31,20 @@
     }
 
     // Information cards values (customizable via settings or branding)
-    $headOffice = setting('contact_office_address', $branding->address ?: 'Metrotech Center, NY 11201');
-    $callCenter = setting('contact_call_center', $branding->support_phone ?: '+1 4995 4919 4004');
-    $email = setting('contact_email', $branding->support_email ?: 'hello@moniveo.com');
-    $workingHours = setting('contact_working_hours', 'Monday - Friday (07 am - 05 pm)');
+    $headOffice = $branding->head_office_address
+        ?: (setting('head_office_address')
+        ?: (setting('contact_office_address')
+        ?: ($branding->address ?: 'Metrotech Center, NY 11201')));
+    $callCenter = $branding->support_phone
+        ?: (setting('contact_call_center')
+        ?: '+1 4995 4919 4004');
+    $email = $branding->support_email
+        ?: (setting('contact_email')
+        ?: 'hello@moniveo.com');
+    $workingHours = $branding->working_hours
+        ?: (setting('working_hours')
+        ?: (setting('contact_working_hours')
+        ?: 'Monday - Friday (07 am - 05 pm)'));
 @endphp
 
 <!-- Contact Section (Light / Dark Pattern Synchronized) -->
