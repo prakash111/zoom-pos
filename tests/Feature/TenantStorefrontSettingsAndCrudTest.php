@@ -5,9 +5,13 @@ namespace Tests\Feature;
 use App\Models\Company;
 use App\Models\Coupon;
 use App\Models\Faq;
+use App\Models\Product;
+use App\Models\ProductReview;
 use App\Models\Role;
 use App\Models\TenantApiKey;
 use App\Models\User;
+use App\Services\Sdui\SchemaResponse;
+use App\Services\Sdui\SchemaValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -393,5 +397,99 @@ class TenantStorefrontSettingsAndCrudTest extends TestCase
         $updateRes->assertOk()->assertJsonPath('success', true);
         $this->company->refresh();
         $this->assertSame('shop.demostore.com', $this->company->custom_domain);
+    }
+
+    public function test_reviews_sdui_view_renders_successfully(): void
+    {
+        $aliases = [
+            'settings-reviews',
+            'settings_reviews',
+            'reviews',
+            'product-ratings-reviews',
+            'storefront-reviews',
+        ];
+
+        foreach ($aliases as $alias) {
+            $resp = SchemaResponse::renderView($alias, $this->company);
+            $this->assertSame(200, $resp->status(), "Alias {$alias} did not return 200");
+            $data = $resp->getData(true);
+            $this->assertTrue($data['success']);
+            $this->assertSame('Product Ratings & Reviews', $data['schema']['title']);
+
+            $validationErrors = app(SchemaValidator::class)->validate($data['schema']);
+            $this->assertEmpty($validationErrors, "Schema for {$alias} had validation errors: " . json_encode($validationErrors));
+        }
+    }
+
+    public function test_tenant_can_list_moderate_and_delete_reviews(): void
+    {
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Organic Honey Jar',
+            'sku' => 'HONEY-001',
+            'price' => 15.00,
+            'status' => 'active',
+        ]);
+
+        $review = ProductReview::create([
+            'company_id' => $this->company->id,
+            'product_id' => $product->id,
+            'customer_name' => 'Alice Walker',
+            'customer_email' => 'alice@example.com',
+            'rating' => 5,
+            'title' => 'Delicious!',
+            'comment' => 'The best natural honey I have ever purchased.',
+            'is_approved' => false,
+            'is_verified_purchase' => true,
+        ]);
+
+        // 1. List reviews
+        $listRes = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/v1/tenant/storefront/reviews');
+
+        $listRes->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertGreaterThanOrEqual(1, count($listRes->json('data.reviews')));
+
+        // 2. Toggle approval to true
+        $approveRes = $this->withHeaders($this->authHeaders())
+            ->postJson("/api/v1/tenant/storefront/reviews/{$review->id}/toggle-approval", [
+                'is_approved' => true,
+            ]);
+
+        $approveRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.is_approved', true);
+
+        $review->refresh();
+        $this->assertTrue($review->is_approved);
+
+        // 3. Delete review
+        $deleteRes = $this->withHeaders($this->authHeaders())
+            ->deleteJson("/api/v1/tenant/storefront/reviews/{$review->id}");
+
+        $deleteRes->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertNull(ProductReview::find($review->id));
+    }
+
+    public function test_tenant_can_update_review_moderation_settings(): void
+    {
+        $res = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/v1/tenant/storefront/reviews/settings', [
+                'enable_product_reviews' => false,
+                'require_review_approval' => true,
+            ]);
+
+        $res->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.enable_product_reviews', false)
+            ->assertJsonPath('data.require_review_approval', true);
+
+        $this->company->refresh();
+        $this->assertFalse((bool) $this->company->enable_product_reviews);
+        $this->assertTrue((bool) $this->company->require_review_approval);
     }
 }

@@ -137,6 +137,16 @@ class SduiViewController extends Controller
 
                 return response()->json(['success' => true, 'message' => 'Tax settings updated successfully.']);
 
+            case 'reviews':
+            case 'settings-reviews':
+            case 'storefront-reviews':
+                $company->update([
+                    'enable_product_reviews' => $request->boolean('enable_product_reviews', true),
+                    'require_review_approval' => $request->boolean('require_review_approval', false),
+                ]);
+                AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'reviews']);
+                return response()->json(['success' => true, 'message' => 'Review settings updated successfully.']);
+
             case 'api-integrations-whatsapp':
                 return app(ApiIntegrationsController::class)->saveChannel($request, 'whatsapp');
 

@@ -229,5 +229,11 @@ Route::middleware([\App\Http\Middleware\AuthenticateTenantApi::class])->group(fu
     Route::match(['put', 'post'], '/tenant/storefront/inquiries/{id}/status', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'updateStatus']);
     Route::match(['delete', 'post'], '/tenant/storefront/inquiries/{id}/delete', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'destroy']);
     Route::delete('/tenant/storefront/inquiries/{id}', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'destroy']);
+    Route::get('/tenant/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantIndex']);
+    Route::post('/tenant/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantStore']);
+    Route::match(['post', 'put'], '/tenant/storefront/reviews/{id}/toggle-approval', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'toggleApproval']);
+    Route::delete('/tenant/storefront/reviews/{id}', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy']);
+    Route::post('/tenant/storefront/reviews/{id}/delete', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy']);
+    Route::match(['post', 'put'], '/tenant/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'updateSettings']);
 });
 

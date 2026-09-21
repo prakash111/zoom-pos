@@ -23,6 +23,7 @@ use App\Models\PaymentMethod;
 use App\Models\PharmacyBatch;
 use App\Models\PharmacyPrescription;
 use App\Models\Product;
+use App\Models\ProductReview;
 use App\Models\RepairDeviceCategory;
 use App\Models\RepairTicket;
 use App\Models\Role;
@@ -2009,6 +2010,126 @@ class SchemaResponse
         ], 'scroll_view', [
             'fab' => self::fab('add', $createFaqModal, 'Add FAQ', ['background_color' => '#059669', 'foreground_color' => '#ffffff']),
         ]);
+    }
+
+    public static function reviewsView(Company $company): array
+    {
+        ProductReview::seedSampleReviewsForCompany($company->id);
+
+        $reviews = ProductReview::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->with('product:id,name')
+            ->latest()
+            ->take(50)
+            ->get();
+
+        $totalCount = $reviews->count();
+        $approvedCount = $reviews->where('is_approved', true)->count();
+        $pendingCount = $reviews->where('is_approved', false)->count();
+        $avgRating = $totalCount > 0 ? round((float) $reviews->avg('rating'), 1) : 5.0;
+
+        $enabled = (bool) ($company->enable_product_reviews ?? true);
+        $requireApproval = (bool) ($company->require_review_approval ?? false);
+
+        $settingsModal = self::openModalAction('Review Moderation Settings', [
+            self::toggleSwitch('enable_product_reviews', 'Enable Product Reviews on Storefront', $enabled),
+            self::text('When enabled, customer ratings and reviews are shown on public product pages.', 'body_small', ['color' => '#6b7280']),
+            self::divider(),
+            self::toggleSwitch('require_review_approval', 'Require Admin Approval Before Publishing', $requireApproval),
+            self::text('When enabled, new customer reviews remain hidden until manually approved by store staff.', 'body_small', ['color' => '#6b7280']),
+            self::buttonPrimary('Save Settings', self::formSubmitAction('/api/v1/tenant/storefront/reviews/settings', 'POST', 'Review settings updated successfully', true, true)),
+        ]);
+
+        $summaryCards = [
+            self::card([
+                self::row([
+                    self::column([
+                        self::text('Product Ratings & Reviews', 'title_medium', ['bold' => true]),
+                        self::text('Customer feedback, ratings, and storefront moderation.', 'body_small', ['color' => '#6b7280']),
+                    ]),
+                    self::badge("★ {$avgRating} / 5.0", '#d97706', 'solid'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::row([
+                    self::column([
+                        self::text((string) $totalCount, 'title_large', ['bold' => true, 'color' => '#2563eb']),
+                        self::text('Total Reviews', 'body_small', ['color' => '#64748b']),
+                    ], ['cross_axis_alignment' => 'center']),
+                    self::column([
+                        self::text((string) $approvedCount, 'title_large', ['bold' => true, 'color' => '#059669']),
+                        self::text('Approved', 'body_small', ['color' => '#64748b']),
+                    ], ['cross_axis_alignment' => 'center']),
+                    self::column([
+                        self::text((string) $pendingCount, 'title_large', ['bold' => true, 'color' => '#d97706']),
+                        self::text('Pending', 'body_small', ['color' => '#64748b']),
+                    ], ['cross_axis_alignment' => 'center']),
+                    self::column([
+                        self::text("{$avgRating} ★", 'title_large', ['bold' => true, 'color' => '#f59e0b']),
+                        self::text('Average', 'body_small', ['color' => '#64748b']),
+                    ], ['cross_axis_alignment' => 'center']),
+                ], ['main_axis_alignment' => 'space_around']),
+                self::divider(),
+                self::row([
+                    self::badge($enabled ? 'STORE REVIEWS ACTIVE' : 'REVIEWS DISABLED', $enabled ? '#059669' : '#dc2626', 'subtle'),
+                    self::buttonOutlined('Settings', $settingsModal, 'settings', ['full_width' => false]),
+                ], ['main_axis_alignment' => 'space_between', 'cross_axis_alignment' => 'center']),
+            ]),
+        ];
+
+        $reviewCards = [];
+        foreach ($reviews as $review) {
+            $starStr = str_repeat('★', (int) $review->rating) . str_repeat('☆', max(0, 5 - (int) $review->rating));
+            $productName = $review->product?->name ?? ('Product #' . $review->product_id);
+            $isApproved = (bool) $review->is_approved;
+
+            $details = [
+                self::row([
+                    self::badge($productName, '#4f46e5', 'subtle'),
+                    ...($review->is_verified_purchase ? [self::badge('VERIFIED PURCHASE', '#2563eb', 'solid')] : []),
+                ], ['spacing' => 6]),
+            ];
+
+            if (! empty($review->title)) {
+                $details[] = self::text($review->title, 'title_small', ['bold' => true]);
+            }
+
+            $details[] = self::text($review->comment ?: 'No written feedback provided.', 'body_medium');
+            $details[] = self::row([
+                self::text('By ' . ($review->customer_name ?: 'Customer') . ($review->customer_email ? " ({$review->customer_email})" : ''), 'body_small', ['color' => '#64748b']),
+                self::text($review->created_at?->diffForHumans() ?? '', 'body_small', ['color' => '#9ca3af']),
+            ], ['main_axis_alignment' => 'space_between']);
+
+            $reviewCards[] = self::card([
+                self::row([
+                    self::row([
+                        self::text($starStr, 'title_small', ['color' => '#f59e0b', 'bold' => true]),
+                        self::text("({$review->rating}/5)", 'body_small', ['color' => '#64748b']),
+                    ], ['spacing' => 6]),
+                    self::badge($isApproved ? 'APPROVED' : 'PENDING APPROVAL', $isApproved ? '#059669' : '#d97706', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::column($details, ['spacing' => 6]),
+                self::divider(),
+                self::row([
+                    $isApproved
+                        ? self::buttonOutlined('Hide', self::apiPostAction("/api/v1/tenant/storefront/reviews/{$review->id}/toggle-approval", ['is_approved' => false], 'Review hidden from storefront', true), 'visibility_off', ['full_width' => false])
+                        : self::buttonPrimary('Approve', self::apiPostAction("/api/v1/tenant/storefront/reviews/{$review->id}/toggle-approval", ['is_approved' => true], 'Review approved and published', true), 'check_circle', ['full_width' => false, 'background_color' => '#059669']),
+                    self::buttonDanger('Delete', self::apiPostAction("/api/v1/tenant/storefront/reviews/{$review->id}/delete", [], 'Review deleted', true), 'delete', ['full_width' => false]),
+                ], ['main_axis_alignment' => 'end', 'spacing' => 8]),
+            ]);
+        }
+
+        if (empty($reviewCards)) {
+            $reviewCards[] = self::card([
+                self::column([
+                    self::icon('rate_review', ['color' => '#d97706', 'size' => 48]),
+                    self::text('No Product Reviews Yet', 'title_medium', ['bold' => true, 'align' => 'center']),
+                    self::text('When customers rate products on your storefront, their ratings and reviews will appear here for moderation.', 'body_small', ['color' => '#6b7280', 'align' => 'center']),
+                ], ['spacing' => 12, 'cross_axis_alignment' => 'center']),
+            ]);
+        }
+
+        return self::screen('Product Ratings & Reviews', array_merge($summaryCards, $reviewCards), 'scroll_view');
     }
 
     public static function restaurantTablesView(Company $company): array
@@ -7049,6 +7170,9 @@ class SchemaResponse
             ['key' => 'settings-payments', 'title' => 'Storefront Payment Gateways', 'endpoint' => '/api/tenant/views/settings-payments', 'permission' => 'gateways.manage'],
             ['key' => 'settings-storefront-domain', 'title' => 'Store Web Address & Domain', 'endpoint' => '/api/tenant/views/settings-storefront-domain', 'permission' => 'storefront.manage'],
             ['key' => 'storefront-inquiries', 'title' => 'Online Store Inquiries', 'endpoint' => '/api/tenant/views/storefront-inquiries', 'permission' => 'storefront.inquiries.view'],
+            ['key' => 'settings-coupons', 'title' => 'Coupons & Discounts', 'endpoint' => '/api/tenant/views/settings-coupons', 'permission' => 'settings.view'],
+            ['key' => 'settings-faqs', 'title' => 'Store FAQs & Help Center', 'endpoint' => '/api/tenant/views/settings-faqs', 'permission' => 'settings.view'],
+            ['key' => 'settings-reviews', 'title' => 'Product Ratings & Reviews', 'endpoint' => '/api/tenant/views/settings-reviews', 'permission' => 'reviews.view'],
         ];
 
         if (! Schema::hasTable('sdui_screens')) {
@@ -7253,6 +7377,10 @@ class SchemaResponse
             return null;
         }
 
+        if (in_array($normalized, ['settings-reviews', 'reviews', 'product-ratings-reviews', 'product_ratings_reviews', 'storefront-reviews', 'storefront_reviews', 'store-reviews'], true)) {
+            return 'reviews.view';
+        }
+
         if (str_starts_with($normalized, 'settings-')
             || in_array($normalized, ['mode', 'profile', 'branding', 'receipts', 'financial', 'localization', 'taxes', 'api', 'api-integrations', 'navigation', 'navigation-menu', 'notifications', 'custom-notifications', 'repair-checklist-settings'], true)) {
             return 'settings.view';
@@ -7369,6 +7497,7 @@ class SchemaResponse
             'settings-advanced', 'advanced', 'danger-zone' => self::advancedView($company),
             'settings-coupons', 'coupons' => self::couponsView($company),
             'settings-faqs', 'faqs' => self::faqsView($company),
+            'settings-reviews', 'reviews', 'product-ratings-reviews', 'product_ratings_reviews', 'storefront-reviews', 'storefront_reviews', 'store-reviews', 'settings_reviews' => self::reviewsView($company),
             'settings-storefront', 'storefront-settings', 'storefront-banner-auth', 'settings_storefront', 'storefront-banner' => self::storefrontBannerAuthView($company),
             'settings-payments', 'storefront-payments', 'storefront-payment-gateways', 'settings_payments', 'storefront-gateway' => self::storefrontPaymentGatewaysView($company),
             'settings-storefront-domain', 'storefront-domain', 'store-domain', 'settings_domain', 'domain' => self::storefrontDomainView($company),

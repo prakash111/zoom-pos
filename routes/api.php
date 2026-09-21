@@ -671,6 +671,21 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::delete('/v1/tenant/faqs/{id}', [FaqApiController::class, 'destroy']);
     Route::post('/v1/tenant/faqs/{id}/delete', [FaqApiController::class, 'destroy']);
 
+    // Tenant Storefront Reviews & Moderation
+    Route::get('/tenant/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantIndex']);
+    Route::post('/tenant/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantStore']);
+    Route::match(['post', 'put'], '/tenant/storefront/reviews/{id}/toggle-approval', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'toggleApproval']);
+    Route::delete('/tenant/storefront/reviews/{id}', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy']);
+    Route::post('/tenant/storefront/reviews/{id}/delete', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy']);
+    Route::match(['post', 'put'], '/tenant/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'updateSettings']);
+
+    Route::get('/v1/tenant/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantIndex']);
+    Route::post('/v1/tenant/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantStore']);
+    Route::match(['post', 'put'], '/v1/tenant/storefront/reviews/{id}/toggle-approval', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'toggleApproval']);
+    Route::delete('/v1/tenant/storefront/reviews/{id}', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy']);
+    Route::post('/v1/tenant/storefront/reviews/{id}/delete', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy']);
+    Route::match(['post', 'put'], '/v1/tenant/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'updateSettings']);
+
     // Secure tenant file uploads (non-executable image/PDF whitelist) — backs
     // the SDUI `file_picker` component (e.g. prescription attachments).
     Route::prefix('tenant/uploads')->group(function () {
@@ -1195,6 +1210,12 @@ Route::prefix('v1/pos')->group(function () {
         Route::match(['put', 'post'], '/faqs/{id}', [FaqApiController::class, 'update'])->middleware('tenant.api.permission:settings,edit');
         Route::delete('/faqs/{id}', [FaqApiController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/faqs/{id}/delete', [FaqApiController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantIndex'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,view']);
+        Route::post('/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantStore'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,create']);
+        Route::match(['post', 'put'], '/storefront/reviews/{id}/toggle-approval', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'toggleApproval'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,edit']);
+        Route::delete('/storefront/reviews/{id}', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,delete']);
+        Route::post('/storefront/reviews/{id}/delete', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,delete']);
+        Route::match(['post', 'put'], '/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'updateSettings'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:settings,edit']);
 
         // Consignments (draft -> dispatched -> reconciled -> finalized)
         Route::get('/consignments', [ConsignmentApiController::class, 'index'])->middleware('tenant.api.permission:consignments,view');
