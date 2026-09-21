@@ -82,6 +82,8 @@ class SduiComponentRegistry {
     // Cash & Sales
     'sales': (_) => const SalesScreen(),
     'sale': (_) => const SalesScreen(),
+    'orders': (_) => const SalesScreen(),
+    'order': (_) => const SalesScreen(),
     'invoices': (_) => const SalesScreen(),
     'invoice': (_) => const SalesScreen(),
     'sales_history': (_) => const SalesScreen(),

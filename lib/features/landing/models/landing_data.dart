@@ -40,8 +40,13 @@ class LandingData {
         ? json['downloads'] as Map<String, dynamic>
         : <String, dynamic>{};
     final contactMap = json['contact'] is Map<String, dynamic>
-        ? json['contact'] as Map<String, dynamic>
+        ? Map<String, dynamic>.from(json['contact'] as Map)
         : <String, dynamic>{};
+    if (json['contact_info'] is Map<String, dynamic>) {
+      (json['contact_info'] as Map<String, dynamic>).forEach((k, v) {
+        if (v != null) contactMap[k] = v;
+      });
+    }
 
     final isEnabled = json['landing_page_enabled'] ?? brandingMap['landing_page_enabled'];
 
@@ -621,6 +626,8 @@ class LandingContact {
     required this.supportEmail,
     required this.pageTitle,
     required this.pageSubtitle,
+    this.headOfficeAddress = 'Metrotech Center, NY 11201',
+    this.workingHours = 'Monday - Friday (07 am - 05 pm)',
   });
 
   final String supportPhone;
@@ -628,6 +635,8 @@ class LandingContact {
   final String supportEmail;
   final String pageTitle;
   final String pageSubtitle;
+  final String headOfficeAddress;
+  final String workingHours;
 
   factory LandingContact.fromJson(Map<String, dynamic> json) {
     final settings = json['settings'] is Map<String, dynamic>
@@ -638,6 +647,12 @@ class LandingContact {
       supportPhone: json['support_phone']?.toString() ?? '+918535075196',
       supportWhatsapp: json['support_whatsapp']?.toString() ?? '+918535075196',
       supportEmail: json['support_email']?.toString() ?? 'support@zoomnearby.com',
+      headOfficeAddress: json['head_office_address']?.toString() ??
+          settings['head_office_address']?.toString() ??
+          'Metrotech Center, NY 11201',
+      workingHours: json['working_hours']?.toString() ??
+          settings['working_hours']?.toString() ??
+          'Monday - Friday (07 am - 05 pm)',
       pageTitle: settings['page_title']?.toString() ?? 'Get in Touch',
       pageSubtitle: settings['page_subtitle']?.toString() ??
           'Questions before you sign up or need a tailored enterprise setup? Our specialists are ready to help.',

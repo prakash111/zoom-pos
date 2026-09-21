@@ -1913,7 +1913,7 @@ class _LandingScreenState extends State<LandingScreen> {
       color: tokens.sectionAltBg,
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 860),
+          constraints: const BoxConstraints(maxWidth: 1000),
           child: Column(
             children: [
               _buildSectionHeader(
@@ -1926,7 +1926,9 @@ class _LandingScreenState extends State<LandingScreen> {
                     : 'Have questions before signing up? Send us a message and our team will get in touch.',
                 tokens: tokens,
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 36),
+              _buildContactCardsGrid(contact, tokens),
+              const SizedBox(height: 36),
               InteractiveContactForm(
                 contact: contact,
                 isDark: tokens.isDark,
@@ -1941,6 +1943,118 @@ class _LandingScreenState extends State<LandingScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildContactCardsGrid(
+    LandingContact contact,
+    _LandingThemeTokens tokens,
+  ) {
+    final items = [
+      (
+        icon: Icons.location_on_outlined,
+        title: 'Head Office',
+        content: contact.headOfficeAddress.isNotEmpty
+            ? contact.headOfficeAddress
+            : 'Metrotech Center, NY 11201',
+      ),
+      (
+        icon: Icons.phone_in_talk_outlined,
+        title: 'Call Center',
+        content: contact.supportPhone.isNotEmpty
+            ? contact.supportPhone
+            : '+1 (555) 019-2834',
+      ),
+      (
+        icon: Icons.email_outlined,
+        title: 'Email',
+        content: contact.supportEmail.isNotEmpty
+            ? contact.supportEmail
+            : 'support@zoomnearby.com',
+      ),
+      (
+        icon: Icons.access_time_rounded,
+        title: 'Working Hours',
+        content: contact.workingHours.isNotEmpty
+            ? contact.workingHours
+            : 'Monday - Friday (07 am - 05 pm)',
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        final cardWidth = isMobile
+            ? constraints.maxWidth
+            : (constraints.maxWidth - 16) / 2;
+
+        return Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: items.map((item) {
+            return SizedBox(
+              width: cardWidth,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: BoxDecoration(
+                  color: tokens.surfaceCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: tokens.borderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: tokens.isDark ? 0.25 : 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: tokens.primaryColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        item.icon,
+                        size: 22,
+                        color: tokens.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            style: TextStyle(
+                              color: tokens.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item.content,
+                            style: TextStyle(
+                              color: tokens.textSecondary,
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 

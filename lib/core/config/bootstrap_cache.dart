@@ -120,7 +120,29 @@ class BootstrapCache extends ChangeNotifier {
   SduiUiSchema uiSchema = const SduiUiSchema();
   NavConfig navConfig = const NavConfig();
   Map<String, dynamic> config = {};
+  Map<String, dynamic> localization = {};
   BootstrapTheme theme = const BootstrapTheme();
+
+  String get defaultDialCode {
+    return localization['default_country_code']?.toString() ??
+        config['default_country_code']?.toString() ??
+        '+91';
+  }
+
+  String get defaultCountryIso {
+    return localization['default_country_iso']?.toString() ??
+        config['default_country_iso']?.toString() ??
+        'IN';
+  }
+
+  bool get isDemo {
+    return config['is_demo'] == true ||
+        config['is_demo'] == 1 ||
+        config['is_demo'] == '1' ||
+        config['demo_mode'] == true ||
+        config['demo_mode'] == 1 ||
+        config['demo_mode'] == '1';
+  }
 
   Future<void>? _diskLoadFuture;
   bool _diskHydrated = false;
@@ -274,6 +296,16 @@ class BootstrapCache extends ChangeNotifier {
         } catch (error, stackTrace) {
           _logParseFailure('cached app configuration', error, stackTrace);
         }
+      }
+
+      final locRaw = prefs.getString('zoom_pos.bootstrap.localization');
+      if (locRaw != null) {
+        try {
+          final decoded = jsonDecode(locRaw);
+          if (decoded is Map) {
+            localization = _safeMap(decoded);
+          }
+        } catch (_) {}
       }
 
       final tenantRaw = prefs.getString(_tenantCacheKey) ??
@@ -494,6 +526,12 @@ class BootstrapCache extends ChangeNotifier {
       if (cfg is Map) {
         config = _safeMap(cfg);
         await prefs.setString(_configCacheKey, jsonEncode(config));
+      }
+
+      final loc = response['localization'] ?? response['system_info'];
+      if (loc is Map) {
+        localization = _safeMap(loc);
+        await prefs.setString('zoom_pos.bootstrap.localization', jsonEncode(localization));
       }
 
       if (response['theme'] is Map) {

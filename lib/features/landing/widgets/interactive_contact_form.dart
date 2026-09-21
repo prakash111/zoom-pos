@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/config/bootstrap_cache.dart';
+import '../../../core/config/countries.dart';
+import '../../../widgets/inputs/phone_number_field.dart';
 import '../models/landing_data.dart';
 import '../services/contact_form_service.dart';
 
@@ -70,11 +73,17 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
       _isSubmitting = true;
     });
 
+    final defaultDial = BootstrapCache.instance.defaultDialCode;
+    final normalizedPhone = normalizePhoneNumber(
+      _phoneController.text,
+      defaultDialCode: defaultDial,
+    );
+
     final service = ContactFormService(context.read<ApiClient>());
     final submission = ContactSubmission(
       name: _nameController.text,
       email: _emailController.text,
-      phone: _phoneController.text,
+      phone: normalizedPhone.isNotEmpty ? normalizedPhone : _phoneController.text,
       storeType: _selectedStoreType,
       subject: _subjectController.text,
       message: _messageController.text,
@@ -339,15 +348,20 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Expanded(
-                                  child: TextFormField(
+                                  child: PhoneNumberField(
                                     controller: _phoneController,
-                                    keyboardType: TextInputType.phone,
-                                    style: TextStyle(color: widget.textPrimary),
-                                    decoration: _inputDecoration(
-                                      label: 'Phone Number',
-                                      hint: '+1 (555) 000-0000',
-                                      prefixIcon: Icons.phone_outlined,
-                                    ),
+                                    label: 'Phone Number',
+                                    fillColor: widget.isDark
+                                        ? const Color(0xFF0F172A)
+                                        : const Color(0xFFF1F5F9),
+                                    borderColor: widget.borderColor,
+                                    focusedBorderColor: widget.primaryColor,
+                                    textStyle: TextStyle(color: widget.textPrimary, fontSize: 14),
+                                    borderRadius: BorderRadius.circular(10),
+                                    initialDialCode: BootstrapCache.instance.defaultDialCode,
+                                    hint: BootstrapCache.instance.defaultDialCode == '+91'
+                                        ? '98765 43210'
+                                        : '(555) 000-0000',
                                   ),
                                 ),
                                 const SizedBox(width: 16),
@@ -420,15 +434,20 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                             },
                           ),
                           const SizedBox(height: 16),
-                          TextFormField(
+                          PhoneNumberField(
                             controller: _phoneController,
-                            keyboardType: TextInputType.phone,
-                            style: TextStyle(color: widget.textPrimary),
-                            decoration: _inputDecoration(
-                              label: 'Phone Number',
-                              hint: '+1 (555) 000-0000',
-                              prefixIcon: Icons.phone_outlined,
-                            ),
+                            label: 'Phone Number',
+                            fillColor: widget.isDark
+                                ? const Color(0xFF0F172A)
+                                : const Color(0xFFF1F5F9),
+                            borderColor: widget.borderColor,
+                            focusedBorderColor: widget.primaryColor,
+                            textStyle: TextStyle(color: widget.textPrimary, fontSize: 14),
+                            borderRadius: BorderRadius.circular(10),
+                            initialDialCode: BootstrapCache.instance.defaultDialCode,
+                            hint: BootstrapCache.instance.defaultDialCode == '+91'
+                                ? '98765 43210'
+                                : '(555) 000-0000',
                           ),
                           const SizedBox(height: 16),
                           DropdownButtonFormField<String>(

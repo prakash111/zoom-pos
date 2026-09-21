@@ -35,6 +35,8 @@ import '../analytics/analytics_repository.dart';
 import 'widgets/dock_rail_slot.dart';
 import 'widgets/oroit_dashboard.dart';
 import 'widgets/posh_dashboard.dart';
+import 'widgets/redesigned_metric_dashboard.dart';
+import '../../core/models/dashboard_summary_model.dart';
 import '../auth/auth_provider.dart';
 import '../navigation/presentation/widgets/app_drawer.dart';
 import '../sales/screens/sales_screen.dart';
@@ -2036,6 +2038,150 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildRedesignedFloatingBottomNav(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    void openRoute(String key) => Navigator.of(context).push(
+          MaterialPageRoute(
+              builder: SduiComponentRegistry.instance.resolve(key)),
+        );
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Container(
+          height: 64,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(36),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.4)
+                    : const Color(0xFF0F172A).withValues(alpha: 0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              ),
+            ],
+            border: Border.all(
+              color: isDark
+                  ? const Color(0xFF334155)
+                  : const Color(0xFFE2E8F0),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildRedesignedNavItem(
+                icon: Icons.home_rounded,
+                label: 'Home',
+                isSelected: _dockIndex == 0,
+                onTap: () => setState(() => _dockIndex = 0),
+                isDark: isDark,
+              ),
+              _buildRedesignedNavItem(
+                icon: Icons.receipt_long_outlined,
+                label: 'Sales',
+                isSelected: false,
+                onTap: () => openRoute('sales'),
+                isDark: isDark,
+              ),
+              // Center FAB + Quick Sale
+              GestureDetector(
+                onTap: () => openRoute('pos'),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF10B981), Color(0xFF059669)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.add,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+              _buildRedesignedNavItem(
+                icon: Icons.shopping_bag_outlined,
+                label: 'Orders',
+                isSelected: false,
+                onTap: () => openRoute('orders'),
+                isDark: isDark,
+              ),
+              _buildRedesignedNavItem(
+                icon: Icons.grid_view_rounded,
+                label: 'More',
+                isSelected: false,
+                onTap: () {
+                  if (_scaffoldKey.currentState?.hasEndDrawer == true) {
+                    _scaffoldKey.currentState?.openEndDrawer();
+                  } else {
+                    _scaffoldKey.currentState?.openDrawer();
+                  }
+                },
+                isDark: isDark,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRedesignedNavItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    const activeColor = Color(0xFF10B981);
+    final inactiveColor =
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: isSelected ? activeColor : inactiveColor,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? activeColor : inactiveColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -2046,6 +2192,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final company = auth.company;
     final l10n = AppLocalizations.of(context);
     final dock = context.watch<NavDockProvider>().position;
+    final layout = context.watch<NavDockProvider>().dashboardLayout;
     final wide = isWide(context);
 
     // Exactly one dock rendering is live per position — never duplicated
@@ -2078,6 +2225,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case NavDockPosition.bottom:
         bottomBar = _buildBottomDock(context);
         break;
+    }
+
+    if (layout == DashboardLayout.redesigned) {
+      drawer ??= _buildDrawer(context, company, auth.user, bootstrap);
+      if (bottomBar == null || dock == NavDockPosition.bottom) {
+        bottomBar = _buildRedesignedFloatingBottomNav(context);
+      }
     }
 
     return Scaffold(
@@ -2273,6 +2427,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               formatter: CurrencyFormatter(
                                   company?.currencySymbol ?? '\$'),
                               onFilter: _pickDateRange,
+                              onOpenNotifications: _openNotificationFeed,
                             );
                           },
                         ),
@@ -2465,15 +2620,22 @@ class _DockChip extends StatelessWidget {
 /// breakdown (payment methods, complete top-products list) stays on the
 /// dedicated Analytics screen.
 class _DashboardAnalytics extends StatelessWidget {
-  const _DashboardAnalytics(
-      {required this.analytics, required this.formatter, this.onFilter});
+  const _DashboardAnalytics({
+    required this.analytics,
+    required this.formatter,
+    this.onFilter,
+    this.onOpenNotifications,
+  });
 
   final AnalyticsModel analytics;
   final CurrencyFormatter formatter;
   final VoidCallback? onFilter;
+  final VoidCallback? onOpenNotifications;
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final company = auth.company;
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final layout = context.watch<NavDockProvider>().dashboardLayout;
@@ -2504,7 +2666,27 @@ class _DashboardAnalytics extends StatelessWidget {
           onOpenTransactions: () => open('sales'),
           onOpenCustomers: () => open('customers'),
         ),
+      DashboardLayout.redesigned => RedesignedMetricDashboard(
+          summary: DashboardSummaryModel.fromAnalytics(
+            analytics,
+            formatter,
+            storeName: company?.tradeName ?? company?.name ?? 'MetroRetail',
+            userName: auth.user?.name ?? 'Store Manager',
+            userRole: auth.user?.role ?? 'Store Manager',
+          ),
+          onAddProduct: () => open('inventory'),
+          onCreateOrder: () => open('pos'),
+          onAddCustomer: () => open('customers'),
+          onViewReports: () => open('reports'),
+          onOpenTransactions: () => open('sales'),
+          onOpenNotifications: onOpenNotifications,
+          isDemo: company?.isDemo == true || BootstrapCache.instance.isDemo,
+        ),
     };
+
+    if (layout == DashboardLayout.redesigned) {
+      return layoutBody;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

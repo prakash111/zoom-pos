@@ -30,6 +30,7 @@ class CompanyModel {
     this.customDomain,
     this.storefrontUrl,
     this.timezone = 'UTC',
+    this.isDemo = false,
   });
 
   factory CompanyModel.fromJson(Map<String, dynamic> json) {
@@ -101,6 +102,10 @@ class CompanyModel {
       customDomain: (json['custom_domain'] ?? json['customDomain'])?.toString(),
       storefrontUrl: (json['storefront_url'] ?? json['storefrontUrl'])?.toString(),
       timezone: json['timezone']?.toString().isNotEmpty == true ? json['timezone'].toString() : 'UTC',
+      isDemo: json['is_demo'] == true ||
+          json['is_demo'] == 1 ||
+          json['is_demo'] == '1' ||
+          (json['plan_name']?.toString().toLowerCase().contains('demo') ?? false),
     );
   }
 
@@ -134,6 +139,7 @@ class CompanyModel {
   final String? customDomain;
   final String? storefrontUrl;
   final String timezone;
+  final bool isDemo;
 
   CompanyModel copyWith({
     String? id,
@@ -173,6 +179,7 @@ class CompanyModel {
     String? storefrontUrl,
     bool clearStorefrontUrl = false,
     String? timezone,
+    bool? isDemo,
   }) {
     return CompanyModel(
       id: id ?? this.id,
@@ -205,6 +212,7 @@ class CompanyModel {
       customDomain: clearCustomDomain ? null : (customDomain ?? this.customDomain),
       storefrontUrl: clearStorefrontUrl ? null : (storefrontUrl ?? this.storefrontUrl),
       timezone: timezone ?? this.timezone,
+      isDemo: isDemo ?? this.isDemo,
     );
   }
 
@@ -260,6 +268,7 @@ class CompanyModel {
         if (customDomain != null) 'custom_domain': customDomain,
         if (storefrontUrl != null) 'storefront_url': storefrontUrl,
         'timezone': timezone,
+        'is_demo': isDemo,
       };
 
   bool isModuleEnabled(String module) {

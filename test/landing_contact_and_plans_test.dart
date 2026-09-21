@@ -111,6 +111,59 @@ void main() {
     });
   });
 
+  group('LandingContact & Head Office / Working Hours Tests', () {
+    test('LandingContact correctly parses headOfficeAddress and workingHours from json', () {
+      final json = {
+        'support_phone': '+1 (800) 555-0199',
+        'support_whatsapp': '+1 (800) 555-0199',
+        'support_email': 'contact@company.com',
+        'head_office_address': '742 Evergreen Terrace, Springfield, OR',
+        'working_hours': 'Monday - Saturday (08 am - 08 pm)',
+        'settings': {
+          'page_title': 'Speak with Specialists',
+          'page_subtitle': 'Direct line to our cloud engineers.',
+        },
+      };
+
+      final contact = LandingContact.fromJson(json);
+
+      expect(contact.supportPhone, '+1 (800) 555-0199');
+      expect(contact.supportEmail, 'contact@company.com');
+      expect(contact.headOfficeAddress, '742 Evergreen Terrace, Springfield, OR');
+      expect(contact.workingHours, 'Monday - Saturday (08 am - 08 pm)');
+      expect(contact.pageTitle, 'Speak with Specialists');
+      expect(contact.pageSubtitle, 'Direct line to our cloud engineers.');
+    });
+
+    test('LandingContact uses fallback values when fields are absent', () {
+      final contact = LandingContact.fromJson({});
+
+      expect(contact.headOfficeAddress, 'Metrotech Center, NY 11201');
+      expect(contact.workingHours, 'Monday - Friday (07 am - 05 pm)');
+      expect(contact.supportPhone, '+918535075196');
+      expect(contact.supportEmail, 'support@zoomnearby.com');
+    });
+
+    test('LandingData parses contact_info object at root', () {
+      final json = {
+        'contact': {
+          'support_phone': '+123456',
+        },
+        'contact_info': {
+          'head_office_address': '100 Innovation Way, Suite 400',
+          'working_hours': '24/7 Enterprise Support',
+          'support_phone': '+1 (999) 888-7777',
+        },
+      };
+
+      final data = LandingData.fromJson(json);
+
+      expect(data.contact.headOfficeAddress, '100 Innovation Way, Suite 400');
+      expect(data.contact.workingHours, '24/7 Enterprise Support');
+      expect(data.contact.supportPhone, '+1 (999) 888-7777');
+    });
+  });
+
   group('PlatformBrandingProvider landingPageEnabled toggle tests', () {
     test('landingPageEnabled defaults to true and reads from SharedPreferences',
         () async {
