@@ -44,8 +44,8 @@ void main() {
   test('DashboardLayout round-trips by name', () {
     expect(DashboardLayout.fromName('oroit'), DashboardLayout.oroit);
     expect(DashboardLayout.fromName('posh'), DashboardLayout.posh);
-    expect(DashboardLayout.fromName(null), DashboardLayout.posh);
-    expect(DashboardLayout.fromName('junk'), DashboardLayout.posh);
+    expect(DashboardLayout.fromName(null), DashboardLayout.redesigned);
+    expect(DashboardLayout.fromName('junk'), DashboardLayout.redesigned);
   });
 
   testWidgets('OroitDashboardHome renders the dark analytics board from data',

@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 /// presentation changes. Chosen in Settings ▸ Appearance / App Preferences and
 /// persisted per device.
 enum DashboardLayout {
-  /// Light "PoshPointHub" cards (default).
+  /// Light "PoshPointHub" cards.
   posh,
 
   /// Dark, glossy "OroitOash" analytics board.
   oroit,
 
-  /// Redesigned Modern Metric layout with sparklines, sales area chart & receivables split.
+  /// Default dashboard with sparklines, sales area chart & receivables split.
   redesigned;
 
   static DashboardLayout fromName(String? name) =>

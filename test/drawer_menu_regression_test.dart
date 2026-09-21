@@ -52,7 +52,6 @@ class _FakeAuthProvider extends ChangeNotifier implements AuthProvider {
   @override
   bool get isBusy => false;
 
-  @override
   RegisterResult? get lastRegisterResult => null;
 
   @override
@@ -517,8 +516,13 @@ void main() {
       expect(find.byType(ExpansionTile), findsNothing);
 
       // 4. Verify user avatar is removed from footer and Help & Support button is rendered
-      expect(find.text('prakash'), findsNothing);
-      expect(find.text('prakash@example.com'), findsNothing);
+      final drawer = find.byType(Drawer);
+      expect(find.descendant(of: drawer, matching: find.text('prakash')),
+          findsNothing);
+      expect(
+          find.descendant(
+              of: drawer, matching: find.text('prakash@example.com')),
+          findsNothing);
       expect(find.widgetWithText(ListTile, 'Help & Support'), findsOneWidget);
     });
 

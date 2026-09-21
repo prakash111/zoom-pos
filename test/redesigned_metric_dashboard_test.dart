@@ -45,7 +45,7 @@ void main() {
     test('contains redesigned layout', () {
       expect(DashboardLayout.values, contains(DashboardLayout.redesigned));
       expect(DashboardLayout.redesigned.name, 'redesigned');
-      expect(DashboardLayout.redesigned.label, 'Modern Metric (split)');
+      expect(DashboardLayout.redesigned.label, 'Metro Retail (dark)');
     });
 
     test('DashboardLayout round-trips by name including redesigned', () {

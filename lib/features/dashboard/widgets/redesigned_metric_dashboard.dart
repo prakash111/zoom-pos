@@ -521,15 +521,16 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
       );
     }
 
-    // 2x2 grid on mobile
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.25,
-      children: cards.map((c) => _buildSingleMetricCard(c, isDark)).toList(),
+    return LayoutBuilder(
+      builder: (context, constraints) => GridView.count(
+        crossAxisCount: constraints.maxWidth < 320 ? 1 : 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        mainAxisExtent: 170,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        children: cards.map((c) => _buildSingleMetricCard(c, isDark)).toList(),
+      ),
     );
   }
 
@@ -946,8 +947,11 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
             children: [
               Text(
                 'Amount Receivable',
@@ -1171,8 +1175,11 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
             children: [
               Text(
                 'Recent Transactions',
