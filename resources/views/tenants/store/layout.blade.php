@@ -2,6 +2,9 @@
     $categories = $categories ?? collect();
     $products = $products ?? collect();
     $languages = $languages ?? \App\Models\Language::query()->where('is_active', true)->orderBy('name')->get();
+    if (!isset($storeMenus) && isset($company)) {
+        $storeMenus = app(\App\Http\Controllers\Tenant\StorefrontController::class)->getStoreMenus($company);
+    }
 @endphp
 <!DOCTYPE html>
 <html lang="{{ app()->getLocale() }}" dir="{{ app(\App\Services\Localization\LocalizationService::class)->isRtl() ? 'rtl' : 'ltr' }}" class="h-full scroll-smooth">
@@ -262,17 +265,28 @@
                 </div>
             </div>
 
-            <!-- Quick Navigation Links (Deals, What's New, Delivery) -->
+            <!-- Quick Navigation Links (Dynamic from storeMenus with fallback) -->
             <nav class="hidden md:flex items-center gap-6 text-xs font-bold text-slate-600 dark:text-slate-300">
-                <a href="#products-section" x-on:click="selectedCategory = 'all'; scrollToProducts();" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">
-                    {{ __('Deals') }}
-                </a>
-                <a href="#products-section" x-on:click="sortBy = 'newest'; scrollToProducts();" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">
-                    {{ __("What's New") }}
-                </a>
-                <a href="#services-section" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">
-                    {{ __('Delivery') }}
-                </a>
+                @if(isset($storeMenus['header_nav']) && count($storeMenus['header_nav']) > 0)
+                    @foreach($storeMenus['header_nav'] as $headerItem)
+                        <a href="{{ $headerItem->resolved_url ?? $headerItem['url'] ?? '#' }}"
+                           @if(($headerItem->target ?? $headerItem['target'] ?? '_self') === '_blank') target="_blank" rel="noopener noreferrer" @endif
+                           @if(str_contains($headerItem->resolved_url ?? $headerItem['url'] ?? '', '#products')) x-on:click="scrollToProducts();" @endif
+                           class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">
+                            {{ $headerItem->title ?? $headerItem['title'] }}
+                        </a>
+                    @endforeach
+                @else
+                    <a href="#products-section" x-on:click="selectedCategory = 'all'; scrollToProducts();" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">
+                        {{ __('Deals') }}
+                    </a>
+                    <a href="#products-section" x-on:click="sortBy = 'newest'; scrollToProducts();" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">
+                        {{ __("What's New") }}
+                    </a>
+                    <a href="#services-section" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">
+                        {{ __('Delivery') }}
+                    </a>
+                @endif
             </nav>
 
             <!-- Desktop Search Bar with Live Real-time Filtering -->
@@ -1551,33 +1565,71 @@
                     </p>
                 </div>
 
-                <!-- Department / Categories -->
+                <!-- Department / Categories (footer_col_1) -->
                 <div class="space-y-2.5 text-xs">
                     <h5 class="font-extrabold text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">{{ __('Department') }}</h5>
                     <ul class="space-y-1.5 text-slate-500 dark:text-slate-400 font-medium">
-                        @foreach ($categories->take(4) as $cat)
-                            <li>
-                                <a href="#products-section" x-on:click="selectedCategory = {{ json_encode($cat->name) }}; scrollToProducts();" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">
-                                    {{ $cat->name }}
-                                </a>
-                            </li>
-                        @endforeach
+                        @if(isset($storeMenus['footer_col_1']) && count($storeMenus['footer_col_1']) > 0)
+                            @foreach($storeMenus['footer_col_1'] as $col1Item)
+                                <li>
+                                    <a href="{{ $col1Item->resolved_url ?? $col1Item['url'] ?? '#' }}"
+                                       @if(($col1Item->target ?? $col1Item['target'] ?? '_self') === '_blank') target="_blank" rel="noopener noreferrer" @endif
+                                       @if(str_contains($col1Item->resolved_url ?? $col1Item['url'] ?? '', '#products')) x-on:click="scrollToProducts();" @endif
+                                       class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">
+                                        {{ $col1Item->title ?? $col1Item['title'] }}
+                                    </a>
+                                </li>
+                            @endforeach
+                        @else
+                            @foreach ($categories->take(4) as $cat)
+                                <li>
+                                    <a href="#products-section" x-on:click="selectedCategory = {{ json_encode($cat->name) }}; scrollToProducts();" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">
+                                        {{ $cat->name }}
+                                    </a>
+                                </li>
+                            @endforeach
+                        @endif
                     </ul>
                 </div>
 
-                <!-- Help -->
+                <!-- Help & Support (footer_col_2) -->
                 <div class="space-y-2.5 text-xs">
                     <h5 class="font-extrabold text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">{{ __('Help & Support') }}</h5>
                     <ul class="space-y-1.5 text-slate-500 dark:text-slate-400 font-medium">
-                        <li><a href="#services-section" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">{{ __('Delivery Terms') }}</a></li>
-                        <li><a href="#services-section" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">{{ __('Order Tracking') }}</a></li>
-                        <li><a href="#services-section" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">{{ __('Returns Policy') }}</a></li>
+                        @if(isset($storeMenus['footer_col_2']) && count($storeMenus['footer_col_2']) > 0)
+                            @foreach($storeMenus['footer_col_2'] as $col2Item)
+                                <li>
+                                    <a href="{{ $col2Item->resolved_url ?? $col2Item['url'] ?? '#' }}"
+                                       @if(($col2Item->target ?? $col2Item['target'] ?? '_self') === '_blank') target="_blank" rel="noopener noreferrer" @endif
+                                       class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">
+                                        {{ $col2Item->title ?? $col2Item['title'] }}
+                                    </a>
+                                </li>
+                            @endforeach
+                        @else
+                            <li><a href="#services-section" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">{{ __('Delivery Terms') }}</a></li>
+                            <li><a href="#services-section" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">{{ __('Order Tracking') }}</a></li>
+                            <li><a href="#services-section" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">{{ __('Returns Policy') }}</a></li>
+                        @endif
                     </ul>
                 </div>
 
-                <!-- Contact Details -->
+                <!-- Contact Details & Legal (footer_col_3) -->
                 <div class="space-y-2.5 text-xs">
                     <h5 class="font-extrabold text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">{{ __('Contact Store') }}</h5>
+                    @if(isset($storeMenus['footer_col_3']) && count($storeMenus['footer_col_3']) > 0)
+                        <ul class="space-y-1.5 text-slate-500 dark:text-slate-400 font-medium pb-1.5">
+                            @foreach($storeMenus['footer_col_3'] as $col3Item)
+                                <li>
+                                    <a href="{{ $col3Item->resolved_url ?? $col3Item['url'] ?? '#' }}"
+                                       @if(($col3Item->target ?? $col3Item['target'] ?? '_self') === '_blank') target="_blank" rel="noopener noreferrer" @endif
+                                       class="hover:text-emerald-600 dark:hover:text-emerald-400 transition">
+                                        {{ $col3Item->title ?? $col3Item['title'] }}
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
                     <div class="space-y-1.5 text-slate-500 dark:text-slate-400">
                         @if ($company->phone)
                             <div>📞 <a href="tel:{{ $company->phone }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 font-bold">{{ $company->phone }}</a></div>

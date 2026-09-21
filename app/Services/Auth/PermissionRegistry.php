@@ -7,12 +7,14 @@ use App\Models\User;
 class PermissionRegistry
 {
     public const STOREFRONT_MANAGE = 'storefront.manage';
+    public const STOREFRONT_MENUS_MANAGE = 'storefront.menus.manage';
     public const STOREFRONT_INQUIRIES_VIEW = 'storefront.inquiries.view';
     public const STOREFRONT_INQUIRIES_ACTION = 'storefront.inquiries.action';
     public const GATEWAYS_MANAGE = 'gateways.manage';
 
     public const DESCRIPTIONS = [
         self::STOREFRONT_MANAGE => 'Manage storefront settings, domain, banner and theme',
+        self::STOREFRONT_MENUS_MANAGE => 'Manage storefront custom CMS pages and navigation menus',
         self::STOREFRONT_INQUIRIES_VIEW => 'View customer inquiries submitted on storefront',
         self::STOREFRONT_INQUIRIES_ACTION => 'Update inquiry status, reply or delete inquiries',
         self::GATEWAYS_MANAGE => 'Configure storefront payment gateways and integrations',

@@ -119,6 +119,12 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         Route::get('/settings/integrations', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.integrations');
         Route::get('/settings/navigation', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.navigation');
         Route::get('/settings/storefront', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.storefront');
+        Route::get('/settings/storefront/menus', \App\Livewire\Tenant\Storefront\MenuBuilderComponent::class)
+            ->middleware(['entitled:ecommerce_storefront', 'tenant.permission:storefront,menus.manage'])
+            ->name('settings.storefront.menus');
+        Route::get('/storefront/menus', \App\Livewire\Tenant\Storefront\MenuBuilderComponent::class)
+            ->middleware(['entitled:ecommerce_storefront', 'tenant.permission:storefront,menus.manage'])
+            ->name('storefront.menus');
         Route::get('/settings/payments', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.payments');
         Route::get('/settings/coupons', Coupons\Index::class)->middleware('tenant.permission:settings,view')->name('settings.coupons');
         Route::get('/coupons', Coupons\Index::class)->middleware('tenant.permission:settings,view')->name('coupons.index');

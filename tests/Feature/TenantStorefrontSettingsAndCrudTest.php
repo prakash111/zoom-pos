@@ -9,6 +9,8 @@ use App\Models\Product;
 use App\Models\ProductReview;
 use App\Models\Role;
 use App\Models\TenantApiKey;
+use App\Models\TenantCustomPage;
+use App\Models\TenantStoreMenu;
 use App\Models\User;
 use App\Services\Sdui\SchemaResponse;
 use App\Services\Sdui\SchemaValidator;
@@ -492,4 +494,180 @@ class TenantStorefrontSettingsAndCrudTest extends TestCase
         $this->assertFalse((bool) $this->company->enable_product_reviews);
         $this->assertTrue((bool) $this->company->require_review_approval);
     }
+
+    public function test_tenant_custom_pages_crud_and_slug_generation(): void
+    {
+        // 1. List pages (defaults seeded)
+        $listRes = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/v1/tenant/storefront/pages');
+
+        $listRes->assertOk()
+            ->assertJsonPath('success', true);
+        $this->assertGreaterThanOrEqual(3, $listRes->json('data.total_count'));
+
+        // 2. Create new page
+        $createRes = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/v1/tenant/storefront/pages', [
+                'title' => 'Warranty & Extended Care',
+                'content' => 'Full coverage details for items.',
+                'meta_title' => 'Warranty Details',
+                'meta_description' => 'Our store warranty terms.',
+                'is_published' => true,
+            ]);
+
+        $createRes->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.title', 'Warranty & Extended Care')
+            ->assertJsonPath('data.slug', 'warranty-extended-care')
+            ->assertJsonPath('data.url', '/page/warranty-extended-care');
+
+        $pageId = (int) $createRes->json('data.id');
+
+        // 3. Show page
+        $showRes = $this->withHeaders($this->authHeaders())
+            ->getJson("/api/v1/tenant/storefront/pages/{$pageId}");
+
+        $showRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.title', 'Warranty & Extended Care')
+            ->assertJsonPath('data.content', 'Full coverage details for items.');
+
+        // 4. Update page
+        $updateRes = $this->withHeaders($this->authHeaders())
+            ->putJson("/api/v1/tenant/storefront/pages/{$pageId}", [
+                'title' => 'Warranty & Care Guarantee',
+                'content' => 'Updated warranty terms.',
+                'is_published' => true,
+            ]);
+
+        $updateRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.title', 'Warranty & Care Guarantee');
+
+        // 5. Delete page
+        $deleteRes = $this->withHeaders($this->authHeaders())
+            ->deleteJson("/api/v1/tenant/storefront/pages/{$pageId}");
+
+        $deleteRes->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertNull(TenantCustomPage::find($pageId));
+    }
+
+    public function test_tenant_store_menus_crud_toggle_and_reorder(): void
+    {
+        // 1. List menus (defaults seeded)
+        $listRes = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/v1/tenant/storefront/menus');
+
+        $listRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'data' => [
+                    'menu_items',
+                    'locations',
+                    'types',
+                ],
+            ]);
+
+        // 2. Create menu item
+        $createRes = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/v1/tenant/storefront/menus', [
+                'location' => 'header_nav',
+                'title' => 'Express Delivery',
+                'type' => 'anchor',
+                'target_url' => '#services-section',
+                'target' => '_self',
+                'is_visible' => true,
+            ]);
+
+        $createRes->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.title', 'Express Delivery')
+            ->assertJsonPath('data.location', 'header_nav');
+
+        $menuId = (int) $createRes->json('data.id');
+
+        // 3. Update menu item
+        $updateRes = $this->withHeaders($this->authHeaders())
+            ->putJson("/api/v1/tenant/storefront/menus/{$menuId}", [
+                'title' => 'Express Home Delivery',
+                'target_url' => '#services-section',
+            ]);
+
+        $updateRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.title', 'Express Home Delivery');
+
+        // 4. Toggle visibility
+        $toggleRes = $this->withHeaders($this->authHeaders())
+            ->postJson("/api/v1/tenant/storefront/menus/{$menuId}/toggle-visibility");
+
+        $toggleRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.is_visible', false);
+
+        // 5. Reorder
+        $items = TenantStoreMenu::where('company_id', $this->company->id)
+            ->where('location', 'header_nav')
+            ->pluck('id')
+            ->toArray();
+
+        $reversed = array_reverse($items);
+
+        $reorderRes = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/v1/tenant/storefront/menus/reorder', [
+                'ordered_ids' => $reversed,
+            ]);
+
+        $reorderRes->assertOk()
+            ->assertJsonPath('success', true);
+
+        // 6. Delete menu item
+        $delRes = $this->withHeaders($this->authHeaders())
+            ->deleteJson("/api/v1/tenant/storefront/menus/{$menuId}");
+
+        $delRes->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertNull(TenantStoreMenu::find($menuId));
+    }
+
+    public function test_public_storefront_menu_api_and_page_rendering(): void
+    {
+        // 1. Public menu feed
+        $menuRes = $this->getJson('/api/v1/storefront/menus?store=' . $this->company->slug);
+
+        $menuRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'data' => [
+                    'header_nav',
+                    'footer_col_1',
+                    'footer_col_2',
+                    'footer_col_3',
+                ],
+            ]);
+
+        $this->assertNotEmpty($menuRes->json('data.header_nav'));
+
+        // 2. Dynamic CMS page rendering
+        $pageRes = $this->get('/store/page/about-us?store=' . $this->company->slug);
+        $pageRes->assertOk()
+            ->assertSee('About Us')
+            ->assertSee('Back to Store');
+    }
+
+    public function test_sdui_schema_storefront_menus_resolution(): void
+    {
+        $response = SchemaResponse::renderView('settings-storefront-menus', $this->company);
+        $this->assertSame(200, $response->status());
+        $data = $response->getData(true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals('screen', $data['schema']['type'] ?? null);
+        $this->assertEquals('Store Navigation Menus & CMS Pages', $data['schema']['title'] ?? null);
+        $this->assertNotEmpty($data['schema']['components'] ?? []);
+    }
 }
+

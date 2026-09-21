@@ -368,8 +368,8 @@ class StorefrontExtendedFeaturesTest extends TestCase
 
     public function test_tenant_navigation_and_permissions_include_coupons_and_faqs(): void
     {
-        $settingsTabs = \App\Services\Navigation\TenantNavRegistry::settingsTabItems();
-        $tabKeys = array_column($settingsTabs, 'key');
+        $storefrontSection = \App\Services\Navigation\TenantNavRegistry::getStorefrontSection($this->company);
+        $tabKeys = array_column($storefrontSection['items'], 'component');
 
         $this->assertContains('settings_coupons', $tabKeys);
         $this->assertContains('settings_faqs', $tabKeys);

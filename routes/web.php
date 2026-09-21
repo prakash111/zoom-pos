@@ -39,6 +39,9 @@ Route::middleware(EnsureAppIsInstalled::class)->post('/store/inquiry', [\App\Htt
 Route::middleware(EnsureAppIsInstalled::class)->post('/storefront/inquiry', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'submitPublicInquiry']);
 Route::middleware(EnsureAppIsInstalled::class)->post('/c/{slug}/inquiry', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'submitPublicInquiry']);
 
+// Storefront Dynamic CMS Pages
+Route::middleware(EnsureAppIsInstalled::class)->get('/store/page/{slug}', [\App\Http\Controllers\Tenant\StorefrontController::class, 'showCmsPage'])->name('tenant.store.page');
+
 // Social Login Routes for Storefront
 Route::get('/store/auth/{provider}/redirect', [\App\Http\Controllers\Tenant\StorefrontAuthController::class, 'redirectToProvider'])->name('tenant.store.auth.redirect');
 Route::get('/store/auth/{provider}/callback', [\App\Http\Controllers\Tenant\StorefrontAuthController::class, 'handleProviderCallback'])->name('tenant.store.auth.callback');
@@ -124,8 +127,8 @@ if (config('app.demo_mode')) {
         ->name('demo.login');
 }
 
-Route::middleware(EnsureAppIsInstalled::class)->get('/page/{page:slug}', [PublicPageController::class, 'show'])->name('page.show');
-Route::middleware(EnsureAppIsInstalled::class)->get('/pages/{page:slug}', [PublicPageController::class, 'show'])->name('pages.show');
+Route::middleware(EnsureAppIsInstalled::class)->get('/page/{slug}', [PublicPageController::class, 'show'])->name('page.show');
+Route::middleware(EnsureAppIsInstalled::class)->get('/pages/{slug}', [PublicPageController::class, 'show'])->name('pages.show');
 
 Route::middleware(EnsureAppIsInstalled::class)
     ->get('/contact', [PublicContactController::class, 'index'])

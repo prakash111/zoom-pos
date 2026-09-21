@@ -1128,6 +1128,18 @@ class TenantNavRegistry
                 'permission' => 'storefront.manage',
             ],
             [
+                'key' => 'nav_storefront_menus',
+                'id' => 'nav_storefront_menus',
+                'label' => 'Store Menus & CMS Pages',
+                'title' => 'Navigation Menus & CMS Pages',
+                'icon' => 'menu_book',
+                'component' => 'storefront_menus',
+                'type' => 'link',
+                'route' => '/settings/storefront/menus',
+                'target_endpoint' => '/api/tenant/views/settings-storefront-menus',
+                'permission' => 'storefront.menus.manage',
+            ],
+            [
                 'key' => 'nav_storefront_inquiries',
                 'id' => 'nav_storefront_inquiries',
                 'label' => 'Online Store Inquiries',

@@ -13,6 +13,8 @@ use App\Models\Faq;
 use App\Models\Language;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Models\TenantCustomPage;
+use App\Models\TenantStoreMenu;
 use App\Services\FinancialAnalyticsService;
 use App\Services\Payment\StorefrontPaymentService;
 use Illuminate\Contracts\View\View;
@@ -120,6 +122,61 @@ class StorefrontController extends Controller
             'languages' => $languages,
             'faqs' => $faqs,
             'catalog' => null,
+            'storeMenus' => $this->getStoreMenus($company),
+        ]);
+    }
+
+    /**
+     * Retrieve categorized storefront menus for header and footer columns.
+     */
+    public function getStoreMenus(Company $company): array
+    {
+        TenantStoreMenu::seedDefaultsForCompany($company->id);
+
+        $items = TenantStoreMenu::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->visible()
+            ->with(['page:id,title,slug', 'category:id,name'])
+            ->ordered()
+            ->get();
+
+        return [
+            'header_nav' => $items->where('location', TenantStoreMenu::LOCATION_HEADER)->values(),
+            'footer_col_1' => $items->where('location', TenantStoreMenu::LOCATION_FOOTER_1)->values(),
+            'footer_col_2' => $items->where('location', TenantStoreMenu::LOCATION_FOOTER_2)->values(),
+            'footer_col_3' => $items->where('location', TenantStoreMenu::LOCATION_FOOTER_3)->values(),
+        ];
+    }
+
+    /**
+     * Render dynamic custom CMS page for the storefront.
+     * GET /page/{slug}
+     * GET /store/page/{slug}
+     */
+    public function showCmsPage(Request $request, string $slug): View
+    {
+        $company = $this->resolveCompany($request);
+        abort_if(! $company, 404, 'Storefront not found.');
+
+        app()->instance('tenant.company_id', $company->id);
+        TenantCustomPage::seedDefaultsForCompany($company->id);
+
+        $page = TenantCustomPage::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->where('slug', $slug)
+            ->where('is_published', true)
+            ->first();
+
+        abort_if(! $page, 404, 'Page not found.');
+
+        $storeMenus = $this->getStoreMenus($company);
+
+        return view('tenants.store.page', [
+            'company' => $company,
+            'page' => $page,
+            'storeMenus' => $storeMenus,
+            'categories' => Category::withoutGlobalScopes()->where('company_id', $company->id)->get(),
+            'products' => Product::withoutGlobalScopes()->where('company_id', $company->id)->where('active', true)->get(),
         ]);
     }
 

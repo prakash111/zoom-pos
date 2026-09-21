@@ -1849,6 +1849,114 @@ class SchemaResponse
         ], $rows));
     }
 
+    public static function storefrontMenusView(Company $company): array
+    {
+        \App\Models\TenantCustomPage::seedDefaultsForCompany($company->id);
+        \App\Models\TenantStoreMenu::seedDefaultsForCompany($company->id);
+
+        $pages = \App\Models\TenantCustomPage::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->orderBy('title')
+            ->get();
+
+        $menus = \App\Models\TenantStoreMenu::withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->ordered()
+            ->get();
+
+        $createPageModal = self::openModalAction('Create Custom CMS Page', [
+            self::textInput('title', 'Page Title (e.g. Return Policy)', ''),
+            self::textInput('slug', 'URL Slug (optional)', ''),
+            self::textInput('content', 'Page Content (HTML or Markdown)', '', ['multiline' => true]),
+            self::textInput('meta_title', 'SEO Meta Title (optional)', ''),
+            self::textInput('meta_description', 'SEO Description (optional)', ''),
+            self::toggleSwitch('is_published', 'Published and Visible', true),
+            self::buttonPrimary('Save Page', self::formSubmitAction('/api/v1/tenant/storefront/pages', 'POST', 'Custom page created successfully', true, true)),
+        ]);
+
+        $createMenuModal = self::openModalAction('Add Navigation Menu Item', [
+            self::dropdownSelect('location', 'Menu Placement', [
+                ['value' => 'header_nav', 'label' => 'Header Navigation'],
+                ['value' => 'footer_col_1', 'label' => 'Footer: Department / Categories'],
+                ['value' => 'footer_col_2', 'label' => 'Footer: Help & Support'],
+                ['value' => 'footer_col_3', 'label' => 'Footer: Company & Legal'],
+            ], 'header_nav'),
+            self::textInput('title', 'Menu Item Label (e.g. About Us)', ''),
+            self::dropdownSelect('type', 'Item Type', [
+                ['value' => 'cms_page', 'label' => 'Custom CMS Page'],
+                ['value' => 'anchor', 'label' => 'Section Jump Anchor (#)'],
+                ['value' => 'custom_url', 'label' => 'Custom Web URL'],
+            ], 'anchor'),
+            self::textInput('target_url', 'Target URL or Anchor (e.g. #products-section or /page/about-us)', ''),
+            self::dropdownSelect('target', 'Open Behavior', [
+                ['value' => '_self', 'label' => 'Same Tab (_self)'],
+                ['value' => '_blank', 'label' => 'New Tab (_blank)'],
+            ], '_self'),
+            self::toggleSwitch('is_visible', 'Visible to Customers', true),
+            self::buttonPrimary('Add Menu Item', self::formSubmitAction('/api/v1/tenant/storefront/menus', 'POST', 'Menu item added successfully', true, true)),
+        ]);
+
+        // CMS Pages Cards
+        $pageCards = [];
+        foreach ($pages as $p) {
+            $pageCards[] = self::card([
+                self::row([
+                    self::column([
+                        self::text($p->title, 'title_small', ['bold' => true]),
+                        self::text('/page/' . $p->slug, 'body_small', ['color' => '#2563eb']),
+                    ]),
+                    self::badge($p->is_published ? 'PUBLISHED' : 'DRAFT', $p->is_published ? '#059669' : '#6b7280', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+            ]);
+        }
+
+        // Navigation Items Cards
+        $menuCards = [];
+        foreach ($menus as $m) {
+            $locationLabel = match ($m->location) {
+                'header_nav' => 'Header Nav',
+                'footer_col_1' => 'Footer Col 1',
+                'footer_col_2' => 'Footer Col 2',
+                'footer_col_3' => 'Footer Col 3',
+                default => $m->location,
+            };
+
+            $menuCards[] = self::card([
+                self::row([
+                    self::column([
+                        self::text($m->title, 'title_small', ['bold' => true]),
+                        self::text($m->resolved_url ?? $m->target_url ?? '#', 'body_small', ['color' => '#6b7280']),
+                    ]),
+                    self::row([
+                        self::badge($locationLabel, '#4f46e5', 'subtle'),
+                        self::badge($m->is_visible ? 'VISIBLE' : 'HIDDEN', $m->is_visible ? '#059669' : '#dc2626', 'subtle'),
+                    ], ['spacing' => 8]),
+                ], ['main_axis_alignment' => 'space_between']),
+            ]);
+        }
+
+        return self::screen('Store Navigation Menus & CMS Pages', [
+            self::card([
+                self::row([
+                    self::column([
+                        self::text('Navigation Menus & CMS Pages', 'title_medium', ['bold' => true]),
+                        self::text('Configure header menus, footer link columns, and dynamic store pages.', 'body_small', ['color' => '#6b7280']),
+                    ]),
+                    self::badge('LIVE SYNCED', '#059669', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+            ]),
+            self::row([
+                self::buttonPrimary('+ Add Menu Item', $createMenuModal),
+                self::buttonOutlined('+ Create CMS Page', $createPageModal),
+            ], ['spacing' => 12]),
+            self::text('Active Navigation Menu Items (' . $menus->count() . ')', 'title_small', ['bold' => true]),
+            ...$menuCards,
+            self::divider(),
+            self::text('Custom Store CMS Pages (' . $pages->count() . ')', 'title_small', ['bold' => true]),
+            ...$pageCards,
+        ]);
+    }
+
     public static function couponsView(Company $company): array
     {
         $coupons = Coupon::where('company_id', $company->id)->orderByDesc('id')->get();
@@ -2083,7 +2191,7 @@ class SchemaResponse
             $isApproved = (bool) $review->is_approved;
 
             $details = [
-                self::row([
+                self::wrap([
                     self::badge($productName, '#4f46e5', 'subtle'),
                     ...($review->is_verified_purchase ? [self::badge('VERIFIED PURCHASE', '#2563eb', 'solid')] : []),
                 ], ['spacing' => 6]),
@@ -7169,6 +7277,7 @@ class SchemaResponse
             ['key' => 'settings-storefront', 'title' => 'Storefront Banner & Auth', 'endpoint' => '/api/tenant/views/settings-storefront', 'permission' => 'storefront.manage'],
             ['key' => 'settings-payments', 'title' => 'Storefront Payment Gateways', 'endpoint' => '/api/tenant/views/settings-payments', 'permission' => 'gateways.manage'],
             ['key' => 'settings-storefront-domain', 'title' => 'Store Web Address & Domain', 'endpoint' => '/api/tenant/views/settings-storefront-domain', 'permission' => 'storefront.manage'],
+            ['key' => 'settings-storefront-menus', 'title' => 'Navigation Menus & CMS Pages', 'endpoint' => '/api/tenant/views/settings-storefront-menus', 'permission' => 'storefront.menus.manage'],
             ['key' => 'storefront-inquiries', 'title' => 'Online Store Inquiries', 'endpoint' => '/api/tenant/views/storefront-inquiries', 'permission' => 'storefront.inquiries.view'],
             ['key' => 'settings-coupons', 'title' => 'Coupons & Discounts', 'endpoint' => '/api/tenant/views/settings-coupons', 'permission' => 'settings.view'],
             ['key' => 'settings-faqs', 'title' => 'Store FAQs & Help Center', 'endpoint' => '/api/tenant/views/settings-faqs', 'permission' => 'settings.view'],
@@ -7377,6 +7486,10 @@ class SchemaResponse
             return null;
         }
 
+        if (in_array($normalized, ['settings-storefront-menus', 'storefront-menus', 'store-menus', 'settings_storefront_menus'], true)) {
+            return 'storefront.menus.manage';
+        }
+
         if (in_array($normalized, ['settings-reviews', 'reviews', 'product-ratings-reviews', 'product_ratings_reviews', 'storefront-reviews', 'storefront_reviews', 'store-reviews'], true)) {
             return 'reviews.view';
         }
@@ -7501,6 +7614,7 @@ class SchemaResponse
             'settings-storefront', 'storefront-settings', 'storefront-banner-auth', 'settings_storefront', 'storefront-banner' => self::storefrontBannerAuthView($company),
             'settings-payments', 'storefront-payments', 'storefront-payment-gateways', 'settings_payments', 'storefront-gateway' => self::storefrontPaymentGatewaysView($company),
             'settings-storefront-domain', 'storefront-domain', 'store-domain', 'settings_domain', 'domain' => self::storefrontDomainView($company),
+            'settings-storefront-menus', 'storefront-menus', 'store-menus', 'settings_storefront_menus', 'storefront_menus' => self::storefrontMenusView($company),
             'storefront-inquiries', 'store-inquiries', 'inquiries', 'tenant-inquiries' => self::storefrontInquiriesView($company),
             'restaurant-tables', 'tables', 'floor-plan' => self::restaurantTablesView($company),
             'restaurant-kds', 'kds', 'kitchen-display' => self::restaurantKdsView($company),

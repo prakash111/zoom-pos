@@ -248,6 +248,9 @@ class PermissionChecker
         'storefront' => [
             'view' => 'View storefront overview & live preview',
             'manage' => 'Manage storefront settings, domain & banner',
+            'menus.manage' => 'Manage storefront custom CMS pages and navigation menus',
+            'menus' => 'View and manage storefront navigation menus',
+            'pages' => 'Create and edit custom CMS pages',
             'inquiries' => 'View and manage storefront inquiries',
             'inquiries.view' => 'View customer inquiries submitted on storefront',
             'inquiries.action' => 'Update inquiry status, reply or delete inquiries',
@@ -444,7 +447,7 @@ class PermissionChecker
                     'coupons' => ['view', 'create', 'edit', 'delete'],
                     'faqs' => ['view', 'create', 'edit', 'delete'],
                     'reviews' => ['view', 'create', 'edit', 'delete'],
-                    'storefront' => ['view', 'manage', 'inquiries', 'inquiries.view', 'inquiries.action', 'edit'],
+                    'storefront' => ['view', 'manage', 'menus.manage', 'menus', 'pages', 'inquiries', 'inquiries.view', 'inquiries.action', 'edit'],
                     'gateways' => ['view', 'manage', 'edit'],
                 ];
 
