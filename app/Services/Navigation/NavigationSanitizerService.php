@@ -44,7 +44,7 @@ class NavigationSanitizerService
             $sanitized[] = $section;
         }
 
-        return $sanitized;
+        return self::deduplicateStorefrontFromStoreSettings($sanitized);
     }
 
     /**
@@ -121,5 +121,176 @@ class NavigationSanitizerService
         }
 
         return $payload;
+    }
+
+    /**
+     * Deduplicate storefront items from Store Settings, retaining them solely
+     * inside the dedicated "sec_storefront" ("Storefront & Online Sales") section.
+     * Also strips lingering legacy eCommerce storefront items from inventory.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     * @return list<array<string, mixed>>
+     */
+    public static function deduplicateStorefrontFromStoreSettings(array $sections): array
+    {
+        $hasStorefrontSection = false;
+        $storefrontItemKeys = [
+            'storefront_banner_auth',
+            'storefront_payment_gateways',
+            'coupons_discounts',
+            'store_faqs',
+            'product_ratings_reviews',
+            'ecommerce_storefront_website',
+            'settings_storefront',
+            'settings_payments',
+            'settings_coupons',
+            'settings_faqs',
+            'settings_reviews',
+            'nav_storefront_banner_auth',
+            'nav_storefront_gateways',
+            'nav_coupons_discounts',
+            'nav_store_faqs',
+            'nav_store_reviews',
+            'nav_storefront_domain',
+            'nav_storefront_inquiries',
+            'nav_view_live_store',
+        ];
+        $storefrontRoutes = [
+            'tenant.settings.storefront',
+            'tenant.settings.payments',
+            'tenant.settings.coupons',
+            'tenant.settings.faqs',
+            'tenant.settings.reviews',
+            '/settings/storefront/banner',
+            '/settings/storefront/payments',
+            '/settings/storefront/coupons',
+            '/settings/storefront/faqs',
+            '/settings/storefront/reviews',
+            '/settings/storefront/domain',
+            '/storefront/inquiries',
+            '/api/tenant/views/settings-storefront',
+            '/api/tenant/views/settings-payments',
+            '/api/tenant/views/settings-coupons',
+            '/api/tenant/views/settings-faqs',
+            '/api/tenant/views/settings-reviews',
+            '/api/tenant/views/settings-storefront-domain',
+            '/api/tenant/views/storefront-inquiries',
+        ];
+        $storefrontComponents = [
+            'settings_storefront',
+            'settings_payments',
+            'settings_coupons',
+            'settings_faqs',
+            'settings_reviews',
+            'store_domain',
+            'store_inquiries',
+        ];
+
+        // Gather all keys, routes, components from the active sec_storefront section
+        foreach ($sections as $section) {
+            $sId = strtolower((string) ($section['id'] ?? $section['key'] ?? ''));
+            if ($sId === 'sec_storefront') {
+                $hasStorefrontSection = true;
+                foreach (($section['items'] ?? []) as $item) {
+                    $k = strtolower(trim((string) ($item['key'] ?? $item['id'] ?? '')));
+                    if ($k !== '') {
+                        $storefrontItemKeys[] = $k;
+                    }
+                    $comp = strtolower(trim((string) ($item['component'] ?? '')));
+                    if ($comp !== '') {
+                        $storefrontComponents[] = $comp;
+                    }
+                    $route = strtolower(rtrim((string) ($item['route'] ?? ''), '/'));
+                    if ($route !== '') {
+                        $storefrontRoutes[] = $route;
+                    }
+                    $endpoint = strtolower(rtrim((string) ($item['target_endpoint'] ?? ''), '/'));
+                    if ($endpoint !== '') {
+                        $storefrontRoutes[] = $endpoint;
+                    }
+                }
+            }
+        }
+
+        $storefrontItemKeys = array_unique(array_filter($storefrontItemKeys));
+        $storefrontRoutes = array_unique(array_filter($storefrontRoutes));
+        $storefrontComponents = array_unique(array_filter($storefrontComponents));
+
+        $isStorefrontItem = function (array $item) use ($storefrontItemKeys, $storefrontRoutes, $storefrontComponents): bool {
+            $key = strtolower(trim((string) ($item['key'] ?? $item['id'] ?? '')));
+            if ($key !== '' && in_array($key, $storefrontItemKeys, true)) {
+                return true;
+            }
+            $comp = strtolower(trim((string) ($item['component'] ?? '')));
+            if ($comp !== '' && in_array($comp, $storefrontComponents, true)) {
+                return true;
+            }
+            $route = strtolower(rtrim((string) ($item['route'] ?? ''), '/'));
+            if ($route !== '' && in_array($route, $storefrontRoutes, true)) {
+                return true;
+            }
+            $endpoint = strtolower(rtrim((string) ($item['target_endpoint'] ?? ''), '/'));
+            if ($endpoint !== '' && in_array($endpoint, $storefrontRoutes, true)) {
+                return true;
+            }
+            $label = strtolower(trim((string) ($item['label'] ?? $item['title'] ?? '')));
+            if ($label === 'ecommerce storefront & website'
+                || $label === 'storefront banner & auth'
+                || $label === 'storefront payment gateways'
+                || $label === 'store faqs & help center'
+                || $label === 'product ratings & reviews'
+                || $label === 'coupons & discounts') {
+                return true;
+            }
+
+            return false;
+        };
+
+        foreach ($sections as &$section) {
+            $sId = strtolower((string) ($section['id'] ?? $section['key'] ?? ''));
+            if ($sId === 'sec_storefront') {
+                continue; // Preserve everything inside the dedicated Storefront section
+            }
+
+            if (isset($section['items']) && is_array($section['items'])) {
+                $filteredItems = [];
+                foreach ($section['items'] as $item) {
+                    $key = strtolower(trim((string) ($item['key'] ?? $item['id'] ?? '')));
+                    $label = strtolower(trim((string) ($item['label'] ?? $item['title'] ?? '')));
+
+                    // Strip legacy catalog labeled 'eCommerce Storefront & Website'
+                    if ($key === 'catalog' && str_contains($label, 'storefront')) {
+                        continue;
+                    }
+                    if ($key === 'ecommerce_storefront_website') {
+                        continue;
+                    }
+
+                    // Check if this item is Store Settings (key 'settings' or 'store_settings')
+                    $isStoreSettings = in_array($key, ['settings', 'store_settings'], true) || $label === 'store settings';
+                    if ($isStoreSettings) {
+                        if (isset($item['children']) && is_array($item['children'])) {
+                            $item['children'] = array_values(array_filter($item['children'], function ($child) use ($isStorefrontItem) {
+                                return ! $isStorefrontItem($child);
+                            }));
+                        }
+                        if (isset($item['sub_items']) && is_array($item['sub_items'])) {
+                            $item['sub_items'] = array_values(array_filter($item['sub_items'], function ($child) use ($isStorefrontItem) {
+                                return ! $isStorefrontItem($child);
+                            }));
+                        }
+                    } elseif ($hasStorefrontSection && $isStorefrontItem($item)) {
+                        // Flat duplicate row in administration or other sections
+                        continue;
+                    }
+
+                    $filteredItems[] = $item;
+                }
+                $section['items'] = array_values($filteredItems);
+            }
+        }
+        unset($section);
+
+        return $sections;
     }
 }
