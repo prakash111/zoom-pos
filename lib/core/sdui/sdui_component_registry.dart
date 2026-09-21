@@ -246,6 +246,14 @@ class SduiComponentRegistry {
     '/storefront/inquiries': (_) => const StoreInquiriesScreen(),
     '/api/tenant/views/storefront-inquiries': (_) => const StoreInquiriesScreen(),
     '/api/tenant/views/inquiries': (_) => const StoreInquiriesScreen(),
+    // Storefront Navigation Menus & CMS Pages
+    'storefront_menus': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-storefront-menus', initialTitle: 'Store Menus & CMS Pages'),
+    'storefront-menus': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-storefront-menus', initialTitle: 'Store Menus & CMS Pages'),
+    'settings_storefront_menus': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-storefront-menus', initialTitle: 'Store Menus & CMS Pages'),
+    'settings-storefront-menus': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-storefront-menus', initialTitle: 'Store Menus & CMS Pages'),
+    'nav_storefront_menus': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-storefront-menus', initialTitle: 'Store Menus & CMS Pages'),
+    '/settings/storefront/menus': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-storefront-menus', initialTitle: 'Store Menus & CMS Pages'),
+    '/api/tenant/views/settings-storefront-menus': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-storefront-menus', initialTitle: 'Store Menus & CMS Pages'),
     'dynamic_page': (_) => const DynamicSchemaPage(),
   };
 

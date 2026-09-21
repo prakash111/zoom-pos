@@ -59,7 +59,7 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
 
       if (!mounted) return;
 
-      if (res is Map && res['success'] == true) {
+      if (res['success'] == true) {
         final data = res['data'] as Map<String, dynamic>? ?? {};
         final rawList = data['reviews'] as List? ?? [];
         setState(() {
@@ -91,7 +91,7 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
 
       if (!mounted) return;
 
-      if (res is Map && res['success'] == true) {
+      if (res['success'] == true) {
         setState(() {
           final idx = _reviews.indexWhere((item) => item['id']?.toString() == id);
           if (idx != -1) {
@@ -223,7 +223,7 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
                           'require_review_approval': requireApproval,
                         },
                       );
-                      if (res is Map && res['success'] == true) {
+                      if (res['success'] == true) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Review settings updated successfully')),
@@ -522,7 +522,7 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
                                           decoration: BoxDecoration(
                                             color: isApproved ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
                                             borderRadius: BorderRadius.circular(6),
-                                            border: BorderSide(
+                                            border: Border.all(
                                               color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                                             ),
                                           ),
@@ -542,52 +542,37 @@ class _ProductReviewsScreenState extends State<ProductReviewsScreen> {
 
                                     // Product & verified purchase tags
                                     Wrap(
-                                      spacing: 6,
-                                      runSpacing: 4,
+                                      spacing: 8.0,
+                                      runSpacing: 4.0,
+                                      crossAxisAlignment: WrapCrossAlignment.center,
                                       children: [
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: Colors.indigo[50],
+                                            color: const Color(0xFF1E293B),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.inventory_2_outlined, size: 14, color: Colors.indigo[700]),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                productName,
-                                                style: TextStyle(
-                                                  color: Colors.indigo[800],
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ],
+                                          child: Text(
+                                            productName,
+                                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                         if (isVerified)
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                             decoration: BoxDecoration(
-                                              color: Colors.blue[50],
+                                              color: const Color(0xFF2563EB),
                                               borderRadius: BorderRadius.circular(6),
                                             ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.verified, size: 14, color: Colors.blue[700]),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  'Verified Purchase',
-                                                  style: TextStyle(
-                                                    color: Colors.blue[800],
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ],
+                                            child: const Text(
+                                              'VERIFIED PURCHASE',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 0.5,
+                                              ),
                                             ),
                                           ),
                                       ],
