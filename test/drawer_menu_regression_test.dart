@@ -76,16 +76,25 @@ class _FakeAuthProvider extends ChangeNotifier implements AuthProvider {
   Future<void> logout() async {}
 
   @override
-  Future<RegisterResult?> register(
-          {required String storeName,
-          required String ownerName,
-          required String email,
-          required String password,
-          String? phone,
-          String? currency,
-          String? country,
-          String? timezone,
-          String posMode = 'general'}) async =>
+  Future<Map<String, dynamic>> checkSubdomain(String subdomain) async => {
+        'available': true,
+        'subdomain': subdomain,
+      };
+
+  @override
+  Future<RegisterResult?> register({
+    required String storeName,
+    required String ownerName,
+    required String email,
+    required String password,
+    String? phone,
+    String? currency,
+    String? country,
+    String? timezone,
+    String posMode = 'general',
+    String? subdomain,
+    String? customDomain,
+  }) async =>
       null;
 
   @override

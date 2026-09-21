@@ -76,8 +76,9 @@ class NavItem {
       permission: safe['permission']?.toString(),
       actionType: safe['action_type']?.toString(),
       type: safe['type']?.toString(),
-      targetEndpoint: safe['target_endpoint']?.toString(),
-      isExternalUrl: NavigationProvider.safeBool(safe['is_external_url'] ?? safe['is_external']),
+      isExternalUrl: NavigationProvider.safeBool(
+          safe['is_external_url'] ?? safe['is_external'],
+          fallback: false),
       url: safe['url']?.toString(),
       badge: safe['badge']?.toString(),
     );

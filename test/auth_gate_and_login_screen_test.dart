@@ -71,6 +71,12 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
   RegisterResult? get pendingEmailVerification => null;
 
   @override
+  Future<Map<String, dynamic>> checkSubdomain(String subdomain) async => {
+        'available': true,
+        'subdomain': subdomain,
+      };
+
+  @override
   Future<RegisterResult?> register({
     required String storeName,
     required String ownerName,
@@ -81,6 +87,8 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
     String? country,
     String? timezone,
     String posMode = 'general',
+    String? subdomain,
+    String? customDomain,
   }) async =>
       RegisterResult(requiresOtp: false, token: 'fake_token');
 
