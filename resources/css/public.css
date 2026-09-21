@@ -18,11 +18,8 @@
 @plugin '@tailwindcss/forms';
 
 @source '../views/layouts/public.blade.php';
-@source '../views/landing/themes/theme_fast.blade.php';
-@source '../views/landing/partials/**/*.blade.php';
-@source '../views/components/landing/icon.blade.php';
-@source '../views/components/landing/contact-form.blade.php';
-@source '../views/components/landing/download-buttons.blade.php';
+@source '../views/landing/**/*.blade.php';
+@source '../views/components/landing/**/*.blade.php';
 @source '../views/public/**/*.blade.php';
 
 /* Class-based dark mode (toggled via localStorage + <html class="dark">). */
