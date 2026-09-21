@@ -10,7 +10,6 @@
     showQrCode: @js((bool) $template->show_qr_code),
     showTaxBreakup: @js((bool) $template->show_tax_breakup),
     sendAsAttachment: @js((bool) $template->send_as_attachment),
-    sendTextWithLink: @js((bool) $template->send_text_with_link),
     messageBody: @js($template->message_body_template ?: ''),
     insertTag(tag) {
         const el = this.$refs.messageBodyTextarea;
@@ -104,6 +103,7 @@
         <div class="lg:col-span-7 space-y-6">
             <form action="{{ route('settings.templates.update', ['type' => $type]) }}" method="POST" class="space-y-6">
                 @csrf
+                <fieldset {{ \App\Services\Auth\PermissionChecker::can($user, 'settings', 'edit') ? '' : 'disabled' }}>
 
                 <!-- Card 1: Branding & Visual Appearance -->
                 <div class="p-5 sm:p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-5">
@@ -157,14 +157,16 @@
 
                         <div class="space-y-3 pt-1">
                             <label class="flex items-center gap-3 cursor-pointer">
-                                <input type="checkbox" x-model="showQrCode" name="show_qr_code" value="1" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500">
+                                <input type="checkbox" x-model="showQrCode" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500">
                                 <span class="text-xs font-bold text-slate-800 dark:text-slate-200">{{ __('Show Dynamic QR Code') }}</span>
                             </label>
                             <label class="flex items-center gap-3 cursor-pointer">
-                                <input type="checkbox" x-model="showTaxBreakup" name="show_tax_breakup" value="1" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500">
+                                <input type="checkbox" x-model="showTaxBreakup" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500">
                                 <span class="text-xs font-bold text-slate-800 dark:text-slate-200">{{ __('Show Tax Breakdown Row') }}</span>
                             </label>
                         </div>
+                        <input type="hidden" name="show_qr_code" :value="showQrCode ? '1' : '0'">
+                        <input type="hidden" name="show_tax_breakup" :value="showTaxBreakup ? '1' : '0'">
                     </div>
                 </div>
 
@@ -203,7 +205,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div class="p-4 rounded-2xl border transition" :class="sendAsAttachment ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-slate-200 dark:border-slate-800'">
                             <label class="flex items-start gap-3 cursor-pointer">
-                                <input type="checkbox" x-model="sendAsAttachment" name="send_as_attachment" value="1" class="w-4 h-4 mt-0.5 rounded text-emerald-600 focus:ring-emerald-500">
+                                <input type="radio" x-model="sendAsAttachment" name="delivery_mode" :value="true" class="w-4 h-4 mt-0.5 text-emerald-600 focus:ring-emerald-500">
                                 <div>
                                     <div class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                                         <span>📎</span>
@@ -216,9 +218,9 @@
                             </label>
                         </div>
 
-                        <div class="p-4 rounded-2xl border transition" :class="sendTextWithLink ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' : 'border-slate-200 dark:border-slate-800'">
+                        <div class="p-4 rounded-2xl border transition" :class="!sendAsAttachment ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' : 'border-slate-200 dark:border-slate-800'">
                             <label class="flex items-start gap-3 cursor-pointer">
-                                <input type="checkbox" x-model="sendTextWithLink" name="send_text_with_link" value="1" class="w-4 h-4 mt-0.5 rounded text-blue-600 focus:ring-blue-500">
+                                <input type="radio" x-model="sendAsAttachment" name="delivery_mode" :value="false" class="w-4 h-4 mt-0.5 text-blue-600 focus:ring-blue-500">
                                 <div>
                                     <div class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                                         <span>🔗</span>
@@ -231,6 +233,8 @@
                             </label>
                         </div>
                     </div>
+
+                    <input type="hidden" name="send_as_attachment" :value="sendAsAttachment ? '1' : '0'">
 
                     <!-- Message Body Template & Placeholder Pills -->
                     <div class="space-y-2 pt-2">
@@ -267,10 +271,13 @@
                     <button type="button" x-on:click="refreshPreview()" class="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 transition">
                         🔄 {{ __('Refresh Live Preview') }}
                     </button>
+                    @if (\App\Services\Auth\PermissionChecker::can($user, 'settings', 'edit'))
                     <button type="submit" class="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-extrabold shadow-md shadow-blue-600/20 transition active:scale-95">
                         💾 {{ __('Save Template Settings') }}
                     </button>
+                    @endif
                 </div>
+                </fieldset>
             </form>
         </div>
 

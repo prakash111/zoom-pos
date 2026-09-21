@@ -33,7 +33,7 @@ class DocumentTemplateController extends Controller
     /**
      * Verify caller has permission to view / manage templates.
      */
-    protected function authorizeTemplateAccess(?User $user, string $type): void
+    protected function authorizeTemplateAccess(?User $user, string $type, bool $editing = false): void
     {
         if (! $user) {
             abort(401, 'Unauthenticated.');
@@ -43,13 +43,8 @@ class DocumentTemplateController extends Controller
             return;
         }
 
-        $normType = $this->normalizeType($type);
-        $plural = $normType === 'quotation' ? 'quotations' : 'invoices';
-
-        $allowed = PermissionChecker::can($user, "templates.{$plural}", 'manage')
-            || PermissionChecker::can($user, 'templates', 'manage')
-            || PermissionChecker::can($user, 'settings', 'edit')
-            || PermissionChecker::can($user, 'settings', 'view');
+        $plural = $this->normalizeType($type) === 'quotation' ? 'quotations' : 'invoices';
+        $allowed = PermissionChecker::can($user, 'settings', $editing ? 'edit' : 'view');
 
         if (! $allowed) {
             abort(403, "You do not have permission to manage {$plural} templates.");
@@ -82,13 +77,13 @@ class DocumentTemplateController extends Controller
     public function update(Request $request, string $type)
     {
         $user = auth('web')->user() ?? auth('sanctum')->user() ?? $request->user();
-        $this->authorizeTemplateAccess($user, $type);
+        $this->authorizeTemplateAccess($user, $type, true);
 
         $company = $this->resolveCompany($request);
         $normType = $this->normalizeType($type);
 
         $validated = $request->validate([
-            'theme_color' => 'nullable|string|max:32',
+            'theme_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'logo_placement' => 'nullable|string|in:left,center,right,hidden',
             'header_title' => 'nullable|string|max:120',
             'terms_conditions' => 'nullable|string|max:4000',
@@ -99,21 +94,25 @@ class DocumentTemplateController extends Controller
             'send_text_with_link' => 'nullable|boolean',
             'message_body_template' => 'nullable|string|max:2000',
         ]);
+        $current = TenantDocumentTemplate::getForCompany($company->id, $normType);
+        $attachPdf = $request->has('send_as_attachment')
+            ? $request->boolean('send_as_attachment')
+            : (bool) $current->send_as_attachment;
 
         $template = TenantDocumentTemplate::updateOrCreate(
             ['company_id' => $company->id, 'template_type' => $normType],
             [
                 'tenant_id' => $company->id,
-                'theme_color' => $validated['theme_color'] ?? ($normType === 'quotation' ? '#0284c7' : '#10b981'),
-                'logo_placement' => $validated['logo_placement'] ?? 'left',
-                'header_title' => $validated['header_title'] ?? ($normType === 'quotation' ? 'Commercial Quotation' : 'Tax Invoice'),
-                'terms_conditions' => $validated['terms_conditions'] ?? null,
-                'show_qr_code' => $request->boolean('show_qr_code', true),
-                'show_tax_breakup' => $request->boolean('show_tax_breakup', true),
-                'footer_notes' => $validated['footer_notes'] ?? null,
-                'send_as_attachment' => $request->boolean('send_as_attachment', true),
-                'send_text_with_link' => $request->boolean('send_text_with_link', false),
-                'message_body_template' => $validated['message_body_template'] ?? null,
+                'theme_color' => $validated['theme_color'] ?? $current->theme_color,
+                'logo_placement' => $validated['logo_placement'] ?? $current->logo_placement,
+                'header_title' => $validated['header_title'] ?? $current->header_title,
+                'terms_conditions' => array_key_exists('terms_conditions', $validated) ? $validated['terms_conditions'] : $current->terms_conditions,
+                'show_qr_code' => $request->has('show_qr_code') ? $request->boolean('show_qr_code') : $current->show_qr_code,
+                'show_tax_breakup' => $request->has('show_tax_breakup') ? $request->boolean('show_tax_breakup') : $current->show_tax_breakup,
+                'footer_notes' => array_key_exists('footer_notes', $validated) ? $validated['footer_notes'] : $current->footer_notes,
+                'send_as_attachment' => $attachPdf,
+                'send_text_with_link' => ! $attachPdf,
+                'message_body_template' => array_key_exists('message_body_template', $validated) ? $validated['message_body_template'] : $current->message_body_template,
             ]
         );
 
@@ -242,13 +241,13 @@ class DocumentTemplateController extends Controller
     public function apiUpdate(Request $request, string $type): JsonResponse
     {
         $user = auth('sanctum')->user() ?? auth('web')->user() ?? $request->user();
-        $this->authorizeTemplateAccess($user, $type);
+        $this->authorizeTemplateAccess($user, $type, true);
 
         $company = $this->resolveCompany($request);
         $normType = $this->normalizeType($type);
 
         $validated = $request->validate([
-            'theme_color' => 'nullable|string|max:32',
+            'theme_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'logo_placement' => 'nullable|string|in:left,center,right,hidden',
             'header_title' => 'nullable|string|max:120',
             'terms_conditions' => 'nullable|string|max:4000',
@@ -259,21 +258,25 @@ class DocumentTemplateController extends Controller
             'send_text_with_link' => 'nullable|boolean',
             'message_body_template' => 'nullable|string|max:2000',
         ]);
+        $current = TenantDocumentTemplate::getForCompany($company->id, $normType);
+        $attachPdf = $request->has('send_as_attachment')
+            ? $request->boolean('send_as_attachment')
+            : (bool) $current->send_as_attachment;
 
         $template = TenantDocumentTemplate::updateOrCreate(
             ['company_id' => $company->id, 'template_type' => $normType],
             [
                 'tenant_id' => $company->id,
-                'theme_color' => $validated['theme_color'] ?? ($normType === 'quotation' ? '#0284c7' : '#10b981'),
-                'logo_placement' => $validated['logo_placement'] ?? 'left',
-                'header_title' => $validated['header_title'] ?? ($normType === 'quotation' ? 'Commercial Quotation' : 'Tax Invoice'),
-                'terms_conditions' => $validated['terms_conditions'] ?? null,
-                'show_qr_code' => $request->boolean('show_qr_code', true),
-                'show_tax_breakup' => $request->boolean('show_tax_breakup', true),
-                'footer_notes' => $validated['footer_notes'] ?? null,
-                'send_as_attachment' => $request->boolean('send_as_attachment', true),
-                'send_text_with_link' => $request->boolean('send_text_with_link', false),
-                'message_body_template' => $validated['message_body_template'] ?? null,
+                'theme_color' => $validated['theme_color'] ?? $current->theme_color,
+                'logo_placement' => $validated['logo_placement'] ?? $current->logo_placement,
+                'header_title' => $validated['header_title'] ?? $current->header_title,
+                'terms_conditions' => array_key_exists('terms_conditions', $validated) ? $validated['terms_conditions'] : $current->terms_conditions,
+                'show_qr_code' => $request->has('show_qr_code') ? $request->boolean('show_qr_code') : $current->show_qr_code,
+                'show_tax_breakup' => $request->has('show_tax_breakup') ? $request->boolean('show_tax_breakup') : $current->show_tax_breakup,
+                'footer_notes' => array_key_exists('footer_notes', $validated) ? $validated['footer_notes'] : $current->footer_notes,
+                'send_as_attachment' => $attachPdf,
+                'send_text_with_link' => ! $attachPdf,
+                'message_body_template' => array_key_exists('message_body_template', $validated) ? $validated['message_body_template'] : $current->message_body_template,
             ]
         );
 

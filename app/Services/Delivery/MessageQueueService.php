@@ -5,6 +5,7 @@ namespace App\Services\Delivery;
 use App\Models\Company;
 use App\Models\MessageQueue;
 use App\Models\Sale;
+use App\Models\TenantDocumentTemplate;
 use App\Services\DispatchChannelService;
 use App\Services\Notifications\DeviceMessageService;
 use App\Services\Notifications\TenantNotificationDispatcherService;
@@ -193,13 +194,19 @@ class MessageQueueService
             return;
         }
 
+        $template = TenantDocumentTemplate::getForCompany($company->id, $isQuotation ? 'quotation' : 'invoice');
+        if (! $template->send_as_attachment) {
+            $this->whatsapp->sendText($company, $recipientPhone, $text);
+            return;
+        }
+
         // Deliver the real receipt/quotation PDF as a WhatsApp document with the
         // formatted summary as its caption. If PDF generation fails for any
         // reason, still get the text summary out rather than nothing.
         try {
             $pdf = $isQuotation
                 ? $this->delivery->generateQuotationPdf($sale)
-                : $this->delivery->generateInvoicePdf($sale);
+                : $this->delivery->generateInvoicePdf($sale, 'a4');
 
             $label = $isQuotation ? 'Quotation' : 'Receipt';
             $filename = ($isQuotation ? 'Quotation-' : 'Receipt-').preg_replace('/[^A-Za-z0-9_-]+/', '', (string) $sale->sale_number).'.pdf';

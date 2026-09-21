@@ -1250,7 +1250,7 @@
                  'flex-1': position === 'left' || position === 'right'
              }">
 
-            @if (config('app.demo_mode') || (auth('web')->user()?->company?->is_demo ?? false))
+            @if (config('app.demo_mode') && (auth('web')->user()?->company?->is_demo ?? false))
                 <!-- Demo Mode Notice & Flutter Web Version CTA -->
                 <div class="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm font-medium shadow-sm shrink-0 z-40">
                     <div class="flex items-center gap-2">

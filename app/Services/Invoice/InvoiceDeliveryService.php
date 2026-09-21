@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\Configuration;
 use App\Models\PlatformBranding;
 use App\Models\Sale;
+use App\Models\TenantDocumentTemplate;
 use App\Models\TenantNotificationGateway;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -204,6 +205,7 @@ class InvoiceDeliveryService
 
         $company = $quote->company ?? Company::find($quote->company_id);
         $logoBase64 = $this->resolveLogoBase64($company?->logo);
+        $template = TenantDocumentTemplate::getForCompany($company->id, 'quotation');
 
         $previousTenantBound = app()->bound('tenant.company_id');
         $previousTenantId = $previousTenantBound ? app('tenant.company_id') : null;
@@ -222,6 +224,8 @@ class InvoiceDeliveryService
                 'sale' => $quote,
                 'company' => $company,
                 'logoBase64' => $logoBase64,
+                'template' => $template,
+                'qrCodeData' => $template->show_qr_code ? $this->generateReceiptQrCode($quote) : null,
             ])->setPaper('a4', 'portrait')
                 ->setOptions([
                     'isHtml5ParserEnabled' => true,
@@ -246,6 +250,7 @@ class InvoiceDeliveryService
         $sale->loadMissing(['payments', 'user']);
         $company = $sale->company ?? Company::find($sale->company_id);
         $logoBase64 = $this->resolveLogoBase64($company?->logo);
+        $template = TenantDocumentTemplate::getForCompany($company->id, 'invoice');
 
         $selectedFormat = $format ?: ($company?->getReceiptFormat() ?: '80mm');
 
@@ -267,6 +272,8 @@ class InvoiceDeliveryService
                     'sale' => $sale,
                     'company' => $company,
                     'logoBase64' => $logoBase64,
+                    'template' => $template,
+                    'qrCodeData' => $template->show_qr_code ? $this->generateReceiptQrCode($sale) : null,
                     ...$this->devanagariFontData(),
                 ])->setPaper('a4', 'portrait')
                     ->setOptions([
@@ -433,6 +440,9 @@ class InvoiceDeliveryService
             '{document_number}' => $document->sale_number,
             '{quote_number}' => $document->sale_number,
             '{invoice_number}' => $document->sale_number,
+            '{quotation_number}' => $document->sale_number,
+            '{amount}' => $totalFormatted,
+            '{document_link}' => $downloadLink,
             '{company_name}' => $companyName,
             '{total_amount}' => $totalFormatted,
             '{subtotal}' => $subtotalFormatted,
@@ -448,6 +458,24 @@ class InvoiceDeliveryService
         ];
 
         return str_replace(array_keys($placeholders), array_values($placeholders), $template);
+    }
+
+    /** Render the tenant's wording and always retain a public document reference. */
+    private function documentMessage(Sale $document, TenantDocumentTemplate $template, ?string $customMessage = null): string
+    {
+        $company = $document->company ?? Company::find($document->company_id);
+        $link = route($template->template_type === 'quotation' ? 'quotes.public' : 'sales.public', $document->sale_number);
+        $message = $customMessage
+            ? $this->formatCustomMessage($customMessage, $document, $company)
+            : $template->renderMessage([
+                'customer_name' => $document->customer_name ?: ($document->customer?->name ?? 'Valued Customer'),
+                'invoice_number' => $document->sale_number,
+                'amount' => $company->formatMoney($document->total),
+                'due_date' => $document->due_date?->format('d M Y') ?? now()->addDays(15)->format('d M Y'),
+                'document_link' => $link,
+            ]);
+
+        return str_contains($message, $link) ? $message : $message."\nView online: {$link}";
     }
 
     /**
@@ -477,6 +505,8 @@ class InvoiceDeliveryService
         }
 
         $company = $quote->company ?? Company::find($quote->company_id);
+        $template = TenantDocumentTemplate::getForCompany($company->id, 'quotation');
+        $attachPdf = (bool) $template->send_as_attachment;
         $smtp = $this->getSmtpConfig($company);
 
         $pdfBinary = null;
@@ -492,7 +522,7 @@ class InvoiceDeliveryService
             }
         }
 
-        $formattedMessage = $customMessage ? $this->formatCustomMessage($customMessage, $quote, $company) : null;
+        $formattedMessage = $this->documentMessage($quote, $template, $customMessage);
         $mailable = new QuotationMailable($quote, $company, $formattedMessage, $attachPdf, $pdfBinary);
 
         if (app()->environment('testing') || config('mail.default') === 'array') {
@@ -560,12 +590,14 @@ class InvoiceDeliveryService
         }
 
         $company = $sale->company ?? Company::find($sale->company_id);
+        $template = TenantDocumentTemplate::getForCompany($company->id, 'invoice');
+        $attachPdf = (bool) $template->send_as_attachment;
         $smtp = $this->getSmtpConfig($company);
 
         $pdfBinary = null;
         if ($attachPdf) {
             try {
-                $pdfBinary = $this->generateInvoicePdf($sale);
+                $pdfBinary = $this->generateInvoicePdf($sale, 'a4');
             } catch (\Throwable $pdfEx) {
                 Log::error("Invoice PDF generation error for #{$sale->sale_number}: ".$pdfEx->getMessage(), [
                     'sale_id' => $sale->id,
@@ -575,7 +607,7 @@ class InvoiceDeliveryService
             }
         }
 
-        $formattedMessage = $customMessage ? $this->formatCustomMessage($customMessage, $sale, $company) : null;
+        $formattedMessage = $this->documentMessage($sale, $template, $customMessage);
         $mailable = new InvoiceMailable($sale, $company, $formattedMessage, $attachPdf, $pdfBinary);
 
         if (app()->environment('testing') || config('mail.default') === 'array') {
@@ -633,44 +665,7 @@ class InvoiceDeliveryService
     {
         $company = $quote->company ?? Company::find($quote->company_id);
 
-        if (! empty($customMessage)) {
-            return $this->formatCustomMessage($customMessage, $quote, $company);
-        }
-
-        $companyName = $company?->trade_name ?? $company?->name ?? 'Store';
-        $customerName = $quote->customer_name ?: 'Valued Client';
-        $currency = $company?->currency ?? 'USD';
-
-        $itemsText = '';
-        foreach ($quote->items ?? [] as $item) {
-            $qty = $item['quantity'] ?? 1;
-            $price = number_format((float) ($item['price'] ?? 0), 2);
-            $name = $item['name'] ?? 'Item';
-            $itemsText .= "• {$name} (x{$qty}) - \${$price}\n";
-        }
-
-        $subtotal = number_format((float) $quote->total + (float) $quote->discount, 2);
-        $discountText = $quote->discount > 0 ? "\n*Discount:* -\$".number_format((float) $quote->discount, 2) : '';
-        $total = number_format((float) $quote->total, 2);
-        $date = $quote->created_at ? $quote->created_at->format('d M Y') : now()->format('d M Y');
-        $validUntil = $quote->due_date ? $quote->due_date->format('d M Y') : ($quote->created_at ? $quote->created_at->addDays(15)->format('d M Y') : now()->addDays(15)->format('d M Y'));
-        $publicLink = route('quotes.public', $quote->sale_number);
-
-        return "📋 *QUOTATION PROPOSAL / PRICE ESTIMATE*\n"
-            ."*Store:* {$companyName}\n"
-            ."*Quote No:* #{$quote->sale_number}\n"
-            ."*Date:* {$date}\n"
-            ."*Valid Until:* {$validUntil}\n"
-            ."*Client:* {$customerName}\n\n"
-            ."*Items Estimate:*\n"
-            ."{$itemsText}\n"
-            ."----------------------------\n"
-            ."*Subtotal:* \${$subtotal}"
-            ."{$discountText}\n"
-            ."*Total Estimate:* \${$total} {$currency}\n"
-            ."----------------------------\n"
-            ."🔗 *View & Accept Proposal Online:*\n{$publicLink}\n\n"
-            ."Thank you for considering {$companyName}! ✨";
+        return $this->documentMessage($quote, TenantDocumentTemplate::getForCompany($company->id, 'quotation'), $customMessage);
     }
 
     /**
@@ -702,51 +697,7 @@ class InvoiceDeliveryService
     {
         $company = $sale->company ?? Company::find($sale->company_id);
 
-        if (! empty($customMessage)) {
-            return $this->formatCustomMessage($customMessage, $sale, $company);
-        }
-
-        $companyName = $company?->trade_name ?? $company?->name ?? 'Store';
-        $customerName = $sale->customer_name ?: 'Valued Customer';
-        $currency = $company?->currency ?? 'USD';
-        $sym = $company?->currency_symbol ?: ($currency === 'INR' ? '₹' : '$');
-        $isIndia = in_array(strtoupper(trim((string) ($company?->country ?? ''))), ['IN', 'IND', 'INDIA'], true) || $currency === 'INR' || $sym === '₹';
-        $taxLabel = $isIndia ? 'GSTIN' : 'Tax ID';
-
-        $itemsText = '';
-        foreach ($sale->items ?? [] as $item) {
-            $qty = $item['quantity'] ?? 1;
-            $price = number_format((float) ($item['price'] ?? 0), 2);
-            $name = $item['name'] ?? 'Item';
-            $itemsText .= "• {$name} (x{$qty}) - {$sym}{$price}\n";
-        }
-
-        $subtotal = number_format((float) ($sale->total - ($sale->tax_amount ?? 0) + $sale->discount), 2);
-        $discountText = $sale->discount > 0 ? "\n*Discount:* -{$sym}".number_format((float) $sale->discount, 2) : '';
-        $taxText = (float) ($sale->tax_amount ?? 0) > 0 ? "\n*".($isIndia ? 'GST' : 'Tax').":* +{$sym}".number_format((float) $sale->tax_amount, 2) : '';
-        $total = number_format((float) $sale->total, 2);
-        $date = $sale->created_at ? $sale->created_at->format('d M Y, h:i A') : now()->format('d M Y, h:i A');
-        $publicLink = route('sales.public', $sale->sale_number);
-        $taxIdLine = ! empty($company?->tax_id) ? "*{$taxLabel}:* {$company->tax_id}\n" : '';
-
-        return '🧾 *'.($isIndia ? 'TAX INVOICE / GST RECEIPT' : 'TAX INVOICE RECEIPT')."*\n"
-            ."*Store:* {$companyName}\n"
-            .$taxIdLine
-            ."*Invoice:* #{$sale->sale_number}\n"
-            ."*Date:* {$date}\n"
-            ."*Customer:* {$customerName}\n\n"
-            ."*Items:*\n"
-            ."{$itemsText}\n"
-            ."----------------------------\n"
-            ."*Subtotal:* {$sym}{$subtotal}"
-            ."{$discountText}"
-            ."{$taxText}\n"
-            ."*Total Paid:* {$sym}{$total} {$currency}\n"
-            .'*Payment:* '.ucfirst($sale->payment_method ?? 'Cash')."\n"
-            .'*Status:* '.ucfirst($sale->status ?? 'Completed')."\n"
-            ."----------------------------\n"
-            ."🔗 *View Official Receipt Online:*\n{$publicLink}\n\n"
-            ."Thank you for shopping with {$companyName}! Have a great day! ✨";
+        return $this->documentMessage($sale, TenantDocumentTemplate::getForCompany($company->id, 'invoice'), $customMessage);
     }
 
     /**

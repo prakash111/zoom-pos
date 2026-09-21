@@ -104,12 +104,38 @@ class Dashboard extends Component
 
         $totalProductsCount = Product::where('active', true)->count();
         $totalCustomersCount = Customer::count();
-        $recentSales = Sale::orderByDesc('created_at')->limit(5)->get();
+        $salesOnly = fn ($query) => $query->whereNull('operation_type')->orWhere('operation_type', '!=', 'quotation');
+        $recentSales = Sale::where($salesOnly)->orderByDesc('created_at')->limit(5)->get();
+        $start = now()->subDays(6)->startOfDay();
+        $dailyRows = Sale::where($salesOnly)
+            ->where('status', 'completed')
+            ->where('created_at', '>=', $start)
+            ->selectRaw('DATE(created_at) as day, SUM(total) as total, COUNT(*) as orders')
+            ->groupByRaw('DATE(created_at)')
+            ->get()
+            ->keyBy('day');
+        $weeklySales = collect(range(0, 6))->map(function ($offset) use ($dailyRows, $start) {
+            $day = $start->copy()->addDays($offset);
+            $row = $dailyRows->get($day->toDateString());
+
+            return [
+                'label' => $day->format('d M'),
+                'total' => (float) ($row?->total ?? 0),
+                'orders' => (int) ($row?->orders ?? 0),
+            ];
+        });
+        $receivables = Sale::where($salesOnly)->where('status', 'completed')->where('due_amount', '>', 0);
+        $receivableAmount = (float) (clone $receivables)->sum('due_amount');
+        $outstandingInvoices = (clone $receivables)->count();
+        $overdueAmount = (float) (clone $receivables)->whereDate('due_date', '<', today())->sum('due_amount');
+        $dueTodayAmount = (float) (clone $receivables)->whereDate('due_date', today())->sum('due_amount');
         $popularProducts = Product::where('active', true)->limit(8)->get();
         $lowStockProducts = Product::where('active', true)
             ->whereColumn('current_stock', '<=', 'minimum_stock')
             ->limit(4)
             ->get();
+        $lowStockCount = Product::where('active', true)
+            ->whereColumn('current_stock', '<=', 'minimum_stock')->count();
         $categories = Category::where('active', true)->orWhereNull('active')->limit(6)->get();
         $salesTargetProgress = SalesTarget::getProgress($companyId, null, (int) now()->year, (int) now()->month);
 
@@ -121,6 +147,12 @@ class Dashboard extends Component
             'totalProductsCount' => $totalProductsCount,
             'totalCustomersCount' => $totalCustomersCount,
             'recentSales' => $recentSales,
+            'weeklySales' => $weeklySales,
+            'receivableAmount' => $receivableAmount,
+            'outstandingInvoices' => $outstandingInvoices,
+            'overdueAmount' => $overdueAmount,
+            'dueTodayAmount' => $dueTodayAmount,
+            'lowStockCount' => $lowStockCount,
             'popularProducts' => $popularProducts,
             'lowStockProducts' => $lowStockProducts,
             'categories' => $categories,

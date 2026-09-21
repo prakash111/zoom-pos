@@ -602,7 +602,7 @@ class TenantNotificationDispatcherService
         $results = [];
 
         if (in_array('whatsapp', $channels, true) && ! empty($phone)) {
-            $results['whatsapp'] = $this->dispatchWhatsApp($company, $phone, $textMessage, $publicLink, $sale);
+            $results['whatsapp'] = $this->dispatchDocumentWhatsApp($company, $sale, $template, $phone, $textMessage, $publicLink);
         }
 
         if (in_array('sms', $channels, true) && ! empty($phone)) {
@@ -618,7 +618,7 @@ class TenantNotificationDispatcherService
             // Strictly check send_as_attachment: when disabled, skip heavy PDF generation
             if ($template->send_as_attachment) {
                 try {
-                    $pdfData = DispatchChannelService::isEmailConfigured($company->id) ? $this->invoiceDeliveryService->generateInvoicePdf($sale) : null;
+                    $pdfData = DispatchChannelService::isEmailConfigured($company->id) ? $this->invoiceDeliveryService->generateInvoicePdf($sale, 'a4') : null;
                 } catch (\Throwable $e) {
                     Log::warning("Could not generate PDF for email: ".$e->getMessage());
                 }
@@ -635,6 +635,11 @@ class TenantNotificationDispatcherService
                 ."<hr style='border:0;border-top:1px solid #e2e8f0;margin:20px 0;'>"
                 ."<p style='color:#64748b;font-size:12px;'>Payment Method: ".ucfirst($sale->payment_method ?? 'Cash')."</p>"
                 ."</div>";
+            if (! $template->send_as_attachment) {
+                $html = '<div style="font-family:sans-serif;white-space:pre-line;max-width:600px">'.nl2br(e($textMessage)).'</div>';
+            } else {
+                $html = '<p style="font-family:sans-serif;white-space:pre-line">'.nl2br(e($textMessage)).'</p>'.$html;
+            }
 
             $results['email'] = $this->dispatchEmail($company, $email, $subject, $html, $pdfData, "Receipt-{$sale->sale_number}.pdf");
         }
@@ -676,6 +681,26 @@ class TenantNotificationDispatcherService
         return $this->dispatchReceipt($company, $sale, $channels, $recipientPhone, $recipientEmail);
     }
 
+    private function dispatchDocumentWhatsApp(Company $company, Sale $document, TenantDocumentTemplate $template, string $phone, string $message, string $link): array
+    {
+        if ($template->send_as_attachment && $this->whatsAppCloudApiClient->isConfigured($company)) {
+            try {
+                $isQuote = $template->template_type === 'quotation';
+                $pdf = $isQuote
+                    ? $this->invoiceDeliveryService->generateQuotationPdf($document)
+                    : $this->invoiceDeliveryService->generateInvoicePdf($document, 'a4');
+                $filename = ($isQuote ? 'Quotation-' : 'Invoice-').preg_replace('/[^A-Za-z0-9_-]+/', '', (string) $document->sale_number).'.pdf';
+                $id = $this->whatsAppCloudApiClient->sendDocument($company, $phone, $pdf, $filename, $message);
+
+                return ['success' => true, 'status' => 'sent', 'provider' => 'meta_cloud_api', 'message_id' => $id];
+            } catch (\Throwable $e) {
+                Log::warning('Document WhatsApp attachment failed; sending link text.', ['document_id' => $document->id, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $this->dispatchWhatsApp($company, $phone, $message, $link, $document);
+    }
+
     /**
      * Dispatch Quotation Document across requested channels.
      */
@@ -712,7 +737,7 @@ class TenantNotificationDispatcherService
 
         if (in_array('whatsapp', $channels, true)) {
             if (! empty($phone)) {
-                $results['whatsapp'] = $this->dispatchWhatsApp($company, $phone, $textMessage, $publicLink, $quote);
+                $results['whatsapp'] = $this->dispatchDocumentWhatsApp($company, $quote, $template, $phone, $textMessage, $publicLink);
             } else {
                 $results['whatsapp'] = [
                     'success' => true,
@@ -750,6 +775,11 @@ class TenantNotificationDispatcherService
                 ."<p>Please find quotation proposal #<strong>{$quote->sale_number}</strong> for <strong>{$totalFormatted}</strong>. This estimate is valid until <strong>{$expiryDate}</strong>.</p>"
                 ."<p><a href='{$publicLink}' style='display:inline-block;padding:10px 20px;background:{$themeColor};color:#ffffff;text-decoration:none;border-radius:6px;'>Review Proposal Online</a></p>"
                 ."</div>";
+            if (! $template->send_as_attachment) {
+                $html = '<div style="font-family:sans-serif;white-space:pre-line;max-width:600px">'.nl2br(e($textMessage)).'</div>';
+            } else {
+                $html = '<p style="font-family:sans-serif;white-space:pre-line">'.nl2br(e($textMessage)).'</p>'.$html;
+            }
 
             $results['email'] = $this->dispatchEmail($company, $email, $subject, $html, $pdfData, "Quotation-{$quote->sale_number}.pdf");
         }

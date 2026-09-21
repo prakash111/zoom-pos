@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Quotation #{{ $sale->sale_number }} — {{ $company->name }}</title>
     @php
-        $accentColor = $company->primary_color ?: '#2d7a58';
+        $template = $template ?? \App\Models\TenantDocumentTemplate::getForCompany($company->id, 'quotation');
+        $accentColor = $template->theme_color ?: ($company->primary_color ?: '#2d7a58');
         $hex = ltrim($accentColor, '#');
         if (strlen($hex) == 3) {
             $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
@@ -251,12 +252,12 @@
         <!-- Header -->
         <table class="header-table">
             <tr>
-                <td style="width: 55%;">
-                    @if (!empty($logoBase64))
+                <td style="width: 55%; text-align: {{ in_array($template->logo_placement, ['center', 'right']) ? $template->logo_placement : 'left' }};">
+                    @if (!empty($logoBase64) && $template->logo_placement !== 'hidden')
                         <img src="{{ $logoBase64 }}" style="max-height: 48px; max-width: 180px; margin-bottom: 6px; display: block;">
                     @endif
                     <div class="brand-title">{{ $company->trade_name ?? $company->name }}</div>
-                    <div class="brand-subtitle">Quotation & Price Proposal</div>
+                    <div class="brand-subtitle">{{ $template->header_title ?: 'Quotation & Price Proposal' }}</div>
                     <div class="brand-address">
                         {{ $company->address ?? 'Business Address' }}<br>
                         @if ($company->city || $company->state)
@@ -363,7 +364,7 @@
             $subtotal = $sale->subtotal;
             $taxSummary = \App\Services\TaxEngineService::normalizeTaxBreakdown($sale->tax_breakdown);
         @endphp
-        @if (!empty($taxSummary))
+        @if ($template->show_tax_breakup && !empty($taxSummary))
             <table class="items-table" style="margin-top: 14px; page-break-inside: avoid;">
                 <thead>
                     <tr>
@@ -455,7 +456,9 @@
                 <td>
                     <div class="card-heading">Terms & Conditions</div>
                     <div class="card-content">
-                        @if (!empty($company->quote_terms))
+                        @if (!empty($template->terms_conditions))
+                            {!! nl2br(e($template->terms_conditions)) !!}
+                        @elseif (!empty($company->quote_terms))
                             {!! clean_html($company->quote_terms) !!}
                         @else
                             <ul class="terms-list">
@@ -486,8 +489,11 @@
         </table>
 
         <!-- Footer -->
+        @if ($template->show_qr_code && !empty($qrCodeData['data_uri']))
+            <div style="text-align: center; margin: 8px 0;"><img src="{{ $qrCodeData['data_uri'] }}" width="80" height="80" alt="Quotation verification QR"><br><small>View quotation online</small></div>
+        @endif
         <div class="footer-bar">
-            Thank you for considering {{ $company->name }}!
+            {{ $template->footer_notes ?: 'Thank you for considering '.$company->name.'!' }}
             @if ($company->phone) &bull; Tel: {{ $company->phone }} @endif
             @if ($company->email) &bull; Email: {{ $company->email }} @endif
             @if ($company->website) &bull; {{ $company->website }} @endif

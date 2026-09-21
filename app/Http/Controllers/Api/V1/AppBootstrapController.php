@@ -220,6 +220,7 @@ class AppBootstrapController extends Controller
             'nav' => NavigationSanitizerService::normalizeNavPayload($company->normalizedNavConfig()),
             'push' => PushNotificationSetting::current()->publicConfig($company->id),
             'config' => [
+                'demo_mode' => (bool) config('app.demo_mode'),
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                 'business_type' => $businessType,
                 'plan_features' => $activeFeatures,

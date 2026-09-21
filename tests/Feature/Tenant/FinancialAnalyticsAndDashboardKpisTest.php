@@ -131,7 +131,7 @@ class FinancialAnalyticsAndDashboardKpisTest extends TestCase
         $this->assertEquals(48.0, $kpis['monthlyProfitMargin']);
     }
 
-    public function test_dashboard_renders_executive_kpi_cards_and_drill_down_shortcuts(): void
+    public function test_dashboard_renders_retail_metrics_chart_and_shortcuts(): void
     {
         // Add sample customer and completed sale
         Customer::create([
@@ -155,18 +155,18 @@ class FinancialAnalyticsAndDashboardKpisTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(Dashboard::class)
-            ->assertSee('Executive Summary')
-            ->assertSee('Today (Daily)')
-            ->assertSee('This Month')
-            ->assertSee('Today\'s Revenue')
-            ->assertSee('Today\'s Net Profit')
-            ->assertSee('Today\'s Invoices')
-            ->assertSee('Avg Ticket (AOV)')
+            ->assertSee('Sales Overview')
+            ->assertSee('Last 7 Days')
+            ->assertSee('Total Sales')
+            ->assertSee('Total Orders')
+            ->assertSee('Total Customers')
+            ->assertSee('Low Stock Items')
+            ->assertSee('Amount Receivable')
             ->assertSee('120.50')
-            ->assertSee('View Sales')
-            ->assertSee('P&L Breakdown')
-            ->assertSee('All Orders')
-            ->assertSee('Customer Dir');
+            ->assertSee('Create Order')
+            ->assertSee('View Reports')
+            ->assertSee('Recent Transactions')
+            ->assertSee('Choose POS Layout');
     }
 
     public function test_financial_analytics_cache_invalidation(): void

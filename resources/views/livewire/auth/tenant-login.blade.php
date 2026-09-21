@@ -67,8 +67,9 @@
             @endif
 
             <!-- Small single button: Try Flutter Web Version Tenant Demo -->
+            @if (config('app.demo_mode') && ! \App\Support\Desktop::isRunning())
             <div class="text-center">
-                <a href="https://web.zoomnearby.com"
+                <a href="https://web.zoomnearby.com/demo"
                    target="_blank"
                    rel="noopener noreferrer"
                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 hover:border-sky-500/50 transition shadow-2xs">
@@ -76,6 +77,7 @@
                     <span>{{ __('Try Flutter Web Version Tenant Demo') }} &rarr;</span>
                 </a>
             </div>
+            @endif
 
             <!-- Form -->
             <form wire:submit.prevent="login" class="space-y-4">

@@ -4,12 +4,17 @@ namespace Tests\Feature\Tenant;
 
 use App\Models\Company;
 use App\Models\Customer;
+use App\Models\Permission;
 use App\Models\Sale;
 use App\Models\TenantDocumentTemplate;
 use App\Models\User;
 use App\Services\Notifications\TenantNotificationDispatcherService;
+use App\Services\Invoice\InvoiceDeliveryService;
+use App\Mail\InvoiceMailable;
+use App\Mail\QuotationMailable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class DocumentTemplateTest extends TestCase
@@ -204,5 +209,162 @@ class DocumentTemplateTest extends TestCase
         $dispatcher = app(TenantNotificationDispatcherService::class);
         $results = $dispatcher->dispatchReceipt($this->company, $sale, ['email'], null, 'alice@example.com');
         $this->assertArrayHasKey('email', $results);
+    }
+
+    public function test_view_permission_does_not_allow_template_update(): void
+    {
+        Permission::create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->cashier->id,
+            'module' => 'settings',
+            'action' => 'view',
+            'allowed' => true,
+        ]);
+
+        $this->actingAs($this->cashier, 'web')
+            ->get('/settings/templates/invoices')->assertOk();
+        $this->actingAs($this->cashier, 'web')
+            ->post('/settings/templates/invoices', [
+                'theme_color' => '#123456',
+                'send_as_attachment' => '0',
+            ])->assertForbidden();
+        $this->assertDatabaseMissing('tenant_document_templates', [
+            'company_id' => $this->company->id,
+            'theme_color' => '#123456',
+        ]);
+    }
+
+    public function test_tenant_delivery_mode_controls_both_email_document_types(): void
+    {
+        Mail::fake();
+        foreach (['invoice', 'quotation'] as $type) {
+            $sale = Sale::create([
+                'company_id' => $this->company->id,
+                'sale_number' => strtoupper($type).'-MAIL-01',
+                'operation_type' => $type === 'quotation' ? 'quotation' : 'sale',
+                'customer_name' => 'Sarah Connor',
+                'total' => 75.50,
+                'status' => 'completed',
+            ]);
+            TenantDocumentTemplate::updateOrCreate(
+                ['company_id' => $this->company->id, 'template_type' => $type],
+                [
+                    'tenant_id' => $this->company->id,
+                    'send_as_attachment' => false,
+                    'send_text_with_link' => true,
+                    'message_body_template' => 'Hello {customer_name}, reference {invoice_number}.',
+                ]
+            );
+
+            $delivery = app(InvoiceDeliveryService::class);
+            if ($type === 'quotation') {
+                $delivery->sendQuotationEmail($sale, 'sarah@example.com');
+                Mail::assertSent(QuotationMailable::class, fn (QuotationMailable $mail) =>
+                    ! $mail->attachPdf && $mail->attachments() === []
+                    && str_contains($mail->customMessage, route('quotes.public', $sale->sale_number))
+                );
+            } else {
+                $delivery->sendInvoiceEmail($sale, 'sarah@example.com');
+                Mail::assertSent(InvoiceMailable::class, fn (InvoiceMailable $mail) =>
+                    ! $mail->attachPdf && $mail->attachments() === []
+                    && str_contains($mail->customMessage, route('sales.public', $sale->sale_number))
+                );
+            }
+        }
+    }
+
+    public function test_saved_design_is_used_by_outbound_a4_documents(): void
+    {
+        foreach (['invoice', 'quotation'] as $type) {
+            $sale = Sale::create([
+                'company_id' => $this->company->id,
+                'sale_number' => strtoupper($type).'-PDF-01',
+                'operation_type' => $type === 'quotation' ? 'quotation' : 'sale',
+                'customer_name' => 'Sarah Connor',
+                'total' => 75.50,
+                'items' => [['name' => 'Chair', 'price' => 75.50, 'quantity' => 1]],
+                'status' => 'completed',
+            ]);
+            $template = TenantDocumentTemplate::updateOrCreate(
+                ['company_id' => $this->company->id, 'template_type' => $type],
+                [
+                    'tenant_id' => $this->company->id,
+                    'theme_color' => '#123456',
+                    'logo_placement' => 'hidden',
+                    'header_title' => 'Metro Custom Document',
+                    'terms_conditions' => 'Pay within 14 days.',
+                    'footer_notes' => 'Metro thanks you.',
+                    'show_qr_code' => false,
+                    'show_tax_breakup' => false,
+                ]
+            );
+
+            $html = view('pdf.'.$type, [
+                'sale' => $sale,
+                'company' => $this->company,
+                'logoBase64' => null,
+                'template' => $template,
+                'qrCodeData' => null,
+            ])->render();
+
+            $this->assertStringContainsString('Metro Custom Document', $html);
+            $this->assertStringContainsString('Pay within 14 days.', $html);
+            $this->assertStringContainsString('Metro thanks you.', $html);
+            $this->assertStringNotContainsString('verification QR', $html);
+        }
+    }
+
+    public function test_switches_can_be_disabled_and_partial_api_updates_preserve_delivery_mode(): void
+    {
+        $this->actingAs($this->admin, 'web')->post('/settings/templates/invoices', [
+            'show_qr_code' => '0',
+            'show_tax_breakup' => '0',
+            'send_as_attachment' => '0',
+            'message_body_template' => 'Document {document_link}',
+        ])->assertRedirect();
+
+        $token = $this->token($this->admin);
+        $this->withToken($token)->putJson('/api/v1/tenant/templates/invoices', [
+            'header_title' => 'Updated Invoice',
+        ])->assertOk();
+
+        $template = TenantDocumentTemplate::getForCompany($this->company->id, 'invoice');
+        $this->assertFalse($template->show_qr_code);
+        $this->assertFalse($template->show_tax_breakup);
+        $this->assertFalse($template->send_as_attachment);
+        $this->assertTrue($template->send_text_with_link);
+        $this->assertSame('Document {document_link}', $template->message_body_template);
+    }
+
+    public function test_attachment_mode_generates_a4_pdfs_for_invoice_and_quotation(): void
+    {
+        Mail::fake();
+        $delivery = app(InvoiceDeliveryService::class);
+
+        foreach (['invoice', 'quotation'] as $type) {
+            $sale = Sale::create([
+                'company_id' => $this->company->id,
+                'sale_number' => strtoupper($type).'-ATTACHED-01',
+                'operation_type' => $type === 'quotation' ? 'quotation' : 'sale',
+                'customer_name' => 'Sarah Connor',
+                'total' => 75.50,
+                'items' => [['name' => 'Chair', 'price' => 75.50, 'quantity' => 1]],
+                'status' => 'completed',
+            ]);
+
+            if ($type === 'quotation') {
+                $delivery->sendQuotationEmail($sale, 'sarah@example.com');
+                Mail::assertSent(QuotationMailable::class, fn (QuotationMailable $mail) =>
+                    $mail->quote->is($sale) && $mail->attachPdf
+                    && str_starts_with($mail->pdfBinary, '%PDF')
+                );
+            } else {
+                $delivery->sendInvoiceEmail($sale, 'sarah@example.com');
+                Mail::assertSent(InvoiceMailable::class, fn (InvoiceMailable $mail) =>
+                    $mail->sale->is($sale) && $mail->attachPdf
+                    && str_starts_with($mail->pdfBinary, '%PDF')
+                );
+            }
+        }
     }
 }
