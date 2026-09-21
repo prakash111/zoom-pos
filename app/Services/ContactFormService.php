@@ -18,22 +18,33 @@ class ContactFormService
     {
         return [
             [
-                'id' => 'name',
-                'name' => 'name',
-                'label' => 'Full Name',
+                'id' => 'first_name',
+                'name' => 'first_name',
+                'label' => 'First Name',
                 'type' => 'text',
-                'placeholder' => 'John Doe',
+                'placeholder' => 'Enter first name',
                 'required' => true,
                 'width' => 'half',
                 'options' => '',
                 'is_system' => true,
             ],
             [
+                'id' => 'last_name',
+                'name' => 'last_name',
+                'label' => 'Last Name',
+                'type' => 'text',
+                'placeholder' => 'Enter last name',
+                'required' => false,
+                'width' => 'half',
+                'options' => '',
+                'is_system' => false,
+            ],
+            [
                 'id' => 'email',
                 'name' => 'email',
-                'label' => 'Business Email',
+                'label' => 'Work Email',
                 'type' => 'email',
-                'placeholder' => 'you@yourstore.com',
+                'placeholder' => 'Enter work email',
                 'required' => true,
                 'width' => 'half',
                 'options' => '',
@@ -44,31 +55,31 @@ class ContactFormService
                 'name' => 'phone',
                 'label' => 'Phone Number',
                 'type' => 'tel',
-                'placeholder' => '+1 (555) 000-0000',
+                'placeholder' => 'Enter phone number',
                 'required' => false,
                 'width' => 'half',
                 'options' => '',
                 'is_system' => false,
             ],
             [
-                'id' => 'store_type',
-                'name' => 'store_type',
-                'label' => 'Store / Business Type',
-                'type' => 'select',
-                'placeholder' => 'Select your business type…',
+                'id' => 'job_title',
+                'name' => 'job_title',
+                'label' => 'Job Title',
+                'type' => 'text',
+                'placeholder' => 'Enter job title',
                 'required' => false,
                 'width' => 'half',
-                'options' => 'Retail & Supermarket, Restaurant / Cafe / QSR, Salon & Spa, Pharmacy, Service Business, Other',
+                'options' => '',
                 'is_system' => false,
             ],
             [
-                'id' => 'subject',
-                'name' => 'subject',
-                'label' => 'Subject',
+                'id' => 'company_name',
+                'name' => 'company_name',
+                'label' => 'Company Name',
                 'type' => 'text',
-                'placeholder' => 'Questions before signing up',
+                'placeholder' => 'Enter company name',
                 'required' => false,
-                'width' => 'full',
+                'width' => 'half',
                 'options' => '',
                 'is_system' => false,
             ],
@@ -77,7 +88,7 @@ class ContactFormService
                 'name' => 'message',
                 'label' => 'Message',
                 'type' => 'textarea',
-                'placeholder' => "Tell us a bit about your business and what you're looking for…",
+                'placeholder' => 'Enter message',
                 'required' => true,
                 'width' => 'full',
                 'options' => '',
@@ -125,7 +136,7 @@ class ContactFormService
             $required = (bool) ($field['required'] ?? false);
             $placeholder = trim((string) ($field['placeholder'] ?? ''));
             $options = trim((string) ($field['options'] ?? ''));
-            $isSystem = in_array($name, ['name', 'email', 'message'], true);
+            $isSystem = in_array($name, ['name', 'first_name', 'email', 'message'], true);
 
             $sanitized[] = [
                 'id' => $field['id'] ?? (string) Str::uuid(),
@@ -160,8 +171,8 @@ class ContactFormService
 
         return [
             'page_title' => (string) setting('contact_page_title', 'Get in Touch'),
-            'page_subtitle' => (string) setting('contact_page_subtitle', 'Questions before you sign up or need a tailored enterprise POS setup? Our specialists are ready to help.'),
-            'submit_button_text' => (string) setting('contact_form_submit_button_text', 'Send Message'),
+            'page_subtitle' => (string) setting('contact_page_subtitle', 'Fill out the form below and our team will get back to you within 1-2 business days.'),
+            'submit_button_text' => (string) setting('contact_form_submit_button_text', 'Submit'),
             'success_message' => (string) setting('contact_form_success_message', "Thanks for reaching out — we'll get back to you shortly."),
             'recipient_email' => (string) setting('contact_form_recipient_email', $branding->support_email ?: ''),
             'enabled' => (bool) setting('contact_form_enabled', true),
@@ -241,8 +252,24 @@ class ContactFormService
 
         // Always ensure base required fields have fallback minimum validations
         if (! isset($rules['name'])) {
-            $rules['name'] = ['required', 'string', 'max:255'];
+            $rules['name'] = ['required_without:first_name', 'string', 'max:255'];
         }
+        $rules['first_name'] = ['nullable', 'string', 'max:120'];
+        $rules['last_name'] = ['nullable', 'string', 'max:120'];
+        $rules['job_title'] = ['nullable', 'string', 'max:150'];
+        $rules['company_name'] = ['nullable', 'string', 'max:150'];
+        $rules['phone_country'] = ['nullable', 'string', 'max:10'];
+
+        if (! isset($rules['phone'])) {
+            $rules['phone'] = ['nullable', 'string', 'max:50'];
+        }
+        if (! isset($rules['subject'])) {
+            $rules['subject'] = ['nullable', 'string', 'max:255'];
+        }
+        if (! isset($rules['store_type'])) {
+            $rules['store_type'] = ['nullable', 'string', 'max:100'];
+        }
+
         if (! isset($rules['email'])) {
             $rules['email'] = ['required', 'email', 'max:255'];
         }
@@ -280,6 +307,22 @@ class ContactFormService
                     'type'  => $type,
                 ];
             }
+        }
+
+        // Standardize name if first_name / last_name provided
+        if (empty($baseData['name']) && (! empty($validatedData['first_name']) || ! empty($validatedData['last_name']))) {
+            $baseData['name'] = trim(($validatedData['first_name'] ?? '') . ' ' . ($validatedData['last_name'] ?? ''));
+        }
+        if (empty($baseData['name']) && ! empty($validatedData['name'])) {
+            $baseData['name'] = $validatedData['name'];
+        }
+        if (empty($baseData['name'])) {
+            $baseData['name'] = 'Visitor';
+        }
+
+        // Format phone with country code if separate prefix was selected
+        if (! empty($baseData['phone']) && ! empty($validatedData['phone_country']) && ! str_starts_with($baseData['phone'], '+')) {
+            $baseData['phone'] = trim($validatedData['phone_country']) . ' ' . $baseData['phone'];
         }
 
         $baseData['custom_fields'] = ! empty($customFields) ? $customFields : null;

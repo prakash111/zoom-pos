@@ -346,19 +346,8 @@
                 @break
 
             @case('contact')
-                {{-- 11. Contact --}}
-                <section id="contact" class="landing-sec-contact scroll-mt-20 border-t {{ $rule }} py-16 sm:py-24 transition-colors duration-300">
-                    <div class="max-w-4xl mx-auto px-4 sm:px-6">
-                        <div class="text-center mb-10">
-                            <span class="{{ $badge }}">{{ $branding->getSectionBadge('contact', __('Get In Touch')) }}</span>
-                            <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white mb-2">{{ $branding->getSectionTitle('contact', __('Speak with an Omnichannel POS Specialist')) }}</h2>
-                            <p class="text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto">{{ $branding->getSectionSubtitle('contact', __("Need a tailored setup for multi-location retail, restaurant chains, or online catalog migration? Our solutions engineering team replies within 24 hours.")) }}</p>
-                        </div>
-                        <div class="contact-form-card rounded-2xl p-6 sm:p-10 border shadow-sm transition-colors duration-300">
-                            <x-landing.contact-form />
-                        </div>
-                    </div>
-                </section>
+                {{-- 11. Contact Us Section --}}
+                <x-landing.contact :branding="$branding" />
                 @break
 
             @case('cta')

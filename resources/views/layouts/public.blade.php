@@ -229,6 +229,7 @@
       html.dark #contact, html.dark .landing-sec-contact, [data-theme="dark"] #contact, [data-theme="dark"] .landing-sec-contact { background-color: var(--landing-contact-dark-bg, var(--landing-contact-bg)) !important; }
 
       .contact-form-card { background-color: var(--landing-contact-card-bg, #ffffff) !important; border-color: #e2e8f0 !important; }
+      .contact-info-card { background-color: var(--landing-contact-card-bg, #ffffff) !important; border-color: #e2e8f0 !important; }
       .contact-form-input {
           background-color: #ffffff !important;
           color: #0f172a !important; /* Visible crisp slate in light theme */
@@ -237,6 +238,15 @@
       .contact-form-input::placeholder {
           color: #94a3b8 !important;
       }
+      .contact-phone-select {
+          background-color: #f8fafc !important;
+          color: #334155 !important;
+          border-color: #cbd5e1 !important;
+      }
+      .contact-phone-wrapper .contact-form-input {
+          border: 0 !important;
+          background-color: transparent !important;
+      }
 
       html.dark .landing-sec-contact,
       [data-theme="dark"] .landing-sec-contact {
@@ -244,9 +254,11 @@
           color: var(--landing-contact-text, #f8fafc) !important;
       }
       html.dark .contact-form-card,
-      [data-theme="dark"] .contact-form-card {
-          background-color: var(--landing-contact-card-dark-bg, #131e29) !important;
-          border-color: #334155 !important;
+      [data-theme="dark"] .contact-form-card,
+      html.dark .contact-info-card,
+      [data-theme="dark"] .contact-info-card {
+          background-color: var(--landing-contact-card-dark-bg, #101726) !important;
+          border-color: #1e293b !important;
       }
       html.dark .contact-form-input,
       [data-theme="dark"] .contact-form-input {
@@ -257,6 +269,16 @@
       html.dark .contact-form-input::placeholder,
       [data-theme="dark"] .contact-form-input::placeholder {
           color: #64748b !important;
+      }
+      html.dark .contact-phone-select,
+      [data-theme="dark"] .contact-phone-select {
+          background-color: #1e293b !important;
+          color: #e2e8f0 !important;
+          border-color: #334155 !important;
+      }
+      html.dark .contact-phone-wrapper .contact-form-input,
+      [data-theme="dark"] .contact-phone-wrapper .contact-form-input {
+          background-color: transparent !important;
       }
 
       .landing-sec-hero h1, .landing-sec-hero h2, .landing-sec-hero h3,

@@ -4,7 +4,9 @@
     Works with JavaScript disabled: a plain POST to `contact.store`, which
     redirects back with a `contact_success` flash. When Alpine is present it
     submits via fetch() for an inline success panel with no page reload.
-    Renders custom dynamic fields configured by Superadmin.
+    Renders custom dynamic fields configured by Superadmin, defaulting to the
+    First Name, Last Name, Work Email, Phone (+Country Code), Job Title, Company Name,
+    and Message layout.
 --}}
 @props([
     'fields' => null,
@@ -14,14 +16,23 @@
 @php
     $fields = $fields ?? get_contact_form_fields();
     $settings = $settings ?? get_contact_form_settings();
-    $submitBtnText = $settings['submit_button_text'] ?: __('Send Message');
+    $submitBtnText = $settings['submit_button_text'] ?: __('Submit');
+
+    $hasExplicitName = collect($fields)->contains('name', 'name');
 @endphp
 
-<div class="max-w-2xl mx-auto"
+<div class="w-full"
      x-data="{
         sending: false,
         sent: {{ session()->has('contact_success') ? 'true' : 'false' }},
         message: @js(session('contact_success') ?: ($settings['success_message'] ?? 'Message sent.')),
+        firstName: @js(old('first_name', '')),
+        lastName: @js(old('last_name', '')),
+        rawName: @js(old('name', '')),
+        get fullName() {
+            const combined = [this.firstName, this.lastName].filter(Boolean).join(' ').trim();
+            return combined || this.rawName;
+        },
         async submit(e) {
             if (!this.$refs.form.reportValidity()) return;
             this.sending = true;
@@ -36,8 +47,10 @@
                 this.message = data.message || 'Message sent.';
                 this.sent = true;
                 this.$refs.form.reset();
+                this.firstName = '';
+                this.lastName = '';
             } catch (_) {
-                this.$refs.form.submit(); // fall back to a full page POST
+                this.$refs.form.submit();
                 return;
             } finally {
                 this.sending = false;
@@ -45,8 +58,9 @@
         }
      }">
 
+    <!-- Success Feedback Alert -->
     <div x-show="sent" x-cloak
-         class="rounded-3xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-8 text-center animate-in fade-in">
+         class="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-8 text-center animate-in fade-in mb-4">
         <div class="text-3xl mb-2">✅</div>
         <h3 class="text-lg font-black text-emerald-700 dark:text-emerald-300">{{ __('Message sent!') }}</h3>
         <p class="text-sm text-emerald-600 dark:text-emerald-400 mt-1" x-text="message">
@@ -59,13 +73,18 @@
     </div>
 
     <form x-ref="form" x-show="!sent" method="POST" action="{{ route('contact.store') }}"
-          x-on:submit.prevent="submit" class="space-y-4" novalidate>
+          x-on:submit.prevent="submit" class="space-y-4 sm:space-y-5" novalidate>
         @csrf
 
-        {{-- Honeypot — hidden from humans, catnip for bots. --}}
+        {{-- Honeypot anti-spam protection --}}
         <div aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden">
             <label>Company website<input type="text" name="company_website" tabindex="-1" autocomplete="off"></label>
         </div>
+
+        {{-- Synced name field for backward compatibility --}}
+        @if (! $hasExplicitName)
+            <input type="hidden" name="name" :value="fullName">
+        @endif
 
         @if (isset($errors) && $errors->any())
             <div class="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-4 py-3 text-xs font-semibold text-rose-700 dark:text-rose-300">
@@ -73,14 +92,14 @@
             </div>
         @endif
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             @foreach ($fields as $field)
                 @php
                     $isFull = ($field['width'] ?? 'half') === 'full' || ($field['type'] ?? '') === 'textarea';
                     $colClass = $isFull ? 'col-span-1 sm:col-span-2' : 'col-span-1';
                     $fieldName = $field['name'];
                     $fieldId = 'cf_' . $fieldName;
-                    $fieldLabel = $field['label'] ?? ucfirst($fieldName);
+                    $fieldLabel = $field['label'] ?? ucfirst(str_replace('_', ' ', $fieldName));
                     $isRequired = !empty($field['required']);
                     $placeholder = $field['placeholder'] ?? '';
                     $type = $field['type'] ?? 'text';
@@ -95,8 +114,8 @@
                                    value="1"
                                    {{ old($fieldName) ? 'checked' : '' }}
                                    {{ $isRequired ? 'required' : '' }}
-                                   class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-700">
-                            <label for="{{ $fieldId }}" class="text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                                   class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 cursor-pointer">
+                            <label for="{{ $fieldId }}" class="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 cursor-pointer">
                                 {{ $fieldLabel }}
                                 @if ($isRequired)
                                     <span class="text-rose-500">*</span>
@@ -104,7 +123,7 @@
                             </label>
                         </div>
                     @elseif ($type === 'textarea')
-                        <label for="{{ $fieldId }}" class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                        <label for="{{ $fieldId }}" class="block text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">
                             {{ $fieldLabel }}
                             @if ($isRequired)
                                 <span class="text-rose-500">*</span>
@@ -114,10 +133,10 @@
                                   name="{{ $fieldName }}"
                                   rows="4"
                                   {{ $isRequired ? 'required minlength=10' : '' }}
-                                  placeholder="{{ $placeholder }}"
-                                  class="contact-form-input w-full px-4 py-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors">{{ old($fieldName) }}</textarea>
+                                  placeholder="{{ $placeholder ?: __('Enter message') }}"
+                                  class="contact-form-input w-full px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900/60 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors">{{ old($fieldName) }}</textarea>
                     @elseif ($type === 'select')
-                        <label for="{{ $fieldId }}" class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                        <label for="{{ $fieldId }}" class="block text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">
                             {{ $fieldLabel }}
                             @if ($isRequired)
                                 <span class="text-rose-500">*</span>
@@ -130,14 +149,48 @@
                         <select id="{{ $fieldId }}"
                                 name="{{ $fieldName }}"
                                 {{ $isRequired ? 'required' : '' }}
-                                class="contact-form-input w-full px-4 py-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors">
+                                class="contact-form-input w-full px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900/60 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors cursor-pointer">
                             <option value="">{{ $placeholder ?: __('Select…') }}</option>
                             @foreach ($optionsList as $opt)
                                 <option value="{{ $opt }}" {{ old($fieldName) == $opt ? 'selected' : '' }}>{{ $opt }}</option>
                             @endforeach
                         </select>
+                    @elseif ($type === 'tel' || $fieldName === 'phone')
+                        <label for="{{ $fieldId }}" class="block text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">
+                            {{ $fieldLabel }}
+                            @if ($isRequired)
+                                <span class="text-rose-500">*</span>
+                            @endif
+                        </label>
+                        <div class="contact-phone-wrapper flex rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900/60 overflow-hidden focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-colors">
+                            <div class="relative flex items-center bg-slate-50 dark:bg-slate-800/80 border-r border-slate-200 dark:border-slate-700/80">
+                                <select name="phone_country"
+                                        aria-label="Country Code"
+                                        class="contact-phone-select appearance-none bg-transparent pl-3 pr-6 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer">
+                                    <option value="+1" selected>+1</option>
+                                    <option value="+44">+44</option>
+                                    <option value="+91">+91</option>
+                                    <option value="+61">+61</option>
+                                    <option value="+81">+81</option>
+                                    <option value="+49">+49</option>
+                                    <option value="+33">+33</option>
+                                    <option value="+55">+55</option>
+                                    <option value="+971">+971</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-1.5 text-slate-400">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                                </div>
+                            </div>
+                            <input id="{{ $fieldId }}"
+                                   type="tel"
+                                   name="{{ $fieldName }}"
+                                   {{ $isRequired ? 'required' : '' }}
+                                   value="{{ old($fieldName) }}"
+                                   placeholder="{{ $placeholder ?: __('Enter phone number') }}"
+                                   class="contact-form-input flex-1 px-3.5 py-2.5 sm:py-3 bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none border-0 focus:ring-0">
+                        </div>
                     @else
-                        <label for="{{ $fieldId }}" class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                        <label for="{{ $fieldId }}" class="block text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1.5">
                             {{ $fieldLabel }}
                             @if ($isRequired)
                                 <span class="text-rose-500">*</span>
@@ -146,10 +199,13 @@
                         <input id="{{ $fieldId }}"
                                type="{{ $type }}"
                                name="{{ $fieldName }}"
+                               @if ($fieldName === 'first_name') x-model="firstName" @endif
+                               @if ($fieldName === 'last_name') x-model="lastName" @endif
+                               @if ($fieldName === 'name') x-model="rawName" @endif
                                {{ $isRequired ? 'required' : '' }}
                                value="{{ old($fieldName) }}"
                                placeholder="{{ $placeholder }}"
-                               class="contact-form-input w-full px-4 py-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors">
+                               class="contact-form-input w-full px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900/60 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors">
                     @endif
 
                     @error($fieldName)
@@ -160,10 +216,18 @@
         </div>
 
         <!-- Submit Button -->
-        <button type="submit" x-bind:disabled="sending"
-                class="w-full py-3.5 px-6 rounded-lg font-bold text-sm tracking-wide text-slate-900 bg-emerald-400 hover:bg-emerald-300 transition-colors shadow-md disabled:opacity-60 cursor-pointer">
-            <span x-show="!sending">{{ $submitBtnText }}</span>
-            <span x-show="sending" x-cloak>{{ __('Sending Message...') }}</span>
-        </button>
+        <div class="pt-2">
+            <button type="submit" x-bind:disabled="sending"
+                    class="w-full py-3.5 px-6 rounded-xl sm:rounded-2xl font-bold text-sm sm:text-base tracking-wide text-white bg-gradient-to-r from-blue-600 via-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 focus:ring-4 focus:ring-blue-500/25 shadow-lg shadow-blue-500/25 active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-60">
+                <span x-show="!sending">{{ $submitBtnText }}</span>
+                <span x-show="sending" x-cloak class="inline-flex items-center gap-2">
+                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    {{ __('Sending Message...') }}
+                </span>
+            </button>
+        </div>
     </form>
 </div>

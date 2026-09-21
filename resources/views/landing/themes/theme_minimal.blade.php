@@ -114,24 +114,7 @@
 
     <!-- Contact Inquiries Section -->
     @if ($branding->isSectionEnabled('contact'))
-    <section id="contact" class="landing-sec-contact w-full py-16 border-t border-slate-200 dark:border-slate-800">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6">
-            <div class="text-center mb-10">
-                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-600 dark:text-amber-400 text-xs font-black uppercase tracking-wider mb-2">
-                    ⚡ {{ $branding->getSectionBadge('contact', __('Get In Touch')) }}
-                </span>
-                <h3 class="text-3xl font-black text-slate-900 dark:text-white">
-                    {{ $branding->getSectionTitle('contact', __('Questions Before You Sign Up?')) }}
-                </h3>
-                <p class="text-xs text-slate-600 dark:text-slate-400 mt-2 max-w-lg mx-auto">
-                    {{ $branding->getSectionSubtitle('contact', __('Need help deciding which POS plan fits your business best? Our team responds within a few hours.')) }}
-                </p>
-            </div>
-            <div class="p-6 sm:p-10 rounded-3xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg">
-                <x-landing.contact-form />
-            </div>
-        </div>
-    </section>
+        <x-landing.contact :branding="$branding" />
     @endif
 
 </div>

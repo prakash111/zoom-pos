@@ -230,24 +230,7 @@
 
     <!-- Studio Contact Inquiries (Editable from SuperAdmin Studio) -->
     @if ($branding->isSectionEnabled('contact'))
-    <section id="contact" class="landing-sec-contact w-full py-16 border-t border-slate-200 dark:border-slate-800/80">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6">
-            <div class="text-center mb-10">
-                <span class="text-xs font-black uppercase tracking-widest text-purple-600 dark:text-purple-400 font-mono block mb-2">
-                    {{ $branding->getSectionBadge('contact', __('Direct Channels')) }}
-                </span>
-                <h2 class="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white font-mono">
-                    {{ $branding->getSectionTitle('contact', __('Deploy Custom Retail Architectures')) }}
-                </h2>
-                <p class="text-xs text-slate-600 dark:text-slate-400 font-mono mt-2 max-w-xl mx-auto">
-                    {{ $branding->getSectionSubtitle('contact', __('Need dedicated custom drivers, multi-warehouse replication, or ERP bridging? Connect with our systems team.')) }}
-                </p>
-            </div>
-            <div class="p-6 sm:p-10 rounded-3xl bg-white dark:bg-[#0f111e] border border-slate-200 dark:border-purple-500/20 shadow-xl">
-                <x-landing.contact-form />
-            </div>
-        </div>
-    </section>
+        <x-landing.contact :branding="$branding" />
     @endif
 
 </div>
