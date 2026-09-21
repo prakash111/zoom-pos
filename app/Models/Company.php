@@ -846,6 +846,39 @@ class Company extends Model
         return trim((string) ($this->attributes['trade_name'] ?? ''));
     }
 
+    public function getSubdomainAttribute(): string
+    {
+        return trim((string) ($this->attributes['subdomain'] ?? $this->attributes['slug'] ?? ''));
+    }
+
+    public function getStorefrontUrlAttribute(): string
+    {
+        return $this->getStorefrontUrl();
+    }
+
+    public function getStorefrontUrl(): string
+    {
+        if (! empty($this->custom_domain)) {
+            $domain = trim($this->custom_domain);
+            return str_starts_with($domain, 'http') ? $domain : "https://{$domain}";
+        }
+
+        $slug = trim((string) ($this->subdomain ?: $this->slug ?: ''));
+        if (empty($slug) && ! empty($this->name)) {
+            $slug = \Illuminate\Support\Str::slug($this->name);
+        }
+        if (empty($slug)) {
+            $slug = 'store';
+        }
+
+        $baseDomain = config('tenancy.central_domain')
+            ?: config('app.domain')
+            ?: parse_url(config('app.url', 'https://saas.zoomnearby.com'), PHP_URL_HOST)
+            ?: 'saas.zoomnearby.com';
+
+        return "https://{$slug}.{$baseDomain}";
+    }
+
     public function getStoreTypeAttribute(): string
     {
         return strtoupper((string) ($this->attributes['pos_mode'] ?? 'RESTAURANT'));

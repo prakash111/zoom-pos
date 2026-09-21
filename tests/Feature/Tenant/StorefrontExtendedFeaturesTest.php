@@ -797,4 +797,108 @@ class StorefrontExtendedFeaturesTest extends TestCase
         $this->assertTrue((bool) $this->company->enable_product_reviews);
         $this->assertFalse((bool) $this->company->require_review_approval);
     }
+
+    public function test_storefront_section_has_collapsible_parent_group_with_nested_children(): void
+    {
+        $storefrontSection = \App\Services\Navigation\TenantNavRegistry::getStorefrontSection($this->company);
+        $this->assertSame('sec_storefront', $storefrontSection['key'] ?? $storefrontSection['id']);
+
+        $items = $storefrontSection['items'];
+        $parentGroup = $items[0];
+
+        $this->assertSame('nav_storefront_group', $parentGroup['key']);
+        $this->assertSame('Storefront & Online Sales', $parentGroup['title']);
+        $this->assertSame('storefront', $parentGroup['icon']);
+        $this->assertSame('accordion', $parentGroup['type']);
+        $this->assertTrue($parentGroup['is_expandable']);
+        $this->assertFalse($parentGroup['initially_expanded']);
+
+        $children = $parentGroup['children'];
+        $this->assertCount(9, $children);
+
+        $expectedKeys = [
+            'nav_view_live_store',
+            'nav_storefront_domain',
+            'nav_storefront_menus',
+            'nav_storefront_inquiries',
+            'nav_storefront_banner_auth',
+            'nav_storefront_gateways',
+            'nav_coupons_discounts',
+            'nav_store_faqs',
+            'nav_store_reviews',
+        ];
+
+        $childKeys = array_column($children, 'key');
+        $this->assertSame($expectedKeys, $childKeys);
+
+        foreach ($children as $child) {
+            $this->assertSame('nav_storefront_group', $child['parent']);
+            $this->assertSame('nav_storefront_group', $child['parent_id']);
+        }
+    }
+
+    public function test_view_live_store_resolves_subdomain_and_custom_domain(): void
+    {
+        $this->company->update([
+            'slug' => 'metro-retail-mart',
+            'custom_domain' => null,
+        ]);
+
+        $section = \App\Services\Navigation\TenantNavRegistry::getStorefrontSection($this->company);
+        $parent = $section['items'][0];
+        $liveStoreItem = collect($parent['children'])->firstWhere('key', 'nav_view_live_store');
+
+        $this->assertNotNull($liveStoreItem);
+        $this->assertTrue($liveStoreItem['is_external_url']);
+        $this->assertStringContainsString('metro-retail-mart', $liveStoreItem['url']);
+        $this->assertNotSame('https://saas.zoomnearby.com', $liveStoreItem['url']);
+        $this->assertNotSame('https://saas.zoomnearby.com/', $liveStoreItem['url']);
+
+        // With custom domain
+        $this->company->update([
+            'custom_domain' => 'store.metroretail.com',
+        ]);
+
+        $section = \App\Services\Navigation\TenantNavRegistry::getStorefrontSection($this->company);
+        $parent = $section['items'][0];
+        $liveStoreItem = collect($parent['children'])->firstWhere('key', 'nav_view_live_store');
+
+        $this->assertSame('https://store.metroretail.com', $liveStoreItem['url']);
+    }
+
+    public function test_bootstrap_payload_includes_subdomain_and_live_store_url(): void
+    {
+        $user = User::create([
+            'company_id' => $this->company->id,
+            'name' => 'Store Owner',
+            'login' => 'owner_test',
+            'email' => 'owner@gadgethub.test',
+            'password' => Hash::make('password123'),
+            'role' => 'administrator',
+            'status' => 'approved',
+            'email_verified_at' => now(),
+        ]);
+
+        $this->company->update([
+            'slug' => 'cool-gadgets',
+        ]);
+
+        $loginRes = $this->postJson('/api/v1/pos/auth/login', [
+            'email' => 'owner@gadgethub.test',
+            'password' => 'password123',
+        ]);
+        $token = $loginRes->json('token') ?? '';
+
+        $response = $this->withToken($token)
+            ->getJson('/api/v1/bootstrap');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('tenant.slug', 'cool-gadgets')
+            ->assertJsonPath('tenant.subdomain', 'cool-gadgets');
+
+        $storefrontUrl = $response->json('tenant.storefront_url');
+        $this->assertNotEmpty($storefrontUrl);
+        $this->assertStringContainsString('cool-gadgets', $storefrontUrl);
+    }
 }

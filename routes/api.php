@@ -234,6 +234,8 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
     Route::get('/tenant/bootstrap', [AppBootstrapController::class, 'bootstrap']);
     Route::get('/v1/tenant/bootstrap', [AppBootstrapController::class, 'bootstrap']);
+    Route::get('/v1/bootstrap', [AppBootstrapController::class, 'bootstrap']);
+    Route::get('/bootstrap', [AppBootstrapController::class, 'bootstrap']);
     Route::get('/app/translations', [LanguageApiController::class, 'appTranslations']);
     Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
 

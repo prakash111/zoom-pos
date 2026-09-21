@@ -811,12 +811,12 @@ class TenantNavRegistry
                 $decorated['badge'] = $meta['badge'];
             }
 
-            // Store Settings must always be an independent root item (never nested under subscription)
-            if ($k === 'settings') {
+            // Store Settings and Storefront Group must always be independent root items
+            if ($k === 'settings' || $k === 'nav_storefront_group' || $k === 'group_storefront') {
                 $parentId = null;
             }
 
-            if ($parentId !== null && $k !== 'settings') {
+            if ($parentId !== null && $k !== 'settings' && $k !== 'nav_storefront_group' && $k !== 'group_storefront') {
                 $decorated['parent'] = $parentId;
                 $decorated['parent_id'] = $parentId;
                 $decorated['type'] = 'link';
@@ -829,7 +829,7 @@ class TenantNavRegistry
             foreach ($node['children'] ?? [] as $child) {
                 if (is_array($child)) {
                     $childKey = trim((string) ($child['key'] ?? $child['id'] ?? ''));
-                    if ($childKey === 'settings') {
+                    if ($childKey === 'settings' || $childKey === 'nav_storefront_group' || $childKey === 'group_storefront') {
                         continue;
                     }
                     $decChild = $decorateNode($child, $k);
@@ -1091,15 +1091,29 @@ class TenantNavRegistry
         $customDomain = '';
         $unreadInquiries = 0;
         if ($tenant instanceof Company) {
-            $subdomain = $tenant->subdomain ?? '';
+            $subdomain = $tenant->subdomain ?: $tenant->slug ?: (isset($tenant->name) ? \Illuminate\Support\Str::slug($tenant->name) : '');
             $customDomain = $tenant->custom_domain ?? '';
             $unreadInquiries = (int) ($tenant->unread_inquiries_count ?? 0);
+            $liveStoreUrl = $tenant->getStorefrontUrl();
+        } elseif (is_array($tenant)) {
+            $subdomain = $tenant['subdomain'] ?? $tenant['slug'] ?? '';
+            $customDomain = $tenant['custom_domain'] ?? '';
+            $unreadInquiries = (int) ($tenant['unread_inquiries_count'] ?? 0);
+            $domainHost = config('tenancy.central_domain')
+                ?: config('app.domain')
+                ?: parse_url(config('app.url', 'https://saas.zoomnearby.com'), PHP_URL_HOST)
+                ?: 'saas.zoomnearby.com';
+            $liveStoreUrl = ! empty($customDomain)
+                ? (str_starts_with($customDomain, 'http') ? $customDomain : 'https://'.$customDomain)
+                : (! empty($subdomain) ? 'https://'.$subdomain.'.'.$domainHost : 'https://store.'.$domainHost);
+        } else {
+            $domainHost = config('tenancy.central_domain')
+                ?: config('app.domain')
+                ?: parse_url(config('app.url', 'https://saas.zoomnearby.com'), PHP_URL_HOST)
+                ?: 'saas.zoomnearby.com';
+            $subdomain = is_string($tenant) && $tenant !== '' ? $tenant : 'store';
+            $liveStoreUrl = 'https://'.$subdomain.'.'.$domainHost;
         }
-
-        $domainHost = config('app.domain', 'saas.zoomnearby.com');
-        $liveStoreUrl = ! empty($customDomain)
-            ? 'https://'.$customDomain
-            : (! empty($subdomain) ? 'https://'.$subdomain.'.'.$domainHost : url('/'));
 
         $items = [
             [
@@ -1113,6 +1127,8 @@ class TenantNavRegistry
                 'is_external_url' => true,
                 'url' => $liveStoreUrl,
                 'target_endpoint' => $liveStoreUrl,
+                'parent' => 'nav_storefront_group',
+                'parent_id' => 'nav_storefront_group',
                 'permission' => 'storefront.manage',
             ],
             [
@@ -1125,18 +1141,22 @@ class TenantNavRegistry
                 'type' => 'link',
                 'route' => '/settings/storefront/domain',
                 'target_endpoint' => '/api/tenant/views/settings-storefront-domain',
+                'parent' => 'nav_storefront_group',
+                'parent_id' => 'nav_storefront_group',
                 'permission' => 'storefront.manage',
             ],
             [
                 'key' => 'nav_storefront_menus',
                 'id' => 'nav_storefront_menus',
                 'label' => 'Store Menus & CMS Pages',
-                'title' => 'Navigation Menus & CMS Pages',
+                'title' => 'Store Menus & CMS Pages',
                 'icon' => 'menu_book',
                 'component' => 'storefront_menus',
                 'type' => 'link',
                 'route' => '/settings/storefront/menus',
                 'target_endpoint' => '/api/tenant/views/settings-storefront-menus',
+                'parent' => 'nav_storefront_group',
+                'parent_id' => 'nav_storefront_group',
                 'permission' => 'storefront.menus.manage',
             ],
             [
@@ -1150,6 +1170,8 @@ class TenantNavRegistry
                 'route' => '/storefront/inquiries',
                 'target_endpoint' => '/api/tenant/views/storefront-inquiries',
                 'badge' => $unreadInquiries > 0 ? (string) $unreadInquiries : null,
+                'parent' => 'nav_storefront_group',
+                'parent_id' => 'nav_storefront_group',
                 'permission' => 'storefront.inquiries.view',
             ],
             [
@@ -1162,6 +1184,8 @@ class TenantNavRegistry
                 'type' => 'link',
                 'route' => '/settings/storefront/banner',
                 'target_endpoint' => '/api/tenant/views/settings-storefront',
+                'parent' => 'nav_storefront_group',
+                'parent_id' => 'nav_storefront_group',
                 'permission' => 'storefront.manage',
             ],
             [
@@ -1174,6 +1198,8 @@ class TenantNavRegistry
                 'type' => 'link',
                 'route' => '/settings/storefront/payments',
                 'target_endpoint' => '/api/tenant/views/settings-payments',
+                'parent' => 'nav_storefront_group',
+                'parent_id' => 'nav_storefront_group',
                 'permission' => 'gateways.manage',
             ],
             [
@@ -1186,6 +1212,8 @@ class TenantNavRegistry
                 'type' => 'link',
                 'route' => '/settings/storefront/coupons',
                 'target_endpoint' => '/api/tenant/views/settings-coupons',
+                'parent' => 'nav_storefront_group',
+                'parent_id' => 'nav_storefront_group',
                 'permission' => 'coupons',
             ],
             [
@@ -1198,6 +1226,8 @@ class TenantNavRegistry
                 'type' => 'link',
                 'route' => '/settings/storefront/faqs',
                 'target_endpoint' => '/api/tenant/views/settings-faqs',
+                'parent' => 'nav_storefront_group',
+                'parent_id' => 'nav_storefront_group',
                 'permission' => 'faqs',
             ],
             [
@@ -1210,8 +1240,24 @@ class TenantNavRegistry
                 'type' => 'link',
                 'route' => '/settings/storefront/reviews',
                 'target_endpoint' => '/api/tenant/views/settings-reviews',
+                'parent' => 'nav_storefront_group',
+                'parent_id' => 'nav_storefront_group',
                 'permission' => 'reviews',
             ],
+        ];
+
+        $parentGroup = [
+            'key' => 'nav_storefront_group',
+            'id' => 'nav_storefront_group',
+            'label' => 'Storefront & Online Sales',
+            'title' => 'Storefront & Online Sales',
+            'icon' => 'storefront',
+            'component' => 'storefront_group',
+            'type' => 'accordion',
+            'permission' => 'storefront.manage',
+            'is_expandable' => true,
+            'initially_expanded' => false,
+            'children' => $items,
         ];
 
         return self::normalizeSection([
@@ -1220,7 +1266,10 @@ class TenantNavRegistry
             'title' => 'Storefront & Online Sales',
             'label' => 'Storefront & Online Sales',
             'color' => '#2563eb',
-            'items' => $items,
+            'items' => [
+                $parentGroup,
+                ...$items,
+            ],
         ]);
     }
 
@@ -1693,16 +1742,22 @@ class TenantNavRegistry
                     return $item;
                 }
 
+                $isExt = (bool) ($item['is_external_url'] ?? false);
+                $isAccordion = (($item['type'] ?? '') === 'accordion' || ! empty($item['children']));
+                $itemType = $isAccordion ? 'accordion' : ($isExt ? 'external_link' : 'list_tile');
+                $actionType = $isExt ? 'OPEN_URL' : 'NAVIGATE_TO';
+
                 return array_merge($item, [
-                    'type' => 'list_tile',
+                    'type' => $itemType,
                     'route' => $route,
                     'target_endpoint' => $route,
-                    'action_type' => 'NAVIGATE_TO',
+                    'action_type' => $actionType,
                     'action' => [
-                        'type' => 'NAVIGATE_TO',
-                        'action_type' => 'NAVIGATE_TO',
+                        'type' => $actionType,
+                        'action_type' => $actionType,
                         'route' => $route,
                         'endpoint' => $route,
+                        'url' => $item['url'] ?? $route,
                     ],
                 ]);
             };

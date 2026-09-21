@@ -31,6 +31,15 @@ class TenantNavigationConfigService
         'settings_taxes' => 'settings',
         'settings_api' => 'settings',
         'settings_navigation' => 'settings',
+        'nav_view_live_store' => 'nav_storefront_group',
+        'nav_storefront_domain' => 'nav_storefront_group',
+        'nav_storefront_menus' => 'nav_storefront_group',
+        'nav_storefront_inquiries' => 'nav_storefront_group',
+        'nav_storefront_banner_auth' => 'nav_storefront_group',
+        'nav_storefront_gateways' => 'nav_storefront_group',
+        'nav_coupons_discounts' => 'nav_storefront_group',
+        'nav_store_faqs' => 'nav_storefront_group',
+        'nav_store_reviews' => 'nav_storefront_group',
     ];
 
     /**
@@ -48,6 +57,8 @@ class TenantNavigationConfigService
         'salon_pos',
         'restaurant_pos',
         'consignments',
+        'nav_storefront_group',
+        'group_storefront',
     ];
 
     /**

@@ -90,6 +90,34 @@ class NavigationSanitizerService
             $item['badge'] = (string) $item['badge'];
         }
 
+        if (($item['key'] ?? '') === 'nav_view_live_store') {
+            $item['is_external_url'] = true;
+            $url = trim((string) ($item['url'] ?? ''));
+            $centralHost = config('tenancy.central_domain')
+                ?: config('app.domain')
+                ?: parse_url(config('app.url', 'https://saas.zoomnearby.com'), PHP_URL_HOST)
+                ?: 'saas.zoomnearby.com';
+            $isGeneric = empty($url) || in_array($url, [
+                'https://'.$centralHost,
+                'https://'.$centralHost.'/',
+                'http://'.$centralHost,
+                'http://'.$centralHost.'/',
+                url('/'),
+            ], true);
+
+            if ($isGeneric) {
+                $companyId = app()->bound('tenant.company_id') ? app('tenant.company_id') : null;
+                $company = $companyId ? \App\Models\Company::find($companyId) : null;
+                if (! $company && auth()->check() && auth()->user()->company) {
+                    $company = auth()->user()->company;
+                }
+                if ($company) {
+                    $item['url'] = $company->getStorefrontUrl();
+                    $item['target_endpoint'] = $item['url'];
+                }
+            }
+        }
+
         return $item;
     }
 
@@ -187,26 +215,39 @@ class NavigationSanitizerService
         ];
 
         // Gather all keys, routes, components from the active sec_storefront section
+        $collectItemInfo = function (array $item) use (&$storefrontItemKeys, &$storefrontComponents, &$storefrontRoutes, &$collectItemInfo): void {
+            $k = strtolower(trim((string) ($item['key'] ?? $item['id'] ?? '')));
+            if ($k !== '') {
+                $storefrontItemKeys[] = $k;
+            }
+            $comp = strtolower(trim((string) ($item['component'] ?? '')));
+            if ($comp !== '') {
+                $storefrontComponents[] = $comp;
+            }
+            $route = strtolower(rtrim((string) ($item['route'] ?? ''), '/'));
+            if ($route !== '') {
+                $storefrontRoutes[] = $route;
+            }
+            $endpoint = strtolower(rtrim((string) ($item['target_endpoint'] ?? ''), '/'));
+            if ($endpoint !== '') {
+                $storefrontRoutes[] = $endpoint;
+            }
+            if (! empty($item['children']) && is_array($item['children'])) {
+                foreach ($item['children'] as $child) {
+                    if (is_array($child)) {
+                        $collectItemInfo($child);
+                    }
+                }
+            }
+        };
+
         foreach ($sections as $section) {
             $sId = strtolower((string) ($section['id'] ?? $section['key'] ?? ''));
             if ($sId === 'sec_storefront') {
                 $hasStorefrontSection = true;
                 foreach (($section['items'] ?? []) as $item) {
-                    $k = strtolower(trim((string) ($item['key'] ?? $item['id'] ?? '')));
-                    if ($k !== '') {
-                        $storefrontItemKeys[] = $k;
-                    }
-                    $comp = strtolower(trim((string) ($item['component'] ?? '')));
-                    if ($comp !== '') {
-                        $storefrontComponents[] = $comp;
-                    }
-                    $route = strtolower(rtrim((string) ($item['route'] ?? ''), '/'));
-                    if ($route !== '') {
-                        $storefrontRoutes[] = $route;
-                    }
-                    $endpoint = strtolower(rtrim((string) ($item['target_endpoint'] ?? ''), '/'));
-                    if ($endpoint !== '') {
-                        $storefrontRoutes[] = $endpoint;
+                    if (is_array($item)) {
+                        $collectItemInfo($item);
                     }
                 }
             }
