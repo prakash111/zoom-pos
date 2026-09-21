@@ -32,4 +32,62 @@ class Plan extends Model
             'price' => 'decimal:2',
         ];
     }
+
+    public const EXTENSION_LABELS = [
+        'leadmanagement' => 'CRM & Leads',
+        'crm_leads' => 'CRM & Leads',
+        'whatsapp_api' => 'WhatsApp API',
+        'custom_domain' => 'Custom Domain',
+    ];
+
+    public function getProductLimitAttribute(): int
+    {
+        return (int) ($this->products_limit ?? data_get($this->limits, 'products', -1));
+    }
+
+    public function getInvoiceLimitAttribute($value): int
+    {
+        return (int) ($value ?? data_get($this->limits, 'invoices', -1));
+    }
+
+    public function getDeviceLimitAttribute($value): int
+    {
+        return (int) ($value ?? data_get($this->limits, 'dispositivos', -1));
+    }
+
+    public function getStaffLimitAttribute($value): int
+    {
+        return (int) ($value ?? data_get($this->limits, 'usuarios', -1));
+    }
+
+    public function getEnabledExtensionsAttribute(): array
+    {
+        $exts = is_array($this->extensions) ? $this->extensions : [];
+        return array_values($exts);
+    }
+
+    public function getFeatureListAttribute(): array
+    {
+        $rawFeatures = is_array($this->features)
+            ? $this->features
+            : (is_string($this->features) ? (json_decode($this->features, true) ?: []) : []);
+
+        $featureList = [];
+        foreach ($rawFeatures as $k => $v) {
+            if (is_numeric($k) && is_string($v)) {
+                $featureList[] = $v;
+            } elseif ($v === true || $v === 1 || $v === '1') {
+                $featureList[] = is_string($k) ? str_replace('_', ' ', ucfirst($k)) : (string) $v;
+            } elseif (is_string($v) && ! empty($v)) {
+                $featureList[] = "$k: $v";
+            }
+        }
+
+        return array_values(array_unique($featureList));
+    }
+
+    public function getExtensionLabel(string $key): string
+    {
+        return self::EXTENSION_LABELS[$key] ?? ucwords(str_replace('_', ' ', $key));
+    }
 }

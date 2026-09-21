@@ -311,77 +311,7 @@
             @case('pricing')
                 {{-- 9. Pricing --}}
                 @if ($plans->isNotEmpty())
-                    <section id="pricing" class="landing-sec-pricing landing-dark-section scroll-mt-20 py-20 border-t {{ $rule }} transition-colors duration-300">
-                        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24" x-data="{ annual: false }">
-                            <div class="text-center mb-10">
-                                <span class="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-3 bg-lime-100 text-lime-800 border border-lime-200 dark:bg-brand-lime/10 dark:text-brand-lime dark:border-brand-lime/20">{{ $branding->getSectionBadge('pricing', __('Predictable Investment')) }}</span>
-                                <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
-                                    {{ $branding->getSectionTitle('pricing', __('Simple, transparent pricing for every tier')) }}
-                                </h2>
-                                <p class="mt-3 text-sm {{ $muted }} max-w-xl mx-auto">
-                                    {{ $branding->getSectionSubtitle('pricing', __('Launch in minutes with zero setup fees.')) }}
-                                </p>
-                            </div>
-
-                            <div class="flex items-center justify-center gap-3 mb-12">
-                                <span class="text-xs font-bold" :class="!annual ? 'text-slate-900 dark:text-white' : 'text-slate-400'">{{ __('Monthly') }}</span>
-                                <button type="button" x-on:click="annual = !annual" role="switch" :aria-checked="annual.toString()"
-                                        :class="annual ? 'bg-brand-lime' : 'bg-slate-300 dark:bg-slate-700'"
-                                        class="relative w-12 h-6 rounded-full transition-colors p-0.5">
-                                    <span class="block w-5 h-5 rounded-full bg-white dark:bg-slate-950 shadow transition-transform" :class="annual ? 'translate-x-6' : 'translate-x-0'"></span>
-                                </button>
-                                <span class="text-xs font-bold flex items-center gap-2" :class="annual ? 'text-slate-900 dark:text-white' : 'text-slate-400'">
-                                    {{ __('Annual') }}
-                                    <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase border border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30">{{ $branding->landingText('pricing.discount_badge', __('Save 20%')) }}</span>
-                                </span>
-                            </div>
-
-                            @php
-                                $sorted = $plans->sortBy('price')->values();
-                                $popular = $sorted->count() >= 2 ? $sorted[1]->name : null;
-                                $pricingCols = $sorted->count() >= 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-2';
-                            @endphp
-                            <div class="grid sm:grid-cols-2 {{ $pricingCols }} gap-6 items-stretch">
-                                @foreach ($sorted as $plan)
-                                    @php
-                                        $price = (float) $plan->price;
-                                        $annualPrice = round($price * 12 * 0.8);
-                                        $isPopular = $plan->name === $popular;
-                                    @endphp
-                                    <div class="relative rounded-2xl p-7 flex flex-col justify-between border {{ $isPopular ? 'border-brand-lime bg-white dark:bg-slate-900 shadow-lg' : 'border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/60 shadow-sm dark:shadow-none' }}">
-                                        @if ($isPopular)
-                                            <span class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-brand-lime text-slate-950 text-[10px] font-black uppercase tracking-widest">{{ __('Most Popular') }}</span>
-                                        @endif
-                                        <div>
-                                            <div class="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">{{ $plan->display_name }}</div>
-                                            <div class="mt-3 flex items-baseline gap-1.5">
-                                                <span class="text-3xl font-black text-slate-900 dark:text-white">
-                                                    <span x-show="!annual">{{ $plan->currency }}{{ number_format($price, 0) }}</span>
-                                                    <span x-show="annual" x-cloak>{{ $plan->currency }}{{ number_format($annualPrice, 0) }}</span>
-                                                </span>
-                                                <span class="text-xs {{ $muted }}" x-text="annual ? '{{ __('/year') }}' : '/{{ $plan->billing_cycle }}'"></span>
-                                            </div>
-                                            <p class="mt-3 text-xs {{ $muted }}">
-                                                {{ $plan->limits['usuarios'] ?? '∞' }} {{ __('Staff Logins') }} ·
-                                                {{ $plan->limits['dispositivos'] ?? '∞' }} {{ __('POS Devices') }}
-                                            </p>
-                                        </div>
-                                        <a href="{{ route('tenant.register') }}?plan={{ $plan->name }}"
-                                           class="mt-6 w-full text-center py-2.5 rounded-xl text-xs font-black transition {{ $isPopular ? 'bg-brand-lime hover:bg-brand-lime-dark text-slate-950' : 'bg-slate-100 hover:bg-slate-200 text-slate-900 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white' }}">
-                                            {{ __('Choose') }} {{ $plan->display_name }}
-                                        </a>
-                                    </div>
-                                @endforeach
-                            </div>
-
-                            @php
-                                $pricingNote = $branding->landingText('pricing.note', '');
-                            @endphp
-                            @if ($pricingNote)
-                                <p class="text-center text-xs {{ $muted }} mt-8">{{ $pricingNote }}</p>
-                            @endif
-                        </div>
-                    </section>
+                    @include('landing.pricing', ['plans' => $plans, 'branding' => $branding])
                 @endif
                 @break
 

@@ -88,48 +88,7 @@
     </section>
 
     <!-- Streamlined Pricing Section -->
-    <section class="landing-sec-pricing w-full py-16 sm:py-20 border-b border-slate-200 dark:border-slate-800/80">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-            <h3 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">{{ $branding->getSectionTitle('pricing', __('Simple, Transparent Tiers')) }}</h3>
-            
-            <div class="flex items-center justify-center gap-3 my-6">
-                <span class="text-xs font-bold" :class="!annual ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'">{{ __('Monthly') }}</span>
-                <button type="button" @click="annual = !annual"
-                        :class="annual ? 'bg-amber-400' : 'bg-slate-200 dark:bg-slate-800'"
-                        class="relative w-12 h-6 rounded-full transition-colors p-0.5 cursor-pointer">
-                    <span class="block w-5 h-5 rounded-full bg-slate-950 shadow transition-transform"
-                          :class="annual ? 'translate-x-6' : 'translate-x-0'"></span>
-                </button>
-                <span class="text-xs font-bold" :class="annual ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'">{{ __('Annual (20% Off)') }}</span>
-            </div>
-
-            @if ($plans->isNotEmpty())
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    @foreach ($plans as $plan)
-                        @php
-                            $price = (float) $plan->price;
-                            $annualPrice = round($price * 12 * 0.8);
-                        @endphp
-                        <div class="p-6 rounded-3xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col justify-between text-left space-y-4 shadow-sm">
-                            <div>
-                                <div class="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">{{ $plan->display_name }}</div>
-                                <div class="mt-2 text-2xl font-black text-slate-900 dark:text-white">
-                                    <span x-show="!annual">{{ $plan->currency }}{{ number_format($price, 2) }}</span>
-                                    <span x-show="annual" x-cloak>{{ $plan->currency }}{{ number_format($annualPrice, 2) }}</span>
-                                    <span class="text-xs font-normal text-slate-500 dark:text-slate-400" x-text="!annual ? '/{{ $plan->billing_cycle }}' : '/year'"></span>
-                                </div>
-                                <p class="text-xs text-slate-600 dark:text-slate-400 mt-2">{{ $plan->limits['usuarios'] ?? '∞' }} {{ __('Users') }} · {{ $plan->limits['dispositivos'] ?? '∞' }} {{ __('POS Devices') }}</p>
-                            </div>
-                            <a href="{{ route('tenant.register') }}?plan={{ $plan->name }}"
-                               class="w-full py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-amber-400 hover:text-slate-950 dark:hover:bg-amber-400 dark:hover:text-slate-950 font-bold text-xs transition text-center text-slate-900 dark:text-white">
-                                {{ __('Choose') }} {{ $plan->display_name }}
-                            </a>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-        </div>
-    </section>
+    @include('landing.pricing', ['plans' => $plans, 'branding' => $branding])
 
     <!-- FAQs Section (Editable from SuperAdmin Studio) -->
     @if (!empty($faqs))

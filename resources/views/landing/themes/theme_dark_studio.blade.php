@@ -204,48 +204,7 @@
     @endif
 
     <!-- Studio Pricing (Editable from Plans) -->
-    <section class="landing-sec-pricing w-full py-16 border-b border-slate-200 dark:border-slate-800/80">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white font-mono">{{ $branding->getSectionTitle('pricing', __('Command Tiers')) }}</h2>
-                <div class="flex items-center justify-center gap-3 mt-4">
-                    <span class="text-xs font-mono" :class="!annual ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-slate-500'">/monthly</span>
-                    <button type="button" @click="annual = !annual"
-                            :class="annual ? 'bg-purple-600' : 'bg-slate-200 dark:bg-slate-800'"
-                            class="relative w-12 h-6 rounded-full transition p-0.5 cursor-pointer">
-                        <span class="block w-5 h-5 rounded-full bg-white shadow transition-transform"
-                              :class="annual ? 'translate-x-6' : 'translate-x-0'"></span>
-                    </button>
-                    <span class="text-xs font-mono" :class="annual ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-slate-500'">/yearly</span>
-                </div>
-            </div>
-
-            @if ($plans->isNotEmpty())
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-5xl mx-auto">
-                    @foreach ($plans as $plan)
-                        <div class="p-8 rounded-3xl bg-white dark:bg-[#0f111e] border-2 border-purple-300 dark:border-purple-500/30 flex flex-col justify-between space-y-6 font-mono shadow-md">
-                            <div>
-                                <div class="text-xs font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest">{{ $plan->display_name }}</div>
-                                <div class="text-3xl font-black text-slate-900 dark:text-white mt-3">
-                                    <span x-show="!annual">{{ $plan->currency }}{{ number_format((float) $plan->price, 0) }}</span>
-                                    <span x-show="annual" x-cloak>{{ $plan->currency }}{{ number_format((float) $plan->price * 12 * 0.8, 0) }}</span>
-                                </div>
-                                <ul class="mt-6 space-y-2.5 text-xs text-slate-600 dark:text-slate-300">
-                                    <li>✓ {{ $plan->limits['usuarios'] ?? '∞' }} Staff Seats</li>
-                                    <li>✓ {{ $plan->limits['dispositivos'] ?? '∞' }} POS Devices</li>
-                                    <li>✓ Full Studio POS & KDS</li>
-                                </ul>
-                            </div>
-                            <a href="{{ route('tenant.register') }}?plan={{ $plan->name }}"
-                               class="w-full py-3 rounded-xl bg-purple-100 hover:bg-purple-600 hover:text-white dark:bg-purple-600/20 hover:dark:bg-purple-600 text-purple-700 dark:text-purple-300 hover:dark:text-white border border-purple-300 dark:border-purple-500/40 font-black text-xs transition text-center">
-                                DEPLOY {{ $plan->display_name }} →
-                            </a>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-        </div>
-    </section>
+    @include('landing.pricing', ['plans' => $plans, 'branding' => $branding])
 
     <!-- Studio FAQs (Editable from SuperAdmin Studio) -->
     @if (!empty($faqs))
