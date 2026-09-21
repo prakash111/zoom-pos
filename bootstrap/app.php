@@ -6,6 +6,7 @@ use App\Http\Middleware\CheckTenantPermission;
 use App\Http\Middleware\EnsureAppIsInstalled;
 use App\Http\Middleware\EnsureNotInstalled;
 use App\Http\Middleware\EnsureTenantEmailIsVerified;
+use App\Http\Middleware\EnsureTenantExtension;
 use App\Http\Middleware\EnsureTenantPosMode;
 use App\Http\Middleware\EnsureTenantSubscriptionActive;
 use App\Http\Middleware\EnsureTenantVertical;
@@ -82,6 +83,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'c/*/payment/*',
             'store/products/*/reviews',
             'c/*/products/*/reviews',
+            'store/inquiry',
+            'c/*/inquiry',
+            'storefront/inquiry',
             'api/v1/webhooks/*',
             'api/webhooks/*',
             'v1/webhooks/*',
@@ -101,6 +105,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.vertical' => EnsureTenantVertical::class,
             'tenant.subscription' => EnsureTenantSubscriptionActive::class,
             'tenant.verified' => EnsureTenantEmailIsVerified::class,
+            'entitled' => EnsureTenantExtension::class,
             'demo.guard' => PreventDemoModifications::class,
         ]);
 

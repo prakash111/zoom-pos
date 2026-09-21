@@ -1747,6 +1747,107 @@ class SchemaResponse
         ]);
     }
 
+    public static function storefrontDomainView(Company $company): array
+    {
+        $baseHost = config('app.domain', 'saas.zoomnearby.com');
+        $subdomain = $company->subdomain ?? '';
+        $customDomain = $company->custom_domain ?? '';
+        $liveStoreUrl = ! empty($customDomain)
+            ? 'https://'.$customDomain
+            : (! empty($subdomain) ? 'https://'.$subdomain.'.'.$baseHost : url('/'));
+
+        $cnameTarget = 'cname.'.$baseHost;
+
+        return self::screen('Store Web Address & Domain', [
+            self::card([
+                self::row([
+                    self::column([
+                        self::text('Online Storefront Address', 'title_medium', ['bold' => true]),
+                        self::text('Manage your store subdomain and connect custom domain branding.', 'body_small', ['color' => '#6b7280']),
+                    ]),
+                    self::badge(! empty($customDomain) ? 'CUSTOM DOMAIN ACTIVE' : 'DEFAULT SUBDOMAIN', '#2563eb', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+            ]),
+            self::card([
+                self::text('Live Web Address', 'title_small', ['bold' => true]),
+                self::divider(),
+                self::text($liveStoreUrl, 'title_medium', ['color' => '#2563eb', 'bold' => true]),
+                self::text('Customers can browse your catalog, place orders, and track deliveries at this URL.', 'body_small', ['color' => '#64748b']),
+            ]),
+            self::card([
+                self::text('Store Subdomain', 'title_small', ['bold' => true]),
+                self::divider(),
+                self::textInput('subdomain', 'Store Subdomain Prefix', $subdomain, ['placeholder' => 'my-store']),
+                self::text("Default address: https://{$subdomain}.{$baseHost}", 'body_small', ['color' => '#64748b']),
+            ]),
+            self::card([
+                self::text('Custom Domain Configuration', 'title_small', ['bold' => true]),
+                self::divider(),
+                self::textInput('custom_domain', 'Custom Domain Name (e.g. shop.mybrand.com)', $customDomain, ['placeholder' => 'shop.mybrand.com']),
+                self::text('To link your custom domain, add the following CNAME record at your DNS provider (Cloudflare, GoDaddy, Namecheap):', 'body_small', ['color' => '#374151']),
+                self::row([
+                    self::text('Record Type: CNAME', 'label_medium', ['bold' => true]),
+                    self::text("Target: {$cnameTarget}", 'label_medium', ['bold' => true, 'color' => '#059669']),
+                ], ['spacing' => 16]),
+                self::text('SSL certificates are automatically generated once DNS propagation is complete.', 'body_small', ['color' => '#64748b']),
+            ]),
+            self::buttonPrimary('Save Domain Settings', self::formSubmitAction('/api/v1/tenant/storefront/domain-config', 'PUT', 'Store domain settings updated successfully', false, true)),
+        ]);
+    }
+
+    public static function storefrontInquiriesView(Company $company): array
+    {
+        $inquiries = \App\Models\TenantInquiry::where('company_id', $company->id)->latest()->take(30)->get();
+        $unreadCount = $inquiries->where('status', 'unread')->count();
+
+        $rows = [];
+        foreach ($inquiries as $inq) {
+            $statusBadgeColor = match ($inq->status) {
+                'unread' => '#dc2626',
+                'contacted' => '#2563eb',
+                'closed' => '#16a34a',
+                default => '#6b7280',
+            };
+
+            $rows[] = self::card([
+                self::row([
+                    self::column([
+                        self::text($inq->name ?: 'Anonymous Customer', 'title_small', ['bold' => true]),
+                        self::text($inq->email ?: ($inq->phone ?: 'No contact details provided'), 'body_small', ['color' => '#6b7280']),
+                    ]),
+                    self::badge(strtoupper($inq->status), $statusBadgeColor, 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+                self::divider(),
+                self::text($inq->message ?: ($inq->subject ?: 'No inquiry message provided.'), 'body_medium'),
+                self::row([
+                    self::text($inq->created_at?->diffForHumans() ?? '', 'body_small', ['color' => '#9ca3af']),
+                    self::badge($inq->inquiry_type ?: 'general', '#4f46e5', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+            ]);
+        }
+
+        if (empty($rows)) {
+            $rows[] = self::card([
+                self::column([
+                    self::text('No Customer Inquiries Yet', 'title_medium', ['bold' => true, 'align' => 'center']),
+                    self::text('When customers contact you or request quotes from your online store, their inquiries will appear here in real-time.', 'body_small', ['color' => '#6b7280', 'align' => 'center']),
+                ], ['spacing' => 8, 'cross_axis_alignment' => 'center']),
+            ]);
+        }
+
+        return self::screen('Online Store Inquiries', array_merge([
+            self::card([
+                self::row([
+                    self::column([
+                        self::text('Customer Inquiries & Leads', 'title_medium', ['bold' => true]),
+                        self::text('Incoming contact inquiries, quotes, and customer messages.', 'body_small', ['color' => '#6b7280']),
+                    ]),
+                    self::badge($unreadCount > 0 ? "{$unreadCount} UNREAD" : 'UP TO DATE', $unreadCount > 0 ? '#dc2626' : '#059669', 'subtle'),
+                ], ['main_axis_alignment' => 'space_between']),
+            ]),
+        ], $rows));
+    }
+
     public static function couponsView(Company $company): array
     {
         $coupons = Coupon::where('company_id', $company->id)->orderByDesc('id')->get();
@@ -6944,6 +7045,10 @@ class SchemaResponse
             ['key' => 'quotations', 'title' => 'Quotations & Estimates', 'endpoint' => '/api/tenant/views/quotations', 'permission' => 'quotes.view'],
             ['key' => 'customers', 'title' => 'Customers & CRM', 'endpoint' => '/api/tenant/views/customers', 'permission' => 'customers.view'],
             ['key' => 'cash-register', 'title' => 'Cash Register', 'endpoint' => '/api/tenant/views/cash-register', 'permission' => 'cash_register.view'],
+            ['key' => 'settings-storefront', 'title' => 'Storefront Banner & Auth', 'endpoint' => '/api/tenant/views/settings-storefront', 'permission' => 'storefront.manage'],
+            ['key' => 'settings-payments', 'title' => 'Storefront Payment Gateways', 'endpoint' => '/api/tenant/views/settings-payments', 'permission' => 'gateways.manage'],
+            ['key' => 'settings-storefront-domain', 'title' => 'Store Web Address & Domain', 'endpoint' => '/api/tenant/views/settings-storefront-domain', 'permission' => 'storefront.manage'],
+            ['key' => 'storefront-inquiries', 'title' => 'Online Store Inquiries', 'endpoint' => '/api/tenant/views/storefront-inquiries', 'permission' => 'storefront.inquiries.view'],
         ];
 
         if (! Schema::hasTable('sdui_screens')) {
@@ -7266,6 +7371,8 @@ class SchemaResponse
             'settings-faqs', 'faqs' => self::faqsView($company),
             'settings-storefront', 'storefront-settings', 'storefront-banner-auth', 'settings_storefront', 'storefront-banner' => self::storefrontBannerAuthView($company),
             'settings-payments', 'storefront-payments', 'storefront-payment-gateways', 'settings_payments', 'storefront-gateway' => self::storefrontPaymentGatewaysView($company),
+            'settings-storefront-domain', 'storefront-domain', 'store-domain', 'settings_domain', 'domain' => self::storefrontDomainView($company),
+            'storefront-inquiries', 'store-inquiries', 'inquiries', 'tenant-inquiries' => self::storefrontInquiriesView($company),
             'restaurant-tables', 'tables', 'floor-plan' => self::restaurantTablesView($company),
             'restaurant-kds', 'kds', 'kitchen-display' => self::restaurantKdsView($company),
             'restaurant-pos' => self::restaurantPosView($company),

@@ -59,6 +59,7 @@ use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\StoreProfileController;
 use App\Http\Controllers\Tenant\Auth\PasswordResetController;
 use App\Http\Controllers\Tenant\InvoiceController;
+use App\Http\Controllers\Tenant\StoreInquiryController;
 use App\Http\Controllers\Webhooks\SubscriptionWebhookController;
 use App\Http\Middleware\AuthenticateTenantApi;
 use App\Http\Middleware\PreventDemoModifications;
@@ -118,6 +119,11 @@ Route::post('/storefront/products/{id}/reviews', [\App\Http\Controllers\Tenant\S
 Route::post('/v1/storefront/products/{id}/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'store']);
 Route::get('/storefront/customer/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'customerReviews']);
 Route::get('/v1/storefront/customer/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'customerReviews']);
+
+// Public Storefront Inquiries Sink
+Route::post('/storefront/inquiry', [StoreInquiryController::class, 'submitPublicInquiry']);
+Route::post('/v1/storefront/inquiry', [StoreInquiryController::class, 'submitPublicInquiry']);
+Route::post('/api/storefront/inquiry', [StoreInquiryController::class, 'submitPublicInquiry']);
 
 // Storefront Customer Auth, Profile, Wishlist, Addresses, & Authoritative Cart Calculation
 $storefrontCustomerRoutes = function () {
@@ -609,7 +615,12 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
         Route::post('/test', [SettingsApiController::class, 'testNotificationChannel']);
     });
 
-    // Storefront Banner, Auth & Payment Gateway settings
+    // Storefront Domain, Banner, Auth & Payment Gateway settings
+    Route::get('/tenant/storefront/domain-config', [StorefrontSettingsController::class, 'getDomainConfig']);
+    Route::match(['post', 'put'], '/tenant/storefront/domain-config', [StorefrontSettingsController::class, 'updateDomainConfig']);
+    Route::get('/v1/tenant/storefront/domain-config', [StorefrontSettingsController::class, 'getDomainConfig']);
+    Route::match(['post', 'put'], '/v1/tenant/storefront/domain-config', [StorefrontSettingsController::class, 'updateDomainConfig']);
+
     Route::get('/tenant/storefront/banner-auth', [StorefrontSettingsController::class, 'getBannerAuth']);
     Route::match(['post', 'put'], '/tenant/storefront/banner-auth', [StorefrontSettingsController::class, 'updateBannerAuth']);
     Route::get('/v1/tenant/storefront/banner-auth', [StorefrontSettingsController::class, 'getBannerAuth']);
@@ -619,6 +630,16 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     Route::match(['post', 'put'], '/tenant/storefront/payment-gateways', [StorefrontSettingsController::class, 'updatePaymentGateways']);
     Route::get('/v1/tenant/storefront/payment-gateways', [StorefrontSettingsController::class, 'getPaymentGateways']);
     Route::match(['post', 'put'], '/v1/tenant/storefront/payment-gateways', [StorefrontSettingsController::class, 'updatePaymentGateways']);
+
+    // Tenant Storefront Inquiries Management
+    Route::get('/tenant/storefront/inquiries', [StoreInquiryController::class, 'index']);
+    Route::match(['post', 'put'], '/tenant/storefront/inquiries/{id}/status', [StoreInquiryController::class, 'updateStatus']);
+    Route::delete('/tenant/storefront/inquiries/{id}', [StoreInquiryController::class, 'destroy']);
+    Route::post('/tenant/storefront/inquiries/{id}/delete', [StoreInquiryController::class, 'destroy']);
+    Route::get('/v1/tenant/storefront/inquiries', [StoreInquiryController::class, 'index']);
+    Route::match(['post', 'put'], '/v1/tenant/storefront/inquiries/{id}/status', [StoreInquiryController::class, 'updateStatus']);
+    Route::delete('/v1/tenant/storefront/inquiries/{id}', [StoreInquiryController::class, 'destroy']);
+    Route::post('/v1/tenant/storefront/inquiries/{id}/delete', [StoreInquiryController::class, 'destroy']);
 
     // Tenant Promotional Coupons & Discounts CRUD
     Route::get('/tenant/coupons', [CouponApiController::class, 'index']);
@@ -1152,11 +1173,16 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/settings/app-preferences', [TenantAppPreferencesController::class, 'getNotificationAlertsScreen'])->middleware('tenant.api.permission:settings,view');
         Route::match(['post', 'put'], '/settings/app-preferences', [TenantAppPreferencesController::class, 'saveNotificationPreferences'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/settings/app-preferences/notifications/upload-audio', [TenantAppPreferencesController::class, 'uploadAudio'])->middleware('tenant.api.permission:settings,edit');
-        Route::delete('/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
-        Route::get('/storefront/banner-auth', [StorefrontSettingsController::class, 'getBannerAuth'])->middleware('tenant.api.permission:settings,view');
-        Route::match(['post', 'put'], '/storefront/banner-auth', [StorefrontSettingsController::class, 'updateBannerAuth'])->middleware('tenant.api.permission:settings,edit');
-        Route::get('/storefront/payment-gateways', [StorefrontSettingsController::class, 'getPaymentGateways'])->middleware('tenant.api.permission:settings,view');
-        Route::match(['post', 'put'], '/storefront/payment-gateways', [StorefrontSettingsController::class, 'updatePaymentGateways'])->middleware('tenant.api.permission:settings,edit');
+        Route::get('/storefront/banner-auth', [StorefrontSettingsController::class, 'getBannerAuth'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,view']);
+        Route::match(['post', 'put'], '/storefront/banner-auth', [StorefrontSettingsController::class, 'updateBannerAuth'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,edit']);
+        Route::get('/storefront/payment-gateways', [StorefrontSettingsController::class, 'getPaymentGateways'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:gateways,view']);
+        Route::match(['post', 'put'], '/storefront/payment-gateways', [StorefrontSettingsController::class, 'updatePaymentGateways'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:gateways,edit']);
+        Route::get('/storefront/domain-config', [StorefrontSettingsController::class, 'getDomainConfig'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,view']);
+        Route::match(['post', 'put'], '/storefront/domain-config', [StorefrontSettingsController::class, 'updateDomainConfig'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,edit']);
+        Route::get('/storefront/inquiries', [StoreInquiryController::class, 'index'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,inquiries.view']);
+        Route::match(['post', 'put'], '/storefront/inquiries/{id}/status', [StoreInquiryController::class, 'updateStatus'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,inquiries.action']);
+        Route::delete('/storefront/inquiries/{id}', [StoreInquiryController::class, 'destroy'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,inquiries.action']);
+        Route::post('/storefront/inquiries/{id}/delete', [StoreInquiryController::class, 'destroy'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,inquiries.action']);
         Route::get('/coupons', [CouponApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
         Route::post('/coupons', [CouponApiController::class, 'store'])->middleware('tenant.api.permission:settings,edit');
         Route::get('/coupons/{id}', [CouponApiController::class, 'show'])->middleware('tenant.api.permission:settings,view');

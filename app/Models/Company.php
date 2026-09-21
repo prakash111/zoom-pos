@@ -297,6 +297,16 @@ class Company extends Model
         return $this->hasMany(PaymentMethod::class)->orderBy('order_index');
     }
 
+    public function inquiries()
+    {
+        return $this->hasMany(TenantInquiry::class, 'company_id')->orderByDesc('created_at');
+    }
+
+    public function getUnreadInquiriesCountAttribute(): int
+    {
+        return $this->inquiries()->where('status', 'unread')->count();
+    }
+
     public function isSuspended(): bool
     {
         return in_array($this->status, ['suspended', 'cancelled'], true);
@@ -538,6 +548,7 @@ class Company extends Model
                 'salon', 'spa', 'wellness', 'beauty', 'salon_wellness', 'service_booking', 'service', 'services' => 'service_booking',
                 'pharmacy', 'pharmacy_pos', 'chemist' => 'pharmacy',
                 'lead', 'leads', 'leadmanagement', 'lead_management' => 'leadmanagement',
+                'storefront', 'ecommerce', 'ecommerce_storefront', 'online_store' => 'ecommerce_storefront',
                 default => $canonical,
             };
             if ($key !== '') {
@@ -574,9 +585,24 @@ class Company extends Model
             'salon', 'spa', 'wellness', 'beauty', 'salon_wellness', 'service_booking', 'service', 'services' => 'service_booking',
             'pharmacy', 'pharmacy_pos', 'chemist' => 'pharmacy',
             'lead', 'leads', 'leadmanagement', 'lead_management' => 'leadmanagement',
+            'storefront', 'ecommerce', 'ecommerce_storefront', 'online_store' => 'ecommerce_storefront',
             default => $canonical,
         };
         $licensed = $this->licensedModuleKeys();
+
+        if ($norm === 'ecommerce_storefront') {
+            if (in_array('ecommerce_storefront', $licensed, true) || in_array('catalog', $licensed, true)) {
+                return true;
+            }
+            if (is_array($this->plan?->extensions) && in_array('ecommerce_storefront', $this->plan->extensions, true)) {
+                return true;
+            }
+            if (is_array($this->plan?->features) && (! empty($this->plan->features['ecommerce_storefront']) || in_array('ecommerce_storefront', $this->plan->features, true))) {
+                return true;
+            }
+            // Active by default for all valid active store accounts unless restricted
+            return true;
+        }
 
         return in_array($norm, $licensed, true) || in_array($canonical, $licensed, true) || in_array($clean, $licensed, true);
     }

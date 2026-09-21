@@ -293,4 +293,121 @@ class StorefrontSettingsController extends Controller
             ],
         ]);
     }
+
+    /**
+     * GET /api/v1/tenant/storefront/domain-config
+     * GET /api/tenant/storefront/domain-config
+     */
+    public function getDomainConfig(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $baseHost = config('app.domain', 'saas.zoomnearby.com');
+        $subdomain = $company->subdomain ?? '';
+        $customDomain = $company->custom_domain ?? '';
+
+        $liveStoreUrl = ! empty($customDomain)
+            ? 'https://'.$customDomain
+            : (! empty($subdomain) ? 'https://'.$subdomain.'.'.$baseHost : url('/'));
+
+        $cnameTarget = 'cname.'.$baseHost;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'subdomain' => $subdomain,
+                'subdomain_url' => ! empty($subdomain) ? 'https://'.$subdomain.'.'.$baseHost : '',
+                'custom_domain' => $customDomain,
+                'live_store_url' => $liveStoreUrl,
+                'cname_target' => $cnameTarget,
+                'dns_records' => [
+                    [
+                        'type' => 'CNAME',
+                        'host' => '@ / www / store',
+                        'value' => $cnameTarget,
+                        'ttl' => '3600 (Automatic)',
+                        'status' => ! empty($customDomain) ? 'Configured' : 'Pending',
+                    ],
+                ],
+                'ssl_status' => 'Auto-provisioned via SSL certificate provider',
+                'propagation_note' => 'DNS changes can take anywhere from 15 minutes up to 24-48 hours to propagate worldwide.',
+            ],
+        ]);
+    }
+
+    /**
+     * PUT /api/v1/tenant/storefront/domain-config
+     * POST /api/v1/tenant/storefront/domain-config
+     */
+    public function updateDomainConfig(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $validator = Validator::make($request->all(), [
+            'custom_domain' => ['nullable', 'string', 'max:255'],
+            'subdomain' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation error.',
+                'details' => $validator->errors(),
+            ], 422);
+        }
+
+        $updates = [];
+
+        if ($request->has('custom_domain')) {
+            $rawDomain = trim((string) $request->input('custom_domain', ''));
+            $cleanDomain = preg_replace('#^https?://#i', '', $rawDomain);
+            $cleanDomain = rtrim($cleanDomain, '/');
+            $cleanDomain = strtolower($cleanDomain);
+
+            if (! empty($cleanDomain)) {
+                $conflict = Company::withoutGlobalScopes()
+                    ->where('id', '!=', $company->id)
+                    ->where('custom_domain', $cleanDomain)
+                    ->exists();
+
+                if ($conflict) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Domain already in use',
+                        'message' => 'This custom domain is already registered to another store.',
+                    ], 422);
+                }
+            }
+            $updates['custom_domain'] = $cleanDomain ?: null;
+        }
+
+        if ($request->has('subdomain') && ! empty($request->input('subdomain'))) {
+            $rawSub = trim((string) $request->input('subdomain'));
+            $cleanSub = strtolower(preg_replace('#[^a-z0-9-]#', '-', $rawSub));
+            $cleanSub = trim($cleanSub, '-');
+
+            if (! empty($cleanSub) && $cleanSub !== $company->subdomain) {
+                $conflict = Company::withoutGlobalScopes()
+                    ->where('id', '!=', $company->id)
+                    ->where('subdomain', $cleanSub)
+                    ->exists();
+
+                if ($conflict) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Subdomain already in use',
+                        'message' => 'This subdomain is already taken.',
+                    ], 422);
+                }
+                $updates['subdomain'] = $cleanSub;
+            }
+        }
+
+        if (! empty($updates)) {
+            $company->update($updates);
+            AuditLog::record('storefront.domain_updated', $company->id, $user?->id, $updates);
+        }
+
+        return $this->getDomainConfig($request);
+    }
 }

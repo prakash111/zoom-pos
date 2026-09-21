@@ -38,6 +38,8 @@ class PermissionChecker
         'coupons' => 'Coupons & Discounts',
         'faqs' => 'Store FAQs & Help Center',
         'reviews' => 'Product Ratings & Reviews',
+        'storefront' => 'Storefront & Online Sales',
+        'gateways' => 'Payment Gateways & Integrations',
     ];
 
     public const ACTIONS = [
@@ -243,6 +245,19 @@ class PermissionChecker
             'edit' => 'Approve or moderate customer reviews',
             'delete' => 'Delete customer reviews',
         ],
+        'storefront' => [
+            'view' => 'View storefront overview & live preview',
+            'manage' => 'Manage storefront settings, domain & banner',
+            'inquiries' => 'View and manage storefront inquiries',
+            'inquiries.view' => 'View customer inquiries submitted on storefront',
+            'inquiries.action' => 'Update inquiry status, reply or delete inquiries',
+            'edit' => 'Edit storefront settings',
+        ],
+        'gateways' => [
+            'view' => 'View active payment gateways',
+            'manage' => 'Configure storefront payment gateways & credentials',
+            'edit' => 'Update gateway settings',
+        ],
     ];
 
     public static function canonicalModuleSlug(string $module): string
@@ -289,8 +304,14 @@ class PermissionChecker
         return app(self::class)->allows($user, $module, $action);
     }
 
-    public function allows(User $user, string $module, string $action): bool
+    public function allows(User $user, string $module, string $action = 'view'): bool
     {
+        if (str_contains($module, '.') && ($action === 'view' || empty($action))) {
+            [$mod, $act] = explode('.', $module, 2);
+            $module = $mod;
+            $action = $act;
+        }
+
         $canonical = self::canonicalModuleSlug($module);
         // Tenant owners and explicit role grants cannot activate an extension.
         if ($canonical === 'leads' && ! $user->company?->hasModule('leadmanagement')) {
@@ -304,7 +325,11 @@ class PermissionChecker
         $perm = Permission::query()
             ->where('user_id', $user->id)
             ->whereIn('module', array_unique([$module, $canonical]))
-            ->where('action', $action)
+            ->where(function ($q) use ($action) {
+                $q->where('action', $action)
+                    ->orWhere('action', 'manage')
+                    ->orWhere('action', '*');
+            })
             ->first();
 
         if ($perm !== null) {
@@ -346,7 +371,19 @@ class PermissionChecker
         $canonical = self::canonicalModuleSlug($module);
         $allowed = $map[$module] ?? $map[$canonical] ?? [];
 
-        return in_array($action, $allowed, true);
+        if (in_array($action, $allowed, true)) {
+            return true;
+        }
+
+        if (in_array('manage', $allowed, true)) {
+            return true;
+        }
+
+        if (str_starts_with($action, 'inquiries.') && in_array('inquiries', $allowed, true)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -407,6 +444,8 @@ class PermissionChecker
                     'coupons' => ['view', 'create', 'edit', 'delete'],
                     'faqs' => ['view', 'create', 'edit', 'delete'],
                     'reviews' => ['view', 'create', 'edit', 'delete'],
+                    'storefront' => ['view', 'manage', 'inquiries', 'inquiries.view', 'inquiries.action', 'edit'],
+                    'gateways' => ['view', 'manage', 'edit'],
                 ];
 
             case User::ROLE_SALESPERSON:
@@ -427,6 +466,7 @@ class PermissionChecker
                     'restaurant' => ['view', 'create', 'edit', 'manage_kot', 'settle'],
                     'pharmacy' => ['view', 'create', 'edit'],
                     'salon' => ['view', 'create', 'edit', 'checkout'],
+                    'storefront' => ['view', 'inquiries.view'],
                 ];
 
             case User::ROLE_CASHIER:

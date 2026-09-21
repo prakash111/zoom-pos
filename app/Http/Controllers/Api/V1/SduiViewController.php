@@ -252,6 +252,12 @@ class SduiViewController extends Controller
             case 'storefront-gateway':
                 return app(\App\Http\Controllers\Api\Tenant\StorefrontSettingsController::class)->updatePaymentGateways($request);
 
+            case 'domain':
+            case 'storefront-domain':
+            case 'settings-storefront-domain':
+            case 'store-domain':
+                return app(\App\Http\Controllers\Api\Tenant\StorefrontSettingsController::class)->updateDomainConfig($request);
+
             case 'mode':
                 return response()->json([
                     'success' => false,

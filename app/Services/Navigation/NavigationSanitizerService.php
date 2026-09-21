@@ -80,6 +80,16 @@ class NavigationSanitizerService
             $item['children'] = self::sanitizeItems($item['children'] ?? []);
         }
 
+        if (array_key_exists('is_external_url', $item)) {
+            $item['is_external_url'] = (bool) $item['is_external_url'];
+        }
+        if (array_key_exists('url', $item) && $item['url'] !== null) {
+            $item['url'] = (string) $item['url'];
+        }
+        if (array_key_exists('badge', $item) && $item['badge'] !== null) {
+            $item['badge'] = (string) $item['badge'];
+        }
+
         return $item;
     }
 

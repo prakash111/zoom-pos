@@ -410,6 +410,17 @@ class TenantNavRegistry
             $sections[] = self::getFinancialSection();
         }
 
+        // Storefront & Online Sales Section
+        $hasStorefront = true;
+        if ($tenant instanceof Company) {
+            $entitlementService = app(\App\Services\Subscription\SubscriptionEntitlementService::class);
+            $hasStorefront = $tenant->hasModule('ecommerce_storefront')
+                || $entitlementService->tenantCanUseExtension($tenant, 'ecommerce_storefront');
+        }
+        if ($hasStorefront) {
+            $sections[] = self::getStorefrontSection($tenant);
+        }
+
         // 2. Restaurant Module Section
         if (in_array('restaurant', $licensed, true)) {
             $sections[] = self::normalizeSection([
@@ -790,6 +801,15 @@ class TenantNavRegistry
             $decorated['component'] = $meta['component'] ?? $k;
             $decorated['target_endpoint'] = $meta['target_endpoint'] ?? ('/api/tenant/views/'.str_replace('_', '-', $k));
             $decorated['permission'] = $meta['permission'] ?? null;
+            if (isset($meta['is_external_url'])) {
+                $decorated['is_external_url'] = (bool) $meta['is_external_url'];
+            }
+            if (isset($meta['url'])) {
+                $decorated['url'] = $meta['url'];
+            }
+            if (isset($meta['badge'])) {
+                $decorated['badge'] = $meta['badge'];
+            }
 
             // Store Settings must always be an independent root item (never nested under subscription)
             if ($k === 'settings') {
@@ -1056,6 +1076,139 @@ class TenantNavRegistry
                 ['key' => 'consignments', 'label' => 'Consignments', 'title' => 'Consignments', 'icon' => 'local_shipping', 'component' => 'consignments', 'permission' => 'consignments', 'target_endpoint' => '/api/tenant/views/consignments'],
                 ['key' => 'customers', 'label' => 'Customers & CRM', 'title' => 'Customers & CRM', 'icon' => 'people', 'component' => 'customers', 'permission' => 'customers', 'target_endpoint' => '/api/tenant/views/customers'],
             ],
+        ]);
+    }
+
+    /**
+     * Storefront & Online Sales dedicated section.
+     *
+     * @param  Company|string|null  $tenant
+     * @return array<string, mixed>
+     */
+    public static function getStorefrontSection(mixed $tenant): array
+    {
+        $subdomain = '';
+        $customDomain = '';
+        $unreadInquiries = 0;
+        if ($tenant instanceof Company) {
+            $subdomain = $tenant->subdomain ?? '';
+            $customDomain = $tenant->custom_domain ?? '';
+            $unreadInquiries = (int) ($tenant->unread_inquiries_count ?? 0);
+        }
+
+        $domainHost = config('app.domain', 'saas.zoomnearby.com');
+        $liveStoreUrl = ! empty($customDomain)
+            ? 'https://'.$customDomain
+            : (! empty($subdomain) ? 'https://'.$subdomain.'.'.$domainHost : url('/'));
+
+        $items = [
+            [
+                'key' => 'nav_view_live_store',
+                'id' => 'nav_view_live_store',
+                'label' => 'View Live Store',
+                'title' => 'View Live Store',
+                'icon' => 'storefront',
+                'component' => 'external_link',
+                'type' => 'link',
+                'is_external_url' => true,
+                'url' => $liveStoreUrl,
+                'target_endpoint' => $liveStoreUrl,
+                'permission' => 'storefront.manage',
+            ],
+            [
+                'key' => 'nav_storefront_domain',
+                'id' => 'nav_storefront_domain',
+                'label' => 'Store Web Address & Domain',
+                'title' => 'Store Web Address & Domain',
+                'icon' => 'domain',
+                'component' => 'store_domain',
+                'type' => 'link',
+                'route' => '/settings/storefront/domain',
+                'target_endpoint' => '/api/tenant/views/settings-storefront-domain',
+                'permission' => 'storefront.manage',
+            ],
+            [
+                'key' => 'nav_storefront_inquiries',
+                'id' => 'nav_storefront_inquiries',
+                'label' => 'Online Store Inquiries',
+                'title' => 'Online Store Inquiries',
+                'icon' => 'mark_email_unread',
+                'component' => 'store_inquiries',
+                'type' => 'link',
+                'route' => '/storefront/inquiries',
+                'target_endpoint' => '/api/tenant/views/storefront-inquiries',
+                'badge' => $unreadInquiries > 0 ? (string) $unreadInquiries : null,
+                'permission' => 'storefront.inquiries.view',
+            ],
+            [
+                'key' => 'nav_storefront_banner_auth',
+                'id' => 'nav_storefront_banner_auth',
+                'label' => 'Storefront Banner & Auth',
+                'title' => 'Storefront Banner & Auth',
+                'icon' => 'view_carousel',
+                'component' => 'settings_storefront',
+                'type' => 'link',
+                'route' => '/settings/storefront/banner',
+                'target_endpoint' => '/api/tenant/views/settings-storefront',
+                'permission' => 'storefront.manage',
+            ],
+            [
+                'key' => 'nav_storefront_gateways',
+                'id' => 'nav_storefront_gateways',
+                'label' => 'Payment Gateways',
+                'title' => 'Storefront Payment Gateways',
+                'icon' => 'payments',
+                'component' => 'settings_payments',
+                'type' => 'link',
+                'route' => '/settings/storefront/payments',
+                'target_endpoint' => '/api/tenant/views/settings-payments',
+                'permission' => 'gateways.manage',
+            ],
+            [
+                'key' => 'nav_coupons_discounts',
+                'id' => 'nav_coupons_discounts',
+                'label' => 'Coupons & Discounts',
+                'title' => 'Coupons & Discounts',
+                'icon' => 'local_offer',
+                'component' => 'settings_coupons',
+                'type' => 'link',
+                'route' => '/settings/storefront/coupons',
+                'target_endpoint' => '/api/tenant/views/settings-coupons',
+                'permission' => 'coupons',
+            ],
+            [
+                'key' => 'nav_store_faqs',
+                'id' => 'nav_store_faqs',
+                'label' => 'Store FAQs',
+                'title' => 'Store FAQs & Help Center',
+                'icon' => 'quiz',
+                'component' => 'settings_faqs',
+                'type' => 'link',
+                'route' => '/settings/storefront/faqs',
+                'target_endpoint' => '/api/tenant/views/settings-faqs',
+                'permission' => 'faqs',
+            ],
+            [
+                'key' => 'nav_store_reviews',
+                'id' => 'nav_store_reviews',
+                'label' => 'Product Reviews',
+                'title' => 'Product Ratings & Reviews',
+                'icon' => 'star',
+                'component' => 'settings_reviews',
+                'type' => 'link',
+                'route' => '/settings/storefront/reviews',
+                'target_endpoint' => '/api/tenant/views/settings-reviews',
+                'permission' => 'reviews',
+            ],
+        ];
+
+        return self::normalizeSection([
+            'id' => 'sec_storefront',
+            'key' => 'sec_storefront',
+            'title' => 'Storefront & Online Sales',
+            'label' => 'Storefront & Online Sales',
+            'color' => '#2563eb',
+            'items' => $items,
         ]);
     }
 

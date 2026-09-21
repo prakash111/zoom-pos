@@ -34,6 +34,11 @@ Route::middleware(EnsureAppIsInstalled::class)->get('/store/products/{id}/review
 Route::middleware(EnsureAppIsInstalled::class)->post('/store/products/{id}/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'store'])->name('tenant.store.reviews.store');
 Route::middleware(EnsureAppIsInstalled::class)->get('/store/customer/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'customerReviews'])->name('tenant.store.customer.reviews');
 
+// Storefront Public Inquiries
+Route::middleware(EnsureAppIsInstalled::class)->post('/store/inquiry', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'submitPublicInquiry'])->name('tenant.store.inquiry');
+Route::middleware(EnsureAppIsInstalled::class)->post('/storefront/inquiry', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'submitPublicInquiry']);
+Route::middleware(EnsureAppIsInstalled::class)->post('/c/{slug}/inquiry', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'submitPublicInquiry']);
+
 // Social Login Routes for Storefront
 Route::get('/store/auth/{provider}/redirect', [\App\Http\Controllers\Tenant\StorefrontAuthController::class, 'redirectToProvider'])->name('tenant.store.auth.redirect');
 Route::get('/store/auth/{provider}/callback', [\App\Http\Controllers\Tenant\StorefrontAuthController::class, 'handleProviderCallback'])->name('tenant.store.auth.callback');
@@ -216,3 +221,13 @@ Route::get('/tenant/views/invoices/create', function (\Illuminate\Http\Request $
 Route::get('/tenant/invoices/create', function (\Illuminate\Http\Request $request) {
     return app(\App\Http\Controllers\Api\InvoiceController::class)->createSchema($request);
 });
+
+Route::middleware([\App\Http\Middleware\AuthenticateTenantApi::class])->group(function () {
+    Route::get('/tenant/storefront/domain-config', [\App\Http\Controllers\Api\Tenant\StorefrontSettingsController::class, 'getDomainConfig']);
+    Route::match(['put', 'post'], '/tenant/storefront/domain-config', [\App\Http\Controllers\Api\Tenant\StorefrontSettingsController::class, 'updateDomainConfig']);
+    Route::get('/tenant/storefront/inquiries', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'index']);
+    Route::match(['put', 'post'], '/tenant/storefront/inquiries/{id}/status', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'updateStatus']);
+    Route::match(['delete', 'post'], '/tenant/storefront/inquiries/{id}/delete', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'destroy']);
+    Route::delete('/tenant/storefront/inquiries/{id}', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'destroy']);
+});
+

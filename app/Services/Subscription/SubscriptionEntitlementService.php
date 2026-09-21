@@ -144,7 +144,7 @@ class SubscriptionEntitlementService
             return false;
         }
 
-        return $company->hasModule($extensionKey);
+        return $company->hasModule($extensionKey) || $this->tenantHasFeature($company, $extensionKey);
     }
 
     /**
