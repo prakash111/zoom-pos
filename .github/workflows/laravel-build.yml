@@ -1,0 +1,47 @@
+name: Laravel Build
+
+on:
+  push:
+    branches:
+      - master
+      - feat/hybrid-license-verification
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_sqlite, sqlite3, curl, dom, fileinfo, gd, zip
+          coverage: none
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare test environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Compile Blade views
+        run: php artisan view:cache
+
+      - name: Test dashboard and document delivery
+        run: php artisan test tests/Feature/Tenant/FinancialAnalyticsAndDashboardKpisTest.php tests/Feature/Tenant/DocumentTemplateTest.php tests/Feature/Delivery/MessageQueueServiceTest.php tests/Feature/Api/UnifiedDocumentDispatchApiTest.php
