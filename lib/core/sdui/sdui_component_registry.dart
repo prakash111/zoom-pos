@@ -28,6 +28,7 @@ import 'components/navigation_tree_builder.dart';
 import '../../features/settings/screens/store_domain_screen.dart';
 import '../../features/settings/screens/tenant_settings_screen.dart';
 import '../../features/staff/screens/staff_screen.dart';
+import '../../features/storefront/screens/product_reviews_screen.dart';
 import '../../features/storefront/screens/store_inquiries_screen.dart';
 import '../../features/storefront/screens/storefront_screen.dart';
 import '../../features/subscription/screens/subscription_screen.dart';
@@ -208,9 +209,21 @@ class SduiComponentRegistry {
     'settings_faqs': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-faqs', initialTitle: 'Store FAQs & Help Center'),
     'settings-faqs': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-faqs', initialTitle: 'Store FAQs & Help Center'),
     'faqs': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-faqs', initialTitle: 'Store FAQs & Help Center'),
-    'settings_reviews': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-reviews', initialTitle: 'Product Ratings & Reviews'),
-    'settings-reviews': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-reviews', initialTitle: 'Product Ratings & Reviews'),
-    'reviews': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-reviews', initialTitle: 'Product Ratings & Reviews'),
+    'settings_reviews': (_) => const ProductReviewsScreen(),
+    'settings-reviews': (_) => const ProductReviewsScreen(),
+    'reviews': (_) => const ProductReviewsScreen(),
+    'product_reviews': (_) => const ProductReviewsScreen(),
+    'product-reviews': (_) => const ProductReviewsScreen(),
+    'store_reviews': (_) => const ProductReviewsScreen(),
+    'store-reviews': (_) => const ProductReviewsScreen(),
+    'product_ratings_reviews': (_) => const ProductReviewsScreen(),
+    'product-ratings-reviews': (_) => const ProductReviewsScreen(),
+    'storefront_reviews': (_) => const ProductReviewsScreen(),
+    'storefront-reviews': (_) => const ProductReviewsScreen(),
+    'nav_store_reviews': (_) => const ProductReviewsScreen(),
+    '/settings/storefront/reviews': (_) => const ProductReviewsScreen(),
+    '/api/tenant/views/settings-reviews': (_) => const ProductReviewsScreen(),
+    '/api/tenant/views/reviews': (_) => const ProductReviewsScreen(),
     'settings_notifications': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-notifications', initialTitle: 'Verification & Notifications'),
     'settings-notifications': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-notifications', initialTitle: 'Verification & Notifications'),
     'verification_notifications': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-notifications', initialTitle: 'Verification & Notifications'),
