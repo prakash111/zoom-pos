@@ -56,7 +56,7 @@ const Set<String> _forcedRootKeys = <String>{
 
 class _FeatureTile {
   _FeatureTile(this.key, this.titleOf, this.icon,
-      [this.builder, this.permissionModule]);
+      [this.builder, this.permissionModule, this.isExternalUrl = false, this.url, this.badge]);
 
   /// Stable identifier for this destination, independent of locale/label and
   /// of [permissionModule] (several tiles share one backend module, e.g.
@@ -81,6 +81,9 @@ class _FeatureTile {
   /// `{module}.view`. `null` means the tile is never permission-gated (no
   /// dedicated backend module, e.g. Subscription/Devices).
   final String? permissionModule;
+  final bool isExternalUrl;
+  final String? url;
+  final String? badge;
 
   bool visibleTo(UserModel? user) {
     final permission = permissionModule?.trim();
@@ -169,6 +172,9 @@ List<_NavSection> _serverDrivenSections() {
                 title: item.title,
               ),
               item.permission,
+              item.isExternalUrl,
+              item.url ?? item.targetEndpoint,
+              item.badge,
             ));
             final parent = item.effectiveParentId ?? defaultParent;
             if (parent != null && parent.isNotEmpty) {
@@ -818,6 +824,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _dockIndex = index);
     final auth = context.read<AuthProvider>();
     final feature = _featuresFor(auth.company, auth.user)[index - 1];
+    if (feature.isExternalUrl && feature.url != null && feature.url!.isNotEmpty) {
+      launchUrl(Uri.parse(feature.url!), mode: LaunchMode.externalApplication);
+      setState(() => _dockIndex = 0);
+      return;
+    }
     final title = feature.titleOf(AppLocalizations.of(context));
     Navigator.of(context)
         .push(MaterialPageRoute(
@@ -1042,6 +1053,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         void openTile(_FeatureTile tile) {
+          if (tile.isExternalUrl && tile.url != null && tile.url!.isNotEmpty) {
+            Navigator.of(context).pop();
+            launchUrl(Uri.parse(tile.url!), mode: LaunchMode.externalApplication);
+            return;
+          }
           final index = indexByKey[tile.key];
           if (index == null) return;
           Navigator.of(context).pop();
@@ -1148,6 +1164,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
                 selected: isSelected,
+                trailing: tile.isExternalUrl
+                    ? Icon(Icons.open_in_new, size: 15, color: unselectedIconColor.withValues(alpha: 0.7))
+                    : (tile.badge != null && tile.badge!.isNotEmpty
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              tile.badge!,
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          )
+                        : null),
                 onTap: () => openTile(tile),
               );
             }

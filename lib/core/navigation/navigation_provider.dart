@@ -20,6 +20,9 @@ class NavItem {
     this.actionType,
     this.type,
     this.targetEndpoint,
+    this.isExternalUrl = false,
+    this.url,
+    this.badge,
   });
 
   final String key;
@@ -37,6 +40,9 @@ class NavItem {
   final String? actionType;
   final String? type;
   final String? targetEndpoint;
+  final bool isExternalUrl;
+  final String? url;
+  final String? badge;
 
   factory NavItem.fromJson(Map<String, dynamic> json) {
     final safe = NavigationProvider.safeMap(json);
@@ -71,6 +77,9 @@ class NavItem {
       actionType: safe['action_type']?.toString(),
       type: safe['type']?.toString(),
       targetEndpoint: safe['target_endpoint']?.toString(),
+      isExternalUrl: NavigationProvider.safeBool(safe['is_external_url'] ?? safe['is_external']),
+      url: safe['url']?.toString(),
+      badge: safe['badge']?.toString(),
     );
   }
 
@@ -90,6 +99,9 @@ class NavItem {
         if (actionType != null) 'action_type': actionType,
         if (type != null) 'type': type,
         if (targetEndpoint != null) 'target_endpoint': targetEndpoint,
+        if (isExternalUrl) 'is_external_url': true,
+        if (url != null) 'url': url,
+        if (badge != null) 'badge': badge,
       };
 }
 

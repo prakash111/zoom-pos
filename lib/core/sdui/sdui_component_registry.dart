@@ -25,8 +25,10 @@ import '../../features/settings/screens/app_preferences_screen.dart';
 import '../../features/settings/screens/change_password_screen.dart';
 import '../../features/settings/screens/global_printer_setup_screen.dart';
 import 'components/navigation_tree_builder.dart';
+import '../../features/settings/screens/store_domain_screen.dart';
 import '../../features/settings/screens/tenant_settings_screen.dart';
 import '../../features/staff/screens/staff_screen.dart';
+import '../../features/storefront/screens/store_inquiries_screen.dart';
 import '../../features/storefront/screens/storefront_screen.dart';
 import '../../features/subscription/screens/subscription_screen.dart';
 import '../../features/taxes/screens/taxes_screen.dart';
@@ -215,6 +217,22 @@ class SduiComponentRegistry {
     'settings_integrations': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-integrations', initialTitle: 'API & Integrations'),
     'integrations': (_) => const DynamicSchemaPage(endpoint: '/api/tenant/views/settings-integrations', initialTitle: 'API & Integrations'),
     'storefront': (_) => const StorefrontScreen(),
+    // Storefront Domain Setup
+    'store_domain': (_) => const StoreDomainScreen(),
+    'storefront_domain': (_) => const StoreDomainScreen(),
+    'settings_storefront_domain': (_) => const StoreDomainScreen(),
+    'settings-storefront-domain': (_) => const StoreDomainScreen(),
+    '/settings/storefront/domain': (_) => const StoreDomainScreen(),
+    '/api/tenant/views/settings-storefront-domain': (_) => const StoreDomainScreen(),
+    '/api/tenant/views/storefront-domain': (_) => const StoreDomainScreen(),
+    '/api/tenant/views/domain': (_) => const StoreDomainScreen(),
+    // Storefront Customer Inquiries
+    'store_inquiries': (_) => const StoreInquiriesScreen(),
+    'storefront_inquiries': (_) => const StoreInquiriesScreen(),
+    'inquiries': (_) => const StoreInquiriesScreen(),
+    '/storefront/inquiries': (_) => const StoreInquiriesScreen(),
+    '/api/tenant/views/storefront-inquiries': (_) => const StoreInquiriesScreen(),
+    '/api/tenant/views/inquiries': (_) => const StoreInquiriesScreen(),
     'dynamic_page': (_) => const DynamicSchemaPage(),
   };
 

@@ -183,6 +183,9 @@ class SduiNavItemSchema {
     this.type,
     this.targetEndpoint,
     this.children = const [],
+    this.isExternalUrl = false,
+    this.url,
+    this.badge,
   });
 
   final String key;
@@ -195,6 +198,9 @@ class SduiNavItemSchema {
   final String? type;
   final String? targetEndpoint;
   final List<SduiNavItemSchema> children;
+  final bool isExternalUrl;
+  final String? url;
+  final String? badge;
 
   String? get effectiveParentId => parentId ?? parent;
   bool get isAccordion => type == 'accordion' || children.isNotEmpty;
@@ -271,6 +277,9 @@ class SduiNavItemSchema {
           json['endpoint']?.toString() ??
           json['route']?.toString(),
       children: normalizedChildren,
+      isExternalUrl: json['is_external_url'] == true || json['is_external'] == true,
+      url: json['url']?.toString(),
+      badge: json['badge']?.toString(),
     );
   }
 
@@ -286,6 +295,9 @@ class SduiNavItemSchema {
         if (parentId != null) 'parent_id': parentId,
         if (type != null) 'type': type,
         if (targetEndpoint != null) 'target_endpoint': targetEndpoint,
+        if (isExternalUrl) 'is_external_url': true,
+        if (url != null) 'url': url,
+        if (badge != null) 'badge': badge,
         if (children.isNotEmpty)
           'children': children.map((c) => c.toJson()).toList(),
       };

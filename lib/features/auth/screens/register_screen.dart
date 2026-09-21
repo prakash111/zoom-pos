@@ -590,8 +590,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
               return null;
             },
           ),
+          if (_subdomainController.text.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest
+                    .withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _subdomainAvailable == true
+                      ? Colors.green.withValues(alpha: 0.5)
+                      : (_subdomainAvailable == false
+                          ? Colors.red.withValues(alpha: 0.5)
+                          : Theme.of(context).dividerColor.withValues(alpha: 0.3)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Text('🌐', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: RichText(
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontFamily: 'monospace',
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        children: [
+                          const TextSpan(
+                            text: 'https://',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          TextSpan(
+                            text: _slugify(_subdomainController.text).isNotEmpty
+                                ? _slugify(_subdomainController.text)
+                                : 'your-store',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _subdomainAvailable == true
+                                  ? Colors.green
+                                  : Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          const TextSpan(
+                            text: '.saas.zoomnearby.com',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (_subdomainStatusText != null) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Row(
               children: [
                 if (_checkingSubdomain)
