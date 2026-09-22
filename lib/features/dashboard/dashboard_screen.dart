@@ -635,6 +635,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  StoreProvider? _storeProvider;
+  int? _analyticsStoreId;
+
+  void _storeChanged() {
+    final id = _storeProvider?.current?.id;
+    if (!mounted || id == _analyticsStoreId) return;
+    _analyticsStoreId = id;
+    setState(() => _analyticsFuture = _loadAnalytics());
+    _loadDashboardChrome();
+  }
+
+  @override
+  void dispose() {
+    _storeProvider?.removeListener(_storeChanged);
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -650,25 +667,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // means login/session restoration has supplied the bearer token.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<StoreProvider>().load();
+      _storeProvider = context.read<StoreProvider>();
+      _analyticsStoreId = _storeProvider?.current?.id;
+      _storeProvider!.addListener(_storeChanged);
+      _storeProvider!.load();
       context.read<LocaleProvider>().refreshFromServer();
     });
   }
 
   Future<void> _openStoreSwitcher() async {
-    final changed = await showModalBottomSheet<bool>(
+    await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (_) => const StoreSwitcherSheet(),
     );
-    if (changed != true || !mounted) return;
-    await BootstrapCache.instance.refresh(
-      context.read<LocaleProvider>().locale.languageCode,
-      context.read<ApiClient>(),
-    );
-    if (!mounted) return;
-    setState(() => _analyticsFuture = _loadAnalytics());
-    _loadDashboardChrome();
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
@@ -1085,7 +1097,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               IconButton(
                 tooltip: 'Switch store',
                 onPressed: _openStoreSwitcher,
-                icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+                icon:
+                    const Icon(Icons.keyboard_arrow_down, color: Colors.white),
               ),
             ],
           ),
@@ -2282,25 +2295,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: InkWell(
           onTap: _openStoreSwitcher,
           child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TenantLogoAvatar(
-              imageUrl: company?.logoUrl ?? bootstrap.logoUrl,
-              tenantName: company?.tradeName ?? company?.name,
-              size: 28,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                currentStore?.name ?? company?.tradeName ?? company?.name ?? 'Sales & Inventory',
-                overflow: TextOverflow.ellipsis,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TenantLogoAvatar(
+                imageUrl: company?.logoUrl ?? bootstrap.logoUrl,
+                tenantName: company?.tradeName ?? company?.name,
+                size: 28,
+                borderRadius: BorderRadius.circular(6),
               ),
-            ),
-            const SizedBox(width: 2),
-            const Icon(Icons.keyboard_arrow_down, size: 18),
-          ],
-        ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  currentStore?.name ??
+                      company?.tradeName ??
+                      company?.name ??
+                      'Sales & Inventory',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 2),
+              const Icon(Icons.keyboard_arrow_down, size: 18),
+            ],
+          ),
         ),
         elevation: 0,
         bottom: appBarBottom,
@@ -2407,6 +2423,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       padding: const EdgeInsets.all(16),
                       children: [
                         FutureBuilder<AnalyticsModel>(
+                          key: ValueKey(_analyticsStoreId),
                           future: _analyticsFuture,
                           builder: (context, snapshot) {
                             if (snapshot.connectionState ==

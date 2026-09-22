@@ -119,6 +119,9 @@ class SyncEngine extends ChangeNotifier {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   bool isSyncing = false;
+  // StoreProvider holds this while changing request context, so a background
+  // pull cannot write the previous branch's rows into the new branch's cache.
+  bool storeTransitionInProgress = false;
   int unsyncedCount = 0;
   DateTime? lastSyncedAt;
   String? lastError;
@@ -300,7 +303,7 @@ class SyncEngine extends ChangeNotifier {
   /// is already running) and every step is independently try/caught so one
   /// failing table never blocks the rest.
   Future<void> syncNow() async {
-    if (isSyncing) return;
+    if (isSyncing || storeTransitionInProgress) return;
     isSyncing = true;
     lastError = null;
     notifyListeners();

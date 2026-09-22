@@ -24,6 +24,7 @@ import '../../features/service_orders/screens/service_orders_screen.dart';
 import '../../features/settings/screens/app_preferences_screen.dart';
 import '../../features/settings/screens/change_password_screen.dart';
 import '../../features/settings/screens/document_templates_tab.dart';
+import '../../features/stores/store_management_screen.dart';
 import '../../features/settings/screens/global_printer_setup_screen.dart';
 import 'components/navigation_tree_builder.dart';
 import '../../features/settings/screens/store_domain_screen.dart';
@@ -185,6 +186,9 @@ class SduiComponentRegistry {
     // target_endpoint and bypass this compatibility registry entirely.
     'subscription': (_) => const SubscriptionScreen(),
     'settings': (_) => const TenantSettingsScreen(),
+    'store_management': (_) => const StoreManagementScreen(),
+    'nav_stores': (_) => const StoreManagementScreen(),
+    '/settings/store/branches': (_) => const StoreManagementScreen(),
     'document_templates': (_) => const DocumentTemplatesScreen(),
     'nav_document_templates': (_) => const DocumentTemplatesScreen(),
     // Device-local workspace prefs (theme / page transition / dock position).
