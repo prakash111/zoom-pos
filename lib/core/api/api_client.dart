@@ -40,6 +40,14 @@ class ApiClient {
   final SecureStorageService _secureStorage;
   final AppPreferences _preferences;
 
+  /// Current authorized branch, sent on every API request after a switch.
+  int? activeStoreId;
+  String? activeTenantId;
+  String? activeUserId;
+
+  String cacheBucket(String bucket) =>
+      '$bucket@${activeTenantId ?? 'unknown'}:${activeUserId ?? 'unknown'}:${activeStoreId ?? 'primary'}';
+
   /// Invoked whenever the server rejects the stored token as unauthenticated,
   /// so the app can drop back to the login screen. Set by AuthProvider.
   void Function()? onUnauthenticated;
@@ -88,6 +96,11 @@ class ApiClient {
         .readLocale()
         .timeout(AppConfig.localReadTimeout, onTimeout: () => 'en');
     _dio.options.headers['Accept-Language'] = locale;
+    if (activeStoreId == null) {
+      _dio.options.headers.remove('X-Store-Id');
+    } else {
+      _dio.options.headers['X-Store-Id'] = activeStoreId.toString();
+    }
   }
 
   Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query}) {
@@ -176,6 +189,13 @@ class ApiClient {
 
   Future<Map<String, dynamic>> post(String path, {Map<String, dynamic>? data}) {
     return _send(() => _dio.post(path, data: data));
+  }
+
+  Future<Map<String, dynamic>> postForStore(String path,
+      {required int storeId, Map<String, dynamic>? data}) {
+    return _send(() => _dio.post(path,
+        data: data,
+        options: Options(headers: {'X-Store-Id': storeId.toString()})));
   }
 
   /// Like [post], but for endpoints outside the `/api/v1/pos` prefix — see
@@ -310,7 +330,9 @@ class ApiClient {
       final json = body is Map ? Map<String, dynamic>.from(body) : null;
 
       // When account verification is required before order placement, let the structured payload through
-      if (json != null && json['verification_required'] == true && status < 400) {
+      if (json != null &&
+          json['verification_required'] == true &&
+          status < 400) {
         return json;
       }
 

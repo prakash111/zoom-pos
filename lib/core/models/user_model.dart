@@ -53,7 +53,7 @@ class UserModel {
   bool can(String permission) {
     if (permissions[permission] == false) return false;
 
-    final dotIndex = permission.indexOf('.');
+    final dotIndex = permission.lastIndexOf('.');
     if (dotIndex != -1) {
       final module = permission.substring(0, dotIndex);
       if (permissions[module] == false) return false;

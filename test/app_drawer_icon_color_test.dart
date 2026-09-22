@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zoom_pos_mobile/core/api/api_client.dart';
 import 'package:zoom_pos_mobile/core/config/bootstrap_cache.dart';
+import 'package:zoom_pos_mobile/core/stores/store_provider.dart';
 import 'package:zoom_pos_mobile/core/config/locale_provider.dart';
 import 'package:zoom_pos_mobile/core/config/nav_dock_provider.dart';
 import 'package:zoom_pos_mobile/core/config/platform_branding_provider.dart';
@@ -51,9 +52,6 @@ class _FakeAuthProvider extends ChangeNotifier implements AuthProvider {
 
   @override
   bool get isBusy => false;
-
-  @override
-  RegisterResult? get lastRegisterResult => null;
 
   @override
   RegisterResult? get pendingEmailVerification => null;
@@ -126,6 +124,15 @@ class _FakeAuthProvider extends ChangeNotifier implements AuthProvider {
 }
 
 class _FakeApiClient extends Fake implements ApiClient {
+  @override
+  int? activeStoreId;
+  @override
+  String? activeTenantId = 'test';
+  @override
+  String? activeUserId = 'test-user';
+  @override
+  String cacheBucket(String bucket) =>
+      '$bucket@test:test-user:${activeStoreId ?? 'primary'}';
   @override
   Future<String> currentBaseUrl() async => 'https://saas.zoomnearby.com';
 
@@ -211,6 +218,8 @@ Widget _buildTestApp({
     providers: [
       Provider<AppPreferences>.value(value: fakePrefs),
       Provider<ApiClient>.value(value: fakeApi),
+      ChangeNotifierProvider<StoreProvider>(
+          create: (_) => StoreProvider(fakeApi)),
       ChangeNotifierProvider<BootstrapCache>.value(
           value: BootstrapCache.instance),
       ChangeNotifierProvider<AuthProvider>.value(value: fakeAuth),
@@ -253,7 +262,9 @@ void main() {
   });
 
   group('resolveItemColor unit tests', () {
-    test('overrides default orange #F97316 and #EA580C with dynamic preference color', () {
+    test(
+        'overrides default orange #F97316 and #EA580C with dynamic preference color',
+        () {
       const purple = Color(0xFF8B5CF6);
 
       expect(resolveItemColor(null, purple), purple);
@@ -276,7 +287,8 @@ void main() {
   });
 
   group('Drawer item widget builders', () {
-    testWidgets('buildDrawerItemTile renders icon and text in preference color', (tester) async {
+    testWidgets('buildDrawerItemTile renders icon and text in preference color',
+        (tester) async {
       const purple = Color(0xFF8B5CF6);
 
       await tester.pumpWidget(MaterialApp(
@@ -299,7 +311,9 @@ void main() {
       expect(textWidget.style?.color, purple);
     });
 
-    testWidgets('buildSubMenuItemTile renders indented icon with softened variant', (tester) async {
+    testWidgets(
+        'buildSubMenuItemTile renders indented icon with softened variant',
+        (tester) async {
       const purple = Color(0xFF8B5CF6);
 
       await tester.pumpWidget(MaterialApp(
@@ -324,7 +338,9 @@ void main() {
   });
 
   group('Dashboard Drawer integration test', () {
-    testWidgets('Drawer icons bind directly to user-selected preference color and never hardcode orange', (tester) async {
+    testWidgets(
+        'Drawer icons bind directly to user-selected preference color and never hardcode orange',
+        (tester) async {
       const purple = Color(0xFF8B5CF6);
 
       final user = UserModel(
@@ -382,7 +398,8 @@ void main() {
 
       // Check root icon (e.g. POS icon or Store Profile icon)
       // Root icons in the drawer inherit purple
-      final posIcon = find.descendant(of: drawerFinder, matching: find.byIcon(Icons.point_of_sale));
+      final posIcon = find.descendant(
+          of: drawerFinder, matching: find.byIcon(Icons.point_of_sale));
       if (posIcon.evaluate().isNotEmpty) {
         final iconWidget = tester.widget<Icon>(posIcon);
         expect(iconWidget.color, purple);

@@ -21,6 +21,7 @@ import 'core/services/thermal/thermal_printer_service.dart';
 import 'core/storage/app_database.dart';
 import 'core/storage/app_preferences.dart';
 import 'core/storage/secure_storage_service.dart';
+import 'core/stores/store_provider.dart';
 import 'core/widgets/desktop_chrome.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/auth_repository.dart';
@@ -157,6 +158,8 @@ class ZoomPosApp extends StatelessWidget {
       providers: [
         Provider<AppPreferences>.value(value: preferences),
         Provider<ApiClient>.value(value: apiClient),
+        ChangeNotifierProvider<StoreProvider>(
+            create: (_) => StoreProvider(apiClient)),
         ChangeNotifierProvider<BootstrapCache>.value(
             value: BootstrapCache.instance),
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),

@@ -28,7 +28,6 @@ class _StoreDomainScreenState extends State<StoreDomainScreen> {
   String _sslStatus = 'Auto-provisioned via SSL certificate provider';
   String _propagationNote =
       'DNS changes can take anywhere from 15 minutes up to 24-48 hours to propagate worldwide.';
-  List<Map<String, dynamic>> _dnsRecords = [];
 
   final _subdomainController = TextEditingController();
   final _customDomainController = TextEditingController();
@@ -82,13 +81,6 @@ class _StoreDomainScreenState extends State<StoreDomainScreen> {
               'Auto-provisioned via SSL certificate provider';
           _propagationNote = data['propagation_note']?.toString() ??
               'DNS changes can take anywhere from 15 minutes up to 24-48 hours to propagate worldwide.';
-
-          if (data['dns_records'] is List) {
-            _dnsRecords = (data['dns_records'] as List)
-                .whereType<Map>()
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList();
-          }
 
           _subdomainController.text = _subdomain;
           _customDomainController.text = _customDomain;

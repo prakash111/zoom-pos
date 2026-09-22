@@ -68,7 +68,14 @@ class SyncEngine extends ChangeNotifier {
 
   static const _lastSyncedMetaKey = 'last_synced_at';
   static const _pullCursorMetaKey = 'pull_cursor';
-  static const _conflictsBucket = 'sync_conflicts';
+
+  String _storeBucket(String bucket) =>
+      const {'products', 'sales', 'quotations'}.contains(bucket)
+          ? _apiClient.cacheBucket(bucket)
+          : bucket;
+
+  String get _storeCursorKey => _apiClient.cacheBucket(_pullCursorMetaKey);
+  String get _conflictsBucket => _apiClient.cacheBucket('sync_conflicts');
   static final Uuid _uuid = Uuid();
 
   /// server plural key in `/sync-pull` -> local cache bucket. The first four
@@ -164,7 +171,7 @@ class SyncEngine extends ChangeNotifier {
     _online = await _checkOnline();
     await refreshUnsyncedCount();
 
-    if (_online) {
+    if (_online && _apiClient.activeTenantId != null) {
       unawaited(syncNow());
     }
   }
@@ -227,7 +234,13 @@ class SyncEngine extends ChangeNotifier {
     required DateTime createdAt,
   }) async {
     await _database.insertOutboxSale(
-        id: id, payload: payload, createdAt: createdAt);
+        id: id,
+        payload: {
+          ...payload,
+          if (_apiClient.activeStoreId != null)
+            '_store_id': _apiClient.activeStoreId,
+        },
+        createdAt: createdAt);
     await refreshUnsyncedCount();
   }
 
@@ -255,7 +268,11 @@ class SyncEngine extends ChangeNotifier {
       externalId: externalId,
       endpoint: endpoint,
       method: method,
-      payload: payload,
+      payload: {
+        ...payload,
+        if (_apiClient.activeStoreId != null)
+          '_store_id': _apiClient.activeStoreId,
+      },
       baseUpdatedAt: baseUpdatedAt,
       createdAt: DateTime.now(),
     ));
@@ -291,6 +308,7 @@ class SyncEngine extends ChangeNotifier {
     final errors = <String>[];
 
     try {
+      await _loadConflicts();
       await _pushPendingMutations(errors);
       await _pushPendingSales(errors);
       await _pullCatalog(errors);
@@ -312,38 +330,44 @@ class SyncEngine extends ChangeNotifier {
   Future<void> _pushPendingMutations(List<String> errors) async {
     final pending = await _database.pendingMutations();
     if (pending.isEmpty) return;
-
-    final ids = pending.map((m) => m.id).toList();
-    await _database.markMutationsInflight(ids);
-
-    final body = _buildSyncBatchBody(pending);
-
-    try {
-      final response =
-          await _apiClient.post(ApiEndpoints.syncBatch, data: body);
-      // The server processed the whole batch transactionally and dedupes on
-      // the client UUID, so once it returns success every row we sent is
-      // durably applied — mark them all, backfilling server ids from id_map.
-      final idMap = <String, String>{};
-      final rawIdMap = response['id_map'];
-      if (rawIdMap is Map) {
-        rawIdMap.forEach((k, v) => idMap[k.toString()] = v.toString());
+    final byStore = <int?, List<OutboxMutation>>{};
+    for (final mutation in pending) {
+      final storeId = (mutation.payload['_store_id'] as num?)?.toInt();
+      (byStore[storeId] ??= []).add(mutation);
+    }
+    for (final group in byStore.entries) {
+      final ids = group.value.map((m) => m.id).toList();
+      await _database.markMutationsInflight(ids);
+      final body = _buildSyncBatchBody(group.value);
+      try {
+        final response = group.key == null
+            ? await _apiClient.post(ApiEndpoints.syncBatch, data: body)
+            : await _apiClient.postForStore(ApiEndpoints.syncBatch,
+                storeId: group.key!, data: body);
+        // The server processed the whole batch transactionally and dedupes on
+        // the client UUID, so once it returns success every row we sent is
+        // durably applied — mark them all, backfilling server ids from id_map.
+        final idMap = <String, String>{};
+        final rawIdMap = response['id_map'];
+        if (rawIdMap is Map) {
+          rawIdMap.forEach((k, v) => idMap[k.toString()] = v.toString());
+        }
+        await _database.markMutationsSynced(ids, idMap);
+        // The server ACKed the batch but may have dropped some edits/deletes as
+        // stale (last-write-wins). Log those so the Sync panel can show them;
+        // the next _pullDeltas refreshes the local rows to the server's copy.
+        await _recordConflicts(response['conflicts']);
+      } on ApiException catch (e) {
+        // Any failure — connectivity or a rejected batch — leaves every row
+        // queued (marked `failed`, retried next cycle). A partially-applied
+        // retry is safe: the server's idempotency ledger skips what it already
+        // ingested.
+        await _database.recordMutationFailure(ids, e.message);
+        errors.add('Offline changes: ${e.message}');
+      } catch (e) {
+        await _database.recordMutationFailure(ids, e.toString());
+        errors.add('Offline changes: $e');
       }
-      await _database.markMutationsSynced(ids, idMap);
-      // The server ACKed the batch but may have dropped some edits/deletes as
-      // stale (last-write-wins). Log those so the Sync panel can show them;
-      // the next _pullDeltas refreshes the local rows to the server's copy.
-      await _recordConflicts(response['conflicts']);
-    } on ApiException catch (e) {
-      // Any failure — connectivity or a rejected batch — leaves every row
-      // queued (marked `failed`, retried next cycle). A partially-applied
-      // retry is safe: the server's idempotency ledger skips what it already
-      // ingested.
-      await _database.recordMutationFailure(ids, e.message);
-      errors.add('Offline changes: ${e.message}');
-    } catch (e) {
-      await _database.recordMutationFailure(ids, e.toString());
-      errors.add('Offline changes: $e');
     }
   }
 
@@ -440,16 +464,23 @@ class SyncEngine extends ChangeNotifier {
   Future<void> _pushPendingSales(List<String> errors) async {
     final pending = await _database.pendingOutboxSales();
     if (pending.isEmpty) return;
-
-    try {
-      final syncedIds = await _salesRepository
-          .pushSalesBatch(pending.map((row) => row.payload).toList());
-      await _database.markOutboxSynced(syncedIds);
-    } on ApiException catch (e) {
-      for (final row in pending) {
-        await _database.recordOutboxFailure(row.id, e.message);
+    final byStore = <int?, List<OutboxSale>>{};
+    for (final sale in pending) {
+      final storeId = (sale.payload['_store_id'] as num?)?.toInt();
+      (byStore[storeId] ??= []).add(sale);
+    }
+    for (final group in byStore.entries) {
+      try {
+        final syncedIds = await _salesRepository.pushSalesBatch(
+            group.value.map((row) => row.payload).toList(),
+            storeId: group.key);
+        await _database.markOutboxSynced(syncedIds);
+      } on ApiException catch (e) {
+        for (final row in group.value) {
+          await _database.recordOutboxFailure(row.id, e.message);
+        }
+        errors.add('Sales: ${e.message}');
       }
-      errors.add('Sales: ${e.message}');
     }
   }
 
@@ -461,8 +492,8 @@ class SyncEngine extends ChangeNotifier {
   Future<void> _pullCatalog(List<String> errors) async {
     try {
       final catalog = await _inventoryRepository.fetchCatalog();
-      await _database.replaceCacheBucket(
-          'products', catalog.products.map((p) => p.toJson()).toList());
+      await _database.replaceCacheBucket(_storeBucket('products'),
+          catalog.products.map((p) => p.toJson()).toList());
       await _database.replaceCacheBucket(
           'categories', catalog.categories.map((c) => c.toJson()).toList());
       await _database.replaceCacheBucket(
@@ -495,7 +526,7 @@ class SyncEngine extends ChangeNotifier {
   /// bucket, prunes rows the server reports deleted since the last cursor.
   Future<void> _pullDeltas(List<String> errors) async {
     try {
-      final cursor = await _database.getMeta(_pullCursorMetaKey);
+      final cursor = await _database.getMeta(_storeCursorKey);
       final response = await _apiClient
           .get(
             ApiEndpoints.syncPull,
@@ -514,9 +545,9 @@ class SyncEngine extends ChangeNotifier {
             .toList();
         if (rows.isEmpty) continue;
         if (cursor == null) {
-          await _database.replaceCacheBucket(entry.value, rows);
+          await _database.replaceCacheBucket(_storeBucket(entry.value), rows);
         } else {
-          await _database.upsertCacheItems(entry.value, rows);
+          await _database.upsertCacheItems(_storeBucket(entry.value), rows);
         }
       }
 
@@ -528,14 +559,14 @@ class SyncEngine extends ChangeNotifier {
               .map((e) => e.toString())
               .toList();
           if (ids.isNotEmpty) {
-            await _database.deleteCacheItems(entry.value, ids);
+            await _database.deleteCacheItems(_storeBucket(entry.value), ids);
           }
         }
       }
 
       final serverTime = response['server_time'];
       if (serverTime is String && serverTime.isNotEmpty) {
-        await _database.setMeta(_pullCursorMetaKey, serverTime);
+        await _database.setMeta(_storeCursorKey, serverTime);
       }
     } on ApiException catch (e) {
       errors.add('Sync pull: ${e.message}');

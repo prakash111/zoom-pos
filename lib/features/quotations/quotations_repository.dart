@@ -14,6 +14,8 @@ class QuotationsRepository with OfflineWriteable {
   final ApiClient _client;
   final AppDatabase _database;
 
+  String get _quotationsBucket => _client.cacheBucket('quotations');
+
   @override
   AppDatabase get offlineDb => _database;
 
@@ -45,11 +47,11 @@ class QuotationsRepository with OfflineWriteable {
       // subset and must not overwrite it.
       if ((status == null || status.isEmpty) && (search == null || search.isEmpty)) {
         await _database.replaceCacheBucket(
-            'quotations', quotations.map((q) => q.toJson()).toList());
+            _quotationsBucket, quotations.map((q) => q.toJson()).toList());
       }
       return quotations;
     } on ApiException {
-      final cached = await _database.readCacheBucket('quotations');
+      final cached = await _database.readCacheBucket(_quotationsBucket);
       if (cached.isEmpty) rethrow;
       var all = cached.map(QuotationModel.fromJson).toList();
       if (status != null && status.isNotEmpty) {
@@ -107,7 +109,7 @@ class QuotationsRepository with OfflineWriteable {
         endpoint: ApiEndpoints.quotation(id),
         method: 'DELETE',
         payload: const {},
-        cacheBucket: 'quotations',
+        cacheBucket: _quotationsBucket,
         online: () => _client.delete(ApiEndpoints.quotation(id)),
         offlineResult: () {},
       );

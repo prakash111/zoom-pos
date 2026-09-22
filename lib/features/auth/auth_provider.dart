@@ -31,8 +31,7 @@ class AuthProvider extends ChangeNotifier {
     // When connectivity returns, re-validate a session that was restored from
     // the local cache while offline (below) — promote it to a fully verified
     // session, or drop it if the server now rejects the token.
-    _connectivitySub =
-        Connectivity().onConnectivityChanged.listen((results) {
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
       final online = results.any((r) => r != ConnectivityResult.none);
       if (online) unawaited(refreshSessionIfOffline());
     });
@@ -68,8 +67,17 @@ class AuthProvider extends ChangeNotifier {
   /// `_company` goes through here rather than the field directly, so none
   /// of them can forget this.
   void _applyCompany(CompanyModel? company) {
+    if (_apiClient.activeTenantId != company?.id) {
+      _apiClient.activeStoreId = null;
+    }
     _company = company;
+    _apiClient.activeTenantId = company?.id;
     TenantTimeService.instance.setTimezone(company?.timezone);
+  }
+
+  void _applyUser(UserModel? user) {
+    _user = user;
+    _apiClient.activeUserId = user?.id;
   }
 
   Future<void> restoreSession() async {
@@ -89,9 +97,10 @@ class AuthProvider extends ChangeNotifier {
               const Duration(seconds: 6),
               onTimeout: () => throw ApiException('Session restore timed out'),
             );
-        _user = result.user;
+        _applyUser(result.user);
         _applyCompany(result.company);
-        await SessionCache.instance.save(user: result.user, company: result.company);
+        await SessionCache.instance
+            .save(user: result.user, company: result.company);
         _offlineSession = false;
         try {
           await BootstrapCache.instance
@@ -115,7 +124,7 @@ class AuthProvider extends ChangeNotifier {
         // retained and re-checked by [refreshSessionIfOffline] on reconnect.
         final cached = await SessionCache.instance.load();
         if (cached != null && cached.company.id.isNotEmpty) {
-          _user = cached.user;
+          _applyUser(cached.user);
           _applyCompany(cached.company);
           _offlineSession = true;
           try {
@@ -147,7 +156,7 @@ class AuthProvider extends ChangeNotifier {
     if (!_offlineSession || _status != AuthStatus.authenticated) return;
     try {
       final result = await _authRepository.session();
-      _user = result.user;
+      _applyUser(result.user);
       _applyCompany(result.company);
       await SessionCache.instance
           .save(user: result.user, company: result.company);
@@ -162,7 +171,7 @@ class AuthProvider extends ChangeNotifier {
         await _secureStorage.clearToken();
         await SessionCache.instance.clear();
         _offlineSession = false;
-        _user = null;
+        _applyUser(null);
         _applyCompany(null);
         _status = AuthStatus.unauthenticated;
         notifyListeners();
@@ -177,7 +186,7 @@ class AuthProvider extends ChangeNotifier {
     if (_status != AuthStatus.authenticated) return;
     try {
       final result = await _authRepository.session();
-      _user = result.user;
+      _applyUser(result.user);
       _applyCompany(result.company);
       await SessionCache.instance
           .save(user: result.user, company: result.company);
@@ -250,7 +259,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  RegisterResult? _lastRegisterResult;
   Future<Map<String, dynamic>> checkSubdomain(String subdomain) async {
     return await _authRepository.checkSubdomain(subdomain);
   }
@@ -286,8 +294,6 @@ class AuthProvider extends ChangeNotifier {
         subdomain: subdomain,
         customDomain: customDomain,
       );
-
-      _lastRegisterResult = result;
 
       if (result.requiresOtp) {
         _status = AuthStatus.unauthenticated;
@@ -357,20 +363,21 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> loginWithToken(String token, {UserModel? user, CompanyModel? company}) async {
+  Future<bool> loginWithToken(String token,
+      {UserModel? user, CompanyModel? company}) async {
     _status = AuthStatus.authenticating;
     _errorMessage = null;
     notifyListeners();
 
     try {
       await _secureStorage.saveToken(token);
-      if (user != null) _user = user;
+      if (user != null) _applyUser(user);
       if (company != null) _applyCompany(company);
 
       try {
         final session = await _authRepository.session();
         _applyCompany(session.company);
-        if (session.user != null) _user = session.user;
+        if (session.user != null) _applyUser(session.user);
       } catch (_) {}
 
       try {
@@ -395,7 +402,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _handleLoginSuccess(LoginResult result) async {
     await _secureStorage.saveToken(result.token);
-    _user = result.user;
+    _applyUser(result.user);
     _applyCompany(result.company);
 
     // The login/register responses omit a few company fields (notably
@@ -406,7 +413,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final refreshed = await _authRepository.session();
       _applyCompany(refreshed.company);
-      if (refreshed.user != null) _user = refreshed.user;
+      if (refreshed.user != null) _applyUser(refreshed.user);
     } catch (_) {
       // Keep the company from the login/register response if this fails.
     }
@@ -453,10 +460,11 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    _apiClient.activeStoreId = null;
     await onBeforeLogout?.call();
     await _secureStorage.clearToken();
     await SessionCache.instance.clear();
-    _user = null;
+    _applyUser(null);
     _applyCompany(null);
     _offlineSession = false;
     _status = AuthStatus.unauthenticated;
@@ -465,9 +473,10 @@ class AuthProvider extends ChangeNotifier {
 
   void _handleUnauthenticated() {
     if (_status != AuthStatus.authenticated) return;
+    _apiClient.activeStoreId = null;
     _secureStorage.clearToken();
     unawaited(SessionCache.instance.clear());
-    _user = null;
+    _applyUser(null);
     _applyCompany(null);
     _offlineSession = false;
     _status = AuthStatus.unauthenticated;

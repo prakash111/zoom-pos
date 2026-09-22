@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/landing/screens/landing_screen.dart';
+import '../../features/settings/screens/document_templates_tab.dart';
 import '../../features/storefront/screens/storefront_screen.dart';
 import 'screens/dynamic_schema_page.dart';
 
@@ -13,6 +14,13 @@ class AppRouter {
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     final requested = settings.name?.trim() ?? '';
     final normalized = requested.toLowerCase().replaceFirst(RegExp(r'^/+'), '');
+
+    if (normalized == 'settings/store/templates') {
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => const DocumentTemplatesScreen(),
+      );
+    }
 
     if (normalized == 'store' || normalized == 'storefront' || normalized == 'shop' || normalized.startsWith('c/')) {
       return MaterialPageRoute<void>(

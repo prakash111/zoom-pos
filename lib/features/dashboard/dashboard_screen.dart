@@ -25,6 +25,7 @@ import '../../core/sdui/sdui_component_registry.dart';
 import '../../core/sdui/sdui_icon_registry.dart';
 import '../../core/services/sync/sync_status_badge.dart';
 import '../../core/storage/app_preferences.dart';
+import '../../core/stores/store_provider.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/widgets/coming_soon_screen.dart';
@@ -40,6 +41,7 @@ import '../../core/models/dashboard_summary_model.dart';
 import '../auth/auth_provider.dart';
 import '../navigation/presentation/widgets/app_drawer.dart';
 import '../sales/screens/sales_screen.dart';
+import '../stores/store_switcher_sheet.dart';
 import '../settings/screens/app_preferences_screen.dart';
 import '../settings/screens/change_password_screen.dart';
 import '../settings/server_settings_screen.dart';
@@ -647,8 +649,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // bootstrap on a fresh install. Retry as soon as Dashboard exists, which
     // means login/session restoration has supplied the bearer token.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<LocaleProvider>().refreshFromServer();
+      if (!mounted) return;
+      context.read<StoreProvider>().load();
+      context.read<LocaleProvider>().refreshFromServer();
     });
+  }
+
+  Future<void> _openStoreSwitcher() async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const StoreSwitcherSheet(),
+    );
+    if (changed != true || !mounted) return;
+    await BootstrapCache.instance.refresh(
+      context.read<LocaleProvider>().locale.languageCode,
+      context.read<ApiClient>(),
+    );
+    if (!mounted) return;
+    setState(() => _analyticsFuture = _loadAnalytics());
+    _loadDashboardChrome();
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
@@ -940,7 +960,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             bootstrap.logoUrl ??
             bootstrap.tenant?.logoUrl ??
             bootstrap.config['logo_url']?.toString();
-        final storeTitle = company?.tradeName ??
+        final storeTitle = context.watch<StoreProvider>().current?.name ??
+            company?.tradeName ??
             company?.name ??
             bootstrap.tenant?.businessName ??
             bootstrap.config['store_name']?.toString() ??
@@ -1060,6 +1081,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                tooltip: 'Switch store',
+                onPressed: _openStoreSwitcher,
+                icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
               ),
             ],
           ),
@@ -2056,9 +2082,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildRedesignedFloatingBottomNav(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark ||
-        context.read<NavDockProvider>().dashboardLayout ==
-            DashboardLayout.redesigned;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     void openRoute(String key) => Navigator.of(context).push(
           MaterialPageRoute(
@@ -2202,6 +2226,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final currentStore = context.watch<StoreProvider>().current;
     final bootstrap = context.watch<BootstrapCache>();
     // Rebuild the whole shell (drawer / rail / bars included) when the display
     // language changes, so nav labels re-resolve without reopening the drawer.
@@ -2253,15 +2278,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor:
-          layout == DashboardLayout.redesigned ? const Color(0xFF07172B) : null,
       appBar: AppBar(
-        backgroundColor: layout == DashboardLayout.redesigned
-            ? const Color(0xFF0B1F35)
-            : null,
-        foregroundColor:
-            layout == DashboardLayout.redesigned ? Colors.white : null,
-        title: Row(
+        title: InkWell(
+          onTap: _openStoreSwitcher,
+          child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             TenantLogoAvatar(
@@ -2273,11 +2293,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                company?.tradeName ?? company?.name ?? 'Sales & Inventory',
+                currentStore?.name ?? company?.tradeName ?? company?.name ?? 'Sales & Inventory',
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            const SizedBox(width: 2),
+            const Icon(Icons.keyboard_arrow_down, size: 18),
           ],
+        ),
         ),
         elevation: 0,
         bottom: appBarBottom,
@@ -2710,22 +2733,9 @@ class _DashboardAnalytics extends StatelessWidget {
     };
 
     if (layout == DashboardLayout.redesigned) {
-      return Theme(
-        data: ThemeData.dark().copyWith(
-          scaffoldBackgroundColor: const Color(0xFF07172B),
-          cardColor: const Color(0xFF10253E),
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF27E498),
-            brightness: Brightness.dark,
-          ),
-        ),
-        child: ColoredBox(
-          color: const Color(0xFF07172B),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: layoutBody,
-          ),
-        ),
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: layoutBody,
       );
     }
 

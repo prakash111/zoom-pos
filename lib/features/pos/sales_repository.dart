@@ -80,11 +80,13 @@ class SalesRepository {
   /// never creates a duplicate sale. Returns the ids the server confirms it
   /// ingested (or already had), so the caller knows which outbox rows to
   /// mark synced.
-  Future<List<String>> pushSalesBatch(
-      List<Map<String, dynamic>> payloads) async {
+  Future<List<String>> pushSalesBatch(List<Map<String, dynamic>> payloads,
+      {int? storeId}) async {
     if (payloads.isEmpty) return const [];
-    final response =
-        await _client.post(ApiEndpoints.syncPush, data: {'sales': payloads});
+    final response = storeId == null
+        ? await _client.post(ApiEndpoints.syncPush, data: {'sales': payloads})
+        : await _client.postForStore(ApiEndpoints.syncPush,
+            storeId: storeId, data: {'sales': payloads});
     return (response['synced_ids'] as List? ?? [])
         .map((e) => e.toString())
         .toList();

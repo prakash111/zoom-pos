@@ -24,7 +24,6 @@ import '../../../core/sdui/screens/dynamic_schema_page.dart';
 import 'app_preferences_screen.dart';
 import 'payment_methods_screen.dart';
 import 'global_printer_setup_screen.dart';
-import 'document_templates_tab.dart';
 
 /// Preset brand-color swatches offered in the Profile tab — a fixed palette
 /// avoids pulling in a color-picker package for what's a fairly small need.
@@ -44,7 +43,6 @@ const List<Color> _brandColorSwatches = [
 const _tabs = [
   'Profile',
   'Receipts',
-  'Templates',
   'Financial',
   'Navigation Menu',
   'Appearance'
@@ -111,7 +109,6 @@ class _TenantSettingsScreenState extends State<TenantSettingsScreen>
     final tabLabels = [
       l10n.tabProfile,
       l10n.tabReceipts,
-      'Templates',
       l10n.tabFinancial,
       l10n.tabNavigationMenu,
       l10n.tabAppearance,
@@ -151,7 +148,6 @@ class _TenantSettingsScreenState extends State<TenantSettingsScreen>
                 timezones: bundle.timezones)),
             _serverTab((bundle) => _ReceiptsTab(
                 repository: _repository, initial: bundle.receipts)),
-            const DocumentTemplatesTab(),
             _serverTab((bundle) => _FinancialTab(
                 repository: _repository, initial: bundle.financial)),
             _serverTab((bundle) => NavMenuSettingsTab(

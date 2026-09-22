@@ -28,6 +28,8 @@ class InventoryRepository with OfflineWriteable {
   final ApiClient _client;
   final AppDatabase _database;
 
+  String get _productsBucket => _client.cacheBucket('products');
+
   @override
   AppDatabase get offlineDb => _database;
 
@@ -55,7 +57,7 @@ class InventoryRepository with OfflineWriteable {
           .map((e) => PaymentMethodModel.fromJson(Map<String, dynamic>.from(e)))
           .toList();
 
-      await _database.replaceCacheBucket('products', products.map((p) => p.toJson()).toList());
+      await _database.replaceCacheBucket(_productsBucket, products.map((p) => p.toJson()).toList());
       await _database.replaceCacheBucket('categories', categories.map((c) => c.toJson()).toList());
       await _database.replaceCacheBucket('payment_methods', paymentMethods.map((p) => p.toJson()).toList());
 
@@ -65,7 +67,7 @@ class InventoryRepository with OfflineWriteable {
         paymentMethods: paymentMethods,
       );
     } on ApiException {
-      final cachedProducts = await _database.readCacheBucket('products');
+      final cachedProducts = await _database.readCacheBucket(_productsBucket);
       if (cachedProducts.isEmpty) rethrow;
 
       final cachedCategories = await _database.readCacheBucket('categories');
@@ -126,7 +128,7 @@ class InventoryRepository with OfflineWriteable {
     };
 
     final cachedRow =
-        isCreate ? null : await _database.readCacheItem('products', ext);
+        isCreate ? null : await _database.readCacheItem(_productsBucket, ext);
     final baseUpdatedAt = DateTime.tryParse(
         cachedRow?['updated_at']?.toString() ?? '');
 
@@ -157,7 +159,7 @@ class InventoryRepository with OfflineWriteable {
       externalId: ext,
       endpoint: ApiEndpoints.inventoryStoreProduct,
       payload: body,
-      cacheBucket: 'products',
+      cacheBucket: _productsBucket,
       optimisticRow: optimisticRow,
       baseUpdatedAt: baseUpdatedAt,
       online: () async {
@@ -225,7 +227,7 @@ class InventoryRepository with OfflineWriteable {
       // applied by hand rather than through writeThrough's cacheBucket.
       online: () => _client.post(ApiEndpoints.inventoryAdjustStock, data: body),
       offlineResult: () async {
-        final cached = await _database.readCacheItem('products', productId);
+        final cached = await _database.readCacheItem(_productsBucket, productId);
         if (cached == null) return;
         final current = (cached['current_stock'] as num?)?.toDouble() ?? 0;
         final next = switch (type) {
@@ -235,7 +237,7 @@ class InventoryRepository with OfflineWriteable {
           _ => current,
         };
         await _database.upsertCacheItems(
-            'products', [{...cached, 'current_stock': next}]);
+            _productsBucket, [{...cached, 'current_stock': next}]);
       },
     );
   }
@@ -248,7 +250,7 @@ class InventoryRepository with OfflineWriteable {
       endpoint: ApiEndpoints.inventoryDeleteProduct(id),
       method: 'DELETE',
       payload: const {},
-      cacheBucket: 'products',
+      cacheBucket: _productsBucket,
       online: () => _client.delete(ApiEndpoints.inventoryDeleteProduct(id)),
       offlineResult: () {},
     );

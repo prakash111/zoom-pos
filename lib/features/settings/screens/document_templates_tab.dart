@@ -5,6 +5,16 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../auth/auth_provider.dart';
 
+class DocumentTemplatesScreen extends StatelessWidget {
+  const DocumentTemplatesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Invoice & Quotation Templates')),
+        body: const DocumentTemplatesTab(),
+      );
+}
+
 /// Edits the same tenant-owned invoice and quotation templates as the web app.
 class DocumentTemplatesTab extends StatefulWidget {
   const DocumentTemplatesTab({super.key});
@@ -31,7 +41,9 @@ class _DocumentTemplatesTabState extends State<DocumentTemplatesTab> {
   @override
   void initState() {
     super.initState();
-    if (context.read<AuthProvider>().user?.can('settings.view') == true) {
+    final user = context.read<AuthProvider>().user;
+    if (user?.can('templates.invoices.manage') == true ||
+        user?.can('settings.view') == true) {
       _load();
     }
   }
@@ -120,12 +132,13 @@ class _DocumentTemplatesTabState extends State<DocumentTemplatesTab> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
-    if (user?.can('settings.view') != true) {
+    if (user?.can('templates.invoices.manage') != true &&
+        user?.can('settings.view') != true) {
       return const Center(
           child:
               Text('You do not have permission to view document templates.'));
     }
-    final canEdit = user?.can('settings.edit') == true;
+    final canEdit = user?.can('templates.invoices.manage') == true;
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(

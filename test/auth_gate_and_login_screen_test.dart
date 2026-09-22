@@ -13,6 +13,7 @@ import 'package:zoom_pos_mobile/core/models/user_model.dart';
 import 'package:zoom_pos_mobile/core/sdui/models/sdui_models.dart';
 import 'package:zoom_pos_mobile/core/services/dynamic_string_service.dart';
 import 'package:zoom_pos_mobile/core/services/sync/sync_engine.dart';
+import 'package:zoom_pos_mobile/core/stores/store_provider.dart';
 import 'package:zoom_pos_mobile/core/storage/app_preferences.dart';
 import 'package:zoom_pos_mobile/core/widgets/split_navigation_tile.dart';
 import 'package:zoom_pos_mobile/features/auth/auth_provider.dart';
@@ -63,9 +64,6 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
     String? accountId,
   }) async =>
       true;
-
-  @override
-  RegisterResult? get lastRegisterResult => null;
 
   @override
   RegisterResult? get pendingEmailVerification => null;
@@ -138,6 +136,15 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
 }
 
 class FakeApiClient extends Fake implements ApiClient {
+  @override
+  int? activeStoreId;
+  @override
+  String? activeTenantId = 'test';
+  @override
+  String? activeUserId = 'test-user';
+  @override
+  String cacheBucket(String bucket) =>
+      '$bucket@test:test-user:${activeStoreId ?? 'primary'}';
   @override
   Future<String> currentBaseUrl() async => 'https://saas.zoomnearby.com';
 
@@ -282,6 +289,8 @@ void main() {
         providers: [
           Provider<AppPreferences>.value(value: fakePreferences),
           Provider<ApiClient>.value(value: fakeApi),
+          ChangeNotifierProvider<StoreProvider>(
+              create: (_) => StoreProvider(fakeApi)),
           ChangeNotifierProvider<BootstrapCache>.value(
               value: BootstrapCache.instance),
           ChangeNotifierProvider<AuthProvider>.value(value: fakeAuth),

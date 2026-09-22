@@ -221,11 +221,11 @@ void main() {
       expect(find.text('DEMO MODE'), findsOneWidget);
       expect(find.text('🚀 Try Flutter Web'), findsOneWidget);
 
-      // Store Brand & Tagline
-      expect(find.text('MetroRetail'), findsOneWidget);
-      expect(find.text('Smarter Retail. Faster Growth.'), findsOneWidget);
-      expect(find.text('Alex Johnson'), findsOneWidget);
-      expect(find.text('Store Manager'), findsOneWidget);
+      // The app bar owns store branding and profile; the dashboard starts at the greeting.
+      expect(find.text('Good Morning, Alex Johnson!'), findsOneWidget);
+      expect(find.text('MetroRetail'), findsNothing);
+      expect(find.text('Smarter Retail. Faster Growth.'), findsNothing);
+      expect(find.text('Store Manager'), findsNothing);
 
       // Status Badges
       expect(find.text('28°C Sunny'), findsOneWidget);

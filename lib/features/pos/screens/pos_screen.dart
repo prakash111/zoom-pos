@@ -199,7 +199,8 @@ class _PosScreenBodyState extends State<_PosScreenBody> {
 
     final catalogWidget = Column(
       children: [
-        if (pos.registerOpen == false)
+        if (pos.registerOpen == false &&
+            BootstrapCache.instance.config['show_cash_register_alerts'] == true)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

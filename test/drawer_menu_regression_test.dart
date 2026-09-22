@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zoom_pos_mobile/core/api/api_client.dart';
 import 'package:zoom_pos_mobile/core/config/bootstrap_cache.dart';
+import 'package:zoom_pos_mobile/core/stores/store_provider.dart';
 import 'package:zoom_pos_mobile/core/config/locale_provider.dart';
 import 'package:zoom_pos_mobile/core/config/nav_dock_provider.dart';
 import 'package:zoom_pos_mobile/core/config/platform_branding_provider.dart';
@@ -126,6 +127,15 @@ class _FakeAuthProvider extends ChangeNotifier implements AuthProvider {
 
 class _FakeApiClient extends Fake implements ApiClient {
   @override
+  int? activeStoreId;
+  @override
+  String? activeTenantId = 'test';
+  @override
+  String? activeUserId = 'test-user';
+  @override
+  String cacheBucket(String bucket) =>
+      '$bucket@test:test-user:${activeStoreId ?? 'primary'}';
+  @override
   Future<String> currentBaseUrl() async => 'https://saas.zoomnearby.com';
 
   @override
@@ -210,6 +220,8 @@ Widget _buildTestApp({
     providers: [
       Provider<AppPreferences>.value(value: fakePrefs),
       Provider<ApiClient>.value(value: fakeApi),
+      ChangeNotifierProvider<StoreProvider>(
+          create: (_) => StoreProvider(fakeApi)),
       ChangeNotifierProvider<BootstrapCache>.value(
           value: BootstrapCache.instance),
       ChangeNotifierProvider<AuthProvider>.value(value: fakeAuth),
@@ -697,7 +709,9 @@ void main() {
           staffTile.contentPadding, const EdgeInsets.only(left: 46, right: 12));
     });
 
-    test('CompanyModel and TenantSchema resolveLiveStoreUrl formats domain properly', () {
+    test(
+        'CompanyModel and TenantSchema resolveLiveStoreUrl formats domain properly',
+        () {
       final companyWithSlug = CompanyModel(
         id: '1',
         name: 'Demo Mart',
@@ -707,7 +721,8 @@ void main() {
         planName: 'pro',
         slug: 'metro-mart',
       );
-      expect(companyWithSlug.resolveLiveStoreUrl(), 'https://metro-mart.saas.zoomnearby.com');
+      expect(companyWithSlug.resolveLiveStoreUrl(),
+          'https://metro-mart.saas.zoomnearby.com');
 
       final companyWithCustomDomain = CompanyModel(
         id: '2',
@@ -719,7 +734,8 @@ void main() {
         slug: 'custom-mart',
         customDomain: 'store.custommart.com',
       );
-      expect(companyWithCustomDomain.resolveLiveStoreUrl(), 'https://store.custommart.com');
+      expect(companyWithCustomDomain.resolveLiveStoreUrl(),
+          'https://store.custommart.com');
 
       final tenantSchema = TenantSchema(
         id: '1',
@@ -727,7 +743,8 @@ void main() {
         activeMode: 'retail',
         subdomain: 'online-shop',
       );
-      expect(tenantSchema.resolveLiveStoreUrl(), 'https://online-shop.saas.zoomnearby.com');
+      expect(tenantSchema.resolveLiveStoreUrl(),
+          'https://online-shop.saas.zoomnearby.com');
     });
   });
 }
