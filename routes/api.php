@@ -394,6 +394,8 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
     Route::get('/invoices', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
     Route::get('/sales/invoices', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
     Route::get('/v1/sales/invoices', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/tenant/sales', [\App\Http\Controllers\Api\Tenant\SalesController::class, 'index'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/v1/tenant/sales', [\App\Http\Controllers\Api\Tenant\SalesController::class, 'index'])->middleware('tenant.api.permission:sales,view');
 
     Route::get('/tenant/views/invoices/{id}/actions-sheet', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
     Route::get('/v1/tenant/views/invoices/{id}/actions-sheet', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
@@ -1128,6 +1130,7 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/receivables/due', [PosSyncApiController::class, 'dueReceivables'])->middleware('tenant.api.permission:customers,view');
         Route::get('/invoices', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
         Route::get('/sales/invoices', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
+        Route::get('/sales', [\App\Http\Controllers\Api\Tenant\SalesController::class, 'index'])->middleware('tenant.api.permission:sales,view');
         Route::match(['get', 'post'], '/receivables/{sale}/remind', [PosSyncApiController::class, 'remindReceivable'])->middleware('tenant.api.permission:finance,edit');
         Route::get('/receivables/{sale}/reminder-sheet', [ReceivablesController::class, 'reminderSheet'])->middleware('tenant.api.permission:customers,view');
         Route::put('/receivables/{sale}/reminder', [PosSyncApiController::class, 'scheduleReceivableReminder'])->middleware('tenant.api.permission:finance,edit');

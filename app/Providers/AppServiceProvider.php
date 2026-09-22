@@ -45,6 +45,7 @@ class AppServiceProvider extends ServiceProvider
 
         Sale::observe(SaleObserver::class);
         Gate::policy(\App\Models\Invoice::class, \App\Policies\InvoicePolicy::class);
+        Gate::policy(\App\Models\Sale::class, \App\Policies\SalePolicy::class);
         Event::listen(TenantRegistered::class, TenantRegisteredListener::class);
 
         // Re-run the demo read-only guard on Livewire follow-up requests

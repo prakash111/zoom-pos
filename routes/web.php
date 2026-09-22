@@ -234,6 +234,12 @@ Route::get('/v1/tenant/invoices', function (\Illuminate\Http\Request $request) {
 Route::get('/sales/invoices', function (\Illuminate\Http\Request $request) {
     return app(\App\Http\Controllers\Api\InvoiceController::class)->index($request);
 });
+Route::get('/tenant/sales', function (\Illuminate\Http\Request $request) {
+    return app(\App\Http\Controllers\Api\Tenant\SalesController::class)->index($request);
+});
+Route::get('/v1/tenant/sales', function (\Illuminate\Http\Request $request) {
+    return app(\App\Http\Controllers\Api\Tenant\SalesController::class)->index($request);
+});
 
 Route::middleware([\App\Http\Middleware\AuthenticateTenantApi::class])->group(function () {
     Route::get('/tenant/storefront/domain-config', [\App\Http\Controllers\Api\Tenant\StorefrontSettingsController::class, 'getDomainConfig']);
