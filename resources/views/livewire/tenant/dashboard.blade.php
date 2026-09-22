@@ -6,17 +6,17 @@
         <!-- ========================================== -->
 
         <!-- Restaurant Hero Banner -->
-        <div class="bg-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-emerald-500/20">
+        <div class="bg-emerald-50 dark:bg-slate-900 rounded-3xl p-6 sm:p-8 text-slate-900 dark:text-white shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-emerald-500/20">
 
             <div class="relative z-10 max-w-xl">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-xs font-bold text-lime-200 mb-3">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-white/15 text-xs font-bold text-emerald-800 dark:text-lime-200 mb-3">
                     <span class="w-2 h-2 rounded-full bg-lime-400 animate-pulse"></span>
                     <span>Food & Restaurant Mode Active &bull; {{ auth()->user()?->company?->name }}</span>
                 </div>
                 <h2 class="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
                     Welcome back, {{ auth()->user()->name }}!
                 </h2>
-                <p class="text-emerald-100 text-xs sm:text-sm mt-1.5 leading-relaxed opacity-90">
+                <p class="text-emerald-800 dark:text-emerald-100 text-xs sm:text-sm mt-1.5 leading-relaxed opacity-90">
                     Floor plan is active. Take Dine-In orders, manage tables, monitor live kitchen tickets, and handle takeaway or deliveries.
                 </p>
             </div>
@@ -28,12 +28,12 @@
                 </a>
 
                 <a href="{{ route('tenant.restaurant.kds') }}"
-                   class="px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-extrabold text-sm transition-all flex items-center gap-1.5">
+                   class="px-5 py-3.5 rounded-2xl bg-white dark:bg-white/15 hover:bg-emerald-100 dark:hover:bg-white/25 text-slate-900 dark:text-white font-extrabold text-sm transition-all flex items-center gap-1.5">
                     <span>🍳 Kitchen KDS</span>
                 </a>
 
                 <a href="{{ route('tenant.restaurant.tables') }}"
-                   class="px-4 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition-all">
+                   class="px-4 py-3.5 rounded-2xl bg-white dark:bg-white/10 hover:bg-emerald-100 dark:hover:bg-white/20 text-slate-900 dark:text-white font-bold text-sm transition-all">
                     🪑 Tables
                 </a>
             </div>

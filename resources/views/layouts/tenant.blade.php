@@ -99,7 +99,7 @@
             --nav-item-active-color: #60a5fa;
         }
     </style>
-<body class="bg-[#1a1f37] dark:bg-[#0c101d] text-slate-900 dark:text-slate-100 antialiased selection:bg-blue-500 selection:text-white {{ $isPosScreen ? 'h-screen overflow-hidden p-0 sm:p-2' : 'min-h-screen p-2 sm:p-4 md:p-6' }}">
+<body class="bg-slate-100 dark:bg-[#0c101d] text-slate-900 dark:text-slate-100 antialiased selection:bg-blue-500 selection:text-white {{ $isPosScreen ? 'h-screen overflow-hidden p-0 sm:p-2' : 'min-h-screen p-2 sm:p-4 md:p-6' }}">
 
     @include('layouts.partials.preloader')
 

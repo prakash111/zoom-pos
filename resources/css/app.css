@@ -9,6 +9,20 @@
 /* Class-based dark mode (toggled via localStorage + <html class="dark">). */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Dashboard charts and icon accents follow the existing html.dark toggle. */
+.metro-dashboard {
+    --dashboard-chart-accent: #047857;
+    --dashboard-chart-grid: #e2e8f0;
+    --dashboard-chart-surface: #ffffff;
+}
+.dark .metro-dashboard {
+    --dashboard-chart-accent: #27e498;
+    --dashboard-chart-grid: #29435e;
+    --dashboard-chart-surface: #10243c;
+}
+.metro-dashboard .dashboard-metric-icon { color: var(--metric-light-accent); }
+.dark .metro-dashboard .dashboard-metric-icon { color: var(--metric-accent); }
+
 [x-cloak] { display: none !important; }
 [wire\:cloak] { display: none !important; }
 
