@@ -287,22 +287,24 @@
                     @if (!empty($logoBase64) && $template->logo_placement !== 'hidden')
                         <img src="{{ $logoBase64 }}" style="max-height: 48px; max-width: 180px; margin-bottom: 6px; display: block;">
                     @endif
-                    <div class="brand-title">{{ $company->trade_name ?? $company->name }}</div>
-                    <div class="brand-subtitle">{{ $template->header_title ?: 'Official Tax Invoice & Receipt' }}</div>
+                    <div class="brand-title">{{ $sale->store?->name ?: ($company->trade_name ?? $company->name) }}</div>
+                    <div class="brand-subtitle">{{ $sale->store?->receipt_header ?: ($template->header_title ?: 'Official Tax Invoice & Receipt') }}</div>
+                    @php
+                        $effectiveAddress = $sale->store?->effective_address ?: ($company->address ? $company->address . ($company->city ? ', ' . $company->city : '') : ($company->city ?: 'Business Address'));
+                        $effectivePhone = $sale->store?->effective_phone ?: $company->phone;
+                        $effectiveTaxId = $sale->store?->effective_tax_id ?: $company->tax_id;
+                    @endphp
                     <div class="brand-address">
-                        {{ $company->address ?? 'Business Address' }}<br>
-                        @if ($company->city || $company->state)
-                            {{ $company->city }}{{ $company->state ? ', ' . $company->state : '' }} {{ $company->postal_code }}<br>
-                        @endif
-                        @if ($company->tax_id)
+                        {{ $effectiveAddress }}<br>
+                        @if ($effectiveTaxId)
                             @php
                                 $headerTaxRows = \App\Services\TaxEngineService::normalizeTaxBreakdown($sale->tax_breakdown);
                                 $appliedTaxRuleName = $headerTaxRows[0]['name'] ?? $sale->tax_name;
                             @endphp
-                            <span>{{ \App\Services\TaxEngineService::getTaxIdentifierLabel($company->country, $appliedTaxRuleName) }}: {{ $company->tax_id }}</span><br>
+                            <span>{{ \App\Services\TaxEngineService::getTaxIdentifierLabel($company->country, $appliedTaxRuleName) }}: {{ $effectiveTaxId }}</span><br>
                         @endif
-                        @if ($company->phone) Tel: {{ $company->phone }} @endif
-                        @if ($company->email) | {{ $company->email }} @endif
+                        @if ($effectivePhone) Tel: {{ $effectivePhone }} @endif
+                        @if ($sale->store?->email ?: $company->email) | {{ $sale->store?->email ?: $company->email }} @endif
                     </div>
                 </td>
                 <td style="width: 45%;">
@@ -531,9 +533,9 @@
             <div style="text-align: center; margin: 8px 0;"><img src="{{ $qrCodeData['data_uri'] }}" width="80" height="80" alt="Invoice verification QR"><br><small>View invoice online</small></div>
         @endif
         <div class="footer-bar">
-            {{ $template->footer_notes ?: 'Thank you for your business with '.$company->name.'!' }}
-            @if ($company->phone) &bull; Tel: {{ $company->phone }} @endif
-            @if ($company->email) &bull; Email: {{ $company->email }} @endif
+            {{ $sale->store?->receipt_footer ?: ($template->footer_notes ?: 'Thank you for your business with '.($sale->store?->name ?: $company->name).'!') }}
+            @if ($sale->store?->effective_phone ?: $company->phone) &bull; Tel: {{ $sale->store?->effective_phone ?: $company->phone }} @endif
+            @if ($sale->store?->email ?: $company->email) &bull; Email: {{ $sale->store?->email ?: $company->email }} @endif
             @if ($company->website) &bull; {{ $company->website }} @endif
             @php
                 $platformBranding = \App\Models\PlatformBranding::current();

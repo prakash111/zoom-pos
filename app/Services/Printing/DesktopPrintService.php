@@ -59,7 +59,7 @@ class DesktopPrintService
             return false;
         }
 
-        $sale->loadMissing(['payments', 'user']);
+        $sale->loadMissing(['payments', 'user', 'store']);
         $company = $sale->company ?? Company::find($sale->company_id);
         $is58mm = $format === '58mm';
         $qr = $this->delivery->generateReceiptQrCode($sale, $is58mm);
@@ -93,7 +93,7 @@ class DesktopPrintService
             return false;
         }
 
-        $sale->loadMissing(['payments', 'user']);
+        $sale->loadMissing(['payments', 'user', 'store']);
         $company = $sale->company ?? Company::find($sale->company_id);
         $isQuotation = $sale->operation_type === 'quotation';
 

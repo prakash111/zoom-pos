@@ -257,6 +257,10 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
     Route::get('/tenant/dashboard/summary', [DashboardController::class, 'summary']);
     Route::get('/v1/dashboard/summary', [DashboardController::class, 'summary']);
     Route::get('/v1/tenant/dashboard/summary', [DashboardController::class, 'summary']);
+    Route::get('/dashboard/sales-chart', [DashboardController::class, 'salesChart']);
+    Route::get('/tenant/dashboard/sales-chart', [DashboardController::class, 'salesChart']);
+    Route::get('/v1/dashboard/sales-chart', [DashboardController::class, 'salesChart']);
+    Route::get('/v1/tenant/dashboard/sales-chart', [DashboardController::class, 'salesChart']);
     Route::get('/tenant/notifications/feed', [NotificationController::class, 'feed']);
     Route::get('/v1/tenant/notifications/feed', [NotificationController::class, 'feed']);
     Route::get('/tenant/notifications/unread-count', [NotificationController::class, 'unreadCount']);
@@ -1123,6 +1127,7 @@ Route::prefix('v1/pos')->group(function () {
         // Analytics & Reports
         Route::get('/analytics', [PosSyncApiController::class, 'analytics'])->middleware('tenant.api.permission:reports,view');
         Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
+        Route::get('/dashboard/sales-chart', [DashboardController::class, 'salesChart']);
 
         // Outbound Delivery (WhatsApp / Email)
         Route::post('/send-delivery', [PosSyncApiController::class, 'sendDelivery'])->middleware('tenant.api.permission:pos,create');

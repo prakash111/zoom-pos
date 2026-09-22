@@ -109,9 +109,18 @@ class DashboardController extends Controller
         $tagline = 'Smarter Retail. Faster Growth.';
         $logoUrl = $company->logo ? asset($company->logo) : null;
 
-        $salesBase = Sale::withoutGlobalScope('company')
+        $storeId = $request->input('store_id')
+            ?? $request->header('X-Store-Id')
+            ?? (app()->bound('tenant.store_id') ? app('tenant.store_id') : null)
+            ?? $user?->current_store_id;
+
+        $salesBase = Sale::withoutGlobalScopes(['company', \App\Scopes\StoreScope::class, 'store'])
             ->where('company_id', $company->id)
             ->where('status', '!=', 'cancelled');
+
+        if ($storeId) {
+            $salesBase->where('store_id', $storeId);
+        }
 
         // Range for 4-column metric cards: Current 30 days vs previous 30 days
         $curr30Start = (clone $now)->subDays(29)->startOfDay();
@@ -374,6 +383,145 @@ class DashboardController extends Controller
             ],
             'quick_actions' => $quickActions,
             'recent_transactions' => $recentTransactions,
+        ]);
+    }
+
+    public function salesChart(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = auth('sanctum')->user() ?? auth('web')->user() ?? $request->user();
+
+        $tz = method_exists($company, 'resolveTimezone') ? $company->resolveTimezone() : ($company->timezone ?: 'UTC');
+        $now = Carbon::now($tz);
+
+        $period = (string) ($request->input('period') ?? $request->input('range') ?? 'last_7_days');
+        if (! in_array($period, ['last_7_days', 'this_month', 'quarter'], true)) {
+            $period = 'last_7_days';
+        }
+
+        $storeId = $request->input('store_id')
+            ?? $request->header('X-Store-Id')
+            ?? (app()->bound('tenant.store_id') ? app('tenant.store_id') : null)
+            ?? $user?->current_store_id;
+
+        $salesBase = Sale::withoutGlobalScopes(['company', \App\Scopes\StoreScope::class, 'store'])
+            ->where('company_id', $company->id)
+            ->where('status', '!=', 'cancelled');
+
+        if ($storeId) {
+            $salesBase->where('store_id', $storeId);
+        }
+
+        $overviewSeries = [];
+        $totalSales = 0.0;
+        $totalOrders = 0;
+
+        if ($period === 'this_month') {
+            // this_month: startOfMonth() to endOfMonth()
+            $monthStart = (clone $now)->startOfMonth();
+            $monthEnd = (clone $now)->endOfMonth();
+
+            $monthSalesGrouped = (clone $salesBase)
+                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'), DB::raw('COUNT(*) as c'))
+                ->groupBy('d')
+                ->get()
+                ->keyBy('d');
+
+            $cursor = (clone $monthStart);
+            $limitDate = (clone $now)->lte($monthEnd) ? (clone $now) : $monthEnd;
+            while ($cursor->lte($limitDate)) {
+                $d = $cursor->format('Y-m-d');
+                $row = $monthSalesGrouped->get($d);
+                $amt = $row ? (float) $row->t : 0.0;
+                $cnt = $row ? (int) $row->c : 0;
+                $totalSales += $amt;
+                $totalOrders += $cnt;
+
+                $overviewSeries[] = [
+                    'date' => $d,
+                    'label' => $cursor->format('j M'),
+                    'day' => $cursor->format('D'),
+                    'amount' => round($amt, 2),
+                    'orders' => $cnt,
+                ];
+                $cursor->addDay();
+            }
+        } elseif ($period === 'quarter') {
+            // quarter: startOfQuarter() to endOfQuarter()
+            $quarterStart = (clone $now)->startOfQuarter();
+            $quarterEnd = (clone $now)->endOfQuarter();
+
+            $cursor = (clone $quarterStart);
+            $weekNum = 1;
+            $limitDate = (clone $now)->lte($quarterEnd) ? (clone $now) : $quarterEnd;
+
+            while ($cursor->lte($limitDate)) {
+                $weekEnd = (clone $cursor)->endOfWeek();
+                if ($weekEnd->gt($limitDate)) {
+                    $weekEnd = (clone $limitDate);
+                }
+                $row = (clone $salesBase)
+                    ->whereBetween('created_at', [$cursor->startOfDay(), $weekEnd->endOfDay()])
+                    ->select(DB::raw('SUM(total) as t'), DB::raw('COUNT(*) as c'))
+                    ->first();
+
+                $amt = $row ? (float) $row->t : 0.0;
+                $cnt = $row ? (int) $row->c : 0;
+                $totalSales += $amt;
+                $totalOrders += $cnt;
+
+                $overviewSeries[] = [
+                    'date' => $cursor->format('Y-m-d'),
+                    'label' => 'W' . $weekNum,
+                    'day' => $cursor->format('M d'),
+                    'amount' => round($amt, 2),
+                    'orders' => $cnt,
+                ];
+                $cursor->addWeek()->startOfWeek();
+                $weekNum++;
+            }
+        } else {
+            // last_7_days: subDays(6)->startOfDay() to now()->endOfDay()
+            $sevenDaysStart = (clone $now)->subDays(6)->startOfDay();
+            $sevenDaysEnd = (clone $now)->endOfDay();
+
+            $recentSalesGrouped = (clone $salesBase)
+                ->whereBetween('created_at', [$sevenDaysStart, $sevenDaysEnd])
+                ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'), DB::raw('COUNT(*) as c'))
+                ->groupBy('d')
+                ->get()
+                ->keyBy('d');
+
+            for ($i = 6; $i >= 0; $i--) {
+                $daySlot = (clone $now)->subDays($i);
+                $d = $daySlot->format('Y-m-d');
+                $row = $recentSalesGrouped->get($d);
+                $amt = $row ? (float) $row->t : 0.0;
+                $cnt = $row ? (int) $row->c : 0;
+                $totalSales += $amt;
+                $totalOrders += $cnt;
+
+                $overviewSeries[] = [
+                    'date' => $d,
+                    'label' => $daySlot->format('D'),
+                    'day' => $daySlot->format('D'),
+                    'amount' => round($amt, 2),
+                    'orders' => $cnt,
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'period' => $period,
+            'range' => $period,
+            'current_range' => $period,
+            'store_id' => $storeId,
+            'series' => $overviewSeries,
+            'total_sales' => round($totalSales, 2),
+            'total_orders' => $totalOrders,
+            'currency' => $company->currency_symbol ?: ($company->currency ?: '$'),
         ]);
     }
 

@@ -21,6 +21,16 @@ class AuthenticateTenantApi
             ?? $request->input('token');
 
         if (! $token) {
+            if (Auth::check() && Auth::user()) {
+                $user = Auth::user();
+                if ($user->company_id) {
+                    app()->instance('tenant.company_id', $user->company_id);
+                    $request->attributes->set('company_id', $user->company_id);
+
+                    return $next($request);
+                }
+            }
+
             $viewParam = strtolower(trim((string) $request->route('view')));
             if ($viewParam !== '' && in_array($viewParam, ['verify-otp', 'otp-verify', 'verify-email', 'login', 'auth-login', 'register-store', 'register-tenant', 'auth-register', 'signup'], true)) {
                 return $next($request);

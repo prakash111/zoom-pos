@@ -15,6 +15,7 @@
     $currency = $company->currency_symbol ?: ($company->currency ?: '₹');
     $money = fn ($amount) => $currency.number_format((float) $amount, 2);
     $isPaid = ($document->payment_status === 'paid') || ((float) ($document->due_amount ?? 0) <= 0);
+    $store = ($document instanceof \Illuminate\Database\Eloquent\Model || property_exists($document, 'store')) ? $document->store : null;
 @endphp
 <!doctype html>
 <html lang="en">
@@ -56,9 +57,22 @@
 <body>
     <header class="header">
         <div>
-            <div class="brand">{{ $company->display_name }}</div>
-            <div class="muted">{{ $company->address }} {{ $company->city }}</div>
-            <div class="muted">{{ $company->tax_id_label ?: 'GSTIN' }}: {{ $company->tax_id ?: 'Unregistered' }}</div>
+            <div class="brand">{{ $store?->name ?: $company->display_name }}</div>
+            @if ($store?->receipt_header)
+                <div style="font-weight: 600; font-size: 0.9em; margin-bottom: 2px;">{{ $store->receipt_header }}</div>
+            @endif
+            @php
+                $headerAddress = $store?->effective_address ?: ($company->address ? $company->address.' '.$company->city : $company->city);
+                $headerPhone = $store?->effective_phone ?: $company->phone;
+                $headerTaxId = $store?->effective_tax_id ?: ($company->tax_id ?: 'Unregistered');
+            @endphp
+            @if (! empty($headerAddress))
+                <div class="muted">{{ $headerAddress }}</div>
+            @endif
+            @if (! empty($headerPhone))
+                <div class="muted">Tel: {{ $headerPhone }}</div>
+            @endif
+            <div class="muted">{{ $company->tax_id_label ?: 'GSTIN' }}: {{ $headerTaxId }}</div>
         </div>
         <div class="right">
             <div class="doc-title">{{ $documentLabel }}</div>
@@ -107,15 +121,42 @@
     </section>
 
     @if ($docTemplate->show_qr_code)
+        @php
+            $qrPayload = $document->einvoice_qr ?? null;
+            if (empty($qrPayload)) {
+                try {
+                    $qrPayload = ($type === 'quotation')
+                        ? route('quotes.public', $reference)
+                        : route('sales.public', $reference);
+                } catch (\Throwable $e) {
+                    $qrPayload = url('/i/' . $reference);
+                }
+            }
+            $qrSize = $isThermal ? 72 : 88;
+            $qrDataUri = null;
+            try {
+                if (class_exists(\SimpleSoftwareIO\QrCode\Facades\QrCode::class)) {
+                    $rawSvg = (string) \SimpleSoftwareIO\QrCode\Facades\QrCode::size($qrSize)
+                        ->margin(0)
+                        ->errorCorrection('M')
+                        ->generate($qrPayload);
+                    $qrDataUri = 'data:image/svg+xml;base64,' . base64_encode($rawSvg);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('QR generation error in document template: ' . $e->getMessage());
+            }
+            if (empty($qrDataUri)) {
+                $qrDataUri = 'https://api.qrserver.com/v1/create-qr-code/?size=' . $qrSize . 'x' . $qrSize . '&data=' . urlencode($qrPayload);
+            }
+        @endphp
         <div style="margin-top: 14px; text-align: center;">
-            <div style="display: inline-block; padding: 6px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 10px; color: #64748b;">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto; display: block;">
-                    <rect x="3" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="14" width="7" height="7"></rect>
-                    <rect x="3" y="14" width="7" height="7"></rect>
-                </svg>
-                <span>Scan to Verify</span>
+            <div style="display: inline-block; padding: 6px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 10px; color: #64748b; background: #fff;">
+                <img src="{{ $qrDataUri }}"
+                     width="{{ $qrSize }}"
+                     height="{{ $qrSize }}"
+                     alt="Scan to Verify QR Code"
+                     style="display: block; margin: 0 auto; width: {{ $qrSize }}px; height: {{ $qrSize }}px; object-fit: contain;" />
+                <span style="display: block; margin-top: 4px; font-weight: 600; font-size: 9px; letter-spacing: 0.02em;">{{ __('Scan to Verify') }}</span>
             </div>
         </div>
     @endif
@@ -132,10 +173,12 @@
     @endif
 
     <footer class="footer">
-        @if (! empty($docTemplate->footer_notes))
+        @if (! empty($store?->receipt_footer))
+            {!! nl2br(e($store->receipt_footer)) !!}
+        @elseif (! empty($docTemplate->footer_notes))
             {!! nl2br(e($docTemplate->footer_notes)) !!}
         @else
-            Thank you for choosing {{ $company->display_name }}.
+            Thank you for choosing {{ $store?->name ?: $company->display_name }}.
         @endif
     </footer>
 </body>

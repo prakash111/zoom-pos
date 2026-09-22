@@ -28,7 +28,7 @@ class StoreContext
             return null;
         }
         $primary = $this->ensurePrimary($company);
-        $header = $request->header('X-Store-Id');
+        $header = $request->header('X-Store-Id') ?: $request->input('store_id');
         $requested = $header ?: $user?->current_store_id;
         $query = Store::withoutGlobalScopes()->where('company_id', $companyId);
         $store = $requested ? (clone $query)->find($requested) : null;

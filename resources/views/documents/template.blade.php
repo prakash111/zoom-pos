@@ -396,15 +396,20 @@
                 @if (!empty($company->logo))
                     <img src="{{ $company->logo }}" alt="{{ $company->name }}" class="brand-logo">
                 @endif
-                <h1 class="brand-title">{{ $company->name ?? 'FAUGET' }}</h1>
-                <div class="brand-subtitle">{{ $company->trade_name ?? ($isQuotation ? 'QUOTATION PROPOSAL' : 'DESIGN STUDIO') }}</div>
+                <h1 class="brand-title">{{ $sale->store?->name ?: ($company->name ?? 'FAUGET') }}</h1>
+                <div class="brand-subtitle">{{ $sale->store?->receipt_header ?: ($company->trade_name ?? ($isQuotation ? 'QUOTATION PROPOSAL' : 'DESIGN STUDIO')) }}</div>
+                @php
+                    $effectiveAddress = $sale->store?->effective_address ?: ($company->address ? $company->address . ($company->city ? ', ' . $company->city : '') : ($company->city ?: '123 Anywhere St., Any City'));
+                    $effectivePhone = $sale->store?->effective_phone ?: $company->phone;
+                    $effectiveTaxId = $sale->store?->effective_tax_id ?: $company->tax_id;
+                @endphp
                 <div class="brand-address">
-                    {{ $company->address ?? '123 Anywhere St., Any City' }}<br>
-                    @if ($company->city || $company->state)
-                        {{ $company->city }}{{ $company->state ? ', ' . $company->state : '' }} {{ $company->postal_code }}
+                    {{ $effectiveAddress }}
+                    @if ($effectivePhone)
+                        <br>Tel: {{ $effectivePhone }}
                     @endif
-                    @if ($company->tax_id)
-                        <br>{{ $documentTaxLabel }}: {{ $company->tax_id }}
+                    @if ($effectiveTaxId)
+                        <br>{{ $documentTaxLabel }}: {{ $effectiveTaxId }}
                     @endif
                 </div>
             </div>

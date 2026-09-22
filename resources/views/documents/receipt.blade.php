@@ -411,23 +411,31 @@
                 <img src="{{ $company->getLogoUrl() }}" alt="{{ $company->name }}" class="store-logo">
             @endif
             
-            <div class="receipt-title">{{ $company->trade_name ?: $company->name }}</div>
+            <div class="receipt-title">{{ $sale->store?->name ?: ($company->trade_name ?: $company->name) }}</div>
+            @if (!empty($sale->store?->receipt_header))
+                <div style="font-size: 10px; font-weight: 600; color: #475569; margin-bottom: 2px;">{{ $sale->store->receipt_header }}</div>
+            @endif
             <div class="receipt-type-pill">*** {{ __("TAX INVOICE / RECEIPT") }} ***</div>
             <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">{{ __("Invoice / Receipt") }}</div>
             
             <div class="store-info" style="margin-top: 4px;">
-                @if (!empty($company->address))
-                    <div>{{ $company->address }}{{ $company->city ? ', ' . $company->city : '' }}</div>
+                @php
+                    $effectiveAddress = $sale->store?->effective_address ?: ($company->address ? $company->address . ($company->city ? ', ' . $company->city : '') : '');
+                    $effectivePhone = $sale->store?->effective_phone ?: $company->phone;
+                    $effectiveTaxId = $sale->store?->effective_tax_id ?: $company->tax_id;
+                @endphp
+                @if (!empty($effectiveAddress))
+                    <div>{{ $effectiveAddress }}</div>
                 @endif
-                @if (!empty($company->phone))
-                    <div>Tel: {{ $company->phone }}</div>
+                @if (!empty($effectivePhone))
+                    <div>Tel: {{ $effectivePhone }}</div>
                 @endif
-                @if (!empty($company->tax_id))
+                @if (!empty($effectiveTaxId))
                     @php
                         $receiptTaxRows = \App\Services\TaxEngineService::normalizeTaxBreakdown($sale->tax_breakdown);
                         $appliedTaxRuleName = $receiptTaxRows[0]['name'] ?? $sale->tax_name;
                     @endphp
-                    <div>{{ \App\Services\TaxEngineService::getTaxIdentifierLabel($company->country, $appliedTaxRuleName) }}: {{ $company->tax_id }}</div>
+                    <div>{{ \App\Services\TaxEngineService::getTaxIdentifierLabel($company->country, $appliedTaxRuleName) }}: {{ $effectiveTaxId }}</div>
                 @endif
             </div>
         </div>
@@ -641,7 +649,11 @@
             <div class="ref-code">#{{ $sale->sale_number }}</div>
 
             <div class="footer-text">
-                <div>{{ __("Thank you for your visit & business!") }}</div>
+                @if (!empty($sale->store?->receipt_footer))
+                    <div>{!! nl2br(e($sale->store->receipt_footer)) !!}</div>
+                @else
+                    <div>{{ __("Thank you for your visit & business!") }}</div>
+                @endif
                 <div>{{ $company->website ?: (config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'yourdomain.com') }}</div>
                 @php
                     $platformBranding = \App\Models\PlatformBranding::current();

@@ -51,10 +51,19 @@ class StoreController extends Controller
 
     private function resource(Store $store, Company $company, ?int $currentId): array
     {
-        return array_merge($store->only(['id', 'name', 'code', 'phone', 'email', 'address', 'tax_id', 'is_primary', 'is_active']), [
+        return array_merge($store->only([
+            'id', 'tenant_id', 'company_id', 'name', 'code', 'branch_code',
+            'phone', 'email', 'address', 'tax_id',
+            'address_line_1', 'address_line_2', 'city', 'state', 'pincode',
+            'receipt_header', 'receipt_footer', 'invoice_prefix',
+            'is_primary', 'is_active',
+        ]), [
+            'effective_address' => $store->effective_address,
+            'effective_phone' => $store->effective_phone,
+            'effective_tax_id' => $store->effective_tax_id,
             'subdomain' => $company->slug,
             'is_current' => $store->is_active && (int) $store->id === $currentId,
-            'receipt_prefix' => $store->settings['invoice_prefix'] ?? $company->invoice_prefix,
+            'receipt_prefix' => $store->invoice_prefix ?: ($store->settings['invoice_prefix'] ?? $company->invoice_prefix),
         ]);
     }
 
@@ -101,6 +110,9 @@ class StoreController extends Controller
 
     private function validatedDetails(Request $request, Company $company, ?Store $store = null): array
     {
+        if ($request->has('branch_code') && ! $request->has('code')) {
+            $request->merge(['code' => $request->input('branch_code')]);
+        }
         if ($request->has('phone') && (is_string($request->input('phone')) || $request->input('phone') === null)) {
             $request->merge(['phone' => self::normalizePhoneNumber(
                 $request->input('phone'),
@@ -110,10 +122,19 @@ class StoreController extends Controller
         return $request->validate([
             'name' => [$store ? 'sometimes' : 'required', 'required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'alpha_dash:ascii', 'max:64', Rule::unique('stores')->where('company_id', $company->id)->ignore($store?->id)],
+            'branch_code' => ['nullable', 'string', 'alpha_dash:ascii', 'max:64'],
             'phone' => ['nullable', 'string', 'regex:/^\+[1-9][0-9]{6,14}$/'],
-            'email' => ['nullable', 'email', 'max:255'],
+            'email' => ['nullable', 'email', 'max:150'],
             'address' => ['nullable', 'string', 'max:2000'],
-            'tax_id' => ['nullable', 'string', 'max:100'],
+            'address_line_1' => ['nullable', 'string', 'max:255'],
+            'address_line_2' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'pincode' => ['nullable', 'string', 'max:20'],
+            'tax_id' => ['nullable', 'string', 'max:50'],
+            'receipt_header' => ['nullable', 'string', 'max:2000'],
+            'receipt_footer' => ['nullable', 'string', 'max:2000'],
+            'invoice_prefix' => ['nullable', 'string', 'max:30'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
     }
@@ -143,8 +164,11 @@ class StoreController extends Controller
             $data['is_active'] = true;
             $store = Store::create($data + [
                 'company_id' => $company->id,
+                'tenant_id' => $company->id,
+                'branch_code' => $data['branch_code'] ?? $data['code'],
+                'invoice_prefix' => $data['invoice_prefix'] ?? (strtoupper($data['code']).'-INV-'),
                 'settings' => [
-                    'invoice_prefix' => strtoupper($data['code']).'-INV-',
+                    'invoice_prefix' => $data['invoice_prefix'] ?? (strtoupper($data['code']).'-INV-'),
                     'quotation_prefix' => strtoupper($data['code']).'-QUO-',
                     // CashRegister rows are sessions. Provision the drawer now;
                     // the first opening creates a session with this terminal.

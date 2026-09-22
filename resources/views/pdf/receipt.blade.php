@@ -247,20 +247,28 @@
         @if (!empty($logoBase64))
             <img src="{{ $logoBase64 }}" class="logo" alt="Logo">
         @endif
-        <div class="store-title">{{ $company->trade_name ?: $company->name }}</div>
+        <div class="store-title">{{ $sale->store?->name ?: ($company->trade_name ?: $company->name) }}</div>
+        @if (!empty($sale->store?->receipt_header))
+            <div style="font-size: {{ $subSize }}; font-weight: bold; margin-bottom: 2px;">{{ $sale->store->receipt_header }}</div>
+        @endif
         <div class="store-meta">
-            @if ($company->address)
-                <div>{{ $company->address }}{{ $company->city ? ', ' . $company->city : '' }}</div>
+            @php
+                $effectiveAddress = $sale->store?->effective_address ?: ($company->address ? $company->address . ($company->city ? ', ' . $company->city : '') : '');
+                $effectivePhone = $sale->store?->effective_phone ?: $company->phone;
+                $effectiveTaxId = $sale->store?->effective_tax_id ?: $company->tax_id;
+            @endphp
+            @if ($effectiveAddress)
+                <div>{{ $effectiveAddress }}</div>
             @endif
-            @if ($company->phone)
-                <div>Tel: {{ $company->phone }}</div>
+            @if ($effectivePhone)
+                <div>Tel: {{ $effectivePhone }}</div>
             @endif
-            @if ($company->tax_id)
+            @if ($effectiveTaxId)
                 @php
                     $receiptTaxRows = \App\Services\TaxEngineService::normalizeTaxBreakdown($sale->tax_breakdown);
                     $appliedTaxRuleName = $receiptTaxRows[0]['name'] ?? $sale->tax_name;
                 @endphp
-                <div>{{ \App\Services\TaxEngineService::getTaxIdentifierLabel($company->country, $appliedTaxRuleName) }}: {{ $company->tax_id }}</div>
+                <div>{{ \App\Services\TaxEngineService::getTaxIdentifierLabel($company->country, $appliedTaxRuleName) }}: {{ $effectiveTaxId }}</div>
             @endif
         </div>
         <div class="receipt-type">*** {!! $L("TAX INVOICE / RECEIPT") !!} ***</div>
@@ -469,7 +477,11 @@
         <div class="ref-code">#{{ $sale->sale_number }}</div>
 
         <div class="footer-text">
-            <div>{!! $L("Thank you for your visit & business!") !!}</div>
+            @if (!empty($sale->store?->receipt_footer))
+                <div>{!! nl2br(e($sale->store->receipt_footer)) !!}</div>
+            @else
+                <div>{!! $L("Thank you for your visit & business!") !!}</div>
+            @endif
             <div>{{ $company->website ?: (config('app.url') ? parse_url(config('app.url'), PHP_URL_HOST) : 'yourdomain.com') }}</div>
             @php
                 $platformBranding = \App\Models\PlatformBranding::current();
