@@ -8,7 +8,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_client.dart';
@@ -186,19 +185,29 @@ class UnifiedDocumentDispatchData {
 /// Document Dispatch Bottom Sheet.
 Future<void> showUnifiedDocumentDispatchSheet(
   BuildContext context,
-  UnifiedDocumentDispatchData data,
-) {
+  UnifiedDocumentDispatchData data, {
+  ApiClient? apiClient,
+}) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   // Match dark elevated midnight navy token (0xFF131E29 / AppTheme.darkCard)
   final background = isDark ? const Color(0xFF131E29) : AppTheme.lightCard;
 
+  Widget sheet = UnifiedDocumentDispatchSheet(
+    parentContext: context,
+    data: data,
+  );
+
+  if (apiClient != null) {
+    sheet = Provider<ApiClient>.value(
+      value: apiClient,
+      child: sheet,
+    );
+  }
+
   return showAdaptiveSheet(
     context,
     backgroundColor: background,
-    builder: (sheetContext) => UnifiedDocumentDispatchSheet(
-      parentContext: context,
-      data: data,
-    ),
+    builder: (sheetContext) => sheet,
   );
 }
 
@@ -460,6 +469,14 @@ class _UnifiedDocumentDispatchSheetState
     _fetchEnabledChannels();
   }
 
+  ApiClient _resolveApiClient() {
+    try {
+      return context.read<ApiClient>();
+    } catch (_) {
+      return widget.parentContext.read<ApiClient>();
+    }
+  }
+
   Future<void> _fetchEnabledChannels() async {
     final candidateEndpoints = <String>[
       if ((widget.data.actionsPathOverride ?? '').isNotEmpty)
@@ -470,7 +487,7 @@ class _UnifiedDocumentDispatchSheetState
     ];
 
     try {
-      final apiClient = widget.parentContext.read<ApiClient>();
+      final apiClient = _resolveApiClient();
       for (final endpoint in candidateEndpoints) {
         try {
           final res = await apiClient.requestAbsolute(endpoint, method: 'GET');
@@ -749,7 +766,7 @@ class _UnifiedDocumentDispatchSheetState
 
     setState(() => _isDispatching = true);
     try {
-      final apiClient = widget.parentContext.read<ApiClient>();
+      final apiClient = _resolveApiClient();
       final response = await apiClient.requestAbsolute(
           widget.data.dispatchEndpoint,
           method: 'POST',
@@ -833,7 +850,7 @@ class _UnifiedDocumentDispatchSheetState
       return;
     }
 
-    final apiClient = widget.parentContext.read<ApiClient>();
+    final apiClient = _resolveApiClient();
     final type = widget.data.documentType.toLowerCase().trim();
     final usesDocumentSchema =
         ['repair', 'ticket', 'job_sheet'].contains(type) ||
@@ -1177,19 +1194,52 @@ class _UnifiedDocumentPreviewScreenState
 
   Future<void> _handleShare() async {
     final data = widget.data;
-    final summary = [
-      '${data.companyName} - ${data.displayTitle}',
-      'Date: ${data.formattedTimestamp ?? DateFormat('d MMM yyyy').format(data.dateTime ?? DateTime.now())}',
-      if ((data.customerName ?? '').isNotEmpty)
-        'Customer: ${data.customerName}',
-      if ((data.tableName ?? '').isNotEmpty) 'Table: ${data.tableName}',
-      if ((data.deviceModel ?? '').isNotEmpty) 'Device: ${data.deviceModel}',
-      'Total: ${data.currencySymbol}${data.total.toStringAsFixed(2)}',
-      'Status: ${data.status}',
-    ].join('\n');
+    final dispatchData = UnifiedDocumentDispatchData(
+      documentType: data.documentType,
+      documentId: data.documentId,
+      documentNumber: data.documentNumber,
+      companyName: data.companyName,
+      title: data.title,
+      customerName: data.customerName,
+      tableName: data.tableName,
+      patientName: data.patientName,
+      customerPhone: data.customerPhone,
+      customerEmail: data.customerEmail,
+      taxId: data.taxId,
+      taxLabel: data.taxLabel,
+      isIndia: data.isIndia,
+      formattedTimestamp: data.formattedTimestamp,
+      dateTime: data.dateTime,
+      lines: data.lines,
+      subtotal: data.subtotal,
+      discount: data.discount,
+      tax: data.tax,
+      total: data.total,
+      taxRate: data.taxRate,
+      paidAmount: data.paidAmount,
+      dueAmount: data.dueAmount,
+      currencySymbol: data.currencySymbol,
+      pdfPathOverride: data.pdfPathOverride,
+      actionsPathOverride: data.actionsPathOverride,
+      dispatchEndpoint: data.dispatchEndpoint,
+      notes: data.notes,
+      status: data.status,
+      defect: data.defect,
+      deviceModel: data.deviceModel,
+      doctorName: data.doctorName,
+      stylistName: data.stylistName,
+      onPreviewPdf: () => Navigator.of(context).pop(),
+      onDispatch: data.onDispatch,
+      onChannelsDispatch: data.onChannelsDispatch,
+      initialChannels: data.initialChannels,
+      showPreview: true,
+    );
 
-    await Share.share(summary,
-        subject: '${data.companyName} - ${data.displayTitle}');
+    await showUnifiedDocumentDispatchSheet(
+      context,
+      dispatchData,
+      apiClient: widget.apiClient,
+    );
   }
 
   Future<void> _handlePrint() async {

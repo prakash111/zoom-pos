@@ -406,6 +406,40 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(api.requestedPaths, contains('/sales/POS-78C8C0CB/pdf?format=58mm'));
   });
+
+  testWidgets(
+      'UnifiedDocumentPreviewScreen Share button opens Unified Document Dispatch Sheet',
+      (tester) async {
+    final api = _DispatchMockApiClient();
+    final data = UnifiedDocumentDispatchData(
+      documentType: 'sale',
+      documentId: 'POS-78C8C0CB',
+      documentNumber: 'POS-78C8C0CB',
+      companyName: 'Zoom Store',
+      total: 100,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: UnifiedDocumentPreviewScreen(
+          apiClient: api,
+          data: data,
+          initialFormatIndex: 0,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    final shareButton = find.widgetWithText(OutlinedButton, 'Share');
+    expect(shareButton, findsOneWidget);
+    await tester.tap(shareButton);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byType(UnifiedDocumentDispatchSheet), findsOneWidget);
+    expect(find.text('Thermal Print'), findsOneWidget);
+  });
 }
 
 Future<void> _openSheet(WidgetTester tester, _DispatchMockApiClient api,
