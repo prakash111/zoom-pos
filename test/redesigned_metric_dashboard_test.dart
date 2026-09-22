@@ -222,7 +222,9 @@ void main() {
       expect(find.text('🚀 Try Flutter Web'), findsOneWidget);
 
       // The app bar owns store branding and profile; the dashboard starts at the greeting.
-      expect(find.text('Good Morning, Alex Johnson!'), findsOneWidget);
+      // fromAnalytics selects the greeting using the local time. Assert that
+      // the widget renders its supplied model so this also passes after noon.
+      expect(find.text(sampleModel.greeting.title), findsOneWidget);
       expect(find.text('MetroRetail'), findsNothing);
       expect(find.text('Smarter Retail. Faster Growth.'), findsNothing);
       expect(find.text('Store Manager'), findsNothing);
