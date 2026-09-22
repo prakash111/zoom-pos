@@ -190,6 +190,7 @@ class PermissionChecker
         'stores' => [
             'view' => 'View assigned stores',
             'create' => 'Add a store within the subscription limit',
+            'manage' => 'Manage branch details and activation',
             'edit' => 'Edit store details',
         ],
         'users' => [
@@ -338,11 +339,13 @@ class PermissionChecker
         $perm = Permission::query()
             ->where('user_id', $user->id)
             ->whereIn('module', array_unique([$module, $canonical]))
-            ->where(function ($q) use ($action) {
-                $q->where('action', $action)
-                    ->orWhere('action', 'manage')
-                    ->orWhere('action', '*');
+            ->where(function ($q) use ($action, $canonical) {
+                $q->where('action', $action)->orWhere('action', '*');
+                if ($canonical !== 'stores' || in_array($action, ['view', 'edit', 'manage'], true)) {
+                    $q->orWhere('action', 'manage');
+                }
             })
+            ->orderByRaw('CASE WHEN action = ? THEN 0 ELSE 1 END', [$action])
             ->first();
 
         if ($perm !== null) {
@@ -388,7 +391,8 @@ class PermissionChecker
             return true;
         }
 
-        if (in_array('manage', $allowed, true)) {
+        if (in_array('manage', $allowed, true)
+            && ($canonical !== 'stores' || in_array($action, ['view', 'edit', 'manage'], true))) {
             return true;
         }
 
@@ -432,6 +436,7 @@ class PermissionChecker
 
             case User::ROLE_MANAGER:
                 return [
+                    'stores' => ['view'],
                     'pos' => ['view', 'create', 'edit', 'delete', 'export'],
                     'sales' => ['view', 'create', 'process_payment', 'apply_discount', 'void', 'edit', 'export'],
                     'consignments' => ['view', 'create', 'reconcile', 'finalize_invoice', 'edit', 'delete', 'export'],
@@ -463,6 +468,7 @@ class PermissionChecker
 
             case User::ROLE_SALESPERSON:
                 return [
+                    'stores' => ['view'],
                     'pos' => ['view', 'create', 'edit'],
                     'sales' => ['view', 'create', 'process_payment', 'apply_discount'],
                     'consignments' => ['view', 'create', 'reconcile', 'edit'],
@@ -485,6 +491,7 @@ class PermissionChecker
             case User::ROLE_CASHIER:
             case 'operador':
                 return [
+                    'stores' => ['view'],
                     'pos' => ['view', 'create'],
                     'sales' => ['view', 'create', 'process_payment'],
                     'consignments' => ['view'],
@@ -503,6 +510,7 @@ class PermissionChecker
             case User::ROLE_TECHNICIAN:
             case 'technician':
                 return [
+                    'stores' => ['view'],
                     'repair' => ['view', 'diagnose'],
                     'customers' => ['view'],
                     'pos' => ['view'],
@@ -511,6 +519,7 @@ class PermissionChecker
 
             case User::ROLE_STOCK_CLERK:
                 return [
+                    'stores' => ['view'],
                     'products' => ['view', 'create', 'edit', 'delete', 'export'],
                     'consignments' => ['view', 'create'],
                     'service_orders' => ['view', 'edit'],
@@ -522,6 +531,7 @@ class PermissionChecker
 
             case User::ROLE_FINANCE:
                 return [
+                    'stores' => ['view'],
                     'sales' => ['view', 'process_payment', 'export'],
                     'consignments' => ['view', 'finalize_invoice', 'export'],
                     'quotes' => ['view', 'approve', 'export'],
@@ -536,6 +546,7 @@ class PermissionChecker
 
             default:
                 return [
+                    'stores' => ['view'],
                     'pos' => ['view', 'create'],
                     'sales' => ['view'],
                     'cash_register' => ['view', 'create'],

@@ -69,7 +69,9 @@ class CashRegisterApiController extends Controller
 
         $register = CashRegister::create([
             'company_id' => $company->id,
-            'terminal_id' => $data['terminal_id'] ?? 'Main POS',
+            'terminal_id' => $data['terminal_id'] ?? (app()->bound('tenant.store_id')
+                ? (\App\Models\Store::find(app('tenant.store_id'))?->settings['cash_register']['terminal_id'] ?? 'Main POS')
+                : 'Main POS'),
             'opened_by' => $user?->id,
             'opening_balance' => $data['opening_balance'],
             'opening_denominations' => $denoms ?: null,

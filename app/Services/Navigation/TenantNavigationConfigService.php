@@ -23,6 +23,8 @@ class TenantNavigationConfigService
      * @var array<string, string>
      */
     public const FORCED_PARENTS = [
+        'nav_stores' => 'settings',
+        'nav_document_templates' => 'settings',
         'settings_mode' => 'settings',
         'settings_profile' => 'settings',
         'settings_branding' => 'settings',

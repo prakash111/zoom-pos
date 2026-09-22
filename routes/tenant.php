@@ -109,6 +109,10 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         Route::get('/billing/invoices/{invoice}/pdf', [SubscriptionInvoiceController::class, 'pdf'])->name('billing.invoices.pdf');
 
         // Store Settings & Languages (Reachable by tenant admin to manage store configs)
+        Route::get('/settings/stores', [\App\Http\Controllers\Api\Tenant\StoreController::class, 'management'])->name('settings.stores');
+        Route::post('/settings/stores', [\App\Http\Controllers\Api\Tenant\StoreController::class, 'webStore'])->middleware(\App\Http\Middleware\PreventDemoModifications::class)->name('stores.create');
+        Route::put('/settings/stores/{id}', [\App\Http\Controllers\Api\Tenant\StoreController::class, 'webUpdate'])->middleware(\App\Http\Middleware\PreventDemoModifications::class)->name('stores.update');
+        Route::post('/settings/stores/{id}/switch', [\App\Http\Controllers\Api\Tenant\StoreController::class, 'webSwitch'])->name('stores.switch');
         Route::get('/settings', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.index');
         Route::get('/settings/mode', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.mode');
         Route::get('/settings/profile', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.profile');

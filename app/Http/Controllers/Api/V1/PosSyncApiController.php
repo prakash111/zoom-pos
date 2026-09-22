@@ -94,6 +94,7 @@ class PosSyncApiController extends Controller
             'stores.view' => $user->hasPermission('stores', 'view'),
             'stores.create' => $user->hasPermission('stores', 'create'),
             'stores.edit' => $user->hasPermission('stores', 'edit'),
+            'stores.manage' => $user->hasPermission('stores', 'manage'),
         ];
 
         if ($user->isPrivilegedRole()) {

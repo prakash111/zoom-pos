@@ -236,6 +236,7 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
     Route::get('/v1/tenant/stores', [StoreController::class, 'index']);
     Route::post('/v1/tenant/stores', [StoreController::class, 'store']);
     Route::post('/v1/tenant/stores/switch', [StoreController::class, 'switch']);
+    Route::post('/v1/tenant/stores/{id}/switch', [StoreController::class, 'switch'])->whereNumber('id');
     Route::put('/v1/tenant/stores/{id}', [StoreController::class, 'update']);
     Route::get('/v1/tenant/stores/{id}/staff', [StoreController::class, 'staff']);
     Route::post('/v1/tenant/stores/{id}/staff', [StoreController::class, 'assignStaff']);

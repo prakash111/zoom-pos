@@ -939,9 +939,13 @@
                         <div class="space-y-1">
                             <x-nav.drawer-link item-key="subscription" :route="route('tenant.billing.index')" dot="blue" bold :title="__('Subscription & Billing')" :badge="__('Invoices')" badge-color="blue" />
 
-                            @if ($canSettings)
-                                <x-nav.drawer-link item-key="settings" :route="route('tenant.settings.index')" :title="__('Store Settings')" />
+                            @if ($canSettings || auth('web')->user()?->hasPermission('stores', 'view'))
+                                <x-nav.drawer-link item-key="settings" :route="$canSettings ? route('tenant.settings.index') : route('tenant.settings.stores')" :title="__('Store Settings')" />
                                 <div class="pl-8 space-y-1 nav-children-container" data-parent-key="settings">
+                                    @if (auth('web')->user()?->hasPermission('stores', 'view'))
+                                        <x-nav.drawer-link item-key="nav_stores" :route="route('tenant.settings.stores')" :title="__('Stores & Branches')" />
+                                    @endif
+                                    @if ($canSettings)
                                     <x-nav.drawer-link item-key="settings_mode" :route="route('tenant.settings.mode')" :title="__('Store Operating Mode')" />
                                     <x-nav.drawer-link item-key="settings_profile" :route="route('tenant.settings.profile')" :title="__('Store Profile & Branding')" />
                                     <x-nav.drawer-link item-key="settings_receipts" :route="route('tenant.settings.receipts')" :title="__('Receipt Prefixes & Bank Terms')" />
@@ -952,6 +956,7 @@
                                     <x-nav.drawer-link item-key="settings_coupons" :route="route('tenant.settings.coupons')" :title="__('Coupons & Discounts')" />
                                     <x-nav.drawer-link item-key="settings_faqs" :route="route('tenant.settings.faqs')" :title="__('Store FAQs')" />
                                     <x-nav.drawer-link item-key="settings_reviews" :route="route('tenant.settings.reviews')" :title="__('Product Reviews')" />
+                                    @endif
                                 </div>
                             @endif
 

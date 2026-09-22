@@ -61,6 +61,10 @@ class DocumentNumberService
 
     private function nextSaleNumber(Company $company, string $prefix, ?string $operationType): string
     {
+        if (app()->bound('tenant.store_id')) {
+            $store = \App\Models\Store::where('company_id', $company->id)->find(app('tenant.store_id'));
+            $prefix = $store?->settings[$operationType === 'quotation' ? 'quotation_prefix' : 'invoice_prefix'] ?? $prefix;
+        }
         $query = Sale::withoutGlobalScope('company')->where('company_id', $company->id);
         if ($operationType !== null) {
             $query->where('operation_type', $operationType);

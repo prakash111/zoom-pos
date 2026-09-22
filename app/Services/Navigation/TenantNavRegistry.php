@@ -2544,6 +2544,18 @@ class TenantNavRegistry
     {
         return [
             [
+                'key' => 'nav_stores',
+                'label' => 'Stores & Branches',
+                'title' => 'Stores & Branches',
+                'icon' => 'store',
+                'component' => 'store_management',
+                'type' => 'link',
+                'route' => '/settings/store/branches',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => 'stores.view',
+            ],
+            [
                 'key' => 'nav_document_templates',
                 'label' => 'Invoice & Quotation Templates',
                 'title' => 'Invoice & Quotation Templates',

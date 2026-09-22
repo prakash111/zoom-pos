@@ -28,20 +28,31 @@ class StoreContext
             return null;
         }
         $primary = $this->ensurePrimary($company);
-        $requested = $request->header('X-Store-Id') ?: $user?->current_store_id ?: $primary->id;
-        $store = Store::withoutGlobalScopes()
-            ->where('company_id', $companyId)
-            ->where('is_active', true)
-            ->find($requested);
-
-        abort_unless($store, 403, 'Store is unavailable or belongs to another tenant.');
-        if ($user && ! $user->isPrivilegedRole()) {
-            if (! $user->stores()->where('stores.id', $store->id)->exists()) {
-                abort(403, 'You are not assigned to this store.');
-            }
-        } elseif (! $user && (int) $store->id !== (int) $primary->id) {
-            abort(403, 'A user account is required to select a non-primary store.');
+        $header = $request->header('X-Store-Id');
+        $requested = $header ?: $user?->current_store_id;
+        $query = Store::withoutGlobalScopes()->where('company_id', $companyId);
+        $store = $requested ? (clone $query)->find($requested) : null;
+        $assigned = fn (Store $branch) => $user
+            ? ($user->isPrivilegedRole() || $user->stores()->where('stores.id', $branch->id)->exists())
+            : (int) $branch->id === (int) $primary->id;
+        // A stale inactive-store header may recover only while discovering or
+        // switching stores. Never silently redirect inventory or sales writes.
+        $discovery = $request->is('api/v1/tenant/stores') && $request->isMethod('GET');
+        $switching = $request->is('api/v1/tenant/stores/*/switch', 'api/v1/tenant/stores/switch') && $request->isMethod('POST');
+        if ($header) {
+            abort_unless($store && $assigned($store), 403, 'Store is unavailable or you are not assigned to it.');
+            abort_unless($store->is_active || $discovery || $switching, 403, 'This store is inactive. Select another store.');
         }
+        if (! $store || ! $store->is_active || ! $assigned($store)) {
+            $available = (clone $query)->where('is_active', true);
+            if ($user && ! $user->isPrivilegedRole()) {
+                $available->whereHas('users', fn ($q) => $q->where('users.id', $user->id));
+            } elseif (! $user) {
+                $available->whereKey($primary->id);
+            }
+            $store = $available->orderByDesc('is_primary')->orderBy('id')->first();
+        }
+        abort_unless($store, 403, 'No active store is assigned to your account.');
 
         app()->instance('tenant.store_id', (int) $store->id);
         app()->instance('tenant.store_is_primary', (bool) $store->is_primary);
