@@ -3,16 +3,19 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToCompany;
+use App\Models\Concerns\BelongsToStore;
 use App\Models\Concerns\SyncableModel;
 use Illuminate\Database\Eloquent\Model;
 
 class OrderPayment extends Model
 {
     use BelongsToCompany;
+    use BelongsToStore;
     use SyncableModel;
 
     protected $fillable = [
         'company_id',
+        'store_id',
         'external_id',
         'sale_id',
         'cash_register_id',

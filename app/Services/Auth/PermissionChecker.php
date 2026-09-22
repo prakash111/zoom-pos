@@ -30,6 +30,8 @@ class PermissionChecker
         'reports' => 'Reports & Analytics',
         'targets' => 'Sales Targets & Goals',
         'settings' => 'Store Settings & SMTP',
+        'templates.invoices' => 'Invoice & Quotation Templates',
+        'stores' => 'Stores & Branches',
         'users' => 'Users & Permissions',
         'leads' => 'Lead Management System',
         'restaurant' => 'Restaurant POS Terminal',
@@ -182,6 +184,14 @@ class PermissionChecker
             'delete' => 'Reset configuration',
             'export' => 'Export backup files',
         ],
+        'templates.invoices' => [
+            'manage' => 'Design invoice and quotation templates and delivery options',
+        ],
+        'stores' => [
+            'view' => 'View assigned stores',
+            'create' => 'Add a store within the subscription limit',
+            'edit' => 'Edit store details',
+        ],
         'users' => [
             'view' => 'View user accounts & team',
             'create' => 'Invite new team members',
@@ -310,9 +320,9 @@ class PermissionChecker
     public function allows(User $user, string $module, string $action = 'view'): bool
     {
         if (str_contains($module, '.') && ($action === 'view' || empty($action))) {
-            [$mod, $act] = explode('.', $module, 2);
-            $module = $mod;
-            $action = $act;
+            $separator = strrpos($module, '.');
+            $action = substr($module, $separator + 1);
+            $module = substr($module, 0, $separator);
         }
 
         $canonical = self::canonicalModuleSlug($module);

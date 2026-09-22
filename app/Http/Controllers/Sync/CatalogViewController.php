@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\Product;
 use App\Models\PublishedCatalog;
 use App\Models\Sale;
+use App\Services\Stores\StoreContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -65,6 +66,7 @@ class CatalogViewController extends Controller
 
         $company = $catalog->company ?? Company::find($catalog->company_id);
         abort_if(! $company, 404, 'Store tenant not found.');
+        $primaryStore = app(StoreContext::class)->ensurePrimary($company);
 
         // Normalize field aliases before validation
         if (! $request->has('delivery_address') && $request->has('address')) {
@@ -140,6 +142,7 @@ class CatalogViewController extends Controller
 
         $sale = Sale::withoutGlobalScopes()->create([
             'company_id' => $company->id,
+            'store_id' => $primaryStore->id,
             'sale_number' => $saleNumber,
             'customer_id' => $customerId,
             'customer_name' => $validated['customer_name'] ?: 'Online Storefront Guest',

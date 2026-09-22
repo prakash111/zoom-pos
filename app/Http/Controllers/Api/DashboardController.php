@@ -132,7 +132,7 @@ class DashboardController extends Controller
 
         $lowStockCount = (int) Product::withoutGlobalScope('company')
             ->where('company_id', $company->id)
-            ->whereRaw('current_stock <= minimum_stock')
+            ->lowStock()
             ->count();
 
         // 7-day sparklines for the 4 stat cards

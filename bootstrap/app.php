@@ -3,6 +3,7 @@
 use App\Http\Middleware\CheckMaintenanceMode;
 use App\Http\Middleware\CheckTenantApiUserPermission;
 use App\Http\Middleware\CheckTenantPermission;
+use App\Http\Middleware\ClearStoreContext;
 use App\Http\Middleware\EnsureAppIsInstalled;
 use App\Http\Middleware\EnsureNotInstalled;
 use App\Http\Middleware\EnsureTenantEmailIsVerified;
@@ -54,7 +55,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // (see LocalizationService::getActiveLocale) so validation errors
             // and any translated strings in API responses match the client's
             // chosen locale.
-            Route::middleware([EnsureAppIsInstalled::class, CheckMaintenanceMode::class, SetLocale::class])
+            Route::middleware([EnsureAppIsInstalled::class, CheckMaintenanceMode::class, SetLocale::class, ClearStoreContext::class])
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));
         },

@@ -8,6 +8,8 @@ use App\Services\Auth\PermissionChecker;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class User extends Authenticatable implements AuthenticatableContract
 {
@@ -42,7 +44,7 @@ class User extends Authenticatable implements AuthenticatableContract
 
     protected $fillable = [
         'company_id', 'name', 'login', 'email', 'password', 'role', 'locale', 'status',
-        'is_demo', 'shift', 'is_specialist', 'dock_position',
+        'is_demo', 'shift', 'is_specialist', 'dock_position', 'current_store_id',
         'commission_rate', 'commission_type',
         'invitation_code_hash', 'invitation_expires_at', 'email_verified_at',
         'verification_code', 'verification_code_expires_at',
@@ -62,6 +64,19 @@ class User extends Authenticatable implements AuthenticatableContract
                 $user->login = explode('@', $user->email)[0];
             }
         });
+        static::created(function (User $user) {
+            if (! Schema::hasTable('stores')) {
+                return;
+            }
+            $primary = Store::withoutGlobalScopes()
+                ->where('company_id', $user->company_id)
+                ->where('is_primary', true)
+                ->first();
+            if ($primary) {
+                DB::table('store_user')->insertOrIgnore(['store_id' => $primary->id, 'user_id' => $user->id]);
+                $user->forceFill(['current_store_id' => $primary->id])->saveQuietly();
+            }
+        });
     }
 
     protected function casts(): array
@@ -79,6 +94,16 @@ class User extends Authenticatable implements AuthenticatableContract
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function stores()
+    {
+        return $this->belongsToMany(Store::class, 'store_user')->withPivot('role_id');
+    }
+
+    public function currentStore()
+    {
+        return $this->belongsTo(Store::class, 'current_store_id');
     }
 
     public function tenant()

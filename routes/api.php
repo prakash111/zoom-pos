@@ -22,6 +22,7 @@ use App\Http\Controllers\SuperAdmin\TenantController as SuperAdminTenantControll
 use App\Http\Controllers\Api\Tenant\CouponApiController;
 use App\Http\Controllers\Api\Tenant\FaqApiController;
 use App\Http\Controllers\Api\Tenant\StorefrontSettingsController;
+use App\Http\Controllers\Api\Tenant\StoreController;
 use App\Http\Controllers\Api\V1\AiImageApiController;
 use App\Http\Controllers\Api\V1\ApiIntegrationsController;
 use App\Http\Controllers\Api\V1\AppBootstrapController;
@@ -62,6 +63,7 @@ use App\Http\Controllers\Tenant\InvoiceController;
 use App\Http\Controllers\Tenant\StoreInquiryController;
 use App\Http\Controllers\Webhooks\SubscriptionWebhookController;
 use App\Http\Middleware\AuthenticateTenantApi;
+use App\Http\Middleware\ResolveStoreContext;
 use App\Http\Middleware\PreventDemoModifications;
 use App\Services\Auth\PermissionChecker;
 use Illuminate\Http\Request;
@@ -230,7 +232,13 @@ foreach (SubscriptionWebhookController::GATEWAYS as $gw) {
 }
 
 // Server-Driven UI Bootstrap, View Schemas, and Form Action Routes
-Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class])->group(function () {
+Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, PreventDemoModifications::class])->group(function () {
+    Route::get('/v1/tenant/stores', [StoreController::class, 'index']);
+    Route::post('/v1/tenant/stores', [StoreController::class, 'store']);
+    Route::post('/v1/tenant/stores/switch', [StoreController::class, 'switch']);
+    Route::put('/v1/tenant/stores/{id}', [StoreController::class, 'update']);
+    Route::get('/v1/tenant/stores/{id}/staff', [StoreController::class, 'staff']);
+    Route::post('/v1/tenant/stores/{id}/staff', [StoreController::class, 'assignStaff']);
     Route::get('/app/bootstrap', [AppBootstrapController::class, 'bootstrap']);
     Route::get('/tenant/bootstrap', [AppBootstrapController::class, 'bootstrap']);
     Route::get('/v1/tenant/bootstrap', [AppBootstrapController::class, 'bootstrap']);
@@ -833,6 +841,7 @@ Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class
     // One-Click Demo Data Purge
     Route::delete('/tenant/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
     Route::delete('/app/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
+    Route::delete('/v1/pos/demo-data', [TenantDemoDataController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
 
     // Navigation Labels & Custom Display Names
     Route::get('/tenant/settings/navigation-labels', [SettingsApiController::class, 'getNavigationLabels'])->middleware('tenant.api.permission:settings,view');
@@ -1056,7 +1065,7 @@ Route::prefix('v1/pos')->group(function () {
     Route::get('/auth/push-config', [PushDeviceApiController::class, 'config']);
 
     // Protected POS Endpoints (Require API Key or Bearer Token)
-    Route::middleware([AuthenticateTenantApi::class, PreventDemoModifications::class])->group(function () {
+    Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, PreventDemoModifications::class])->group(function () {
         Route::get('/auth/session', [PosSyncApiController::class, 'session']);
         Route::get('/auth/me', [PosSyncApiController::class, 'session']);
         Route::get('/v1/auth/me', [PosSyncApiController::class, 'session']);

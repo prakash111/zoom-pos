@@ -1554,7 +1554,7 @@ class UniversalPosBuilder
 
         $schema = SchemaResponse::screen($title, $fallbackComponents);
         $schema['type'] = 'pos_screen';
-        $schema['banner'] = $registerOpen ? null : [
+        $schema['banner'] = ($registerOpen || ! $company->show_cash_register_alerts) ? null : [
             'icon' => 'info_outline',
             'message' => 'No cash register is open. Sales can continue outside a register session.',
             'variant' => 'warning',

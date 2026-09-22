@@ -49,6 +49,7 @@ class Company extends Model
         'enable_product_reviews', 'require_review_approval',
         'require_customer_verification', 'verification_channels',
         'enable_order_notifications', 'order_notification_channels', 'order_notification_events',
+        'show_cash_register_alerts',
     ];
 
     protected $appends = [
@@ -73,6 +74,7 @@ class Company extends Model
             'require_customer_verification' => 'boolean',
             'verification_channels' => 'array',
             'enable_order_notifications' => 'boolean',
+            'show_cash_register_alerts' => 'boolean',
             'order_notification_channels' => 'array',
             'order_notification_events' => 'array',
             'storefront_payment_gateways' => 'array',
@@ -270,6 +272,11 @@ class Company extends Model
     public function idPrefix(): string
     {
         return 'emp_';
+    }
+
+    public function stores(): HasMany
+    {
+        return $this->hasMany(Store::class);
     }
 
     public function plan()

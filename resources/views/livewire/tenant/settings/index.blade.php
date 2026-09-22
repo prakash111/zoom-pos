@@ -503,6 +503,14 @@
                 </label>
             </div>
 
+            <label class="flex items-center justify-between gap-4 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+                <span>
+                    <span class="block font-bold text-sm text-slate-800 dark:text-slate-200">{{ __('Show cash register alerts') }}</span>
+                    <span class="block text-xs text-slate-500 dark:text-slate-400">{{ __('Show a notice on POS when no register session is open.') }}</span>
+                </span>
+                <input type="checkbox" wire:model="showCashRegisterAlerts" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+            </label>
+
             <!-- Save Button for Operating Mode -->
             <div class="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
                 <button wire:click="save"

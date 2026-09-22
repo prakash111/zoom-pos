@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Company;
+use App\Services\Stores\StoreContext;
 use App\Support\Installation;
 use Closure;
 use Illuminate\Http\Request;
@@ -41,8 +42,15 @@ class ResolveTenantContext
 
         if ($companyId) {
             app()->instance('tenant.company_id', $companyId);
+            app(StoreContext::class)->bind($request, $user, $companyId);
         } elseif (app()->bound('tenant.company_id')) {
             app()->forgetInstance('tenant.company_id');
+            if (app()->bound('tenant.store_id')) {
+                app()->forgetInstance('tenant.store_id');
+            }
+            if (app()->bound('tenant.store_is_primary')) {
+                app()->forgetInstance('tenant.store_is_primary');
+            }
         }
 
         return $next($request);

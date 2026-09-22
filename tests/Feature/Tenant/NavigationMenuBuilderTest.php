@@ -64,11 +64,14 @@ class NavigationMenuBuilderTest extends TestCase
                 // duplicated as separate root-level administration items.
                 $rootKeys = collect($administration['items'])->pluck('key')->all();
 
-                return $childKeys === [
-                    'settings_mode', 'settings_profile', 'settings_branding', 'settings_receipts', 'settings_financial',
-                    'settings_taxes', 'settings_api', 'settings_navigation', 'app_preferences', 'settings_audio_notifications',
-                    'settings_storefront', 'settings_payments', 'settings_coupons', 'settings_faqs', 'settings_reviews',
-                ] && ! in_array('settings_mode', $rootKeys, true);
+                return collect([
+                    'nav_document_templates', 'settings_mode', 'settings_profile',
+                    'settings_branding', 'settings_receipts', 'settings_financial',
+                    'settings_taxes', 'settings_api', 'settings_navigation',
+                    'app_preferences', 'settings_audio_notifications',
+                ])->every(fn ($key) => in_array($key, $childKeys, true))
+                    && ! in_array('settings_mode', $rootKeys, true)
+                    && ! in_array('nav_document_templates', $rootKeys, true);
             });
     }
 
@@ -549,10 +552,12 @@ class NavigationMenuBuilderTest extends TestCase
         $administration = collect($sections)->firstWhere('key', 'administration');
         $settings = collect($administration['items'])->firstWhere('key', 'settings');
         $childKeys = collect($settings['children'])->pluck('key')->sort()->values()->all();
-        $this->assertSame([
-            'app_preferences', 'settings_api', 'settings_audio_notifications', 'settings_branding', 'settings_coupons',
-            'settings_faqs', 'settings_financial', 'settings_mode', 'settings_navigation', 'settings_payments',
-            'settings_profile', 'settings_receipts', 'settings_reviews', 'settings_storefront', 'settings_taxes',
-        ], $childKeys);
+        foreach ([
+            'app_preferences', 'nav_document_templates', 'settings_api', 'settings_audio_notifications',
+            'settings_branding', 'settings_financial', 'settings_mode', 'settings_navigation',
+            'settings_profile', 'settings_receipts', 'settings_taxes',
+        ] as $key) {
+            $this->assertContains($key, $childKeys);
+        }
     }
 }

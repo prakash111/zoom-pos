@@ -5,13 +5,17 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\TracksSyncState;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Product extends Model
 {
     use BelongsToCompany;
     use SoftDeletes;
     use TracksSyncState;
+
+    private ?float $pendingStoreStock = null;
 
     protected $fillable = [
         'company_id', 'external_id', 'code', 'sku', 'barcode', 'name', 'description', 'image_url', 'category_id', 'category_name', 'category_type',
@@ -65,6 +69,102 @@ class Product extends Model
                 }
             }
         });
+
+        static::saved(function (Product $product) {
+            if (! app()->bound('tenant.store_id')) {
+                return;
+            }
+            if ($product->wasRecentlyCreated || $product->pendingStoreStock !== null) {
+                $product->setStoreStock($product->pendingStoreStock ?? (float) ($product->getAttributes()['current_stock'] ?? 0));
+                $product->pendingStoreStock = null;
+            }
+        });
+    }
+
+    public function getCurrentStockAttribute($value): float
+    {
+        if (! app()->bound('tenant.store_id') || ! $this->exists) {
+            return (float) $value;
+        }
+
+        return (float) (DB::table('product_store_stock')
+            ->where('product_id', $this->id)
+            ->where('store_id', app('tenant.store_id'))
+            ->value('quantity') ?? 0);
+    }
+
+    public function setCurrentStockAttribute($value): void
+    {
+        if ($this->exists && app()->bound('tenant.store_id')) {
+            $this->pendingStoreStock = (float) $value;
+            if (! app()->bound('tenant.store_is_primary') || ! app('tenant.store_is_primary')) {
+                return;
+            }
+        }
+        $this->attributes['current_stock'] = $value;
+    }
+
+    public function setStoreStock(float $quantity): void
+    {
+        if (! app()->bound('tenant.store_id')) {
+            $this->attributes['current_stock'] = $quantity;
+            return;
+        }
+        DB::table('product_store_stock')->updateOrInsert(
+            ['product_id' => $this->id, 'store_id' => app('tenant.store_id')],
+            ['quantity' => $quantity, 'updated_at' => now(), 'created_at' => now()]
+        );
+        if (app()->bound('tenant.store_is_primary') && app('tenant.store_is_primary')) {
+            DB::table('products')->where('id', $this->id)->update(['current_stock' => $quantity]);
+        }
+    }
+
+    public function increment($column, $amount = 1, array $extra = [])
+    {
+        if ($column !== 'current_stock' || ! app()->bound('tenant.store_id')) {
+            return parent::increment($column, $amount, $extra);
+        }
+        $this->changeStoreStock((float) $amount);
+        return 1;
+    }
+
+    public function decrement($column, $amount = 1, array $extra = [])
+    {
+        if ($column !== 'current_stock' || ! app()->bound('tenant.store_id')) {
+            return parent::decrement($column, $amount, $extra);
+        }
+        $this->changeStoreStock(-((float) $amount));
+        return 1;
+    }
+
+    private function changeStoreStock(float $delta): void
+    {
+        DB::table('product_store_stock')->insertOrIgnore([
+            'product_id' => $this->id,
+            'store_id' => app('tenant.store_id'),
+            'quantity' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('product_store_stock')
+            ->where('product_id', $this->id)
+            ->where('store_id', app('tenant.store_id'))
+            ->increment('quantity', $delta, ['updated_at' => now()]);
+        if (app()->bound('tenant.store_is_primary') && app('tenant.store_is_primary')) {
+            DB::table('products')->where('id', $this->id)->increment('current_stock', $delta);
+        }
+    }
+
+    public function scopeLowStock(Builder $query): Builder
+    {
+        if (app()->bound('tenant.store_id')) {
+            return $query->whereRaw(
+                'COALESCE((SELECT quantity FROM product_store_stock WHERE product_store_stock.product_id = products.id AND product_store_stock.store_id = ?), 0) <= products.minimum_stock',
+                [app('tenant.store_id')]
+            );
+        }
+
+        return $query->whereRaw('current_stock <= minimum_stock');
     }
 
     public function category()

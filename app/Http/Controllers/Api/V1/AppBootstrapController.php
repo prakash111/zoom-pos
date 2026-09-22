@@ -221,6 +221,7 @@ class AppBootstrapController extends Controller
             'push' => PushNotificationSetting::current()->publicConfig($company->id),
             'config' => [
                 'demo_mode' => (bool) config('app.demo_mode'),
+                'show_cash_register_alerts' => (bool) ($company->show_cash_register_alerts ?? false),
                 'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
                 'business_type' => $businessType,
                 'plan_features' => $activeFeatures,

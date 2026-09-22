@@ -44,4 +44,4 @@ jobs:
         run: php artisan view:cache
 
       - name: Test dashboard and document delivery
-        run: php artisan test tests/Feature/Tenant/FinancialAnalyticsAndDashboardKpisTest.php tests/Feature/Tenant/DocumentTemplateTest.php tests/Feature/Delivery/MessageQueueServiceTest.php tests/Feature/Api/UnifiedDocumentDispatchApiTest.php
+        run: php artisan test tests/Feature/Tenant/FinancialAnalyticsAndDashboardKpisTest.php tests/Feature/Tenant/DocumentTemplateTest.php tests/Feature/Tenant/MultiStoreTest.php tests/Feature/Delivery/MessageQueueServiceTest.php tests/Feature/Api/UnifiedDocumentDispatchApiTest.php

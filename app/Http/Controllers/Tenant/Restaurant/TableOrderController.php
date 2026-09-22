@@ -94,11 +94,11 @@ class TableOrderController extends Controller
             ];
         }
 
-        $saleCount = Sale::withoutGlobalScopes()->where('company_id', $company->id)->count();
+        $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count();
         $saleNumber = 'ORD-'.sprintf('%04d', $saleCount + 1);
 
         // 1. Create Sale Order
-        $sale = Sale::withoutGlobalScopes()->create([
+        $sale = Sale::withoutGlobalScope('company')->create([
             'company_id' => $company->id,
             'sale_number' => $saleNumber,
             'customer_name' => $validated['guest_name'] ?: ($table->table_number.' Guest'),

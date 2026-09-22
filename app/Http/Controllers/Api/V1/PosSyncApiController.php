@@ -89,6 +89,11 @@ class PosSyncApiController extends Controller
             'customers.edit' => $user->hasPermission('customers', 'edit'),
             'reports.view' => $user->hasPermission('reports', 'view'),
             'settings.view' => $user->hasPermission('settings', 'view'),
+            'settings.edit' => $user->hasPermission('settings', 'edit'),
+            'templates.invoices.manage' => $user->hasPermission('templates.invoices', 'manage'),
+            'stores.view' => $user->hasPermission('stores', 'view'),
+            'stores.create' => $user->hasPermission('stores', 'create'),
+            'stores.edit' => $user->hasPermission('stores', 'edit'),
         ];
 
         if ($user->isPrivilegedRole()) {
@@ -3424,7 +3429,7 @@ class PosSyncApiController extends Controller
         // Low stock count & Receivables
         $lowStockCount = Product::withoutGlobalScope('company')
             ->where('company_id', $company->id)
-            ->whereRaw('current_stock <= minimum_stock')
+            ->lowStock()
             ->count();
 
         $totalReceivables = (float) (clone $salesBase)->sum('due_amount');

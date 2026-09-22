@@ -44,7 +44,8 @@ class DocumentTemplateController extends Controller
         }
 
         $plural = $this->normalizeType($type) === 'quotation' ? 'quotations' : 'invoices';
-        $allowed = PermissionChecker::can($user, 'settings', $editing ? 'edit' : 'view');
+        $allowed = PermissionChecker::can($user, 'templates.invoices', 'manage')
+            || (! $editing && PermissionChecker::can($user, 'settings', 'view'));
 
         if (! $allowed) {
             abort(403, "You do not have permission to manage {$plural} templates.");

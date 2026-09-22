@@ -234,7 +234,7 @@ class StorefrontController extends Controller
             ];
         }
 
-        $saleCount = Sale::withoutGlobalScopes()->where('company_id', $company->id)->count();
+        $saleCount = Sale::withoutGlobalScope('company')->where('company_id', $company->id)->count();
         $codePart = strtoupper(substr($company->slug ?? preg_replace('/[^a-zA-Z0-9]/', '', $company->name), 0, 4));
         if (strlen($codePart) < 3) {
             $codePart = 'WEB';
@@ -369,7 +369,7 @@ class StorefrontController extends Controller
 
         $trackingCode = 'TRK-'.strtoupper(Str::random(8));
 
-        $sale = Sale::withoutGlobalScopes()->create([
+        $sale = Sale::withoutGlobalScope('company')->create([
             'company_id' => $company->id,
             'sale_number' => $saleNumber,
             'tracking_code' => $trackingCode,
@@ -663,7 +663,7 @@ class StorefrontController extends Controller
         abort_if(! $company, 404, 'Storefront not found.');
         app()->instance('tenant.company_id', $company->id);
 
-        $sale = Sale::withoutGlobalScopes()
+        $sale = Sale::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where(function ($q) use ($code) {
                 $q->where('tracking_code', $code)
@@ -813,7 +813,7 @@ class StorefrontController extends Controller
 
         $gateway = strtolower($request->input('payment_method'));
 
-        $query = Sale::withoutGlobalScopes()->where('company_id', $company->id);
+        $query = Sale::withoutGlobalScope('company')->where('company_id', $company->id);
         if ($request->filled('order_id')) {
             $query->where('id', $request->input('order_id'));
         } elseif ($request->filled('sale_number')) {
@@ -860,7 +860,7 @@ class StorefrontController extends Controller
 
         $gateway = strtolower($request->input('payment_method'));
 
-        $query = Sale::withoutGlobalScopes()->where('company_id', $company->id);
+        $query = Sale::withoutGlobalScope('company')->where('company_id', $company->id);
         if ($request->filled('order_id')) {
             $query->where('id', $request->input('order_id'));
         } elseif ($request->filled('sale_number')) {

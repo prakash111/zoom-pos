@@ -138,7 +138,7 @@ class QuotationController extends Controller
      */
     public function publicShow(string $quoteNumber)
     {
-        $quote = Sale::withoutGlobalScopes()->where('sale_number', $quoteNumber)->firstOrFail();
+        $quote = Sale::withoutGlobalScope('company')->where('sale_number', $quoteNumber)->firstOrFail();
         $company = $quote->company ?? Company::find($quote->company_id);
         $deliveryService = app(InvoiceDeliveryService::class);
         $whatsAppUrl = $deliveryService->generateQuotationWhatsAppUrl($quote);

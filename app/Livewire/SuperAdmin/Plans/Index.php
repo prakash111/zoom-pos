@@ -91,7 +91,7 @@ class Index extends Component
             'limitUsers' => ['required', 'integer', 'min:-1'],
             'limitDevices' => ['required', 'integer', 'min:-1'],
             'limitStorageMb' => ['required', 'integer', 'min:0'],
-            'limitBranches' => ['required', 'integer', 'min:0'],
+            'limitBranches' => ['required', 'integer', 'min:-1'],
             'invoiceLimit' => ['required', 'integer', 'min:-1'],
             'productsLimit' => ['required', 'integer', 'min:-1'],
             'deviceLimit' => ['required', 'integer', 'min:-1'],
@@ -167,7 +167,7 @@ class Index extends Component
         $this->limitUsers = $this->staffLimit;
         $this->limitDevices = $this->deviceLimit;
         $this->limitStorageMb = $plan->limits['armazenamento_mb'] ?? 1024;
-        $this->limitBranches = $plan->limits['filiais'] ?? 1;
+        $this->limitBranches = $plan->store_limit ?? ($plan->limits['filiais'] ?? 1);
         $this->extensions = is_array($plan->extensions) ? $plan->extensions : [];
         $this->customExtensionInput = '';
         $this->featureMultiLocation = (bool) ($plan->features['multi_location'] ?? false);
@@ -252,6 +252,7 @@ class Index extends Component
                 'products_limit' => $this->productsLimit,
                 'device_limit' => $this->limitDevices !== 3 ? $this->limitDevices : $this->deviceLimit,
                 'staff_limit' => $this->limitUsers !== 5 ? $this->limitUsers : $this->staffLimit,
+                'store_limit' => $this->limitBranches,
                 'extensions' => array_values(array_unique(array_filter($this->extensions))),
                 'limits' => [
                     'usuarios' => $this->limitUsers !== 5 ? $this->limitUsers : $this->staffLimit,

@@ -118,7 +118,8 @@ class SduiViewApiTest extends TestCase
             ->flatMap(fn (array $section) => $section['items'])
             ->firstWhere('key', 'settings');
         $this->assertNotEmpty($settings['children']);
-        $this->assertSame('settings_profile', $settings['children'][1]['key']);
+        $this->assertContains('settings_profile', array_column($settings['children'], 'key'));
+        $this->assertContains('nav_document_templates', array_column($settings['children'], 'key'));
     }
 
     public function test_database_authored_navigation_screen_is_hydrated_with_tenant_tree_data(): void
@@ -698,8 +699,8 @@ class SduiViewApiTest extends TestCase
             ->getJson('/api/app/bootstrap');
 
         $response->assertOk();
-        $response->assertJsonPath('schema_contract.version', SchemaResponse::SCHEMA_VERSION)
-            ->assertJsonPath('screens.0.endpoint', '/api/tenant/views/settings-mode');
+        $response->assertJsonPath('schema_contract.version', SchemaResponse::SCHEMA_VERSION);
+        $this->assertContains('/api/tenant/views/settings-mode', array_column($response->json('screens'), 'endpoint'));
         $menu = $response->json('menu_structure');
         $this->assertNotEmpty($menu);
 
@@ -711,9 +712,12 @@ class SduiViewApiTest extends TestCase
         $this->assertSame('accordion', $settingsItem['type']);
         $this->assertNotEmpty($settingsItem['children']);
 
-        $firstTab = $settingsItem['children'][0];
-        $this->assertArrayHasKey('target_endpoint', $firstTab);
-        $this->assertSame('/api/tenant/views/settings-mode', $firstTab['target_endpoint']);
+        $modeTab = collect($settingsItem['children'])->firstWhere('key', 'settings_mode');
+        $this->assertNotNull($modeTab);
+        $this->assertSame('/api/tenant/views/settings-mode', $modeTab['target_endpoint']);
+        $templatesTab = collect($settingsItem['children'])->firstWhere('key', 'nav_document_templates');
+        $this->assertNotNull($templatesTab);
+        $this->assertSame('/settings/store/templates', $templatesTab['target_endpoint']);
     }
 
     public function test_licensed_module_views_render_valid_sdui_screens(): void

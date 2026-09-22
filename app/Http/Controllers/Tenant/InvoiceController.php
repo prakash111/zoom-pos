@@ -55,7 +55,7 @@ class InvoiceController extends Controller
      */
     public function signedPdf(Request $request, string $sale)
     {
-        $model = Sale::withoutGlobalScopes()
+        $model = Sale::withoutGlobalScope('company')
             ->with(['payments' => fn ($q) => $q->withoutGlobalScope('company')])
             ->where(function ($q) use ($sale) {
                 $q->where('id', $sale)->orWhere('sale_number', $sale)->orWhere('external_id', $sale);
@@ -251,7 +251,7 @@ class InvoiceController extends Controller
      */
     public function publicShow(Request $request, string $saleNumber)
     {
-        $sale = Sale::withoutGlobalScopes()
+        $sale = Sale::withoutGlobalScope('company')
             ->with(['payments' => fn ($q) => $q->withoutGlobalScope('company')])
             ->where('sale_number', $saleNumber)
             ->firstOrFail();

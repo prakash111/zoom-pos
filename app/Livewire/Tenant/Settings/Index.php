@@ -107,6 +107,8 @@ class Index extends Component
 
     public bool $enableConsignments = true;
 
+    public bool $showCashRegisterAlerts = false;
+
     /// Read-only display of the tenant's operating mode — set once at
     /// registration and only ever changeable by a superadmin (via the
     /// `restaurant_mode_locked` override on the tenant's Company record).
@@ -444,6 +446,7 @@ class Index extends Component
         $this->defaultCommissionRate = (float) ($this->company->default_commission_rate ?? 0);
         $this->defaultCommissionType = (string) ($this->company->default_commission_type ?: 'percentage');
         $this->enableConsignments = (bool) ($this->company->enable_consignments ?? true);
+        $this->showCashRegisterAlerts = (bool) ($this->company->show_cash_register_alerts ?? false);
         $this->posMode = (string) ($this->company->pos_mode ?: 'general');
 
         // PIX & Card Fees & Scale
@@ -952,6 +955,7 @@ class Index extends Component
             'default_commission_rate' => $this->defaultCommissionRate,
             'default_commission_type' => $this->defaultCommissionType ?: 'percentage',
             'enable_consignments' => $this->enableConsignments,
+            'show_cash_register_alerts' => $this->showCashRegisterAlerts,
             'pix_key_type' => $this->pixKeyType,
             'pix_key' => $this->pixKey ?: null,
             'pix_merchant_name' => $this->pixMerchantName ?: null,

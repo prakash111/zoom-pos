@@ -2544,6 +2544,18 @@ class TenantNavRegistry
     {
         return [
             [
+                'key' => 'nav_document_templates',
+                'label' => 'Invoice & Quotation Templates',
+                'title' => 'Invoice & Quotation Templates',
+                'icon' => 'receipt_long',
+                'component' => 'document_templates',
+                'type' => 'link',
+                'route' => '/settings/store/templates',
+                'parent' => 'settings',
+                'parent_id' => 'settings',
+                'permission' => 'templates.invoices.manage',
+            ],
+            [
                 'key' => 'settings_mode',
                 'label' => 'Store Operating Mode',
                 'title' => 'Store Operating Mode',

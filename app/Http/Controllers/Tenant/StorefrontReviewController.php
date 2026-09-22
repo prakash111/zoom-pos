@@ -181,7 +181,7 @@ class StorefrontReviewController extends Controller
         // Check if customer made a verified purchase of this product
         $isVerified = false;
         if ($customer) {
-            $hasPurchased = Sale::withoutGlobalScopes()
+            $hasPurchased = Sale::withoutGlobalScope('company')
                 ->where('company_id', $company->id)
                 ->where('customer_id', $customer->id)
                 ->where(function ($q) use ($product) {
@@ -257,7 +257,7 @@ class StorefrontReviewController extends Controller
             ->get();
 
         // Find products ordered by customer that can be rated
-        $sales = Sale::withoutGlobalScopes()
+        $sales = Sale::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where('customer_id', $customer->id)
             ->recent()

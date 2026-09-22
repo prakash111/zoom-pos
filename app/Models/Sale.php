@@ -3,16 +3,18 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToCompany;
+use App\Models\Concerns\BelongsToStore;
 use App\Models\Concerns\TracksSyncState;
 use Illuminate\Database\Eloquent\Model;
 
 class Sale extends Model
 {
     use BelongsToCompany;
+    use BelongsToStore;
     use TracksSyncState;
 
     protected $fillable = [
-        'company_id', 'external_id', 'sale_number', 'tracking_code', 'customer_id', 'lead_id', 'customer_name', 'user_id', 'cash_register_id',
+        'company_id', 'store_id', 'external_id', 'sale_number', 'tracking_code', 'customer_id', 'lead_id', 'customer_name', 'user_id', 'cash_register_id',
         'total', 'net_amount', 'discount', 'payment_method', 'agreed_payment_method', 'installments', 'status', 'is_demo', 'items', 'operation_type', 'gst_invoice',
         'service_type', 'dining_table_id', 'table_name', 'guest_count', 'pickup_time',
         'delivery_address', 'driver_name', 'driver_phone', 'dispatch_status', 'kot_status',
@@ -276,4 +278,3 @@ class Sale extends Model
         return 'Placed';
     }
 }
-
