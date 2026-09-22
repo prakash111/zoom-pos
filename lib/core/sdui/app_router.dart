@@ -5,6 +5,7 @@ import '../../features/auth/screens/register_screen.dart';
 import '../../features/landing/screens/landing_screen.dart';
 import '../../features/settings/screens/document_templates_tab.dart';
 import '../../features/storefront/screens/storefront_screen.dart';
+import '../../features/sales/screens/sales_screen.dart';
 import 'screens/dynamic_schema_page.dart';
 import '../../features/stores/store_management_screen.dart';
 
@@ -56,6 +57,26 @@ class AppRouter {
       return MaterialPageRoute<void>(
         settings: settings,
         builder: (_) => const RegisterScreen(),
+      );
+    }
+
+    if (normalized == 'sales' ||
+        normalized == 'sales/invoices' ||
+        normalized == 'invoices' ||
+        normalized == 'tenant/sales') {
+      final args = settings.arguments;
+      String? initialDueFilter;
+      if (args is Map) {
+        initialDueFilter = (args['initial_due_filter'] ??
+                args['due_filter'] ??
+                args['filter'])
+            ?.toString();
+      }
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => SalesScreen(
+          initialDueFilter: initialDueFilter,
+        ),
       );
     }
 

@@ -901,6 +901,13 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
             label: 'Overdue Amount',
             value: r.formattedOverdue,
             isDark: isDark,
+            onTap: () {
+              Navigator.pushNamed(
+                context,
+                '/sales',
+                arguments: {'initial_due_filter': 'overdue'},
+              );
+            },
           ),
           const SizedBox(height: 10),
           _buildReceivableBreakdownRow(
@@ -909,6 +916,13 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
             label: 'Due Today',
             value: r.formattedDueToday,
             isDark: isDark,
+            onTap: () {
+              Navigator.pushNamed(
+                context,
+                '/sales',
+                arguments: {'initial_due_filter': 'due_today'},
+              );
+            },
           ),
           const SizedBox(height: 16),
 
@@ -938,8 +952,9 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
     required String label,
     required String value,
     required bool isDark,
+    VoidCallback? onTap,
   }) {
-    return Row(
+    final rowContent = Row(
       children: [
         Container(
           width: 26,
@@ -969,8 +984,29 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
             color: isDark ? Colors.white : const Color(0xFF0F172A),
           ),
         ),
+        if (onTap != null) ...[
+          const SizedBox(width: 4),
+          Icon(
+            Icons.chevron_right,
+            size: 16,
+            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+          ),
+        ],
       ],
     );
+
+    if (onTap != null) {
+      return InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+          child: rowContent,
+        ),
+      );
+    }
+
+    return rowContent;
   }
 
   Widget _buildQuickActionsGrid(BuildContext context, bool isDark) {

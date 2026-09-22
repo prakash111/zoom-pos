@@ -75,6 +75,7 @@ class StoreProvider extends ChangeNotifier {
   bool get canCreateMore => canCreate && !limitReached && !fromCache;
   List<StoreBranch> get activeStores =>
       stores.where((s) => s.isActive).toList();
+  int? get currentStoreId => current?.id;
 
   void _apply(Map<String, dynamic> response) {
     final data = response['data'];

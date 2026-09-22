@@ -6,6 +6,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/models/sale_model.dart';
 import '../../../core/services/tenant_time_service.dart';
+import '../../../core/stores/store_provider.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/error_view.dart';
@@ -22,12 +23,19 @@ final _dateFormat = DateFormat('MMM d, y · h:mm a');
 /// number or customer name. Read-only — new sales are recorded from the
 /// Point of Sale module.
 class SalesScreen extends StatefulWidget {
-  const SalesScreen({super.key, this.initialFilter});
+  const SalesScreen({
+    super.key,
+    this.initialFilter,
+    this.initialDueFilter,
+  });
 
   /// A pre-applied text filter (e.g. a "Popular Tag" tapped on the dashboard).
   /// Shown as a dismissible chip and matched against the sale #, customer and
   /// line-item names.
   final String? initialFilter;
+
+  /// An initial due date filter (e.g. 'overdue', 'due_today') passed from navigation.
+  final String? initialDueFilter;
 
   @override
   State<SalesScreen> createState() => _SalesScreenState();
@@ -35,20 +43,45 @@ class SalesScreen extends StatefulWidget {
 
 class _SalesScreenState extends State<SalesScreen> {
   late final SalesRepository _repository;
-  late Future<List<SaleModel>> _future;
+  Future<List<SaleModel>>? _future;
   final _searchController = TextEditingController();
   String _query = '';
   String? _tagFilter;
+  String _selectedFilter = 'all';
+  DateTimeRange? _customDateRange;
+  bool _initializedArgs = false;
 
   @override
   void initState() {
     super.initState();
     _repository = SalesRepository(context.read<ApiClient>());
-    _future = _repository.fetchRecentSales();
     final tag = widget.initialFilter?.trim();
     if (tag != null && tag.isNotEmpty) {
       _tagFilter = tag;
       _query = tag.toLowerCase();
+      _searchController.text = tag;
+    }
+    if (widget.initialDueFilter != null && widget.initialDueFilter!.isNotEmpty) {
+      _selectedFilter = widget.initialDueFilter!;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initializedArgs) {
+      _initializedArgs = true;
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map) {
+        final argFilter = (args['initial_due_filter'] ??
+                args['due_filter'] ??
+                args['filter'])
+            ?.toString();
+        if (argFilter != null && argFilter.isNotEmpty) {
+          _selectedFilter = argFilter;
+        }
+      }
+      _reload();
     }
   }
 
@@ -59,7 +92,166 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   void _reload() {
-    setState(() => _future = _repository.fetchRecentSales());
+    final storeProvider = context.read<StoreProvider>();
+    setState(() {
+      _future = _repository.fetchSales(
+        query: _query,
+        filter: _selectedFilter,
+        startDate: _customDateRange?.start,
+        endDate: _customDateRange?.end,
+        storeId: storeProvider.currentStoreId,
+      );
+    });
+  }
+
+  Future<void> _pickCustomDateRange() async {
+    final now = DateTime.now();
+    final initialRange = _customDateRange ??
+        DateTimeRange(
+          start: now.subtract(const Duration(days: 7)),
+          end: now,
+        );
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 2),
+      initialDateRange: initialRange,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context),
+          child: child ?? const SizedBox(),
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _customDateRange = picked;
+        _selectedFilter = 'custom_date';
+      });
+      _reload();
+    }
+  }
+
+  Widget _buildFilterBar() {
+    final theme = Theme.of(context);
+    final chips = [
+      {'key': 'all', 'label': 'All', 'icon': null},
+      {'key': 'overdue', 'label': 'Overdue', 'icon': Icons.error_outline},
+      {'key': 'due_today', 'label': 'Due Today', 'icon': Icons.access_time},
+      {'key': 'due_7_days', 'label': 'Due in 7 Days', 'icon': Icons.date_range_outlined},
+      {'key': 'due_15_days', 'label': 'Due in 15 Days', 'icon': Icons.calendar_today_outlined},
+    ];
+
+    String dateLabel = 'Date Filter';
+    if (_customDateRange != null) {
+      final s = DateFormat('MMM d').format(_customDateRange!.start);
+      final e = DateFormat('MMM d').format(_customDateRange!.end);
+      dateLabel = '$s - $e';
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          ...chips.map((chip) {
+            final key = chip['key'] as String;
+            final label = chip['label'] as String;
+            final icon = chip['icon'] as IconData?;
+            final isSelected = _selectedFilter == key;
+
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                showCheckmark: false,
+                avatar: icon != null
+                    ? Icon(
+                        icon,
+                        size: 16,
+                        color: isSelected
+                            ? Colors.white
+                            : (key == 'overdue'
+                                ? const Color(0xFFEF4444)
+                                : key == 'due_today'
+                                    ? const Color(0xFFF59E0B)
+                                    : theme.colorScheme.primary),
+                      )
+                    : null,
+                label: Text(label),
+                labelStyle: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? Colors.white : theme.colorScheme.onSurface,
+                ),
+                selected: isSelected,
+                selectedColor: key == 'overdue'
+                    ? const Color(0xFFEF4444)
+                    : key == 'due_today'
+                        ? const Color(0xFFF59E0B)
+                        : theme.colorScheme.primary,
+                backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color: isSelected
+                        ? Colors.transparent
+                        : theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  ),
+                ),
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _selectedFilter = key;
+                      if (key != 'custom_date') {
+                        _customDateRange = null;
+                      }
+                    });
+                    _reload();
+                  }
+                },
+              ),
+            );
+          }),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              showCheckmark: false,
+              avatar: Icon(
+                Icons.calendar_month_outlined,
+                size: 16,
+                color: _selectedFilter == 'custom_date'
+                    ? Colors.white
+                    : theme.colorScheme.primary,
+              ),
+              label: Text(dateLabel),
+              labelStyle: TextStyle(
+                fontSize: 12.5,
+                fontWeight: _selectedFilter == 'custom_date'
+                    ? FontWeight.w700
+                    : FontWeight.w500,
+                color: _selectedFilter == 'custom_date'
+                    ? Colors.white
+                    : theme.colorScheme.onSurface,
+              ),
+              selected: _selectedFilter == 'custom_date',
+              selectedColor: theme.colorScheme.primary,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: _selectedFilter == 'custom_date'
+                      ? Colors.transparent
+                      : theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                ),
+              ),
+              onSelected: (_) => _pickCustomDateRange(),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -74,7 +266,7 @@ class _SalesScreenState extends State<SalesScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: DesktopBoundedField(
                 child: TextField(
                   controller: _searchController,
@@ -82,6 +274,7 @@ class _SalesScreenState extends State<SalesScreen> {
                     _query = value.trim().toLowerCase();
                     _tagFilter = null;
                   }),
+                  onSubmitted: (_) => _reload(),
                   decoration: InputDecoration(
                     hintText: 'Search sale #, customer or item',
                     prefixIcon: const Icon(Icons.search),
@@ -95,30 +288,35 @@ class _SalesScreenState extends State<SalesScreen> {
                                 _query = '';
                                 _tagFilter = null;
                               });
+                              _reload();
                             },
                           ),
                   ),
                 ),
               ),
             ),
+            _buildFilterBar(),
             if (_tagFilter != null)
               Align(
                 alignment: Alignment.centerLeft,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                   child: InputChip(
                     avatar: const Icon(Icons.local_offer_outlined, size: 16),
                     label: Text('Filtered by #$_tagFilter'),
                     onDeleted: () => setState(() {
                       _tagFilter = null;
                       _query = '';
+                      _reload();
                     }),
                   ),
                 ),
               ),
             Expanded(
-              child: FutureBuilder<List<SaleModel>>(
-                future: _future,
+              child: _future == null
+                  ? const LoadingIndicator()
+                  : FutureBuilder<List<SaleModel>>(
+                      future: _future,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState != ConnectionState.done) {
                     return const LoadingIndicator();

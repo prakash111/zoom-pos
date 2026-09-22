@@ -17,19 +17,22 @@ class SaleModel {
     required this.dueAmount,
     required this.status,
     required this.createdAt,
+    this.dueDate,
   });
 
   factory SaleModel.fromJson(Map<String, dynamic> json) {
     return SaleModel(
       id: json['id'].toString(),
       serverId: json['server_id']?.toString(),
-      saleNumber: json['sale_number'] as String? ?? '',
+      saleNumber: (json['sale_number'] ?? json['invoice_number'] ?? '') as String,
       customerName: json['customer_name'] as String?,
       items: (json['items'] as List? ?? [])
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .toList(),
-      total: (json['total'] as num?)?.toDouble() ?? 0,
+      total: (json['total'] as num?)?.toDouble() ??
+          (json['total_amount'] as num?)?.toDouble() ??
+          0,
       discount: (json['discount'] as num?)?.toDouble() ?? 0,
       tax: (json['tax'] as num?)?.toDouble() ?? 0,
       paymentMethod: json['payment_method'] as String? ?? 'cash',
@@ -37,7 +40,10 @@ class SaleModel {
       paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? 0,
       dueAmount: (json['due_amount'] as num?)?.toDouble() ?? 0,
       status: json['status'] as String? ?? 'completed',
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
+      createdAt: DateTime.tryParse(
+          json['createdAt'] as String? ?? json['created_at'] as String? ?? ''),
+      dueDate: DateTime.tryParse(
+          json['dueDate'] as String? ?? json['due_date'] as String? ?? ''),
     );
   }
 
@@ -55,6 +61,7 @@ class SaleModel {
   final double dueAmount;
   final String status;
   final DateTime? createdAt;
+  final DateTime? dueDate;
 
   bool get isCancelled => status == 'cancelled';
 }

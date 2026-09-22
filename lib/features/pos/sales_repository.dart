@@ -23,6 +23,149 @@ class SalesRepository {
         .toList();
   }
 
+  Future<List<SaleModel>> fetchSales({
+    String? query,
+    String? filter,
+    DateTime? startDate,
+    DateTime? endDate,
+    int? storeId,
+  }) async {
+    try {
+      final queryParams = <String, String>{};
+      if (query != null && query.trim().isNotEmpty) {
+        queryParams['query'] = query.trim();
+      }
+      if (filter != null && filter.isNotEmpty) {
+        queryParams['filter'] = filter;
+      }
+      if (startDate != null) {
+        queryParams['start_date'] =
+            startDate.toIso8601String().split('T').first;
+      }
+      if (endDate != null) {
+        queryParams['end_date'] = endDate.toIso8601String().split('T').first;
+      }
+      if (storeId != null) {
+        queryParams['store_id'] = storeId.toString();
+      }
+
+      final uri = queryParams.isEmpty
+          ? ApiEndpoints.sales
+          : Uri(
+              path: ApiEndpoints.sales,
+              queryParameters: queryParams,
+            ).toString();
+
+      final response = await _client.get(uri);
+      final list =
+          (response['data'] as List? ?? response['sales'] as List? ?? []);
+      return list
+          .map((e) => SaleModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      final all = await fetchRecentSales();
+      return _filterLocalSales(
+        all,
+        query: query,
+        filter: filter,
+        startDate: startDate,
+        endDate: endDate,
+      );
+    }
+  }
+
+  List<SaleModel> _filterLocalSales(
+    List<SaleModel> sales, {
+    String? query,
+    String? filter,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
+    var result = sales;
+    if (query != null && query.trim().isNotEmpty) {
+      final q = query.trim().toLowerCase();
+      result = result.where((s) {
+        final matchNum = s.saleNumber.toLowerCase().contains(q);
+        final matchCustomer =
+            s.customerName?.toLowerCase().contains(q) ?? false;
+        final matchItems = s.items.any((item) =>
+            (item['product_name'] ?? item['name'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(q));
+        return matchNum || matchCustomer || matchItems;
+      }).toList();
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final in7Days = today.add(const Duration(days: 7));
+    final in15Days = today.add(const Duration(days: 15));
+
+    switch (filter) {
+      case 'overdue':
+        result = result.where((s) {
+          if (s.dueDate == null) return false;
+          final d =
+              DateTime(s.dueDate!.year, s.dueDate!.month, s.dueDate!.day);
+          return d.isBefore(today) && s.paymentStatus.toLowerCase() != 'paid';
+        }).toList();
+        break;
+      case 'due_today':
+        result = result.where((s) {
+          if (s.dueDate == null) return false;
+          final d =
+              DateTime(s.dueDate!.year, s.dueDate!.month, s.dueDate!.day);
+          return d.isAtSameMomentAs(today) &&
+              s.paymentStatus.toLowerCase() != 'paid';
+        }).toList();
+        break;
+      case 'due_7_days':
+        result = result.where((s) {
+          if (s.dueDate == null) return false;
+          final d =
+              DateTime(s.dueDate!.year, s.dueDate!.month, s.dueDate!.day);
+          return !d.isBefore(today) &&
+              !d.isAfter(in7Days) &&
+              s.paymentStatus.toLowerCase() != 'paid';
+        }).toList();
+        break;
+      case 'due_15_days':
+        result = result.where((s) {
+          if (s.dueDate == null) return false;
+          final d =
+              DateTime(s.dueDate!.year, s.dueDate!.month, s.dueDate!.day);
+          return !d.isBefore(today) &&
+              !d.isAfter(in15Days) &&
+              s.paymentStatus.toLowerCase() != 'paid';
+        }).toList();
+        break;
+      case 'custom_date':
+        if (startDate != null || endDate != null) {
+          final sDate = startDate != null
+              ? DateTime(startDate.year, startDate.month, startDate.day)
+              : null;
+          final eDate = endDate != null
+              ? DateTime(
+                  endDate.year, endDate.month, endDate.day, 23, 59, 59)
+              : null;
+          result = result.where((s) {
+            final date = s.createdAt;
+            if (date == null) return false;
+            if (sDate != null && date.isBefore(sDate)) return false;
+            if (eDate != null && date.isAfter(eDate)) return false;
+            return true;
+          }).toList();
+        }
+        break;
+      case 'all':
+      default:
+        break;
+    }
+
+    return result;
+  }
+
   Future<SaleModel> fetchSale(String id) async {
     final response = await _client.get(ApiEndpoints.sale(id));
     return SaleModel.fromJson(response['sale'] as Map<String, dynamic>);

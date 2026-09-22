@@ -10,6 +10,7 @@ import 'core/config/locale_provider.dart';
 import 'core/config/nav_dock_provider.dart';
 import 'core/config/platform_branding_provider.dart';
 import 'core/providers/dashboard_provider.dart';
+import 'core/providers/sales_provider.dart';
 import 'core/config/theme.dart';
 import 'core/config/theme_provider.dart';
 import 'core/sdui/app_router.dart';
@@ -163,6 +164,8 @@ class ZoomPosApp extends StatelessWidget {
             create: (_) => StoreProvider(apiClient)),
         ChangeNotifierProvider<DashboardProvider>(
             create: (_) => DashboardProvider(apiClient)),
+        ChangeNotifierProvider<SalesProvider>(
+            create: (_) => SalesProvider(SalesRepository(apiClient))),
         ChangeNotifierProvider<BootstrapCache>.value(
             value: BootstrapCache.instance),
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),

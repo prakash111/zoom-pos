@@ -78,6 +78,7 @@ class ApiEndpoints {
       '/receivables/$saleId/reminder';
   static const String pushConfig = '/auth/push-config';
   static const String pushDevices = '/push-devices';
+  static const String sales = '/sales';
   static String sale(String id) => '/sales/$id';
   static String salePdf(String id) => '/sales/$id/pdf';
   static String quotationPdf(String id) => '/quotations/$id/pdf';
