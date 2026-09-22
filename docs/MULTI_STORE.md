@@ -41,7 +41,12 @@ uses that branch's default terminal ID without creating an artificial session.
 
 ## Management and limits
 
-Laravel: **Store Settings → Stores & Branches** (`/tenant/settings/stores`).
+Laravel: use the active-store dropdown beneath the page title, or
+**Store Settings → Stores & Branches** (`/tenant/settings/stores`). All desktop
+navigation layouts and the Settings overview also expose branch management.
+Header switching performs a full dashboard reload. Revenue KPI caches and
+low-stock queries use the active branch, so switching does not retain another
+branch's figures.
 Flutter: the same drawer child (`/settings/store/branches`) and the switcher
 footer. Creation appears only when permission and plan capacity allow it.
 Super Admin → Plans controls the store limit; `-1` means unlimited. Inactive

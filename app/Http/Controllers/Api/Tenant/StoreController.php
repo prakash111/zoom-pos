@@ -243,7 +243,8 @@ class StoreController extends Controller
     public function webSwitch(Request $request, string $id)
     {
         $this->switch($request, $id);
-        return redirect()->route('tenant.settings.stores')->with('status', 'Active store changed.');
+        $destination = $request->input('redirect_to') === 'dashboard' ? 'tenant.dashboard' : 'tenant.settings.stores';
+        return redirect()->route($destination)->with('status', 'Active store changed.');
     }
 
     public function staff(Request $request, string $id): JsonResponse

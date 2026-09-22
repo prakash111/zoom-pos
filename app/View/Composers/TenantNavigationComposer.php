@@ -3,6 +3,7 @@
 namespace App\View\Composers;
 
 use App\Models\Company;
+use App\Models\Store;
 use App\Services\Auth\PermissionChecker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\View as ViewFacade;
@@ -70,8 +71,29 @@ class TenantNavigationComposer
         $hiddenNavKeys = collect($navConfig['items'] ?? [])->where('visible', false)->pluck('key')->all();
         ViewFacade::share(['hiddenNavKeys' => $hiddenNavKeys, 'tenantNavConfig' => $navConfig]);
 
+        $canStores = $user && $company->exists && $allows('stores');
+        $switchableStores = collect();
+        $storeLimit = (int) ($company->plan?->store_limit ?? 1);
+        $storeCount = 0;
+        if ($canStores) {
+            $stores = Store::where('company_id', $company->id)->where('is_active', true);
+            if (! $user->isPrivilegedRole()) {
+                $stores->whereHas('users', fn ($query) => $query->where('users.id', $user->id));
+            }
+            $switchableStores = $stores->orderByDesc('is_primary')->orderBy('name')->get();
+            $storeCount = Store::where('company_id', $company->id)->count();
+        }
+        $activeStoreId = app()->bound('tenant.store_id') ? app('tenant.store_id') : $user?->current_store_id;
+
         $view->with([
             'tenantCompany' => $company,
+            'canStores' => $canStores,
+            'switchableStores' => $switchableStores,
+            'activeStore' => $switchableStores->firstWhere('id', $activeStoreId),
+            'tenantStoreCount' => $storeCount,
+            'tenantStoreLimit' => $storeLimit,
+            'canCreateStore' => $canStores && $allows('stores', 'create'),
+            'canAddStore' => $canStores && $allows('stores', 'create') && ($storeLimit === -1 || $storeCount < $storeLimit),
             'themeClasses' => $themeClasses,
             'uiAccentColorHex' => $company->primary_color ?: ($themeClasses['hex'] ?? '#2563eb'),
             'isRestaurant' => $isRestaurantMode,

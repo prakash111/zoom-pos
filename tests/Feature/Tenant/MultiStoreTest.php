@@ -188,4 +188,62 @@ class MultiStoreTest extends TestCase
         $this->putJson('/api/v1/tenant/stores/'.$id, ['is_active' => false], $headers)->assertUnprocessable();
     }
 
+    public function test_laravel_header_exposes_branch_actions_and_switches_back_to_dashboard(): void
+    {
+        [$company, $admin, $headers] = $this->adminAccount();
+        $mainId = $this->getJson('/api/v1/tenant/stores', $headers)->assertOk()->json('current_store_id');
+        $branchId = $this->postJson('/api/v1/tenant/stores', ['name' => 'Visible North Branch', 'address' => 'North Street'], $headers)
+            ->assertCreated()->json('data.id');
+        $this->actingAs($admin->fresh(), 'web')->get(route('tenant.dashboard'))->assertOk()
+            ->assertSee('data-testid="tenant-store-switcher"', false)
+            ->assertSee('Visible North Branch')->assertSee('North Street')
+            ->assertSee('Manage Stores & Branches')->assertSee('Add New Store / Branch');
+        $this->post(route('tenant.stores.switch', $mainId), ['redirect_to' => 'dashboard'])
+            ->assertRedirect(route('tenant.dashboard'));
+        $this->assertEquals($mainId, $admin->fresh()->current_store_id);
+        $this->put(route('tenant.stores.update', $branchId), ['name' => 'Edited North Branch', 'phone' => '+919876543210'])
+            ->assertRedirect(route('tenant.settings.stores'));
+        $this->assertDatabaseHas('stores', ['id' => $branchId, 'name' => 'Edited North Branch']);
+        $this->get(route('tenant.settings.index'))->assertOk()->assertSee('Stores & Branches');
+        $company->plan->update(['store_limit' => 2]);
+        $this->actingAs($admin->fresh(), 'web')->get(route('tenant.dashboard'))->assertOk()
+            ->assertDontSee('Add New Store / Branch')->assertSee('Store limit reached. Upgrade to add a branch.');
+    }
+
+    public function test_laravel_switcher_only_shows_assigned_stores_and_honors_denied_view(): void
+    {
+        [$company, , $headers] = $this->adminAccount();
+        $this->getJson('/api/v1/tenant/stores', $headers)->assertOk();
+        $staff = User::factory()->create(['company_id' => $company->id, 'role' => 'cashier']);
+        Store::withoutGlobalScopes()->create(['company_id' => $company->id, 'name' => 'Unassigned Secret Branch', 'code' => 'SECRET']);
+        $this->actingAs($staff, 'web')->get(route('tenant.dashboard'))->assertOk()
+            ->assertSee('data-testid="tenant-store-switcher"', false)
+            ->assertDontSee('Unassigned Secret Branch')->assertDontSee('Add New Store / Branch');
+        \App\Models\Permission::create(['company_id' => $company->id, 'user_id' => $staff->id,
+            'module' => 'stores', 'action' => 'view', 'allowed' => false]);
+        $this->get(route('tenant.dashboard'))->assertOk()->assertDontSee('data-testid="tenant-store-switcher"', false);
+        $this->get(route('tenant.settings.stores'))->assertForbidden();
+    }
+
+    public function test_laravel_dashboard_caches_and_low_stock_counts_are_separate_per_branch(): void
+    {
+        [$company, $admin, $headers] = $this->adminAccount();
+        $mainId = $this->getJson('/api/v1/tenant/stores', $headers)->assertOk()->json('current_store_id');
+        $product = Product::create(['company_id' => $company->id, 'name' => 'Branch Stock',
+            'current_stock' => 10, 'minimum_stock' => 2, 'active' => true, 'sale_price' => 20]);
+        \App\Models\Sale::create(['company_id' => $company->id, 'store_id' => $mainId,
+            'sale_number' => 'MAIN-CACHED', 'status' => 'completed', 'total' => 125, 'items' => []]);
+        $service = app(\App\Services\FinancialAnalyticsService::class);
+        $this->assertSame(125.0, $service->getExecutiveDashboardKpis($company)['dailyRevenue']);
+        $branchId = $this->postJson('/api/v1/tenant/stores', ['name' => 'Empty Branch'], $headers)->assertCreated()->json('data.id');
+        $this->actingAs($admin->fresh(), 'web')->get(route('tenant.dashboard'))->assertOk();
+        $this->assertSame(0.0, $service->getExecutiveDashboardKpis($company)['dailyRevenue']);
+        \Livewire\Livewire::test(\App\Livewire\Tenant\Dashboard::class)->assertViewHas('lowStockCount', 1);
+        $this->post(route('tenant.stores.switch', $mainId), ['redirect_to' => 'dashboard'])->assertRedirect(route('tenant.dashboard'));
+        $this->actingAs($admin->fresh(), 'web')->get(route('tenant.dashboard'))->assertOk();
+        $this->assertSame(125.0, $service->getExecutiveDashboardKpis($company)['dailyRevenue']);
+        \Livewire\Livewire::test(\App\Livewire\Tenant\Dashboard::class)->assertViewHas('lowStockCount', 0);
+        $this->assertNotEquals($mainId, $branchId);
+    }
+
 }

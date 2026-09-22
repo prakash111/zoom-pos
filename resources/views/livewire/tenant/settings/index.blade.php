@@ -71,6 +71,14 @@
             <span>{{ __('Overview') }}</span>
         </a>
 
+        @if (auth()->user()?->hasPermission('stores', 'view'))
+            <a href="{{ route('tenant.settings.stores') }}"
+               class="snap-center px-3.5 sm:px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shrink-0 font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950">
+                <span class="text-sm" aria-hidden="true">🏬</span>
+                <span>{{ __('Stores & Branches') }}</span>
+            </a>
+        @endif
+
         <!-- Tab 1: Operating Mode -->
         <a href="{{ route('tenant.settings.mode') }}"
            wire:navigate
@@ -216,6 +224,14 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            @if (auth()->user()?->hasPermission('stores', 'view'))
+                <a href="{{ route('tenant.settings.stores') }}" class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-800 shadow-sm hover:shadow-md transition-all">
+                    <div class="text-2xl mb-3" aria-hidden="true">🏬</div>
+                    <h3 class="text-base font-extrabold text-slate-900 dark:text-white">{{ __('Stores & Branches') }}</h3>
+                    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{{ __('Create branches, edit store details, and switch your active location.') }}</p>
+                    <span class="mt-4 inline-block text-sm font-bold text-emerald-700 dark:text-emerald-400">{{ __('Manage stores') }} →</span>
+                </a>
+            @endif
             <!-- Card 1: Operating Mode -->
             <a href="{{ route('tenant.settings.mode') }}" wire:navigate class="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
                 <div class="space-y-3">

@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Models\Company;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Models\Store;
 use App\Models\VendorBill;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 class FinancialAnalyticsService
 {
@@ -39,6 +41,9 @@ class FinancialAnalyticsService
     public function getExecutiveDashboardKpis(Company $company, bool $forceFresh = false): array
     {
         $cacheKey = "tenant_executive_kpis_{$company->id}";
+        if (app()->bound('tenant.store_id')) {
+            $cacheKey .= '_store_'.app('tenant.store_id');
+        }
 
         if ($forceFresh) {
             Cache::forget($cacheKey);
@@ -56,6 +61,11 @@ class FinancialAnalyticsService
     {
         $companyId = $company instanceof Company ? $company->id : $company;
         Cache::forget("tenant_executive_kpis_{$companyId}");
+        if (Schema::hasTable('stores')) {
+            foreach (Store::withoutGlobalScopes()->where('company_id', $companyId)->pluck('id') as $storeId) {
+                Cache::forget("tenant_executive_kpis_{$companyId}_store_{$storeId}");
+            }
+        }
     }
 
     /**

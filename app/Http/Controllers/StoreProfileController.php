@@ -142,7 +142,7 @@ class StoreProfileController extends Controller
         Cache::forget("tenant_{$tenantId}_settings");
         Cache::forget("tenant_nav_{$tenantId}");
         Cache::forget("company_{$tenantId}");
-        Cache::forget("tenant_executive_kpis_{$tenantId}");
+        app(\App\Services\FinancialAnalyticsService::class)->clearCache($tenantId);
         Cache::forget("tenant_{$tenantId}_drawer");
         Cache::forget("tenant_{$tenantId}_drawer_menu");
         Cache::forget("navigation_menu_{$tenantId}");

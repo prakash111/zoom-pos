@@ -390,6 +390,12 @@
                     </x-nav.rail-item>
                 @endif
 
+                @if ($canStores)
+                    <x-nav.rail-item :route="route('tenant.settings.stores')" :active="request()->routeIs('tenant.settings.stores')" item-key="nav_stores" title="{{ __('Stores & Branches') }}" label="{{ __('Stores & Branches') }}">
+                        <span class="text-xl shrink-0" aria-hidden="true">🏬</span>
+                    </x-nav.rail-item>
+                @endif
+
                 @if ($canSettings)
                     <x-nav.rail-item :route="route('tenant.settings.index')" :active="$isSettings" item-key="settings" label="{{ __('Settings') }}">
                         <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -527,6 +533,11 @@
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
                         {{ __('Administration & Settings') }}
                     </div>
+                    @if ($canStores)
+                        <x-nav.expanded-item :route="route('tenant.settings.stores')" :active="request()->routeIs('tenant.settings.stores')" item-key="nav_stores" title="{{ __('Stores & Branches') }}" subtitle="{{ __('Create, edit and switch branches') }}">
+                            <span class="text-base shrink-0" aria-hidden="true">🏬</span>
+                        </x-nav.expanded-item>
+                    @endif
                     @if ($canSettings)
                         <x-nav.expanded-item :route="route('tenant.settings.index')" :active="$isSettings" item-key="settings" title="{{ __('Store Settings') }}" subtitle="{{ __('Profile, printer, tax & domain') }}">
                             <span class="text-base shrink-0">⚙️</span>
@@ -633,6 +644,9 @@
             @endif
 
             <!-- 8. Settings -->
+            @if ($canStores)
+                <x-nav.pill-item :route="route('tenant.settings.stores')" :active="request()->routeIs('tenant.settings.stores')" item-key="nav_stores" title="{{ __('Stores & Branches') }}">🏬</x-nav.pill-item>
+            @endif
             @if ($canSettings)
                 <x-nav.pill-item :route="route('tenant.settings.index')" :active="$isSettings" item-key="settings" title="{{ __('Store Settings') }}">⚙️</x-nav.pill-item>
             @endif
@@ -710,6 +724,9 @@
                     <x-nav.speed-dial-item :route="route('tenant.reports.index')" item-key="reports" label="{{ __('Reports') }}">📊</x-nav.speed-dial-item>
                 @endif
 
+                @if ($canStores)
+                    <x-nav.speed-dial-item :route="route('tenant.settings.stores')" item-key="nav_stores" label="{{ __('Stores & Branches') }}">🏬</x-nav.speed-dial-item>
+                @endif
                 @if ($canSettings)
                     <x-nav.speed-dial-item :route="route('tenant.settings.index')" item-key="settings" label="{{ __('Settings') }}">⚙️</x-nav.speed-dial-item>
                 @endif
@@ -1273,7 +1290,7 @@
             <!-- Top Header Bar -->
             <header class="relative z-30 px-3 sm:px-6 py-2 sm:py-3.5 flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shrink-0">
                 
-                <div class="flex items-center gap-3">
+                <div class="flex min-w-0 items-center gap-2 sm:gap-3">
                     <button type="button"
                             x-on:click="sidebarOpen = true"
                             class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-blue-50 hover:text-blue-600 transition"
@@ -1283,12 +1300,13 @@
                         </svg>
                     </button>
 
-                    <div>
-                        <h1 class="text-base font-black text-slate-800 dark:text-slate-100 tracking-tight">{{ $title ?? 'Dashboard' }}</h1>
+                    <div class="min-w-0">
+                        <h1 class="text-base font-black text-slate-800 dark:text-slate-100 tracking-tight truncate">{{ $title ?? 'Dashboard' }}</h1>
+                        @include('layouts.partials.tenant-store-switcher')
                     </div>
                 </div>
 
-                <div class="flex items-center gap-3 sm:gap-4">
+                <div class="flex shrink-0 items-center gap-1 sm:gap-4">
                     <!-- Quick action to POS based on active mode -->
                     @if ($isRestaurant)
                         @unless(request()->routeIs('tenant.restaurant.pos'))

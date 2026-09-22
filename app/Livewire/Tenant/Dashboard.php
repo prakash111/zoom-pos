@@ -131,11 +131,11 @@ class Dashboard extends Component
         $dueTodayAmount = (float) (clone $receivables)->whereDate('due_date', today())->sum('due_amount');
         $popularProducts = Product::where('active', true)->limit(8)->get();
         $lowStockProducts = Product::where('active', true)
-            ->whereColumn('current_stock', '<=', 'minimum_stock')
+            ->lowStock()
             ->limit(4)
             ->get();
         $lowStockCount = Product::where('active', true)
-            ->whereColumn('current_stock', '<=', 'minimum_stock')->count();
+            ->lowStock()->count();
         $categories = Category::where('active', true)->orWhereNull('active')->limit(6)->get();
         $salesTargetProgress = SalesTarget::getProgress($companyId, null, (int) now()->year, (int) now()->month);
 

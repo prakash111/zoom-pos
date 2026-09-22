@@ -3,6 +3,7 @@
 @section('content')
 <div class="max-w-5xl mx-auto space-y-6">
     <div>
+        <a href="{{ route('tenant.dashboard') }}" class="text-sm text-emerald-600 hover:underline">← {{ __('Back to dashboard') }}</a>
         <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Stores & Branches</h1>
         <p class="mt-1 text-sm text-slate-500">Switch locations or manage the branches under your subscription.</p>
         <p class="mt-2 text-sm font-medium">{{ $meta['total_stores'] }} stores · {{ $meta['max_allowed_stores'] === -1 ? 'Unlimited stores' : 'Plan limit: '.$meta['max_allowed_stores'] }}</p>
@@ -53,7 +54,7 @@
         @endforeach
     </div>
     @if ($meta['can_create_more'])
-        <section class="rounded-2xl border border-emerald-300 dark:border-emerald-800 bg-white dark:bg-slate-900 p-5">
+        <section id="create-store" class="scroll-mt-6 rounded-2xl border border-emerald-300 dark:border-emerald-800 bg-white dark:bg-slate-900 p-5">
             <h2 class="text-lg font-bold">Add New Store / Branch</h2>
             <form method="POST" action="{{ route('tenant.stores.create') }}" class="mt-4 grid gap-4 md:grid-cols-2">
                 @csrf
