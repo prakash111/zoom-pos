@@ -1,8 +1,11 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/models/dashboard_summary_model.dart';
+import '../../../core/providers/dashboard_provider.dart';
+import '../../../core/stores/store_provider.dart';
 
 /// Redesigned Metric & Transaction Dashboard layout (reference: 1000592601.png).
 ///
@@ -70,6 +73,10 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
   void _handleRangeSelect(String range) {
     setState(() => _selectedRange = range);
     widget.onRangeChanged?.call(range);
+    try {
+      final storeId = context.read<StoreProvider?>()?.current?.id;
+      context.read<DashboardProvider?>()?.fetchSalesOverview(period: range, storeId: storeId);
+    } catch (_) {}
   }
 
   Future<void> _launchDemoUrl() async {
@@ -527,8 +534,13 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
   }
 
   Widget _buildSalesOverviewCard(BuildContext context, bool isDark) {
-    final overview = widget.summary.salesOverview;
+    final dashboardProvider = context.watch<DashboardProvider?>();
+    final overview = (dashboardProvider?.salesOverview != null &&
+            dashboardProvider?.currentPeriod == _selectedRange)
+        ? dashboardProvider!.salesOverview!
+        : widget.summary.salesOverview;
     final series = overview.series;
+    final isLoading = dashboardProvider?.isLoading ?? false;
 
     final spots = <FlSpot>[];
     for (var i = 0; i < series.length; i++) {
@@ -564,13 +576,28 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Sales Overview',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          'Sales Overview',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        if (isLoading) ...[
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF2563EB),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     Text(
                       'Revenue trend with area gradient',
@@ -608,13 +635,28 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Sales Overview',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              'Sales Overview',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            if (isLoading) ...[
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF2563EB),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         Text(
                           'Revenue trend with area gradient',
@@ -740,10 +782,12 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
   Widget _buildRangePill(String label, String key, bool isDark) {
     final isSelected = _selectedRange == key;
 
-    return GestureDetector(
+    return InkWell(
       onTap: () => _handleRangeSelect(key),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: isSelected
               ? (isDark ? const Color(0xFF2563EB) : Colors.white)

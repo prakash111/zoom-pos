@@ -26,6 +26,7 @@ import '../../core/sdui/sdui_icon_registry.dart';
 import '../../core/services/sync/sync_status_badge.dart';
 import '../../core/storage/app_preferences.dart';
 import '../../core/stores/store_provider.dart';
+import '../../core/providers/dashboard_provider.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/widgets/coming_soon_screen.dart';
@@ -2744,6 +2745,10 @@ class _DashboardAnalytics extends StatelessWidget {
           onViewReports: () => open('reports'),
           onOpenTransactions: () => open('sales'),
           onOpenNotifications: onOpenNotifications,
+          onRangeChanged: (range) {
+            final storeId = context.read<StoreProvider?>()?.current?.id;
+            context.read<DashboardProvider>().fetchSalesOverview(period: range, storeId: storeId);
+          },
           isDemo: BootstrapCache.instance.config['demo_mode'] == true &&
               company?.isDemo == true,
         ),

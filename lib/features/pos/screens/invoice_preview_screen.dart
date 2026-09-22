@@ -1,17 +1,13 @@
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/thermal/thermal_printer_service.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../core/widgets/adaptive_sheet.dart';
-import '../../settings/screens/printer_selection_dialog.dart';
+import '../../../core/widgets/unified_document_dispatch_sheet.dart';
 import '../cart_item.dart';
 
 /// The page formats the preview can be rendered as. The two roll sizes are
@@ -126,10 +122,6 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
   Future<Uint8List> _build(PdfPageFormat _) =>
       _buildReceiptPdf(widget.data, _format);
 
-  static bool get _supportsThermalPrint =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS);
 
   Future<void> _print() async {
     final bytes = await _build(_format.pdfFormat);
@@ -138,249 +130,36 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
         onLayout: (_) async => bytes, format: _format.pdfFormat);
   }
 
-  Future<void> _export() async {
-    final bytes = await _build(_format.pdfFormat);
-    if (!mounted) return;
-    await Printing.sharePdf(
-      bytes: bytes,
-      filename: '${widget.data.documentType.toLowerCase()}-preview.pdf',
+  void _openUnifiedDispatch() {
+    final d = widget.data;
+    final dispatchData = UnifiedDocumentDispatchData(
+      documentType: d.documentType,
+      documentId: 'preview',
+      documentNumber: '${d.documentType.toUpperCase()}-PREVIEW',
+      companyName: d.companyName,
+      customerName: d.customerName,
+      customerPhone: d.customerPhone,
+      customerEmail: d.customerEmail,
+      currencySymbol: d.currencySymbol,
+      subtotal: d.subtotal,
+      discount: d.discount,
+      tax: d.taxTotal,
+      total: d.grandTotal,
+      paidAmount: d.paidAmount,
+      dueAmount: d.dueAmount,
+      notes: d.notes,
+      lines: d.items
+          .map((item) => ReceiptLine(
+                name: item.product.name,
+                quantity: item.quantity,
+                unitPrice: item.product.salePrice,
+                lineTotal: item.lineTotal,
+              ))
+          .toList(),
+      onPreviewPdf: () => _print(),
     );
-  }
 
-  Future<void> _printThermal() async {
-    final data = widget.data;
-    final service = ThermalPrinterService();
-    if (!mounted) return;
-    final target = await PrinterSelectionDialog.ensureSelected(context);
-    if (target == null || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text('Printing…')));
-    final ok = await service.printReceipt(
-      companyName: data.companyName,
-      documentLabel: '${data.documentType} Preview',
-      lines: [
-        for (final item in data.items)
-          ReceiptLine(
-            name: item.product.name,
-            quantity: item.quantity,
-            unitPrice: item.product.salePrice,
-            lineTotal: item.lineTotal,
-          ),
-      ],
-      subtotal: data.subtotal,
-      discount: data.discount,
-      tax: data.taxTotal,
-      total: data.grandTotal,
-      customerName: data.customerName,
-      currencySymbol: data.currencySymbol,
-      taxId: data.taxId,
-      taxLabel: data.taxLabel,
-      isIndia: data.isIndia,
-      paidAmount: data.paidAmount,
-      dueAmount: data.dueAmount,
-    );
-    messenger.showSnackBar(SnackBar(
-        content:
-            Text(ok ? 'Sent to printer.' : 'Could not reach the printer.')));
-  }
-
-  /// A plain-text summary of the draft invoice, used as the WhatsApp / SMS /
-  /// email body when dispatching straight from the preview stage.
-  String _summaryText() {
-    final data = widget.data;
-    final c = CurrencyFormatter(data.currencySymbol);
-    final b = StringBuffer()
-      ..writeln('${data.companyName} — ${data.documentType}')
-      ..writeln('');
-    for (final it in data.items) {
-      b.writeln(
-          '${it.product.name} x${_formatQty(it.quantity)}  ${c.format(it.lineTotal)}');
-    }
-    b
-      ..writeln('')
-      ..writeln('Subtotal: ${c.format(data.subtotal)}');
-    if (data.discount > 0) b.writeln('Discount: -${c.format(data.discount)}');
-    if (data.taxTotal > 0) {
-      b.writeln('${data.taxLabel}: +${c.format(data.taxTotal)}');
-    }
-    b.writeln('Total: ${c.format(data.grandTotal)}');
-    if (data.dueAmount > 0.001) {
-      b.writeln('Due: ${c.format(data.dueAmount)}');
-    }
-    if ((data.notes ?? '').isNotEmpty) b.writeln('\nNote: ${data.notes}');
-    return b.toString().trimRight();
-  }
-
-  Future<String?> _promptContact(String title, String hint,
-      {String? initial}) async {
-    final controller = TextEditingController(text: initial ?? '');
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: title.toLowerCase().contains('email')
-              ? TextInputType.emailAddress
-              : TextInputType.phone,
-          decoration: InputDecoration(hintText: hint),
-          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('Send'),
-          ),
-        ],
-      ),
-    );
-    return (result == null || result.isEmpty) ? null : result;
-  }
-
-  Future<void> _launch(Uri uri, {String? failMsg}) async {
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(failMsg ?? 'Could not open ${uri.scheme}.')),
-      );
-    }
-  }
-
-  Future<void> _sendWhatsApp() async {
-    var phone = widget.data.customerPhone?.trim();
-    if (phone == null || phone.isEmpty) {
-      phone = await _promptContact(
-          'Send via WhatsApp', 'Customer phone (with country code)');
-      if (phone == null) return;
-    }
-    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    await _launch(
-      Uri.parse(
-          'https://wa.me/$digits?text=${Uri.encodeComponent(_summaryText())}'),
-      failMsg: 'WhatsApp is not installed.',
-    );
-  }
-
-  Future<void> _sendSms() async {
-    var phone = widget.data.customerPhone?.trim();
-    if (phone == null || phone.isEmpty) {
-      phone = await _promptContact('Send via SMS', 'Customer phone number');
-      if (phone == null) return;
-    }
-    await _launch(Uri(
-      scheme: 'sms',
-      path: phone,
-      queryParameters: {'body': _summaryText()},
-    ));
-  }
-
-  Future<void> _sendEmail() async {
-    var email = widget.data.customerEmail?.trim();
-    if (email == null || email.isEmpty) {
-      email = await _promptContact('Send via Email', 'Customer email address');
-      if (email == null) return;
-    }
-    await _launch(Uri(
-      scheme: 'mailto',
-      path: email,
-      queryParameters: {
-        'subject':
-            '${widget.data.documentType} from ${widget.data.companyName}',
-        'body': _summaryText(),
-      },
-    ));
-  }
-
-  /// The same unified bottom-sheet popup used after a sale is finalized —
-  /// print / thermal / share / direct dispatch all live inside it.
-  Future<void> _openActionsSheet() async {
-    await showAdaptiveSheet<void>(
-      context,
-      builder: (sheetCtx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '${widget.data.documentType} Preview',
-                style: Theme.of(sheetCtx)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf_outlined),
-              title: const Text('Preview & Print'),
-              subtitle: const Text('View the PDF, print, or share the file'),
-              onTap: () {
-                Navigator.of(sheetCtx).pop();
-                _print();
-              },
-            ),
-            if (_supportsThermalPrint)
-              ListTile(
-                leading: const Icon(Icons.print_outlined),
-                title: const Text('Print on receipt printer'),
-                subtitle: const Text('Bluetooth thermal printer'),
-                onTap: () {
-                  Navigator.of(sheetCtx).pop();
-                  _printThermal();
-                },
-              ),
-            ListTile(
-              leading: const Icon(Icons.ios_share),
-              title: const Text('Share as PDF file'),
-              subtitle: const Text('Send the invoice PDF via any app'),
-              onTap: () {
-                Navigator.of(sheetCtx).pop();
-                _export();
-              },
-            ),
-            const Divider(height: 8),
-            ListTile(
-              leading: const Icon(Icons.chat, color: Color(0xFF25D366)),
-              title: const Text('Send via WhatsApp'),
-              subtitle: Text((widget.data.customerPhone ?? '').isNotEmpty
-                  ? 'to ${widget.data.customerPhone}'
-                  : 'Enter a phone number'),
-              onTap: () {
-                Navigator.of(sheetCtx).pop();
-                _sendWhatsApp();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.email_outlined),
-              title: const Text('Send via Email'),
-              subtitle: Text((widget.data.customerEmail ?? '').isNotEmpty
-                  ? 'to ${widget.data.customerEmail}'
-                  : 'Enter an email address'),
-              onTap: () {
-                Navigator.of(sheetCtx).pop();
-                _sendEmail();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.sms_outlined),
-              title: const Text('Send via SMS'),
-              subtitle: Text((widget.data.customerPhone ?? '').isNotEmpty
-                  ? 'to ${widget.data.customerPhone}'
-                  : 'Enter a phone number'),
-              onTap: () {
-                Navigator.of(sheetCtx).pop();
-                _sendSms();
-              },
-            ),
-            const SizedBox(height: 4),
-          ],
-        ),
-      ),
-    );
+    showUnifiedDocumentDispatchSheet(context, dispatchData);
   }
 
   @override
@@ -433,9 +212,9 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
                   onPressed: _print,
                 ),
                 IconButton(
-                  tooltip: 'Export PDF',
-                  icon: const Icon(Icons.picture_as_pdf_outlined),
-                  onPressed: _export,
+                  tooltip: 'Dispatch & Share',
+                  icon: const Icon(Icons.share_outlined),
+                  onPressed: _openUnifiedDispatch,
                 ),
               ],
             ),
@@ -501,9 +280,9 @@ class _InvoicePreviewScreenState extends State<_InvoicePreviewScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: _openActionsSheet,
-                      icon: const Icon(Icons.print_outlined),
-                      label: const Text('Print / Share'),
+                      onPressed: _openUnifiedDispatch,
+                      icon: const Icon(Icons.share_outlined),
+                      label: const Text('Dispatch / Share'),
                     ),
                   ),
                   const SizedBox(height: 8),
