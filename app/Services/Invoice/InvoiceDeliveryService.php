@@ -382,7 +382,21 @@ class InvoiceDeliveryService
                     ->errorCorrection('M')
                     ->generate($verificationUrl);
 
-                $dataUri = 'data:image/svg+xml;base64,'.base64_encode($svg);
+                $pngDataUri = '';
+                try {
+                    $pngRaw = (string) QrCode::format('png')
+                        ->size($size)
+                        ->margin(0)
+                        ->errorCorrection('M')
+                        ->generate($verificationUrl);
+                    if (!empty($pngRaw)) {
+                        $pngDataUri = 'data:image/png;base64,' . base64_encode($pngRaw);
+                    }
+                } catch (\Throwable $pngEx) {
+                    // Fall back to SVG data URI if PNG generator is not supported
+                }
+
+                $dataUri = !empty($pngDataUri) ? $pngDataUri : ('data:image/svg+xml;base64,' . base64_encode($svg));
 
                 return [
                     'svg' => $svg,
@@ -391,12 +405,14 @@ class InvoiceDeliveryService
                 ];
             }
         } catch (\Throwable $e) {
-            Log::warning('QR Code generation error: '.$e->getMessage());
+            Log::warning('QR Code generation error: ' . $e->getMessage());
         }
+
+        $fallbackUri = 'https://api.qrserver.com/v1/create-qr-code/?size=' . $size . 'x' . $size . '&data=' . urlencode($verificationUrl);
 
         return [
             'svg' => '',
-            'data_uri' => '',
+            'data_uri' => $fallbackUri,
             'url' => $verificationUrl,
         ];
     }

@@ -73,4 +73,66 @@ class PreviewDispatchSheetTest extends TestCase
         $response->assertSee('data:image/svg+xml;base64,');
         $response->assertDontSee('<rect x="3" y="3" width="7" height="7"></rect>', false);
     }
+
+    public function test_post_sale_modal_provides_direct_trigger_to_unified_dispatch_bottom_sheet(): void
+    {
+        [$company] = $this->actingAsTenantAdmin();
+
+        $customer = Customer::create([
+            'company_id' => $company->id,
+            'name' => 'John Doe Walk-in',
+            'phone' => '+919876543210',
+        ]);
+
+        $product = Product::create([
+            'company_id' => $company->id,
+            'name' => 'Test Item',
+            'sale_price' => 20.00,
+            'active' => true,
+        ]);
+
+        $sale = Sale::create([
+            'company_id' => $company->id,
+            'customer_id' => $customer->id,
+            'sale_number' => 'POS-99887766',
+            'customer_name' => 'John Doe Walk-in',
+            'total' => 20.00,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+            'payment_method' => 'cash',
+        ]);
+
+        Livewire::test(SalesCreate::class)
+            ->set('completedSaleId', $sale->id)
+            ->set('showSaleSuccessModal', true)
+            ->assertSee('Open Unified Dispatch Sheet')
+            ->assertSee('open-sdui-sheet')
+            ->assertSee('preview-modal')
+            ->assertSee('Print Slip')
+            ->assertSee('WhatsApp')
+            ->assertSee('Download PDF');
+    }
+
+    public function test_invoice_delivery_service_generates_valid_qr_data_uri_and_svg(): void
+    {
+        [$company] = $this->actingAsTenantAdmin();
+
+        $sale = Sale::create([
+            'company_id' => $company->id,
+            'sale_number' => 'POS-11223344',
+            'customer_name' => 'QR Test Client',
+            'total' => 45.00,
+            'status' => 'completed',
+            'payment_status' => 'paid',
+        ]);
+
+        $service = app(\App\Services\Invoice\InvoiceDeliveryService::class);
+        $qrData = $service->generateReceiptQrCode($sale, false);
+
+        $this->assertNotEmpty($qrData['data_uri']);
+        $this->assertStringStartsWith('data:image/', $qrData['data_uri']);
+        $this->assertNotEmpty($qrData['svg']);
+        $this->assertStringContainsString('<svg', $qrData['svg']);
+        $this->assertStringContainsString('POS-11223344', $qrData['url']);
+    }
 }

@@ -472,6 +472,14 @@
                 </div>
                 <div class="qr-caption">{!! $L("Scan for digital e-receipt & verify") !!}</div>
             </div>
+        @else
+            @php
+                $pdfVerifyUrl = $verificationUrl ?? ($sale->operation_type === 'quotation' ? route('quotes.public', $sale->sale_number) : route('sales.public', $sale->sale_number));
+            @endphp
+            <div class="qr-wrapper">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($pdfVerifyUrl) }}" class="qr-image" alt="QR Code">
+                <div class="qr-caption">{!! $L("Scan for digital e-receipt & verify") !!}</div>
+            </div>
         @endif
 
         <div class="ref-code">#{{ $sale->sale_number }}</div>

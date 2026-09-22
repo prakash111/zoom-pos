@@ -632,6 +632,9 @@
 
         <!-- Centered Footer Block with QR Code -->
         <div class="footer-section">
+            @php
+                $receiptVerifyUrl = $verificationUrl ?? ($sale->operation_type === 'quotation' ? route('quotes.public', $sale->sale_number) : route('sales.public', $sale->sale_number));
+            @endphp
             @if (!empty($qrCodeSvg))
                 <div class="qr-container">
                     <div style="width: {{ $qrDimension }}; height: {{ $qrDimension }}; margin: 0 auto;">
@@ -641,7 +644,12 @@
                 </div>
             @elseif (!empty($qrCodeDataUri))
                 <div class="qr-container">
-                    <img src="{{ $qrCodeDataUri }}" class="qr-image" alt="QR Code">
+                    <img src="{{ $qrCodeDataUri }}" class="qr-image" alt="QR Code" style="width: {{ $qrDimension }}; height: {{ $qrDimension }}; margin: 0 auto; display: block;">
+                    <div class="qr-caption">{{ __("Scan for digital e-receipt & verify") }}</div>
+                </div>
+            @else
+                <div class="qr-container">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($receiptVerifyUrl) }}" class="qr-image" alt="QR Code" style="width: {{ $qrDimension }}; height: {{ $qrDimension }}; margin: 0 auto; display: block;">
                     <div class="qr-caption">{{ __("Scan for digital e-receipt & verify") }}</div>
                 </div>
             @endif

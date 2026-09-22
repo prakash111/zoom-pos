@@ -45,80 +45,47 @@
 
         <!-- Receipt & Post-Sale Dispatch Actions -->
         <div class="space-y-3">
-            <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ __("Receipt & Dispatch Options") }}</div>
+            <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ __("Receipt & Omnichannel Dispatch") }}</div>
 
-            <!-- 1. Print Now (desktop, silent) or in-app invoice preview -->
-            @if ($this->completedSaleDesktopPrintReady)
-                <button type="button"
-                        wire:click="printCompletedSaleNow"
-                        wire:loading.attr="disabled"
-                        class="w-full py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white font-extrabold text-xs shadow-md active:scale-[0.97] transition duration-150 ease-out flex items-center justify-center gap-2 cursor-pointer">
-                    <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z" /></svg>
-                    <span>{{ __("Print Receipt") }}</span>
-                </button>
-            @else
+            <!-- 1. Primary CTA: Unified Dispatch Bottom Sheet -->
+            <button type="button"
+               @click="$dispatch('open-sdui-sheet', { endpoint: @js(route('tenant.documents.preview-modal', ['type' => 'invoice', 'id' => $cSale->id])) })"
+               class="w-full py-3.5 px-4 rounded-2xl bg-[#006aff] hover:bg-[#0055d6] text-white font-black text-sm shadow-xl shadow-blue-500/25 active:scale-[0.98] transition flex items-center justify-center gap-2 cursor-pointer">
+                <span>⚡ {{ __("Open Unified Dispatch Sheet") }}</span>
+                <span class="text-xs opacity-85 font-medium">(WhatsApp, Email, SMS, Thermal Print) &rarr;</span>
+            </button>
+
+            <!-- 2. Quick Direct Action Chips -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                @if ($this->completedSaleDesktopPrintReady)
+                    <button type="button"
+                            wire:click="printCompletedSaleNow"
+                            wire:loading.attr="disabled"
+                            class="py-2.5 px-3 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white font-extrabold text-xs shadow-md active:scale-[0.97] transition flex items-center justify-center gap-1.5 cursor-pointer">
+                        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z" /></svg>
+                        <span>{{ __("Print Receipt") }}</span>
+                    </button>
+                @else
+                    <button type="button"
+                       @click="$dispatch('open-sdui-sheet', { endpoint: @js(route('tenant.documents.preview-modal', ['type' => 'invoice', 'id' => $cSale->id])) })"
+                       class="py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-extrabold text-xs border border-slate-200 dark:border-slate-700 active:scale-[0.97] transition flex items-center justify-center gap-1.5 cursor-pointer">
+                        <span>🖨️ {{ __("Print Slip") }}</span>
+                    </button>
+                @endif
+
                 <button type="button"
                    @click="$dispatch('open-sdui-sheet', { endpoint: @js(route('tenant.documents.preview-modal', ['type' => 'invoice', 'id' => $cSale->id])) })"
-                   class="w-full py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white font-extrabold text-xs shadow-md active:scale-[0.97] transition duration-150 ease-out flex items-center justify-center gap-2 cursor-pointer">
-                    <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z" /></svg>
-                    <span>{{ __("Preview & Print Invoice") }}</span>
+                   class="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md shadow-emerald-500/20 active:scale-[0.97] transition flex items-center justify-center gap-1.5 cursor-pointer">
+                    <span>💬 WhatsApp</span>
                 </button>
-            @endif
 
-            <!-- 2. WhatsApp Direct Sharing -->
-            <div class="space-y-1.5">
-                <label class="block text-[11px] font-semibold text-slate-500">{{ __("Share Receipt on WhatsApp") }}</label>
-                <div class="flex items-center gap-2">
-                    <input type="text"
-                           wire:model.live.debounce.250ms="sharePhone"
-                           placeholder="{{ __("Phone number (+1 555 0199)") }}"
-                           class="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 font-mono">
-
-                    @if ($this->completedSaleWhatsAppApiConfigured)
-                        <button type="button"
-                                wire:click="sendSaleWhatsApp"
-                                wire:loading.attr="disabled"
-                                class="py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md shadow-emerald-500/20 active:scale-[0.97] transition duration-150 ease-out flex items-center gap-1.5 shrink-0 cursor-pointer">
-                            <span wire:loading.remove>💬 WhatsApp</span>
-                            <span wire:loading>{{ __("Sending...") }}</span>
-                        </button>
-                    @else
-                        <a href="{{ $this->completedSaleWhatsAppUrl }}"
-                           target="_blank"
-                           class="py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md shadow-emerald-500/20 active:scale-[0.97] transition duration-150 ease-out flex items-center gap-1.5 shrink-0 cursor-pointer">
-                            <span>💬 WhatsApp</span>
-                        </a>
-                    @endif
-                </div>
+                <a href="{{ route('tenant.sales.pdf', ['sale' => $cSale->id, 'download' => 1]) }}"
+                   download="Invoice_{{ $cSale->sale_number }}.pdf"
+                   data-turbo="false"
+                   class="py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs shadow-md shadow-purple-500/20 active:scale-[0.97] transition flex items-center justify-center gap-1.5 cursor-pointer col-span-2 sm:col-span-1">
+                    <span>📥 {{ __("Download PDF") }}</span>
+                </a>
             </div>
-
-            <!-- 3. Email PDF Invoice -->
-            <div class="space-y-1.5">
-                <label class="block text-[11px] font-semibold text-slate-500">{{ __("Send Invoice via Email") }}</label>
-                <div class="flex items-center gap-2">
-                    <input type="email"
-                           wire:model="shareEmail"
-                           placeholder="customer@example.com"
-                           class="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-purple-500">
-
-                    <button type="button"
-                            wire:click="sendSaleEmail"
-                            wire:loading.attr="disabled"
-                            class="py-2 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs shadow-md shadow-purple-500/20 active:scale-[0.97] transition duration-150 ease-out flex items-center gap-1.5 shrink-0 cursor-pointer">
-                        <span wire:loading.remove>✉️ {{ __("Send") }}</span>
-                        <span wire:loading>{{ __("Sending...") }}</span>
-                    </button>
-                </div>
-
-                @if ($emailStatus)
-                    <p class="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1">✓ {{ $emailStatus }}</p>
-                @endif
-
-                @if ($emailError)
-                    <p class="text-xs font-bold text-rose-600 dark:text-rose-400 mt-1">✕ {{ $emailError }}</p>
-                @endif
-            </div>
-
         </div>
 
         <x-slot:footer>
