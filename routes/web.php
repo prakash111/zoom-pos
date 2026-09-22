@@ -225,6 +225,15 @@ Route::get('/tenant/views/invoices/create', function (\Illuminate\Http\Request $
 Route::get('/tenant/invoices/create', function (\Illuminate\Http\Request $request) {
     return app(\App\Http\Controllers\Api\InvoiceController::class)->createSchema($request);
 });
+Route::get('/tenant/invoices', function (\Illuminate\Http\Request $request) {
+    return app(\App\Http\Controllers\Api\InvoiceController::class)->index($request);
+});
+Route::get('/v1/tenant/invoices', function (\Illuminate\Http\Request $request) {
+    return app(\App\Http\Controllers\Api\InvoiceController::class)->index($request);
+});
+Route::get('/sales/invoices', function (\Illuminate\Http\Request $request) {
+    return app(\App\Http\Controllers\Api\InvoiceController::class)->index($request);
+});
 
 Route::middleware([\App\Http\Middleware\AuthenticateTenantApi::class])->group(function () {
     Route::get('/tenant/storefront/domain-config', [\App\Http\Controllers\Api\Tenant\StorefrontSettingsController::class, 'getDomainConfig']);

@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Services\NotificationAlertService;
+use App\Services\Sdui\DashboardSduiService;
 use App\Services\Sdui\SchemaResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -372,6 +373,7 @@ class DashboardController extends Controller
             ],
             'receivables' => [
                 'total_outstanding' => round($totalOutstanding, 2),
+                'total_amount' => round($totalOutstanding, 2),
                 'formatted' => $currency . number_format($totalOutstanding, 2),
                 'breakdown' => [
                     'overdue_amount' => round($overdueAmount, 2),
@@ -380,7 +382,45 @@ class DashboardController extends Controller
                     'formatted_due_today' => $currency . number_format($dueTodayAmount, 2),
                     'outstanding_invoices_count' => $outstandingInvoicesCount,
                 ],
+                'rows' => [
+                    [
+                        'id' => 'row_overdue',
+                        'label' => 'Overdue Amount',
+                        'amount' => round($overdueAmount, 2),
+                        'formatted' => $currency . number_format($overdueAmount, 2),
+                        'color' => '#EF4444',
+                        'action' => [
+                            'type' => 'navigate',
+                            'route' => '/sales/invoices',
+                            'params' => [
+                                'status' => 'overdue',
+                                'sort'   => 'due_date_asc',
+                            ],
+                        ],
+                    ],
+                    [
+                        'id' => 'row_due_today',
+                        'label' => 'Due Today',
+                        'amount' => round($dueTodayAmount, 2),
+                        'formatted' => $currency . number_format($dueTodayAmount, 2),
+                        'color' => '#F59E0B',
+                        'action' => [
+                            'type' => 'navigate',
+                            'route' => '/sales/invoices',
+                            'params' => [
+                                'status' => 'due_today',
+                                'sort'   => 'amount_desc',
+                            ],
+                        ],
+                    ],
+                ],
             ],
+            'amount_receivable_card' => DashboardSduiService::buildAmountReceivableCard(
+                $totalOutstanding,
+                $overdueAmount,
+                $dueTodayAmount,
+                $outstandingInvoicesCount
+            ),
             'quick_actions' => $quickActions,
             'recent_transactions' => $recentTransactions,
         ]);

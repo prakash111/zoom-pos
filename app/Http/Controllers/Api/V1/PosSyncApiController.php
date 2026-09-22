@@ -4589,73 +4589,140 @@ class PosSyncApiController extends Controller
     public function dueReceivables(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
+        $user = auth('sanctum')->user() ?? auth('web')->user() ?? $request->user();
+        $storeId = $request->get('store_id', $user?->current_store_id ?? $request->header('X-Store-Id'));
+        $today = now()->toDateString();
 
-        $sales = Sale::withoutGlobalScope('company')
+        $query = Sale::withoutGlobalScope('company')
             ->where('company_id', $company->id)
             ->where(fn ($operation) => $operation->whereNull('operation_type')->orWhere('operation_type', 'sale'))
             ->where('status', '!=', 'cancelled')
-            ->where('due_amount', '>', 0)
-            ->with('customer')
-            ->orderBy('due_date')
-            ->orderByDesc('created_at')
+            ->where('due_amount', '>', 0);
+
+        if ($storeId) {
+            $query->where('store_id', $storeId);
+        }
+
+        $status = $request->get('status');
+        if ($status === 'overdue') {
+            $query->whereDate('due_date', '<', $today);
+        } elseif ($status === 'due_today') {
+            $query->whereDate('due_date', '=', $today);
+        }
+
+        $sort = $request->get('sort');
+        if ($sort === 'due_date_asc') {
+            $query->orderBy('due_date', 'asc')->orderByDesc('due_amount');
+        } elseif ($sort === 'amount_desc') {
+            $query->orderByDesc('due_amount')->orderBy('due_date', 'asc');
+        } else {
+            // Conditional sort: overdue first, due today second, future due dates third
+            $query->orderByRaw("
+                CASE 
+                    WHEN due_date IS NOT NULL AND due_date < '{$today}' THEN 1
+                    WHEN due_date IS NOT NULL AND due_date = '{$today}' THEN 2
+                    ELSE 3
+                END ASC
+            ")
+            // Within overdue: show the oldest overdue accounts first (highest priority)
+            // Within due today: sort by highest outstanding balance first
+            ->orderByRaw("
+                CASE 
+                    WHEN due_date IS NOT NULL AND due_date < '{$today}' THEN due_date 
+                END ASC
+            ")
+            ->orderByDesc('due_amount')
+            ->orderByDesc('total');
+        }
+
+        $sales = $query->with('customer')
             ->paginate((int) $request->input('per_page', 50));
+
+        $receivablesList = collect($sales->items())->map(function (Sale $sale) {
+            $postSaleData = SchemaResponse::postSaleActionData($sale);
+            $documentType = str_starts_with(strtoupper((string) $sale->sale_number), 'POS-') ? 'sale' : 'invoice';
+            $postSaleData['actions_endpoint'] = "/api/v1/tenant/receivables/{$sale->id}/reminder-sheet?document_type={$documentType}";
+            $nativeSheetAction = [
+                'type' => 'show_post_sale_sheet',
+                'action_type' => 'show_post_sale_sheet',
+                'data' => $postSaleData,
+            ];
+
+            return [
+                'sale_id' => (string) ($sale->external_id ?: $sale->id),
+                'document_id' => (string) $sale->id,
+                'document_type' => $documentType,
+                'sale_number' => $sale->sale_number,
+                'invoice_number' => $sale->sale_number,
+                'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? 'Walk-in',
+                'phone' => $sale->customer?->phone,
+                'email' => $sale->customer?->email,
+                'date' => $sale->created_at?->toIso8601String(),
+                'due_date' => $sale->due_date?->toIso8601String(),
+                'due_reminder_at' => $sale->due_reminder_at?->toIso8601String(),
+                'due_reminder_sent_at' => $sale->due_reminder_sent_at?->toIso8601String(),
+                'total' => (float) $sale->total,
+                'total_amount' => (float) ($sale->total_amount ?? $sale->total),
+                'paid_amount' => (float) $sale->paid_amount,
+                'due_amount' => (float) $sale->due_amount,
+                'status' => $sale->payment_status,
+                // Card taps and the visible reminder affordance both use
+                // the exact native POS post-sale bottom-sheet contract.
+                'action' => $nativeSheetAction,
+                'on_tap' => $nativeSheetAction,
+                'modal_endpoint' => "/api/v1/tenant/documents/{$documentType}/{$sale->id}/actions-sheet",
+                'post_sale_sheet' => [
+                    'action' => 'show_post_sale_sheet',
+                    'data' => $postSaleData,
+                ],
+                'actions' => [
+                    [
+                        'label' => 'Schedule push reminder',
+                        'icon' => 'schedule',
+                        'action' => [
+                            'type' => 'OPEN_DIALOG',
+                            'action_type' => 'OPEN_DIALOG',
+                            'title' => 'Schedule push reminder',
+                            'endpoint' => "/api/v1/pos/receivables/{$sale->id}/reminder",
+                        ],
+                    ],
+                    [
+                        'label' => 'Send Reminder',
+                        'icon' => 'send',
+                        'action' => $nativeSheetAction,
+                    ],
+                ],
+            ];
+        })->values();
+
+        $metaOverdue = Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', '!=', 'cancelled')
+            ->where('due_amount', '>', 0)
+            ->whereDate('due_date', '<', $today)
+            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
+            ->sum('due_amount');
+
+        $metaDueToday = Sale::withoutGlobalScope('company')
+            ->where('company_id', $company->id)
+            ->where('status', '!=', 'cancelled')
+            ->where('due_amount', '>', 0)
+            ->whereDate('due_date', '=', $today)
+            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
+            ->sum('due_amount');
 
         return response()->json([
             'success' => true,
-            'receivables' => collect($sales->items())->map(function (Sale $sale) {
-                $postSaleData = SchemaResponse::postSaleActionData($sale);
-                $documentType = str_starts_with(strtoupper((string) $sale->sale_number), 'POS-') ? 'sale' : 'invoice';
-                $postSaleData['actions_endpoint'] = "/api/v1/tenant/receivables/{$sale->id}/reminder-sheet?document_type={$documentType}";
-                $nativeSheetAction = [
-                    'type' => 'show_post_sale_sheet',
-                    'action_type' => 'show_post_sale_sheet',
-                    'data' => $postSaleData,
-                ];
-
-                return [
-                    'sale_id' => (string) ($sale->external_id ?: $sale->id),
-                    'document_id' => (string) $sale->id,
-                    'document_type' => $documentType,
-                    'sale_number' => $sale->sale_number,
-                    'customer_name' => $sale->customer?->name ?? $sale->customer_name ?? 'Walk-in',
-                    'phone' => $sale->customer?->phone,
-                    'email' => $sale->customer?->email,
-                    'date' => $sale->created_at?->toIso8601String(),
-                    'due_date' => $sale->due_date?->toIso8601String(),
-                    'due_reminder_at' => $sale->due_reminder_at?->toIso8601String(),
-                    'due_reminder_sent_at' => $sale->due_reminder_sent_at?->toIso8601String(),
-                    'total' => (float) $sale->total,
-                    'paid_amount' => (float) $sale->paid_amount,
-                    'due_amount' => (float) $sale->due_amount,
-                    'status' => $sale->payment_status,
-                    // Card taps and the visible reminder affordance both use
-                    // the exact native POS post-sale bottom-sheet contract.
-                    'action' => $nativeSheetAction,
-                    'on_tap' => $nativeSheetAction,
-                    'modal_endpoint' => "/api/v1/tenant/documents/{$documentType}/{$sale->id}/actions-sheet",
-                    'post_sale_sheet' => [
-                        'action' => 'show_post_sale_sheet',
-                        'data' => $postSaleData,
-                    ],
-                    'actions' => [
-                        [
-                            'label' => 'Schedule push reminder',
-                            'icon' => 'schedule',
-                            'action' => [
-                                'type' => 'OPEN_DIALOG',
-                                'action_type' => 'OPEN_DIALOG',
-                                'title' => 'Schedule push reminder',
-                                'endpoint' => "/api/v1/pos/receivables/{$sale->id}/reminder",
-                            ],
-                        ],
-                        [
-                            'label' => 'Send Reminder',
-                            'icon' => 'send',
-                            'action' => $nativeSheetAction,
-                        ],
-                    ],
-                ];
-            })->values(),
+            'receivables' => $receivablesList,
+            'data' => $receivablesList,
+            'meta' => [
+                'total_overdue' => (float) $metaOverdue,
+                'total_due_today' => (float) $metaDueToday,
+                'current_page' => $sales->currentPage(),
+                'last_page' => $sales->lastPage(),
+                'per_page' => $sales->perPage(),
+                'total' => $sales->total(),
+            ],
             'total' => $sales->total(),
             'current_page' => $sales->currentPage(),
             'last_page' => $sales->lastPage(),

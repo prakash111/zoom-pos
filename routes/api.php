@@ -387,6 +387,13 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
     Route::get('/invoices/create', [ApiInvoiceController::class, 'createSchema']);
     Route::post('/tenant/invoices', [ApiInvoiceController::class, 'store']);
     Route::post('/v1/tenant/invoices', [ApiInvoiceController::class, 'store']);
+    Route::get('/tenant/invoices', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/v1/tenant/invoices', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/tenant/receivables', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/v1/tenant/receivables', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/invoices', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/sales/invoices', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
+    Route::get('/v1/sales/invoices', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
 
     Route::get('/tenant/views/invoices/{id}/actions-sheet', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
     Route::get('/v1/tenant/views/invoices/{id}/actions-sheet', [ApiInvoiceController::class, 'actionsSheet'])->middleware('tenant.api.permission:sales,view');
@@ -1119,6 +1126,8 @@ Route::prefix('v1/pos')->group(function () {
 
         // Due Payments / Receivables dashboard panel
         Route::get('/receivables/due', [PosSyncApiController::class, 'dueReceivables'])->middleware('tenant.api.permission:customers,view');
+        Route::get('/invoices', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
+        Route::get('/sales/invoices', [ApiInvoiceController::class, 'index'])->middleware('tenant.api.permission:sales,view');
         Route::match(['get', 'post'], '/receivables/{sale}/remind', [PosSyncApiController::class, 'remindReceivable'])->middleware('tenant.api.permission:finance,edit');
         Route::get('/receivables/{sale}/reminder-sheet', [ReceivablesController::class, 'reminderSheet'])->middleware('tenant.api.permission:customers,view');
         Route::put('/receivables/{sale}/reminder', [PosSyncApiController::class, 'scheduleReceivableReminder'])->middleware('tenant.api.permission:finance,edit');

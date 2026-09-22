@@ -4,20 +4,148 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\InvoiceResource;
 use App\Models\Company;
 use App\Models\Customer;
+use App\Models\Invoice;
 use App\Models\Lead;
 use App\Models\Quotation;
 use App\Models\Sale;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class InvoiceController extends Controller
 {
     use ResolvesTenantSyncContext;
+
+    /**
+     * List Invoices / Receivables with Prioritized Default Sorting.
+     * Overdue invoices appear first (sorted oldest overdue first),
+     * accounts due today second (sorted by highest balance first),
+     * and future/pending invoices third.
+     *
+     * GET /api/v1/tenant/invoices
+     * GET /api/tenant/invoices
+     * GET /tenant/invoices
+     * GET /v1/tenant/invoices
+     * GET /sales/invoices
+     */
+    public function index(Request $request): JsonResponse
+    {
+        if (method_exists($this, 'authorize')) {
+            try {
+                $this->authorize('viewAny', Invoice::class);
+            } catch (\Throwable $e) {
+                $user = auth('sanctum')->user() ?? auth('web')->user() ?? $request->user();
+                if ($user && method_exists($user, 'hasPermission') && ! $user->isPrivilegedRole()) {
+                    if (! $user->hasPermission('sales.view')) {
+                        abort(403, 'Unauthorized access to invoices.');
+                    }
+                }
+            }
+        }
+
+        $user = auth('sanctum')->user() ?? auth('web')->user() ?? $request->user();
+
+        $company = null;
+        try {
+            $company = $this->resolveCompany($request);
+        } catch (\Throwable $e) {
+            $companyId = $user?->company_id ?? $user?->tenant_id ?? (app()->bound('tenant.company_id') ? app('tenant.company_id') : null);
+            if ($companyId) {
+                $company = Company::find($companyId);
+            }
+        }
+
+        $storeId = $request->get('store_id', $user?->current_store_id ?? $request->header('X-Store-Id'));
+        $today = now()->toDateString();
+
+        $query = Invoice::query();
+
+        if ($company) {
+            $query->where('company_id', $company->id);
+        }
+
+        if ($storeId) {
+            $query->where('store_id', $storeId);
+        }
+
+        $query->where('status', '!=', 'cancelled');
+
+        $status = $request->get('status');
+        if ($status === 'overdue') {
+            $query->where('payment_status', '!=', 'paid')
+                ->whereDate('due_date', '<', $today);
+        } elseif ($status === 'due_today') {
+            $query->where('payment_status', '!=', 'paid')
+                ->whereDate('due_date', '=', $today);
+        } else {
+            $query->where('payment_status', '!=', 'paid');
+        }
+
+        $sort = $request->get('sort');
+        if ($sort === 'due_date_asc') {
+            $query->orderBy('due_date', 'asc')->orderByDesc('total_amount');
+        } elseif ($sort === 'amount_desc') {
+            $query->orderByDesc('total_amount')->orderBy('due_date', 'asc');
+        } else {
+            // Conditional sort: overdue first, due today second, future due dates third
+            $query->orderByRaw("
+                CASE 
+                    WHEN due_date IS NOT NULL AND due_date < '{$today}' THEN 1
+                    WHEN due_date IS NOT NULL AND due_date = '{$today}' THEN 2
+                    ELSE 3
+                END ASC
+            ")
+            // Within overdue: show the oldest overdue accounts first (highest priority)
+            // Within due today: sort by highest outstanding balance first
+            ->orderByRaw("
+                CASE 
+                    WHEN due_date IS NOT NULL AND due_date < '{$today}' THEN due_date 
+                END ASC
+            ")
+            ->orderByDesc('total_amount');
+        }
+
+        $invoices = $query->with('customer')->paginate((int) $request->get('per_page', 20));
+
+        $overdueMetaQuery = Invoice::query()
+            ->when($company, fn ($q) => $q->where('company_id', $company->id))
+            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
+            ->where('status', '!=', 'cancelled')
+            ->where('payment_status', '!=', 'paid')
+            ->whereDate('due_date', '<', $today);
+
+        $dueTodayMetaQuery = Invoice::query()
+            ->when($company, fn ($q) => $q->where('company_id', $company->id))
+            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
+            ->where('status', '!=', 'cancelled')
+            ->where('payment_status', '!=', 'paid')
+            ->whereDate('due_date', '=', $today);
+
+        $collection = InvoiceResource::collection($invoices);
+
+        return response()->json([
+            'success'     => true,
+            'data'        => $collection,
+            'receivables' => $collection,
+            'meta'        => [
+                'total_overdue'   => (float) $overdueMetaQuery->sum('total_amount'),
+                'total_due_today' => (float) $dueTodayMetaQuery->sum('total_amount'),
+                'current_page'    => $invoices->currentPage(),
+                'last_page'       => $invoices->lastPage(),
+                'per_page'        => $invoices->perPage(),
+                'total'           => $invoices->total(),
+            ],
+            'total'        => $invoices->total(),
+            'current_page' => $invoices->currentPage(),
+            'last_page'    => $invoices->lastPage(),
+        ]);
+    }
 
     /**
      * Pre-populated SDUI Schema for creating / converting to a Tax Invoice.
