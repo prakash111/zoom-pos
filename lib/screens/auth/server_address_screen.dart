@@ -60,6 +60,7 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
     try {
       final result = await LicenseSecurityEngine.verifyServerDomain(cleanUrl);
 
+      // 1. Success
       if (result['code'] == 200 && result['status'] == 'authorized') {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('custom_server_url', cleanUrl);
@@ -83,8 +84,11 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
             Navigator.pushReplacementNamed(context, '/login');
           }
         }
-      } else {
-        // Unregistered or blocked server
+        return;
+      }
+
+      // 2. Unregistered or Blocked Domain
+      if (result['code'] == 403 || result['status'] == 'unregistered') {
         if (mounted) {
           _showLicenseAlert(
             context,
@@ -94,6 +98,19 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
             actionUrl: result['buy_url'] ?? 'https://zoomnearby.com/pricing',
           );
         }
+        return;
+      }
+
+      // 3. Concrete Diagnostic Error (DNS, SSL, 404, or 500)
+      if (mounted) {
+        _showLicenseAlert(
+          context,
+          title: 'Verification Failed',
+          message: result['message'] ?? 'Could not connect to the license verification server. Check your connection and try again.',
+          actionLabel: 'Retry',
+          actionUrl: null,
+          onRetry: () => _handleSaveServerAddress(context, inputUrl),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -103,6 +120,7 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
           message: 'Could not connect to the license verification server. Check your connection and try again.',
           actionLabel: 'Retry',
           actionUrl: null,
+          onRetry: () => _handleSaveServerAddress(context, inputUrl),
         );
       }
     } finally {
@@ -125,6 +143,7 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
     required String message,
     required String actionLabel,
     String? actionUrl,
+    VoidCallback? onRetry,
   }) {
     showDialog(
       context: context,
@@ -156,7 +175,12 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
             )
           else
             ElevatedButton(
-              onPressed: () => Navigator.pop(ctx),
+              onPressed: () {
+                Navigator.pop(ctx);
+                if (onRetry != null) {
+                  onRetry();
+                }
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF10B981),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

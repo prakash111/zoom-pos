@@ -270,7 +270,7 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(find.text('Verification Failed'), findsOneWidget);
       expect(
-        find.text('Could not connect to the license verification server. Check your connection and try again.'),
+        find.textContaining('Network connection timed out'),
         findsOneWidget,
       );
       expect(find.widgetWithText(ElevatedButton, 'Retry'), findsOneWidget);
