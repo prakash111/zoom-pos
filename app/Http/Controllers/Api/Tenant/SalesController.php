@@ -80,9 +80,24 @@ class SalesController extends Controller
         // Apply Due Date Filters
         switch ($filter) {
             case 'overdue':
-                $query->where('payment_status', '!=', 'paid')
-                    ->whereDate('due_date', '<', $today)
-                    ->orderBy('due_date', 'asc');
+                // 1. Fetch ALL unpaid or partially paid sales/invoices
+                $query->where(function ($q) {
+                    $q->whereIn('payment_status', ['unpaid', 'partial', 'pending'])
+                        ->orWhere('due_amount', '>', 0);
+                });
+
+                // 2. Strict prioritization: Overdue first, Due Today second, Future Dues third
+                $query->orderByRaw("
+                    CASE 
+                        WHEN due_date IS NOT NULL AND due_date < '{$today}' THEN 1
+                        WHEN due_date IS NOT NULL AND due_date = '{$today}' THEN 2
+                        ELSE 3
+                    END ASC
+                ")
+                // 3. Within past-due invoices, sort by oldest due date (highest urgency)
+                ->orderBy('due_date', 'asc')
+                // 4. Secondary sort by highest unpaid balance
+                ->orderByDesc('due_amount');
                 break;
 
             case 'due_today':

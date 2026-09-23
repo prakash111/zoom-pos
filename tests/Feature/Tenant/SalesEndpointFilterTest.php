@@ -92,12 +92,15 @@ class SalesEndpointFilterTest extends TestCase
             'created_at' => $today,
         ]);
 
-        // 5. Test Filter: overdue
+        // 5. Test Filter: overdue (returns all unpaid dues with overdue placed first)
         $resOverdue = $this->actingAs($user, 'sanctum')->getJson('/api/v1/tenant/sales?filter=overdue');
         $resOverdue->assertStatus(200);
         $dataOverdue = $resOverdue->json('data');
-        $this->assertCount(1, $dataOverdue);
+        $this->assertCount(4, $dataOverdue);
         $this->assertEquals('SALE-OVERDUE', $dataOverdue[0]['sale_number']);
+        $this->assertEquals('SALE-TODAY', $dataOverdue[1]['sale_number']);
+        $this->assertEquals('SALE-DUE-5D', $dataOverdue[2]['sale_number']);
+        $this->assertEquals('SALE-DUE-12D', $dataOverdue[3]['sale_number']);
 
         // 6. Test Filter: due_today
         $resToday = $this->actingAs($user, 'sanctum')->getJson('/api/v1/tenant/sales?filter=due_today');
