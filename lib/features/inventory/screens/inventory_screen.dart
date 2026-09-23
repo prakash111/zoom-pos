@@ -19,23 +19,33 @@ import 'product_form_sheet.dart';
 /// Product catalog management: list/search/filter, create, edit, and stock
 /// adjustment. Owns an [InventoryProvider] scoped to this route.
 class InventoryScreen extends StatelessWidget {
-  const InventoryScreen({super.key});
+  const InventoryScreen({super.key, this.initialFilter});
+
+  final String? initialFilter;
 
   @override
   Widget build(BuildContext context) {
     final apiClient = context.read<ApiClient>();
 
     return ChangeNotifierProvider(
-      create: (_) =>
-          InventoryProvider(repository: InventoryRepository(apiClient))
-            ..loadCatalog(),
-      child: const _InventoryScreenBody(),
+      create: (_) {
+        final provider =
+            InventoryProvider(repository: InventoryRepository(apiClient))
+              ..loadCatalog();
+        if (initialFilter == 'low_stock') {
+          provider.setFilterLowStock(true);
+        }
+        return provider;
+      },
+      child: _InventoryScreenBody(initialFilter: initialFilter),
     );
   }
 }
 
 class _InventoryScreenBody extends StatefulWidget {
-  const _InventoryScreenBody();
+  const _InventoryScreenBody({this.initialFilter});
+
+  final String? initialFilter;
 
   @override
   State<_InventoryScreenBody> createState() => _InventoryScreenBodyState();
@@ -43,6 +53,20 @@ class _InventoryScreenBody extends StatefulWidget {
 
 class _InventoryScreenBodyState extends State<_InventoryScreenBody> {
   final _searchController = TextEditingController();
+  bool _initializedArgs = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initializedArgs) {
+      _initializedArgs = true;
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map &&
+          (args['filter'] == 'low_stock' || widget.initialFilter == 'low_stock')) {
+        context.read<InventoryProvider>().setFilterLowStock(true);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -153,6 +177,19 @@ class _InventoryScreenBodyState extends State<_InventoryScreenBody> {
                         ),
                       ),
                   ],
+                ),
+              ),
+            if (inventory.filterLowStock)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                  child: InputChip(
+                    avatar: const Icon(Icons.warning_amber_rounded,
+                        size: 16, color: Color(0xFFF59E0B)),
+                    label: const Text('Filtered by Low Stock'),
+                    onDeleted: () => inventory.setFilterLowStock(false),
+                  ),
                 ),
               ),
             const SizedBox(height: 8),

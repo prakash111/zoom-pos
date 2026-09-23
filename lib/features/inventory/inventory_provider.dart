@@ -23,6 +23,7 @@ class InventoryProvider extends ChangeNotifier {
 
   String searchQuery = '';
   String? selectedCategoryId;
+  bool filterLowStock = false;
 
   bool isSaving = false;
   String? actionError;
@@ -30,12 +31,25 @@ class InventoryProvider extends ChangeNotifier {
   List<ProductModel> get filteredProducts {
     final query = searchQuery.trim().toLowerCase();
     return _products.where((p) {
-      if (selectedCategoryId != null && p.categoryId != selectedCategoryId) return false;
+      if (filterLowStock &&
+          !p.isLowStock &&
+          !(p.minimumStock > 0 && p.currentStock <= p.minimumStock)) {
+        return false;
+      }
+      if (selectedCategoryId != null && p.categoryId != selectedCategoryId) {
+        return false;
+      }
       if (query.isEmpty) return true;
       return p.name.toLowerCase().contains(query) ||
           p.sku.toLowerCase().contains(query) ||
           p.barcode.toLowerCase().contains(query);
     }).toList();
+  }
+
+  void setFilterLowStock(bool value) {
+    if (filterLowStock == value) return;
+    filterLowStock = value;
+    notifyListeners();
   }
 
   Future<void> loadCatalog() async {

@@ -334,6 +334,9 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
         color: const Color(0xFF10B981), // Emerald
         icon: Icons.payments_outlined,
         sparkline: m.totalSales.sparkline,
+        onTap: () {
+          Navigator.pushNamed(context, '/sales');
+        },
       ),
       _MetricCardSpec(
         title: 'Total Orders',
@@ -343,6 +346,9 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
         color: const Color(0xFF0284C7), // Sky blue
         icon: Icons.shopping_bag_outlined,
         sparkline: m.totalOrders.sparkline,
+        onTap: () {
+          Navigator.pushNamed(context, '/orders');
+        },
       ),
       _MetricCardSpec(
         title: 'Total Customers',
@@ -352,6 +358,9 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
         color: const Color(0xFF8B5CF6), // Purple
         icon: Icons.people_outline,
         sparkline: m.totalCustomers.sparkline,
+        onTap: () {
+          Navigator.pushNamed(context, '/customers');
+        },
       ),
       _MetricCardSpec(
         title: 'Low Stock Items',
@@ -361,6 +370,13 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
         color: const Color(0xFFF59E0B), // Amber
         icon: Icons.inventory_2_outlined,
         sparkline: m.lowStockItems.sparkline,
+        onTap: () {
+          Navigator.pushNamed(
+            context,
+            '/inventory',
+            arguments: {'filter': 'low_stock'},
+          );
+        },
       ),
     ];
 
@@ -391,104 +407,115 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
   }
 
   Widget _buildSingleMetricCard(_MetricCardSpec spec, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Icon container
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: spec.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(spec.icon, color: spec.color, size: 17),
-              ),
-              // Trend pill
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: spec.isPositive
-                      ? const Color(0xFF10B981).withValues(alpha: 0.12)
-                      : const Color(0xFFF59E0B).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: InkWell(
+          onTap: spec.onTap,
+          borderRadius: BorderRadius.circular(20),
+          splashColor: spec.color.withValues(alpha: 0.12),
+          highlightColor: spec.color.withValues(alpha: 0.06),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(
-                      spec.isPositive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                      size: 10,
-                      color: spec.isPositive ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                    // Icon container
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: spec.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(spec.icon, color: spec.color, size: 17),
                     ),
-                    const SizedBox(width: 2),
-                    Text(
-                      spec.trend,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: spec.isPositive ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                    // Trend pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: spec.isPositive
+                            ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                            : const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            spec.isPositive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                            size: 10,
+                            color: spec.isPositive ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            spec.trend,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: spec.isPositive ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                spec.formattedValue,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                const SizedBox(height: 6),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      spec.formattedValue,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      spec.title,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(
-                spec.title,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                const SizedBox(height: 6),
+                // Smooth sparkline
+                SizedBox(
+                  height: 24,
+                  child: _buildMiniSparkline(spec.sparkline, spec.color),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 6),
-          // Smooth sparkline
-          SizedBox(
-            height: 24,
-            child: _buildMiniSparkline(spec.sparkline, spec.color),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1245,6 +1272,7 @@ class _MetricCardSpec {
     required this.color,
     required this.icon,
     required this.sparkline,
+    this.onTap,
   });
 
   final String title;
@@ -1254,6 +1282,7 @@ class _MetricCardSpec {
   final Color color;
   final IconData icon;
   final List<double> sparkline;
+  final VoidCallback? onTap;
 }
 
 class _QuickActionSpec {

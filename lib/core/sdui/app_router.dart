@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
+import '../../features/customers/screens/customers_screen.dart';
+import '../../features/inventory/screens/inventory_screen.dart';
 import '../../features/landing/screens/landing_screen.dart';
 import '../../features/settings/screens/document_templates_tab.dart';
 import '../../features/storefront/screens/storefront_screen.dart';
@@ -63,6 +65,9 @@ class AppRouter {
     if (normalized == 'sales' ||
         normalized == 'sales/invoices' ||
         normalized == 'invoices' ||
+        normalized == 'orders' ||
+        normalized == 'order' ||
+        normalized == 'transactions' ||
         normalized == 'tenant/sales') {
       final args = settings.arguments;
       String? initialDueFilter;
@@ -77,6 +82,28 @@ class AppRouter {
         builder: (_) => SalesScreen(
           initialDueFilter: initialDueFilter,
         ),
+      );
+    }
+
+    if (normalized == 'customers' ||
+        normalized == 'customer' ||
+        normalized == 'crm/customers' ||
+        normalized == 'crm') {
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => const CustomersScreen(),
+      );
+    }
+
+    if (normalized == 'inventory' ||
+        normalized == 'products' ||
+        normalized == 'product' ||
+        normalized == 'stock') {
+      final args = settings.arguments;
+      final filter = args is Map ? args['filter']?.toString() : null;
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => InventoryScreen(initialFilter: filter),
       );
     }
 
