@@ -1,0 +1,9 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^api/v1/license/verify/?$   api/verify.php   [L]
+    RewriteRule ^api/v1/license/issue/?$    api/issue.php    [L]
+    RewriteRule ^api/v1/catalog/?$          api/catalog.php  [L]
+    RewriteRule ^api/v1/module/download/?$  api/download.php [L]
+    RewriteRule ^api/v2/verify-entitlement/?$ api/verify-entitlement.php [L]
+    RewriteRule ^api/verify-entitlement/?$    api/verify-entitlement.php [L]
+</IfModule>

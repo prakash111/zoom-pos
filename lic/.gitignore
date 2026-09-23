@@ -1,0 +1,4 @@
+/config/config.php
+/setup.php
+/storage/
+*.log
