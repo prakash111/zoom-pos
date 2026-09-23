@@ -18,6 +18,8 @@ dependencies:
 
   # Networking
   dio: ^5.7.0
+  http: ^1.2.0
+  crypto: ^3.0.3
   connectivity_plus: ^6.1.0
 
   # Local storage

@@ -7,49 +7,55 @@ import '../../core/config/app_config.dart';
 import '../../core/security/license_security_engine.dart';
 import '../../core/storage/app_preferences.dart';
 
-/// Lets the store owner point this terminal at wherever they self-hosted the
-/// Sales & Inventory platform, subject to license authority verification.
-class ServerSettingsScreen extends StatefulWidget {
-  const ServerSettingsScreen({super.key, required this.preferences});
-
-  final AppPreferences preferences;
+class ServerAddressScreen extends StatefulWidget {
+  const ServerAddressScreen({super.key});
 
   @override
-  State<ServerSettingsScreen> createState() => _ServerSettingsScreenState();
+  State<ServerAddressScreen> createState() => _ServerAddressScreenState();
 }
 
-class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
-  final _formKey = GlobalKey<FormState>();
+class _ServerAddressScreenState extends State<ServerAddressScreen> {
   final _urlController = TextEditingController();
-  bool _loading = true;
-  bool _saving = false;
+  final _formKey = GlobalKey<FormState>();
+  bool _isVerifying = false;
+  bool _isLoadingInitial = true;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadInitialUrl();
   }
 
-  Future<void> _load() async {
-    final url = await widget.preferences.readBaseUrl();
-    if (!mounted) return;
-    setState(() {
-      _urlController.text = url;
-      _loading = false;
-    });
+  Future<void> _loadInitialUrl() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUrl = prefs.getString('custom_server_url') ??
+          prefs.getString('zoom_pos.base_url') ??
+          AppConfig.defaultBaseUrl;
+      _urlController.text = savedUrl;
+    } catch (_) {
+      _urlController.text = AppConfig.defaultBaseUrl;
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingInitial = false);
+      }
+    }
   }
 
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+  @override
+  void dispose() {
+    _urlController.dispose();
+    super.dispose();
+  }
 
-    final inputUrl = _urlController.text.trim();
-    final cleanUrl = inputUrl.replaceAll(RegExp(r'/+$'), '');
+  Future<void> _handleSaveServerAddress(BuildContext context, String inputUrl) async {
+    final cleanUrl = inputUrl.trim().replaceAll(RegExp(r'/+$'), '');
     if (cleanUrl.isEmpty || !Uri.parse(cleanUrl).isAbsolute) {
       _showErrorSnackBar(context, 'Please enter a valid HTTP/HTTPS URL');
       return;
     }
 
-    setState(() => _saving = true);
+    setState(() => _isVerifying = true);
 
     try {
       final result = await LicenseSecurityEngine.verifyServerDomain(cleanUrl);
@@ -60,37 +66,47 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
         await prefs.setString('active_license_token', result['license_token'] ?? '');
         await prefs.setString('license_tier', result['license_tier'] ?? 'regular');
 
+        // Extended License: Load dynamic white-label brand assets
         if (result['entitlements']?['white_label_branding'] == true && result['branding'] != null) {
           await prefs.setString('whitelabel_config', jsonEncode(result['branding']));
         } else {
           await prefs.remove('whitelabel_config');
         }
 
-        await widget.preferences.saveBaseUrl(cleanUrl);
-        if (!mounted) return;
+        // Also synchronize with core AppPreferences for seamless API routing
+        await AppPreferences().saveBaseUrl(cleanUrl);
 
-        Navigator.of(context).pop(true);
+        if (mounted) {
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context, true);
+          } else {
+            Navigator.pushReplacementNamed(context, '/login');
+          }
+        }
       } else {
-        if (!mounted) return;
-        _showLicenseAlert(
-          context,
-          title: 'Unauthorized Server',
-          message: result['message'] ?? 'Your domain is not registered. You are not authorized to access. Buy a valid core script license to continue.',
-          actionLabel: 'Buy License',
-          actionUrl: result['buy_url'] ?? 'https://zoomnearby.com/pricing',
-        );
+        // Unregistered or blocked server
+        if (mounted) {
+          _showLicenseAlert(
+            context,
+            title: 'Unauthorized Server',
+            message: result['message'] ?? 'Your domain is not registered. You are not authorized to access. Buy a valid core script license to continue.',
+            actionLabel: 'Buy License',
+            actionUrl: result['buy_url'] ?? 'https://zoomnearby.com/pricing',
+          );
+        }
       }
     } catch (e) {
-      if (!mounted) return;
-      _showLicenseAlert(
-        context,
-        title: 'Verification Failed',
-        message: 'Could not connect to the license verification server. Check your connection and try again.',
-        actionLabel: 'Retry',
-        actionUrl: null,
-      );
+      if (mounted) {
+        _showLicenseAlert(
+          context,
+          title: 'Verification Failed',
+          message: 'Could not connect to the license verification server. Check your connection and try again.',
+          actionLabel: 'Retry',
+          actionUrl: null,
+        );
+      }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) setState(() => _isVerifying = false);
     }
   }
 
@@ -153,16 +169,12 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
   }
 
   @override
-  void dispose() {
-    _urlController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Server address')),
-      body: _loading
+      appBar: AppBar(
+        title: const Text('Server address'),
+      ),
+      body: _isLoadingInitial
           ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.all(20),
@@ -198,18 +210,27 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _saving ? null : _save,
-                        child: _saving
+                        onPressed: _isVerifying
+                            ? null
+                            : () {
+                                if (_formKey.currentState?.validate() == true) {
+                                  _handleSaveServerAddress(context, _urlController.text);
+                                }
+                              },
+                        child: _isVerifying
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
                               )
                             : const Text('Save'),
                       ),
                     ),
                     TextButton(
-                      onPressed: _saving
+                      onPressed: _isVerifying
                           ? null
                           : () {
                               _urlController.text = AppConfig.defaultBaseUrl;

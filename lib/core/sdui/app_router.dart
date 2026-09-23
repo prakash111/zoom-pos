@@ -10,6 +10,7 @@ import '../../features/storefront/screens/storefront_screen.dart';
 import '../../features/sales/screens/sales_screen.dart';
 import 'screens/dynamic_schema_page.dart';
 import '../../features/stores/store_management_screen.dart';
+import '../../screens/auth/server_address_screen.dart';
 
 /// The business-page and public route resolver in the Flutter shell.
 class AppRouter {
@@ -18,6 +19,16 @@ class AppRouter {
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     final requested = settings.name?.trim() ?? '';
     final normalized = requested.toLowerCase().replaceFirst(RegExp(r'^/+'), '');
+
+    if (normalized == 'server_address' ||
+        normalized == 'server-address' ||
+        normalized == 'server' ||
+        normalized == 'settings/server') {
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => const ServerAddressScreen(),
+      );
+    }
 
     if (normalized == 'settings/store/branches') {
       return MaterialPageRoute<void>(
