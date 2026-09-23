@@ -19,7 +19,7 @@ class DesktopWindow {
   /// Matches the desktop breakpoint (`Breakpoints.desktop` = 1024) plus room
   /// for the status bar / window chrome.
   static const Size minimumSize = Size(1024, 720);
-  static const String title = 'Sales & Inventory';
+  static const String title = 'Zoom Sales CRM & Inventory';
 
   static bool get isSupported => !kIsWeb && Platform.isWindows;
 

@@ -81,7 +81,7 @@ class _AuthGateState extends State<AuthGate> {
                 Text(
                   branding.platformName.isNotEmpty
                       ? branding.platformName
-                      : t('Sales & Inventory'),
+                      : t('Zoom Sales CRM & Inventory'),
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: onBg,

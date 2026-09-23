@@ -181,7 +181,7 @@ class Tenant {
   String get displayName =>
       (tradeName != null && tradeName!.trim().isNotEmpty)
           ? tradeName!.trim()
-          : (name.trim().isNotEmpty ? name.trim() : 'ZoomNearby Enterprise');
+          : (name.trim().isNotEmpty ? name.trim() : 'Zoom Sales CRM & Inventory');
 
   String get displayType {
     final t = businessType.trim();

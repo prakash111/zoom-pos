@@ -1,4 +1,4 @@
-name: Windows Build
+name: Zoom Sales CRM & Inventory — Windows Build
 
 on:
   workflow_dispatch: {}
@@ -84,7 +84,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: SalesAndInventory-Windows-Installer-${{ env.APP_VERSION }}
+          name: Zoom-Sales-CRM-Inventory-Windows-Installer-${{ env.APP_VERSION }}
           path: Output/*.exe
           if-no-files-found: warn
           retention-days: 5

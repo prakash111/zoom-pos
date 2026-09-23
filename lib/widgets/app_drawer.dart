@@ -200,7 +200,7 @@ Widget buildDrawerMenuItem(
 ///
 /// Guaranteed behavior:
 /// - Renders store logo (via [TenantLogoAvatar]), brand name, and store type badge pill.
-/// - Falls back to 'ZoomNearby Enterprise' and 'RETAIL' if [tenant] is null or loading.
+/// - Falls back to 'Zoom Sales CRM & Inventory' and 'RETAIL' if [tenant] is null or loading.
 /// - Never collapses into SizedBox.shrink() or empty space.
 /// - No web-specific suppression (renders consistently across web, desktop, and mobile).
 Widget buildDrawerHeader(
@@ -217,7 +217,7 @@ Widget buildDrawerHeader(
       ? tenant!.displayName
       : (fallbackName != null && fallbackName.trim().isNotEmpty
           ? fallbackName.trim()
-          : 'ZoomNearby Enterprise');
+          : 'Zoom Sales CRM & Inventory');
 
   final displayType = (tenant?.displayType.isNotEmpty == true)
       ? tenant!.displayType

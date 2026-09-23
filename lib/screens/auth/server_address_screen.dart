@@ -208,7 +208,7 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Enter the web address of your Sales & Inventory platform. '
+                      'Enter the web address of your Zoom Sales CRM & Inventory platform. '
                       'The server must be verified by the central license authority.',
                       style: TextStyle(color: Colors.grey.shade600),
                     ),

@@ -1,5 +1,5 @@
 ; ---------------------------------------------------------------------------
-; installer.iss — Inno Setup script for the Sales and Inventory Windows
+; installer.iss — Inno Setup script for the Zoom Sales CRM & Inventory Windows
 ; desktop installer
 ;
 ; Local build:
@@ -12,7 +12,7 @@
 ;   build\windows\x64\runner\Release\
 ; ---------------------------------------------------------------------------
 
-#define MyAppName "Sales and Inventory"
+#define MyAppName "Zoom Sales CRM & Inventory"
 #define MyAppPublisher "Zoom Nearby"
 #define MyAppURL "https://saas.zoomnearby.com"
 #define MyAppExeName "sales_and_inventory.exe"
@@ -39,7 +39,7 @@ AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 VersionInfoVersion={#MyAppVersion}
 
-; Program Files\ZoomPOS by default, user can change it in the wizard.
+; Program Files\Zoom Sales CRM & Inventory by default, user can change it in the wizard.
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes

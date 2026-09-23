@@ -8,7 +8,7 @@ import '../../core/security/license_security_engine.dart';
 import '../../core/storage/app_preferences.dart';
 
 /// Lets the store owner point this terminal at wherever they self-hosted the
-/// Sales & Inventory platform, subject to license authority verification.
+/// Zoom Sales CRM & Inventory platform, subject to license authority verification.
 class ServerSettingsScreen extends StatefulWidget {
   const ServerSettingsScreen({super.key, required this.preferences});
 
@@ -196,7 +196,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Enter the web address of your Sales & Inventory platform. '
+                      'Enter the web address of your Zoom Sales CRM & Inventory platform. '
                       'The server must be verified by the central license authority.',
                       style: TextStyle(color: Colors.grey.shade600),
                     ),

@@ -336,7 +336,7 @@ class LandingBranding {
   factory LandingBranding.fromJson(Map<String, dynamic> json) {
     return LandingBranding(
       platformName:
-          json['platform_name']?.toString() ?? 'Smart Inventory & Sales',
+          json['platform_name']?.toString() ?? 'Zoom Sales CRM & Inventory',
       logoUrl: json['logo_url']?.toString(),
       faviconUrl: json['favicon_url']?.toString(),
       primaryColorHex: json['primary_color']?.toString() ?? '#4f46e5',
@@ -352,7 +352,7 @@ class LandingBranding {
   }
 
   factory LandingBranding.fallback() => const LandingBranding(
-        platformName: 'Smart Inventory & Sales',
+        platformName: 'Zoom Sales CRM & Inventory',
       );
 }
 

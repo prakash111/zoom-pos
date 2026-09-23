@@ -475,7 +475,7 @@ void main() {
 
       // Verify fallback name and badge render
       expect(find.byKey(const ValueKey('app-drawer-header')), findsOneWidget);
-      expect(find.text('ZoomNearby Enterprise'), findsOneWidget);
+      expect(find.text('Zoom Sales CRM & Inventory'), findsOneWidget);
       expect(find.text('RETAIL'), findsOneWidget);
       expect(find.byType(TenantLogoAvatar), findsOneWidget);
     });

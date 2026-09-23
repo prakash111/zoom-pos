@@ -67,7 +67,7 @@ void main() {
           'weather': '28°C Sunny',
         },
         'top_app_bar': {
-          'store_name': 'MetroRetail',
+          'store_name': 'Zoom Sales CRM & Inventory',
           'tagline': 'Smarter Retail. Faster Growth.',
           'unread_notifications_count': 3,
           'user_name': 'Alex Johnson',
@@ -147,7 +147,7 @@ void main() {
       final model = DashboardSummaryModel.fromJson(json);
 
       expect(model.greeting.title, 'Good Morning, Alex Johnson!');
-      expect(model.topAppBar.storeName, 'MetroRetail');
+      expect(model.topAppBar.storeName, 'Zoom Sales CRM & Inventory');
       expect(model.topAppBar.tagline, 'Smarter Retail. Faster Growth.');
       expect(model.topAppBar.unreadNotificationsCount, 3);
       expect(model.metrics.totalSales.formatted, '\$12,480.00');
@@ -166,12 +166,12 @@ void main() {
       final model = DashboardSummaryModel.fromAnalytics(
         analytics,
         formatter,
-        storeName: 'MetroRetail',
+        storeName: 'Zoom Sales CRM & Inventory',
         userName: 'Alex Johnson',
         userRole: 'Store Manager',
       );
 
-      expect(model.topAppBar.storeName, 'MetroRetail');
+      expect(model.topAppBar.storeName, 'Zoom Sales CRM & Inventory');
       expect(model.topAppBar.userName, 'Alex Johnson');
       expect(model.metrics.totalSales.value, 12480.0);
       expect(model.metrics.totalOrders.value, 348.0);
@@ -194,7 +194,7 @@ void main() {
       final sampleModel = DashboardSummaryModel.fromAnalytics(
         _sampleAnalytics(),
         CurrencyFormatter('\$'),
-        storeName: 'MetroRetail',
+        storeName: 'Zoom Sales CRM & Inventory',
         userName: 'Alex Johnson',
         userRole: 'Store Manager',
       );
@@ -225,7 +225,7 @@ void main() {
       // fromAnalytics selects the greeting using the local time. Assert that
       // the widget renders its supplied model so this also passes after noon.
       expect(find.text(sampleModel.greeting.title), findsOneWidget);
-      expect(find.text('MetroRetail'), findsNothing);
+      expect(find.text('Zoom Sales CRM & Inventory'), findsNothing);
       expect(find.text('Smarter Retail. Faster Growth.'), findsNothing);
       expect(find.text('Store Manager'), findsNothing);
 

@@ -40,7 +40,7 @@ class PlatformBrandingProvider extends ChangeNotifier {
 
   /// Fallbacks shown until (and unless) the server responds — these mirror the
   /// Superadmin contract defaults.
-  static const String defaultName = 'Sales & Inventory';
+  static const String defaultName = 'Zoom Sales CRM & Inventory';
   static const String defaultTagline = 'Online inventory management system';
   static const String defaultSupportPhone = '+918535075196';
   static const String defaultSupportEmail = 'support@zoomnearby.com';

@@ -788,7 +788,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onTap: () async {
                     Navigator.pop(sheetCtx);
                     final waUrl = Uri.parse(
-                        'https://wa.me/$digits?text=${Uri.encodeComponent('Hello, I need assistance with ZoomPOS.')}');
+                        'https://wa.me/$digits?text=${Uri.encodeComponent('Hello, I need assistance with Zoom Sales CRM & Inventory.')}');
                     if (await canLaunchUrl(waUrl)) {
                       await launchUrl(waUrl,
                           mode: LaunchMode.externalApplication);
@@ -839,7 +839,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onTap: () async {
                     Navigator.pop(sheetCtx);
                     final mailUrl = Uri.parse(
-                        'mailto:$email?subject=${Uri.encodeComponent('ZoomPOS Support Inquiry')}');
+                        'mailto:$email?subject=${Uri.encodeComponent('Zoom Sales CRM & Inventory Support Inquiry')}');
                     if (await canLaunchUrl(mailUrl)) {
                       await launchUrl(mailUrl);
                     }
@@ -981,7 +981,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             bootstrap.config['trade_name']?.toString() ??
             bootstrap.config['business_name']?.toString() ??
             bootstrap.config['name']?.toString() ??
-            'ZoomNearby Enterprise';
+            'Zoom Sales CRM & Inventory';
         final hasCover = coverUrl != null && coverUrl.isNotEmpty;
         final primaryColor = tp.activeLinkColor ??
             bootstrap.theme.primaryColorValue ??
@@ -2310,7 +2310,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   currentStore?.name ??
                       company?.tradeName ??
                       company?.name ??
-                      'Sales & Inventory',
+                      'Zoom Sales CRM & Inventory',
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -2454,7 +2454,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       Text(
                                         company?.tradeName ??
                                             company?.name ??
-                                            'Sales & Inventory',
+                                            'Zoom Sales CRM & Inventory',
                                         style: Theme.of(context)
                                             .textTheme
                                             .titleMedium
@@ -2735,7 +2735,7 @@ class _DashboardAnalytics extends StatelessWidget {
           summary: DashboardSummaryModel.fromAnalytics(
             analytics,
             formatter,
-            storeName: company?.tradeName ?? company?.name ?? 'MetroRetail',
+            storeName: company?.tradeName ?? company?.name ?? 'Zoom Sales CRM & Inventory',
             userName: auth.user?.name ?? 'Store Manager',
             userRole: auth.user?.role ?? 'Store Manager',
           ),

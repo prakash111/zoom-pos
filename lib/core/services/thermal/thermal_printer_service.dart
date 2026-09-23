@@ -310,7 +310,7 @@ class ThermalPrinterService {
     final size = await savedPaperSize();
     final generator = Generator(size, profile);
     final bytes = <int>[
-      ...generator.text('ZoomNearby POS',
+      ...generator.text('Zoom Sales CRM & Inventory',
           styles: const PosStyles(
               align: PosAlign.center,
               bold: true,

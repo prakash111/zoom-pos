@@ -1,11 +1,11 @@
 {
-    "name": "Zoom POS - Sales & Inventory",
-    "short_name": "Zoom POS",
+    "name": "Zoom Sales CRM & Inventory",
+    "short_name": "Zoom Sales CRM & Inventory",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Sales and Inventory client for the multi-tenant SaaS platform.",
+    "description": "Zoom Sales CRM & Inventory client for the multi-tenant SaaS platform.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

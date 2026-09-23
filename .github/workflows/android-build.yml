@@ -1,4 +1,4 @@
-name: Android Build
+name: Zoom Sales CRM & Inventory — Android Build
 
 on:
   workflow_dispatch: {}
@@ -119,19 +119,19 @@ jobs:
       - name: Prepare release artifacts
         run: |
           mkdir -p release-output
-          cp build/app/outputs/flutter-apk/app-release.apk release-output/zoom-pos-v${{ env.APP_VERSION }}.apk
-          cp build/app/outputs/flutter-apk/app-release.apk release-output/zoom-pos-release.apk
-          cp build/app/outputs/bundle/release/app-release.aab release-output/zoom-pos-v${{ env.APP_VERSION }}.aab
-          cp build/app/outputs/bundle/release/app-release.aab release-output/zoom-pos-release.aab
+          cp build/app/outputs/flutter-apk/app-release.apk release-output/zoom-sales-crm-inventory-v${{ env.APP_VERSION }}.apk
+          cp build/app/outputs/flutter-apk/app-release.apk release-output/zoom-sales-crm-inventory-release.apk
+          cp build/app/outputs/bundle/release/app-release.aab release-output/zoom-sales-crm-inventory-v${{ env.APP_VERSION }}.aab
+          cp build/app/outputs/bundle/release/app-release.aab release-output/zoom-sales-crm-inventory-release.aab
 
       - name: Upload APK artifact (best-effort)
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: ZoomPOS-Android-APK-v${{ env.APP_VERSION }}
+          name: Zoom-Sales-CRM-Inventory-Android-APK-v${{ env.APP_VERSION }}
           path: |
-            release-output/zoom-pos-v${{ env.APP_VERSION }}.apk
-            release-output/zoom-pos-release.apk
+            release-output/zoom-sales-crm-inventory-v${{ env.APP_VERSION }}.apk
+            release-output/zoom-sales-crm-inventory-release.apk
             build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: warn
           retention-days: 5
@@ -140,10 +140,10 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: ZoomPOS-Android-Bundle-v${{ env.APP_VERSION }}
+          name: Zoom-Sales-CRM-Inventory-Android-Bundle-v${{ env.APP_VERSION }}
           path: |
-            release-output/zoom-pos-v${{ env.APP_VERSION }}.aab
-            release-output/zoom-pos-release.aab
+            release-output/zoom-sales-crm-inventory-v${{ env.APP_VERSION }}.aab
+            release-output/zoom-sales-crm-inventory-release.aab
             build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: warn
           retention-days: 5
@@ -156,8 +156,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release-output/zoom-pos-v${{ env.APP_VERSION }}.apk
-            release-output/zoom-pos-v${{ env.APP_VERSION }}.aab
+            release-output/zoom-sales-crm-inventory-v${{ env.APP_VERSION }}.apk
+            release-output/zoom-sales-crm-inventory-v${{ env.APP_VERSION }}.aab
           fail_on_unmatched_files: true
           tag_name: >-
             ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name

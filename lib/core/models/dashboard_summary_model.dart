@@ -44,7 +44,7 @@ class TopAppBarData {
   factory TopAppBarData.fromJson(Map<String, dynamic> json) {
     final user = json['user'] is Map ? Map<String, dynamic>.from(json['user'] as Map) : <String, dynamic>{};
     return TopAppBarData(
-      storeName: json['store_name'] as String? ?? 'MetroRetail',
+      storeName: json['store_name'] as String? ?? 'Zoom Sales CRM & Inventory',
       tagline: json['tagline'] as String? ?? 'Smarter Retail. Faster Growth.',
       logoUrl: json['logo_url'] as String?,
       unreadNotificationsCount: (json['unread_notifications_count'] as num?)?.toInt() ?? 0,
@@ -325,7 +325,7 @@ class DashboardSummaryModel {
   factory DashboardSummaryModel.fromAnalytics(
     AnalyticsModel analytics,
     CurrencyFormatter formatter, {
-    String storeName = 'MetroRetail',
+    String storeName = 'Zoom Sales CRM & Inventory',
     String userName = 'Store Manager',
     String userRole = 'Store Manager',
   }) {
