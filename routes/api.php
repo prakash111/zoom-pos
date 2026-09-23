@@ -81,6 +81,8 @@ use Modules\leadmanagement\Http\Controllers\LeadModuleController;
 // Signed "license issued" push from the vendor's License Manager after a
 // hosted-checkout purchase. HMAC-verified in the controller (no auth middleware).
 Route::post('/license/activate', [LicenseActivationController::class, 'activate']);
+Route::post('/v2/verify-entitlement', [\App\Http\Controllers\LicenseVerificationController::class, 'verifyClientApp']);
+Route::post('/verify-entitlement', [\App\Http\Controllers\LicenseVerificationController::class, 'verifyClientApp']);
 Route::get('/public/landing', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
 Route::get('/public/landing-config', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
 Route::get('/v1/public/landing-config', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);

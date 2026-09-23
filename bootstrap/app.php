@@ -91,6 +91,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/webhooks/*',
             'v1/webhooks/*',
             'webhooks/*',
+            'api/v2/*',
+            'lic/*',
         ]);
 
         $middleware->alias([

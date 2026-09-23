@@ -268,3 +268,7 @@ Route::middleware(['auth:web', \App\Http\Middleware\ResolveTenantContext::class]
         ->name('settings.templates.preview');
 });
 
+Route::post('/api/v2/verify-entitlement', [\App\Http\Controllers\LicenseVerificationController::class, 'verifyClientApp']);
+Route::post('/lic/api/v2/verify-entitlement', [\App\Http\Controllers\LicenseVerificationController::class, 'verifyClientApp']);
+Route::post('/lic/api/verify-entitlement', [\App\Http\Controllers\LicenseVerificationController::class, 'verifyClientApp']);
+
