@@ -11,7 +11,7 @@ return new class extends Migration
         // Singleton row (id = 1): platform white-label branding + SMTP settings.
         Schema::create('platform_branding', function (Blueprint $table) {
             $table->id();
-            $table->string('platform_name')->default('Smart Inventory & Sales');
+            $table->string('platform_name')->default('Zoom Sales CRM & Inventory');
             $table->string('logo_url')->nullable();
             $table->string('favicon_url')->nullable();
             $table->string('primary_color', 16)->nullable();

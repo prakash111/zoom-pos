@@ -17,7 +17,7 @@ return [
      */
     'app_id' => env('NATIVEPHP_APP_ID', 'com.zoomnearby.zoompos'),
 
-    'app_name' => 'Zoom POS',
+    'app_name' => 'Zoom Sales CRM & Inventory',
 
     /**
      * If your application allows deep linking, you can specify the scheme
@@ -221,7 +221,7 @@ return [
         'perMachine' => true,
         'createDesktopShortcut' => true,
         'createStartMenuShortcut' => true,
-        'shortcutName' => 'Zoom POS',
+        'shortcutName' => 'Zoom Sales CRM & Inventory',
         'runAfterFinish' => true,
         'installerIcon' => base_path('launcher.png'),
         'uninstallerIcon' => base_path('launcher.png'),
@@ -231,7 +231,7 @@ return [
     'deb' => [
         'packageCategory' => 'misc',
         'priority' => 'optional',
-        'synopsis' => 'Zoom POS Retail & Supermarket Management',
+        'synopsis' => 'Zoom Sales CRM & Inventory Retail & Supermarket Management',
         'description' => 'Complete multi-tenant point of sale and inventory management desktop suite.',
     ],
 

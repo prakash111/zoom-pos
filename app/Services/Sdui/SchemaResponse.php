@@ -7360,7 +7360,7 @@ class SchemaResponse
 
     public static function loginView(Company $company): array
     {
-        $brandName = $company->name ?: config('app.name', 'ZoomNearby POS');
+        $brandName = $company->name ?: config('app.name', 'Zoom Sales CRM & Inventory');
 
         return self::screen("Sign In - {$brandName}", [
             self::card([
@@ -7404,7 +7404,7 @@ class SchemaResponse
 
     public static function registerView(Company $company): array
     {
-        $brandName = $company->name ?: config('app.name', 'ZoomNearby POS');
+        $brandName = $company->name ?: config('app.name', 'Zoom Sales CRM & Inventory');
 
         return self::screen("Register Store - {$brandName}", [
             self::card([

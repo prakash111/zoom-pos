@@ -69,7 +69,7 @@ class LandingDarkBgCustomizerTest extends TestCase
     public function test_public_landing_page_renders_custom_dark_bg_and_mission_pricing_sections(): void
     {
         PlatformBranding::firstOrCreate([], [
-            'platform_name' => 'Zoom POS',
+            'platform_name' => 'Zoom Sales CRM & Inventory',
             'landing_page_enabled' => true,
         ]);
 

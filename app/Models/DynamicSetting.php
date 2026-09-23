@@ -56,7 +56,7 @@ class DynamicSetting extends Model
             if (! empty($name)) {
                 return $name;
             }
-            return $default ?? $fallback ?? config('app.name', 'Smart Inventory');
+            return $default ?? $fallback ?? config('app.name', 'Zoom Sales CRM & Inventory');
         }
 
         if ($key === 'enable_registration_domain_setup') {

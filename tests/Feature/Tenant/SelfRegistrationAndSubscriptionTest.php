@@ -269,7 +269,7 @@ class SelfRegistrationAndSubscriptionTest extends TestCase
             'invoice_date' => now()->toDateString(),
             'seller_details' => [
                 'company_name' => 'Smart SaaS Corp',
-                'legal_name' => 'Smart Inventory Platform Inc.',
+                'legal_name' => 'Zoom Sales CRM & Inventory',
                 'tax_id' => 'GSTIN-SELLER-1234',
             ],
             'buyer_details' => [
@@ -282,7 +282,7 @@ class SelfRegistrationAndSubscriptionTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('OFFICIAL TAX INVOICE');
         $response->assertSee('INV-SUB-2026-9999');
-        $response->assertSee('Smart Inventory Platform Inc.');
+        $response->assertSee('Zoom Sales CRM & Inventory');
         $response->assertSee('234.82');
         $response->assertSee('CGST (9%)');
         $response->assertSee('SGST (9%)');

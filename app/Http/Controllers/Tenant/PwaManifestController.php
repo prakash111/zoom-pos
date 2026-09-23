@@ -10,7 +10,7 @@ class PwaManifestController extends Controller
     public function __invoke(): JsonResponse
     {
         $company = auth('web')->user()?->company;
-        $name = trim((string) ($company?->trade_name ?: $company?->name ?: config('app.name', 'Zoom POS')));
+        $name = trim((string) ($company?->trade_name ?: $company?->name ?: config('app.name', 'Zoom Sales CRM & Inventory')));
         $themeColor = $this->validColor($company?->primary_color) ?: '#2563eb';
 
         return response()->json([

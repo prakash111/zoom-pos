@@ -127,7 +127,7 @@ class Index extends Component
     {
         $branding = PlatformBranding::current();
 
-        $this->platformName = (string) ($branding->platform_name ?: 'Smart Inventory & Sales');
+        $this->platformName = (string) ($branding->platform_name ?: 'Zoom Sales CRM & Inventory');
         $this->logoUrl = (string) ($branding->logo_url ?: DynamicSetting::get('platform_logo_url', ''));
         $this->faviconUrl = (string) $branding->favicon_url;
         $this->showAuthBanner = (bool) DynamicSetting::get('show_auth_banner', false);

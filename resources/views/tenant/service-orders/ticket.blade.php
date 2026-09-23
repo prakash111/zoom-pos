@@ -2,7 +2,7 @@
     
     <!-- Ticket Header -->
     <div class="text-center pb-4 border-b border-slate-200">
-        <h2 class="text-lg font-black tracking-tight uppercase">{{ $order->company?->trade_name ?? $order->company?->name ?? 'Zoom POS & Market' }}</h2>
+        <h2 class="text-lg font-black tracking-tight uppercase">{{ $order->company?->trade_name ?? $order->company?->name ?? 'Zoom Sales CRM & Inventory' }}</h2>
         <p class="text-xs text-slate-500 mt-0.5">{{ $order->company?->address ?? '742 Evergreen Terrace' }} • Tel: {{ $order->company?->phone ?? '+1-555-0199' }}</p>
         <div class="inline-block mt-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider">
             Service Order / Repair Ticket #{{ $order->ticket_number }}

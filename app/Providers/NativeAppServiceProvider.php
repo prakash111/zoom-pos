@@ -24,7 +24,7 @@ class NativeAppServiceProvider implements ProvidesPhpIni
         $this->ensureApplicationInitialized();
 
         Window::open('main')
-            ->title('Zoom POS')
+            ->title('Zoom Sales CRM & Inventory')
             ->width(1366)
             ->height(850)
             ->minWidth(1024)
@@ -36,7 +36,7 @@ class NativeAppServiceProvider implements ProvidesPhpIni
 
         MenuBar::create()
             ->icon(base_path('launcher.png'))
-            ->tooltip('Zoom POS Background Service')
+            ->tooltip('Zoom Sales CRM & Inventory Background Service')
             ->showDockIcon();
 
         $this->startBackgroundSyncCycle();

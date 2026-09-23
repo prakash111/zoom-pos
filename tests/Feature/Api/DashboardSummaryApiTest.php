@@ -25,7 +25,7 @@ class DashboardSummaryApiTest extends TestCase
         $this->company = Company::create([
             'id' => 'comp-summary-test-01',
             'name' => 'Metro Retail Mart',
-            'trade_name' => 'MetroRetail',
+            'trade_name' => 'Zoom Sales CRM & Inventory',
             'slug' => 'metro-retail-mart',
             'email' => 'metro@retail.com',
             'country' => 'US',
@@ -132,7 +132,7 @@ class DashboardSummaryApiTest extends TestCase
         ]);
 
         $json = $response->json();
-        $this->assertEquals('MetroRetail', $json['top_app_bar']['store_name']);
+        $this->assertEquals('Zoom Sales CRM & Inventory', $json['top_app_bar']['store_name']);
         $this->assertEquals('Alex Johnson', $json['top_app_bar']['user']['name']);
         $this->assertEquals('AJ', $json['top_app_bar']['user']['initials']);
         $this->assertStringContainsString('Alex Johnson', $json['greeting']['title']);

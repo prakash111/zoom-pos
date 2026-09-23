@@ -44,10 +44,10 @@
         <div class="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-200 pb-8">
             <div class="space-y-1.5">
                 <div class="text-2xl font-black tracking-tight text-blue-600 flex items-center gap-2">
-                    <span>⚡ {{ $branding?->platform_name ?? 'Smart Inventory & POS Platform' }}</span>
+                    <span>⚡ {{ $branding?->platform_name ?? 'Zoom Sales CRM & Inventory' }}</span>
                 </div>
                 <div class="text-xs text-slate-500 font-medium">
-                    {{ $invoice->seller_details['legal_name'] ?? 'Smart Inventory SaaS Solutions Inc.' }}
+                    {{ $invoice->seller_details['legal_name'] ?? 'Zoom Sales CRM & Inventory' }}
                 </div>
                 <div class="text-xs text-slate-500 font-mono">
                     GSTIN / Tax ID: <span class="font-bold text-slate-800">{{ $invoice->seller_details['tax_id'] ?? 'GSTIN-PLATFORM-2026-991A' }}</span>
@@ -138,7 +138,7 @@
             <div class="text-xs text-slate-500 space-y-1.5 max-w-sm">
                 <div class="font-bold text-slate-800 uppercase tracking-wider text-[10px]">Payment & Compliance Notes</div>
                 <p class="leading-relaxed">
-                    This is a computer-generated official tax invoice for subscription software services provided by {{ $branding?->platform_name ?? 'Smart Inventory SaaS Platform' }}.
+                    This is a computer-generated official tax invoice for subscription software services provided by {{ $branding?->platform_name ?? 'Zoom Sales CRM & Inventory' }}.
                 </p>
                 @if ($invoice->payment_reference)
                     <div class="font-mono text-[10px] text-slate-400">Ref: {{ $invoice->payment_reference }}</div>
@@ -185,7 +185,7 @@
         <!-- Footer Seal / Signature -->
         <div class="pt-8 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-400 gap-4">
             <div>
-                Thank you for choosing {{ $branding?->platform_name ?? 'Smart Inventory & POS SaaS' }}!
+                Thank you for choosing {{ $branding?->platform_name ?? 'Zoom Sales CRM & Inventory' }}!
             </div>
             <div class="text-center sm:text-right">
                 <div class="font-bold text-slate-800 uppercase tracking-widest text-[10px]">Authorized Digital Signature</div>

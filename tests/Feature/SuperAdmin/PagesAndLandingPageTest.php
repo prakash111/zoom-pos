@@ -223,7 +223,7 @@ class PagesAndLandingPageTest extends TestCase
         $this->actingAsSuperAdmin();
 
         Livewire::test(SettingsIndex::class)
-            ->set('platformName', 'Zoom POS')
+            ->set('platformName', 'Zoom Sales CRM & Inventory')
             ->set('landingPlaystoreEnabled', true)
             ->set('landingPlaystoreUrl', 'https://play.google.com/store/apps/details?id=com.zoom.pos')
             ->set('landingWindowsEnabled', true)

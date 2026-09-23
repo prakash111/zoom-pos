@@ -186,7 +186,7 @@ class OtpVerificationService
         Mail::to($email)->send(new OtpVerificationMail(
             otp: $otp,
             recipientName: $recipientName,
-            platformName: $branding->platform_name ?: config('app.name', 'Smart Inventory & Sales'),
+            platformName: $branding->platform_name ?: config('app.name', 'Zoom Sales CRM & Inventory'),
             validMinutes: self::OTP_EXPIRY_MINUTES,
             fromEmail: $branding->smtp_from_address ?: ($branding->support_email ?: config('mail.from.address')),
             fromSenderName: $branding->smtp_from_name ?: ($branding->platform_name ?: config('mail.from.name')),

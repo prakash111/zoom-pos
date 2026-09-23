@@ -2,7 +2,7 @@
     "$schema": "https://www.schemastore.org/package.json",
     "name": "zoom-pos",
     "version": "1.1.0",
-    "description": "Zoom POS secure Windows web application",
+    "description": "Zoom Sales CRM & Inventory secure Windows web application",
     "homepage": "https://saas.zoomnearby.com",
     "author": {
         "name": "ZoomNearby",

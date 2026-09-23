@@ -104,7 +104,7 @@
                 <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">{{ __("Email From Name (Sender Name) *") }}</label>
                 <input type="text"
                        wire:model="smtpFromName"
-                       placeholder="{{ __("Smart Inventory Platform, SaaS Billing…") }}"
+                       placeholder="{{ __("Zoom Sales CRM & Inventory") }}"
                        class="w-full rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm focus:ring-indigo-500 focus:border-indigo-500 font-medium">
                 <p class="text-[11px] text-slate-400 mt-1">{{ __("Brand or company name displayed to recipients.") }}</p>
                 @error('smtpFromName') <p class="text-rose-600 text-xs mt-1">{{ $message }}</p> @enderror

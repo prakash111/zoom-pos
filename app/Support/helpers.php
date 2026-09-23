@@ -60,7 +60,7 @@ if (! function_exists('get_appearance_settings')) {
             'landing_primary_color' => $branding->landing_primary_color ?? '#10b981',
             'landing_accent_color' => $branding->landing_accent_color ?? '#d7f24e',
             'superadmin_sidebar_color' => $branding->superadmin_sidebar_color ?? '#4338ca',
-            'platform_name' => $branding->platform_name ?? config('app.name', 'Smart Inventory & Sales'),
+            'platform_name' => $branding->platform_name ?? config('app.name', 'Zoom Sales CRM & Inventory'),
             'logo_url' => $branding->logo_url,
             'favicon_url' => $branding->favicon_url,
             'support_email' => $branding->support_email,

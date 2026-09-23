@@ -349,8 +349,8 @@ class TenantProvisioningService
         $branding = PlatformBranding::current();
 
         $sellerDetails = [
-            'company_name' => $branding?->platform_name ?? 'Smart Inventory & POS SaaS',
-            'legal_name' => $branding?->platform_name ?? 'Smart Inventory Platform Inc.',
+            'company_name' => $branding?->platform_name ?? 'Zoom Sales CRM & Inventory',
+            'legal_name' => $branding?->platform_name ?? 'Zoom Sales CRM & Inventory',
             'tax_id' => 'GSTIN-PLATFORM-2026-991A',
             'support_email' => $branding?->support_email ?? 'support@example.com',
             'support_phone' => $branding?->support_phone ?? '+1 (800) 555-0199',

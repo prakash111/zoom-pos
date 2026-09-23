@@ -84,7 +84,7 @@ class BrandingAndSmtpTest extends TestCase
         $this->actingAsSuperAdmin();
 
         Livewire::test(BrandingIndex::class)
-            ->set('platformName', 'ZoomNearby POS & Inventory')
+            ->set('platformName', 'Zoom Sales CRM & Inventory')
             ->set('superadminSidebarColor', '#0f766e')
             ->set('landingPrimaryColor', '#059669')
             ->set('landingAccentColor', '#84cc16')
@@ -99,7 +99,7 @@ class BrandingAndSmtpTest extends TestCase
             ->assertHasNoErrors();
 
         $branding = PlatformBranding::current();
-        $this->assertSame('ZoomNearby POS & Inventory', $branding->platform_name);
+        $this->assertSame('Zoom Sales CRM & Inventory', $branding->platform_name);
         $this->assertSame('#0f766e', $branding->superadmin_sidebar_color);
         $this->assertSame('#059669', $branding->landing_primary_color);
         $this->assertSame('#84cc16', $branding->landing_accent_color);

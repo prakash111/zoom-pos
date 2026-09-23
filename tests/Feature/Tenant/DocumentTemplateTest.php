@@ -32,7 +32,7 @@ class DocumentTemplateTest extends TestCase
         $this->company = Company::create([
             'id' => 'comp-template-test-01',
             'name' => 'Metro Retail Mart',
-            'trade_name' => 'MetroRetail',
+            'trade_name' => 'Zoom Sales CRM & Inventory',
             'slug' => 'metro-retail-mart-templates',
             'email' => 'metro@retail.com',
             'country' => 'US',
@@ -84,7 +84,7 @@ class DocumentTemplateTest extends TestCase
                 'terms_conditions' => 'Strict 14-day warranty return policy.',
                 'show_qr_code' => '1',
                 'show_tax_breakup' => '1',
-                'footer_notes' => 'Thank you for shopping at MetroRetail!',
+                'footer_notes' => 'Thank you for shopping at Zoom Sales CRM & Inventory!',
                 'send_as_attachment' => '0',
                 'send_text_with_link' => '1',
                 'message_body_template' => 'Hi {customer_name}! Your invoice #{invoice_number} for {amount} is here: {document_link}',

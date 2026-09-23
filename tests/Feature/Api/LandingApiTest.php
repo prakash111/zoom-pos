@@ -17,7 +17,7 @@ class LandingApiTest extends TestCase
     public function test_public_landing_api_returns_all_sections(): void
     {
         PlatformBranding::current()->update([
-            'platform_name' => 'ZoomPOS Enterprise',
+            'platform_name' => 'Zoom Sales CRM & Inventory',
             'support_phone' => '+918535075196',
             'support_email' => 'support@zoomnearby.com',
         ]);
@@ -39,7 +39,7 @@ class LandingApiTest extends TestCase
 
             $response->assertOk()
                 ->assertJsonPath('success', true)
-                ->assertJsonPath('branding.platform_name', 'ZoomPOS Enterprise')
+                ->assertJsonPath('branding.platform_name', 'Zoom Sales CRM & Inventory')
                 ->assertJsonPath('branding.support_phone', '+918535075196')
                 ->assertJsonPath('branding.support_whatsapp', '+918535075196')
                 ->assertJsonPath('branding.support_email', 'support@zoomnearby.com')

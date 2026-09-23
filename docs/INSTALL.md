@@ -1,6 +1,6 @@
 # Installation & Deployment
 
-Zoom POS SaaS is a standard Laravel 13 application. It ships with a browser
+Zoom Sales CRM & Inventory is a standard Laravel 13 application. It ships with a browser
 installer (`/install`) and can also be installed from the command line.
 
 ## 1. Server requirements

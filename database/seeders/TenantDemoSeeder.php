@@ -23,7 +23,7 @@ class TenantDemoSeeder extends Seeder
 
         if ($companies->isEmpty()) {
             $company = Company::create([
-                'name' => 'Zoom POS & Market',
+                'name' => 'Zoom Sales CRM & Inventory',
                 'trade_name' => 'Zoom Fresh Supermarket & Cafe',
                 'slug' => 'demo',
                 'email' => 'store@zoommarket.test',

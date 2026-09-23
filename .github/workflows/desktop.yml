@@ -1,4 +1,4 @@
-name: Zoom POS Desktop
+name: Zoom Sales CRM & Inventory Desktop
 on:
   workflow_dispatch:
   push:

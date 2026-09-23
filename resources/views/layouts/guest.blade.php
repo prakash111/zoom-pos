@@ -5,7 +5,7 @@
     $branding = \App\Models\PlatformBranding::current();
     $dynamicLogo = \App\Models\DynamicSetting::get('platform_logo_url');
     $dynamicName = \App\Models\DynamicSetting::get('platform_brand_name');
-    $guestBrandName = $guestTenantCompany?->trade_name ?: ($guestTenantCompany?->name ?: ($dynamicName ?: ($branding?->platform_name ?? config('app.name', 'Smart Inventory'))));
+    $guestBrandName = $guestTenantCompany?->trade_name ?: ($guestTenantCompany?->name ?: ($dynamicName ?: ($branding?->platform_name ?? config('app.name', 'Zoom Sales CRM & Inventory'))));
     $guestLogoUrl = $guestTenantCompany?->getLogoUrl() ?: ($dynamicLogo ?: $branding?->getLogoPublicUrl());
     $guestFaviconUrl = $guestTenantCompany?->favicon ?: ($branding?->getFaviconPublicUrl() ?: $branding?->favicon_url);
     $guestLocService = app(\App\Services\Localization\LocalizationService::class);

@@ -316,7 +316,7 @@ class Index extends Component
         }
 
         // Load Platform System Settings
-        $this->appName = (string) PlatformSystem::get('app_name', config('app.name', 'Smart Inventory & Sales'));
+        $this->appName = (string) PlatformSystem::get('app_name', config('app.name', 'Zoom Sales CRM & Inventory'));
         $this->platformDefaultCurrency = PlatformRegionalService::defaultCurrency();
         $this->platformDefaultLanguage = PlatformRegionalService::defaultLanguage();
         $this->platformDefaultTimezone = PlatformRegionalService::defaultTimezone();
@@ -344,7 +344,7 @@ class Index extends Component
 
         // Load Platform Branding & SMTP
         $branding = PlatformBranding::current();
-        $this->platformName = (string) ($branding->platform_name ?: 'Smart Inventory & Sales');
+        $this->platformName = (string) ($branding->platform_name ?: 'Zoom Sales CRM & Inventory');
         $this->logoUrl = (string) ($branding->logo_url ?: \App\Models\DynamicSetting::get('platform_logo_url', ''));
         $this->faviconUrl = (string) $branding->favicon_url;
         $this->showAuthBanner = (bool) \App\Models\DynamicSetting::get('show_auth_banner', false);

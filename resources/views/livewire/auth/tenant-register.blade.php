@@ -113,7 +113,7 @@
                                 <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{{ __('Create Your Store') }}</h2>
                             </div>
                             <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                {{ __('Start your 14-day free trial and experience the power of ZoomNearby POS & Inventory Management.') }}
+                                {{ __('Start your 14-day free trial and experience the power of Zoom Sales CRM & Inventory.') }}
                             </p>
                         </div>
                     </div>

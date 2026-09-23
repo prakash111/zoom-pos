@@ -169,7 +169,7 @@ class PlatformBranding extends Model
 
         return [
             'platform' => [
-                'name' => $this->platform_name ?: config('app.name', 'POS Systems'),
+                'name' => $this->platform_name ?: config('app.name', 'Zoom Sales CRM & Inventory'),
                 // Purely Superadmin-authored — no app-side default marketing
                 // copy. `null` tells the client to render nothing.
                 'headline' => $this->auth_headline ?: null,
@@ -678,7 +678,7 @@ class PlatformBranding extends Model
     public static function current(): self
     {
         return static::query()->firstOrCreate(['id' => 1], [
-            'platform_name' => 'Smart Inventory & Sales',
+            'platform_name' => 'Zoom Sales CRM & Inventory',
             'superadmin_sidebar_color' => '#4338ca',
             'landing_primary_color' => '#10b981',
             'landing_accent_color' => '#d7f24e',

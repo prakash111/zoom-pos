@@ -1647,7 +1647,7 @@
             <!-- Bottom Copyright & Safe Payment Badges -->
             <div class="pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
                 <div>
-                    &copy; {{ date('Y') }} {{ $company->name }}. {{ __('All rights reserved. Powered by ZoomPOS.') }}
+                    &copy; {{ date('Y') }} {{ $company->name }}. {{ __('All rights reserved. Powered by Zoom Sales CRM & Inventory.') }}
                 </div>
                 <div class="flex items-center gap-3 font-semibold text-[11px]">
                     <span class="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">🛡️ {{ __('100% Secure Checkout') }}</span>

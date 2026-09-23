@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Zoom POS — Dual-Mode Standalone Client</title>
+    <title>Zoom Sales CRM & Inventory — Dual-Mode Standalone Client</title>
     <link rel="icon" type="image/png" href="/launcher.png">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
@@ -27,7 +27,7 @@
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="text-xs font-black tracking-wide text-white uppercase">Zoom POS</h1>
+                        <h1 class="text-xs font-black tracking-wide text-white uppercase">Zoom Sales CRM & Inventory</h1>
                         <span class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px] font-bold">Dual-Mode</span>
                     </div>
                     <p class="text-[10px] text-slate-400 font-mono" x-text="statusText"></p>

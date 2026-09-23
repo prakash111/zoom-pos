@@ -34,7 +34,7 @@ class SduiViewController extends Controller
                 $company = $this->resolveCompany($request);
             } catch (\Throwable $e) {
                 $company = Company::query()->first() ?? new Company([
-                    'name' => config('app.name', 'ZoomNearby POS'),
+                    'name' => config('app.name', 'Zoom Sales CRM & Inventory'),
                     'currency_symbol' => '$',
                 ]);
             }

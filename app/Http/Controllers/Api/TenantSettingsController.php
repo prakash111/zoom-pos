@@ -100,7 +100,7 @@ class TenantSettingsController extends Controller
             ?? $request->input('recipient')
             ?? '+918041118080';
 
-        $testMessage = 'Test message from ZoomNearby POS CRM. Custom Android SMS Gateway connected successfully! Time: ' . now()->format('Y-m-d H:i:s');
+        $testMessage = 'Test message from Zoom Sales CRM & Inventory. Custom Android SMS Gateway connected successfully! Time: ' . now()->format('Y-m-d H:i:s');
 
         $result = SmsGatewayService::send($recipient, $testMessage, $tenantId);
 

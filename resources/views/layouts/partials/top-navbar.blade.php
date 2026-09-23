@@ -3,12 +3,12 @@
         @if(Route::has('tenant.dashboard'))
             <a href="{{ route('tenant.dashboard') }}" wire:navigate class="flex items-center gap-2.5 font-black text-sm text-white hover:opacity-90 transition">
                 <span class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-base shadow-sm">⚡</span>
-                <span class="tracking-tight">{{ auth()->user()?->company?->name ?? config('app.name', 'Zoom POS & Market') }}</span>
+                <span class="tracking-tight">{{ auth()->user()?->company?->name ?? config('app.name', 'Zoom Sales CRM & Inventory') }}</span>
             </a>
         @else
             <a href="{{ url('/') }}" wire:navigate class="flex items-center gap-2.5 font-black text-sm text-white hover:opacity-90 transition">
                 <span class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-base shadow-sm">⚡</span>
-                <span class="tracking-tight">{{ config('app.name', 'Zoom POS & Market') }}</span>
+                <span class="tracking-tight">{{ config('app.name', 'Zoom Sales CRM & Inventory') }}</span>
             </a>
         @endif
     </div>

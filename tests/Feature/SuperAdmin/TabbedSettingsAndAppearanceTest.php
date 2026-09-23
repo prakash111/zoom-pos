@@ -337,7 +337,7 @@ class TabbedSettingsAndAppearanceTest extends TestCase
             } elseif ($theme === 'theme_dark_studio') {
                 $response->assertSee('Dark Studio POS');
             } else {
-                $response->assertSee('Smart Inventory & Sales');
+                $response->assertSee('Zoom Sales CRM & Inventory');
             }
         }
     }

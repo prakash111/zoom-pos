@@ -9,7 +9,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $title ?? 'Super Admin' }} — {{ config('app.name', 'Smart Inventory & Sales') }}</title>
+    <title>{{ $title ?? 'Super Admin' }} — {{ config('app.name', 'Zoom Sales CRM & Inventory') }}</title>
     @php
         $branding = \App\Models\PlatformBranding::current();
         $saSidebarColor = $branding->superadmin_sidebar_color ?: '#4338ca';

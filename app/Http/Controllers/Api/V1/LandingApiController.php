@@ -46,7 +46,7 @@ class LandingApiController extends Controller
                 'default_country_iso' => PlatformRegionalService::defaultCountryIso(),
             ],
             'branding' => [
-                'platform_name' => $branding->platform_name ?: config('app.name', 'Smart Inventory & Sales'),
+                'platform_name' => $branding->platform_name ?: config('app.name', 'Zoom Sales CRM & Inventory'),
                 'logo_url' => $branding->getLogoPublicUrl(),
                 'favicon_url' => $branding->getFaviconPublicUrl(),
                 'primary_color' => $branding->landing_primary_color ?: ($branding->primary_color ?: '#4f46e5'),

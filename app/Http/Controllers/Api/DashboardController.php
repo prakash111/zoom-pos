@@ -106,7 +106,7 @@ class DashboardController extends Controller
         }
 
         $currency = $company->currency_symbol ?: ($company->currency ?: '$');
-        $storeName = $company->trade_name ?: ($company->name ?: 'MetroRetail');
+        $storeName = $company->trade_name ?: ($company->name ?: 'Zoom Sales CRM & Inventory');
         $tagline = 'Smarter Retail. Faster Growth.';
         $logoUrl = $company->logo ? asset($company->logo) : null;
 

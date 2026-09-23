@@ -22,7 +22,7 @@ class DemoEnvironmentResetSeeder extends Seeder
     public const PASSWORD = 'demo1234';
 
     private const DEMOS = [
-        ['slug' => 'tenant-demo-all-enterprise', 'name' => 'ZoomNearby Enterprise Demo', 'email' => 'demo@zoomnearby.com', 'alias' => 'allmodules.demo@zoomnearby.com', 'mode' => 'retail'],
+        ['slug' => 'tenant-demo-all-enterprise', 'name' => 'Zoom Sales CRM & Inventory Demo', 'email' => 'demo@zoomnearby.com', 'alias' => 'allmodules.demo@zoomnearby.com', 'mode' => 'retail'],
         ['slug' => 'tenant-demo-retail', 'name' => 'Metro Retail Mart', 'email' => 'retail.demo@zoomnearby.com', 'mode' => 'retail'],
         ['slug' => 'tenant-demo-restaurant', 'name' => 'Urban Bistro & Cafe', 'email' => 'restaurant.demo@zoomnearby.com', 'mode' => 'restaurant'],
         ['slug' => 'tenant-demo-pharmacy', 'name' => 'CareWell Chemist & Pharmacy', 'email' => 'pharmacy.demo@zoomnearby.com', 'mode' => 'pharmacy'],

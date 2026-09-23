@@ -143,7 +143,7 @@ class LandingSectionsThemePaletteTest extends TestCase
     public function test_public_landing_page_renders_css_variables_and_semantic_classes(): void
     {
         PlatformBranding::firstOrCreate([], [
-            'platform_name' => 'Zoom POS',
+            'platform_name' => 'Zoom Sales CRM & Inventory',
             'landing_page_enabled' => true,
         ]);
 
@@ -291,7 +291,7 @@ class LandingSectionsThemePaletteTest extends TestCase
     public function test_light_theme_renders_semantic_classes_and_scoped_dark_sections(): void
     {
         $branding = PlatformBranding::firstOrCreate([], [
-            'platform_name' => 'Zoom POS',
+            'platform_name' => 'Zoom Sales CRM & Inventory',
             'landing_page_enabled' => true,
         ]);
         $branding->update([

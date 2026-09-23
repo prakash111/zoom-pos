@@ -235,7 +235,7 @@ class MenuBuilderTest extends TestCase
     public function test_public_layout_renders_dynamic_header_and_footer_menu_items(): void
     {
         PlatformBranding::create([
-            'platform_name' => 'ZoomNearby POS',
+            'platform_name' => 'Zoom Sales CRM & Inventory',
             'landing_page_enabled' => true,
         ]);
 

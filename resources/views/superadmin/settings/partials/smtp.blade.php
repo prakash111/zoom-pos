@@ -96,7 +96,7 @@
                 </label>
                 <input type="text"
                        wire:model="smtpFromName"
-                       placeholder="Smart Inventory & Sales"
+                       placeholder="Zoom Sales CRM & Inventory"
                        class="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
                 <p class="text-[10px] text-slate-400">{{ __('Brand or company name displayed to recipients.') }}</p>
                 @error('smtpFromName') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror

@@ -16,7 +16,7 @@ class OtpVerificationMail extends Mailable
     public function __construct(
         public string $otp,
         public string $recipientName = 'Store Administrator',
-        public string $platformName = 'Smart Inventory & Sales',
+        public string $platformName = 'Zoom Sales CRM & Inventory',
         public int $validMinutes = 15,
         public ?string $fromEmail = null,
         public ?string $fromSenderName = null,

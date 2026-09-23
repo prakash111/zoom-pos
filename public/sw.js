@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoom-pos-static-v1';
+const CACHE_VERSION = 'zoom-pos-static-v2';
 const OFFLINE_URL = '/offline.html';
 const PRECACHE = [
     OFFLINE_URL,
