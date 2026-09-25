@@ -1,12 +1,12 @@
 // Generated bundled translations for Zoom Sales POS Landing Page
 // Supports zero-latency switching with fallback to Laravel API & English originals.
-import '../../locale/translations_cache.dart';
+import 'package:zoom_pos_mobile/core/services/translations_cache.dart';
 
 class LandingTranslations {
   LandingTranslations._();
 
-  static String tr(String text, {required String localeCode}) {
-    final code = localeCode.toLowerCase().trim();
+  static String tr(String text, [String? localeCode]) {
+    final code = (localeCode ?? 'en').toLowerCase().trim();
     if (code.isEmpty || code == 'en') {
       return text;
     }

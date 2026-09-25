@@ -7,7 +7,7 @@ import '../../../core/config/countries.dart';
 import '../../../widgets/inputs/phone_number_field.dart';
 import '../models/landing_data.dart';
 import '../models/landing_translations.dart';
-import '../../locale/locale_provider.dart';
+import 'package:zoom_pos_mobile/core/config/locale_provider.dart';
 import '../services/contact_form_service.dart';
 
 class InteractiveContactForm extends StatefulWidget {
@@ -204,9 +204,8 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
   @override
   Widget build(BuildContext context) {
     final localeProvider = Provider.of<LocaleProvider>(context);
-    final localeCode = localeProvider.currentLocale.languageCode;
-    String _t(String text) =>
-        LandingTranslations.tr(text, localeCode: localeCode);
+    final localeCode = localeProvider.locale.languageCode;
+    String _t(String text) => LandingTranslations.tr(text, localeCode);
 
     return Container(
       padding: const EdgeInsets.all(32),
