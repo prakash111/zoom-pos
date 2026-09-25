@@ -57,10 +57,10 @@ class _SplitNavigationTileState extends State<SplitNavigationTile> {
   }
 
   void _handleTileTap() {
-    if (widget.children.isNotEmpty) {
-      _toggleExpanded();
-    } else if (widget.onTap != null) {
+    if (widget.onTap != null) {
       widget.onTap!();
+    } else if (widget.children.isNotEmpty) {
+      _toggleExpanded();
     }
   }
 
