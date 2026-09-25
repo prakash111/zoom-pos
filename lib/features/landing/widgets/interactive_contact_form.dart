@@ -203,8 +203,13 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
 
   @override
   Widget build(BuildContext context) {
-    final localeProvider = Provider.of<LocaleProvider>(context);
-    final localeCode = localeProvider.locale.languageCode;
+    LocaleProvider? localeProvider;
+    try {
+      localeProvider = Provider.of<LocaleProvider>(context);
+    } catch (_) {
+      localeProvider = null;
+    }
+    final localeCode = localeProvider?.locale.languageCode ?? 'en';
     String _t(String text) => LandingTranslations.tr(text, localeCode);
 
     return Container(
