@@ -131,6 +131,7 @@ void main() {
         'ada@corner.test');
     await tester.enterText(
         find.widgetWithText(TextFormField, 'Create a password'), 'sup3rsecret');
+    await tester.ensureVisible(find.text('Continue'));
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 
@@ -140,8 +141,10 @@ void main() {
     await tester.enterText(
         find.widgetWithText(TextFormField, 'Enter your business name'),
         'Corner Cafe');
+    await tester.ensureVisible(find.text('Restaurant'));
     await tester.tap(find.text('Restaurant'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Continue'));
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 
@@ -151,6 +154,7 @@ void main() {
     expect(find.text('Create store'), findsOneWidget);
 
     // Country is required — submitting without it is blocked.
+    await tester.ensureVisible(find.text('Create store'));
     await tester.tap(find.text('Create store'));
     await tester.pumpAndSettle();
     expect(api.capturedRegister, isNull);
@@ -164,6 +168,7 @@ void main() {
     await tester.tap(find.text('Brazil (BR)').last);
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Create store'));
     await tester.tap(find.text('Create store'));
     await tester.pumpAndSettle();
 
