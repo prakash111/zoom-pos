@@ -1857,132 +1857,24 @@ class LandingTranslations {
       '▼ Configure': '▼ تهيئة',
       '🍽️ Dining & Food POS': '🍽️ نقطة بيع المطاعم والأطعمة',
       '🏪 Retail & Barcode POS': '🏪 نقطة بيع التجزئة والباركود',
-      '360-degree customer purchasing profiles, contact directories, and buying habits
-Sales lead management pipeline with activity logging, follow-up reminders, and stage tracking
-Automated customer loyalty reward points that accumulate and redeem at checkout
-Benefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': 'ملفات تعريف الشراء للعملاء بزاوية 360 درجة، وأدلة الاتصال، وعادات الشراء
-خط أنابيب لإدارة المبيعات مع تسجيل الأنشطة وتذكيرات المتابعة وتتبع المرحلة
-نقاط مكافأة ولاء العملاء الآلية التي يتم تجميعها واستردادها عند الخروج
-الفائدة: تعزيز القيمة الدائمة للعميل (LTV) ومتوسط قيمة الطلب (AOV) بنسبة 25% من خلال امتيازات الولاء الشخصية.',
-      'Branch, cashier, and staff sales target monitoring with real-time achievement progress
-Live Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics
-Top-selling products, category contribution, and dead-stock identification
-Benefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'مراقبة أهداف مبيعات الفروع وأمين الصندوق والموظفين مع تقدم الإنجاز في الوقت الفعلي
-بيانات الربح والخسارة المباشرة (P&L)، وإجمالي الهوامش، وتحليلات تكلفة البضائع المباعة (COGS)
-المنتجات الأكثر مبيعًا، ومساهمة الفئة، وتحديد المخزون الميت
-الفائدة: يمنح أصحاب الأعمال وضوحًا ماليًا بنسبة 100% لتقليص الخطوط ذات الأداء الضعيف وزيادة صافي الربحية إلى أقصى حد.',
-      'Centralized catalog management with branch-specific pricing and localized tax rates
-Inter-branch stock transfer requests with transit tracking and receiving audits
-Consolidated corporate reports with isolated tenant workspace security
-Benefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'إدارة مركزية للكتالوجات مع تسعير خاص بالفرع ومعدلات ضرائب محلية
-طلبات نقل المخزون بين الفروع مع تتبع النقل واستلام عمليات التدقيق
-تقارير الشركة الموحدة مع أمان مساحة عمل المستأجر المعزول
-الفائدة: يمكنك التوسع بسهولة من متجر حي واحد إلى مئات مواقع الامتياز في جميع أنحاء البلاد.',
-      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)
-Device serial number/IMEI tracking, intake diagnostic notes, and warranty logs
-Integrated spare parts inventory deduction and technician labor invoicing
-Benefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'دورة حياة الإصلاح الكاملة (تم الاستلام -> التشخيص -> الأجزاء المطلوبة -> جاهزة -> تم التسليم)
-الرقم التسلسلي للجهاز/تتبع IMEI، وملاحظات تشخيصية، وسجلات الضمان
-خصم مخزون قطع الغيار المتكامل وفواتير العمالة الفنية
-الفائدة: إطلاق إيرادات خدمات الإصلاح ذات الهامش المرتفع لمتاجر الإلكترونيات والكمبيوتر والدراجات بشفافية كاملة.',
-      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes
-One-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF
-Thermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices
-Benefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'يتم إنشاء فواتير ضريبية متوافقة تلقائيًا مع تفاصيل ضريبية مفصلة وأكواد HSN/SAC
-إرسال فوري بنقرة واحدة إلى العميل عبر تطبيق WhatsApp والرسائل النصية القصيرة والبريد الإلكتروني باستخدام ملف PDF يحمل العلامة التجارية
-الإيصالات الحرارية (58 مم/80 مم) جنبًا إلى جنب مع الفواتير الضريبية بتنسيق A4 PDF الخاصة بالمؤسسة
-الفائدة: امتثال بنسبة 100% للضرائب والتدقيق، وعدم هدر الورق، ومعدلات فتح إيصالات WhatsApp بنسبة 98% لإعادة مشاركة العملاء.',
-      'Customer credit limits, balance statements, and aged receivables tracking
-Supplier purchase bills, payment schedules, and outstanding ledger balances
-Comprehensive transaction history and automated debit/credit balancing
-Benefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'حدود ائتمان العملاء وبيانات الرصيد وتتبع المستحقات القديمة
-فواتير شراء الموردين وجداول الدفع وأرصدة دفتر الأستاذ المستحقة
-سجل المعاملات الشامل والموازنة الآلية للخصم/الائتمان
-الفائدة: تعظيم رؤية رأس المال العامل، وتقليل الديون المعدومة، والحفاظ على شروط تجارية قوية للموردين.',
-      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion
-Direct ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet
-Runs on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones
-Benefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'تطبيق أصلي مخصص لنظام Android APK وسطح مكتب Windows للانغماس في العداد بملء الشاشة
-اتصال مباشر بالطابعة الحرارية ESC/POS عبر USB وBluetooth وLAN/Ethernet
-يعمل على الأجهزة الموجودة - الأجهزة اللوحية، أو محطات نقاط البيع الشاملة، أو أجهزة الكمبيوتر المحمولة، أو الهواتف المحمولة
-الفائدة: لا توجد أقفال خاصة باهظة الثمن للأجهزة - مما يوفر الآلاف من تكاليف الإعداد والصيانة الأولية.',
-      'Full counter operations, barcode search, cart calculations, and receipt printing without internet
-Automatic background synchronization on reconnect with tamper-proof duplicate prevention
-Continuous local data caching so tills never freeze during network cuts
-Benefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'عمليات العداد كاملة وبحث الباركود وحسابات العربة وطباعة الإيصالات بدون إنترنت
-مزامنة خلفية تلقائية عند إعادة الاتصال مع منع التكرارات المقاومة للتلاعب
-التخزين المؤقت المستمر للبيانات المحلية حتى لا تتجمد عمليات التخزين أبدًا أثناء انقطاع الشبكة
-الفائدة: صفر توقف عن العمل وصفر مبيعات مفقودة عندما ينقطع الإنترنت خلال ساعات الذروة للتسوق.',
-      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)
-Device authorization and terminal registration to prevent unauthorized logins
-Tamper-proof audit trails for every price override, discount, held cart, and refund
-Benefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'أذونات تفصيلية لكل وحدة (أمين الصندوق، مديري المتاجر، كتبة المخزون، المحاسبين)
-ترخيص الجهاز وتسجيل المحطة لمنع عمليات تسجيل الدخول غير المصرح بها
-مسارات تدقيق مقاومة للتلاعب لكل تجاوز للسعر، وخصم، وعربة التسوق، واسترداد الأموال
-الفائدة: يحمي هوامش الربح من إساءة استخدام خصم أمين الصندوق ويحافظ على امتثال العمليات بشكل صارم.',
-      'Instant mobile-friendly digital storefront with category & brand filtering
-One-click WhatsApp product link & cart sharing for direct social commerce
-Direct QR code ordering with instant payment gateway integration
-Benefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'واجهة متجر رقمية فورية متوافقة مع الأجهزة المحمولة مع تصفية الفئات والعلامات التجارية
-رابط منتج WhatsApp ومشاركة سلة التسوق بنقرة واحدة للتجارة الاجتماعية المباشرة
-طلب رمز الاستجابة السريعة المباشر مع تكامل بوابة الدفع الفوري
-الفائدة: إطلاق التجارة الإلكترونية في دقائق، وجذب المشترين عبر الإنترنت بدون رسوم سوق، ومزامنة الطلبات تلقائيًا.',
-      'Millisecond barcode scanning with quick-access visual favorites & held carts
-Multi-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)
-High-speed thermal receipt printing with automated cash drawer kick pulse
-Benefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'مسح الباركود بالمللي ثانية باستخدام المفضلات المرئية سريعة الوصول والعربات المحمولة
-مدفوعات مقسمة متعددة المناقصات (نقدًا، وبطاقة، وواجهة الدفعات الموحدة (UPI)، ومحافظ، وائتمان متجر العميل)
-طباعة إيصالات حرارية عالية السرعة مع خاصية الدفع التلقائي لدرج النقود
-الفائدة: التخلص من اختناقات الخروج في الكاونتر، والتعامل مع حشود الذروة في العطلات دون عناء، وزيادة المبيعات بشكل أسرع 3 مرات.',
-      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts
-Automated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability
-Real-time cash variance detection that isolates discrepancies per drawer
-Benefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'فتح تسجيل تعويم النقدية، وقسائم المصروفات النثرية المدفوعة / المدفوعة، والعد الأعمى
-تقارير X-Reports آلية في منتصف المناوبة وتقارير Z في نهاية اليوم مع إمكانية المساءلة لكل أمين صندوق
-كشف التباين النقدي في الوقت الحقيقي والذي يعزل التناقضات لكل درج
-الفائدة: إيقاف انكماش الدرج، ومنع سرقة الموظفين، وتقليل وقت إغلاق السجل اليومي من ساعات إلى دقائق.',
-      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring
-Prescription record management, doctor attribution, and patient dosage instructions
-Flexible unit conversions (box, strip, tablet, bottle) with batch-level costing
-Benefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'تتبع دفعة الأدوية الصيدلانية ودفعتها مع مراقبة صارمة لتاريخ انتهاء الصلاحية
-إدارة سجلات الوصفات الطبية، وإسناد الطبيب، وتعليمات جرعة المريض
-تحويلات مرنة للوحدات (الصندوق، الشريط، الجهاز اللوحي، الزجاجة) مع تحديد التكلفة على مستوى الدُفعة
-الفائدة: الامتثال الكامل للوائح الصحية، وعدم صرف أي أدوية منتهية الصلاحية، وتقليل الانكماش.',
-      'Professional quotation builder with customizable discounts, terms, and validity dates
-One-click automated conversion from Quote to confirmed Sale and Invoice
-Branded PDF downloads and direct customer sharing via email or messaging
-Benefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'منشئ عروض أسعار احترافي مع خصومات وشروط وتواريخ صلاحية قابلة للتخصيص
-تحويل آلي بنقرة واحدة من عرض الأسعار إلى البيع المؤكد والفاتورة
-تنزيل ملفات PDF ذات العلامة التجارية ومشاركة العملاء مباشرة عبر البريد الإلكتروني أو الرسائل
-الفائدة: تسريع عمليات إغلاق صفقات B2B والجملة، والتخلص من الإدخال اليدوي للبيانات المكررة، وتسريع التدفق النقدي.',
-      'Real-time stock synchronization across online store, physical shops, and central warehouses
-Batch, lot, and expiry date tracking with automatic low-stock reorder thresholds
-Inter-branch stock consignments and transfers with dispatch/receiving audit trails
-Benefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'مزامنة المخزون في الوقت الفعلي عبر المتجر عبر الإنترنت والمتاجر الفعلية والمستودعات المركزية
-تتبع الدفعة والدفعة وتاريخ انتهاء الصلاحية من خلال عتبات إعادة الطلب التلقائية للمخزون المنخفض
-شحنات ونقل المخزون بين الفروع مع مسارات تدقيق الإرسال/الاستلام
-الفائدة: يمنع الإفراط في البيع على الويب، ويزيل المخزونات، ويمنع رأس المال من حبس المخزون الزائد.',
-      'Visual appointment calendar with stylist/therapist scheduling and room assignment
-Service catalog with custom durations, add-on treatments, and pricing tiers
-Automatic stylist commission calculation based on completed services and retail product upsells
-Benefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'تقويم المواعيد المرئية مع جدولة المصمم/المعالج وتخصيص الغرفة
-كتالوج الخدمة يتضمن فترات مخصصة وعلاجات إضافية ومستويات تسعير
-حساب عمولة المصمم التلقائي بناءً على الخدمات المكتملة وزيادة مبيعات منتجات التجزئة
-الفائدة: القضاء على تضارب المواعيد، وتحسين استخدام الكرسي، وتحفيز الموظفين من خلال دفع عمولات دقيقة.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering â guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'مخططات أرضية الطاولة المرئية مع حالة الإشغال وتناول الطعام والفوترة
-طلب قائمة QR للجدول بدون تلامس - يقوم الضيوف بمسح وتصفح وطلب من الهواتف
-يتم توجيه تذاكر طلبات المطبخ (KOT) مباشرةً إلى شاشات نظام عرض المطبخ المباشر (KDS).
-الفائدة: تسريع دوران الطاولة بنسبة 35%، والقضاء على أخطاء ترتيب المطبخ، وخفض النفقات العامة لموظفي الانتظار.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering — guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'مخططات أرضية الطاولة المرئية مع حالة الإشغال وتناول الطعام والفوترة
-طلب قائمة QR على الطاولة بدون تلامس - يقوم الضيوف بالمسح والتصفح والطلب من الهواتف
-يتم توجيه تذاكر طلبات المطبخ (KOT) مباشرةً إلى شاشات نظام عرض المطبخ المباشر (KDS).
-الفائدة: تسريع دوران الطاولة بنسبة 35%، والقضاء على أخطاء ترتيب المطبخ، وخفض النفقات العامة لموظفي الانتظار.',
+      '360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': 'ملفات تعريف الشراء للعملاء بزاوية 360 درجة، وأدلة الاتصال، وعادات الشراء\nخط أنابيب لإدارة المبيعات مع تسجيل الأنشطة وتذكيرات المتابعة وتتبع المرحلة\nنقاط مكافأة ولاء العملاء الآلية التي يتم تجميعها واستردادها عند الخروج\nالفائدة: تعزيز القيمة الدائمة للعميل (LTV) ومتوسط قيمة الطلب (AOV) بنسبة 25% من خلال امتيازات الولاء الشخصية.',
+      'Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'مراقبة أهداف مبيعات الفروع وأمين الصندوق والموظفين مع تقدم الإنجاز في الوقت الفعلي\nبيانات الربح والخسارة المباشرة (P&L)، وإجمالي الهوامش، وتحليلات تكلفة البضائع المباعة (COGS)\nالمنتجات الأكثر مبيعًا، ومساهمة الفئة، وتحديد المخزون الميت\nالفائدة: يمنح أصحاب الأعمال وضوحًا ماليًا بنسبة 100% لتقليص الخطوط ذات الأداء الضعيف وزيادة صافي الربحية إلى أقصى حد.',
+      'Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'إدارة مركزية للكتالوجات مع تسعير خاص بالفرع ومعدلات ضرائب محلية\nطلبات نقل المخزون بين الفروع مع تتبع النقل واستلام عمليات التدقيق\nتقارير الشركة الموحدة مع أمان مساحة عمل المستأجر المعزول\nالفائدة: يمكنك التوسع بسهولة من متجر حي واحد إلى مئات مواقع الامتياز في جميع أنحاء البلاد.',
+      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'دورة حياة الإصلاح الكاملة (تم الاستلام -> التشخيص -> الأجزاء المطلوبة -> جاهزة -> تم التسليم)\nالرقم التسلسلي للجهاز/تتبع IMEI، وملاحظات تشخيصية، وسجلات الضمان\nخصم مخزون قطع الغيار المتكامل وفواتير العمالة الفنية\nالفائدة: إطلاق إيرادات خدمات الإصلاح ذات الهامش المرتفع لمتاجر الإلكترونيات والكمبيوتر والدراجات بشفافية كاملة.',
+      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'يتم إنشاء فواتير ضريبية متوافقة تلقائيًا مع تفاصيل ضريبية مفصلة وأكواد HSN/SAC\nإرسال فوري بنقرة واحدة إلى العميل عبر تطبيق WhatsApp والرسائل النصية القصيرة والبريد الإلكتروني باستخدام ملف PDF يحمل العلامة التجارية\nالإيصالات الحرارية (58 مم/80 مم) جنبًا إلى جنب مع الفواتير الضريبية بتنسيق A4 PDF الخاصة بالمؤسسة\nالفائدة: امتثال بنسبة 100% للضرائب والتدقيق، وعدم هدر الورق، ومعدلات فتح إيصالات WhatsApp بنسبة 98% لإعادة مشاركة العملاء.',
+      'Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'حدود ائتمان العملاء وبيانات الرصيد وتتبع المستحقات القديمة\nفواتير شراء الموردين وجداول الدفع وأرصدة دفتر الأستاذ المستحقة\nسجل المعاملات الشامل والموازنة الآلية للخصم/الائتمان\nالفائدة: تعظيم رؤية رأس المال العامل، وتقليل الديون المعدومة، والحفاظ على شروط تجارية قوية للموردين.',
+      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'تطبيق أصلي مخصص لنظام Android APK وسطح مكتب Windows للانغماس في العداد بملء الشاشة\nاتصال مباشر بالطابعة الحرارية ESC/POS عبر USB وBluetooth وLAN/Ethernet\nيعمل على الأجهزة الموجودة - الأجهزة اللوحية، أو محطات نقاط البيع الشاملة، أو أجهزة الكمبيوتر المحمولة، أو الهواتف المحمولة\nالفائدة: لا توجد أقفال خاصة باهظة الثمن للأجهزة - مما يوفر الآلاف من تكاليف الإعداد والصيانة الأولية.',
+      'Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'عمليات العداد كاملة وبحث الباركود وحسابات العربة وطباعة الإيصالات بدون إنترنت\nمزامنة خلفية تلقائية عند إعادة الاتصال مع منع التكرارات المقاومة للتلاعب\nالتخزين المؤقت المستمر للبيانات المحلية حتى لا تتجمد عمليات التخزين أبدًا أثناء انقطاع الشبكة\nالفائدة: صفر توقف عن العمل وصفر مبيعات مفقودة عندما ينقطع الإنترنت خلال ساعات الذروة للتسوق.',
+      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'أذونات تفصيلية لكل وحدة (أمين الصندوق، مديري المتاجر، كتبة المخزون، المحاسبين)\nترخيص الجهاز وتسجيل المحطة لمنع عمليات تسجيل الدخول غير المصرح بها\nمسارات تدقيق مقاومة للتلاعب لكل تجاوز للسعر، وخصم، وعربة التسوق، واسترداد الأموال\nالفائدة: يحمي هوامش الربح من إساءة استخدام خصم أمين الصندوق ويحافظ على امتثال العمليات بشكل صارم.',
+      'Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'واجهة متجر رقمية فورية متوافقة مع الأجهزة المحمولة مع تصفية الفئات والعلامات التجارية\nرابط منتج WhatsApp ومشاركة سلة التسوق بنقرة واحدة للتجارة الاجتماعية المباشرة\nطلب رمز الاستجابة السريعة المباشر مع تكامل بوابة الدفع الفوري\nالفائدة: إطلاق التجارة الإلكترونية في دقائق، وجذب المشترين عبر الإنترنت بدون رسوم سوق، ومزامنة الطلبات تلقائيًا.',
+      'Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'مسح الباركود بالمللي ثانية باستخدام المفضلات المرئية سريعة الوصول والعربات المحمولة\nمدفوعات مقسمة متعددة المناقصات (نقدًا، وبطاقة، وواجهة الدفعات الموحدة (UPI)، ومحافظ، وائتمان متجر العميل)\nطباعة إيصالات حرارية عالية السرعة مع خاصية الدفع التلقائي لدرج النقود\nالفائدة: التخلص من اختناقات الخروج في الكاونتر، والتعامل مع حشود الذروة في العطلات دون عناء، وزيادة المبيعات بشكل أسرع 3 مرات.',
+      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'فتح تسجيل تعويم النقدية، وقسائم المصروفات النثرية المدفوعة / المدفوعة، والعد الأعمى\nتقارير X-Reports آلية في منتصف المناوبة وتقارير Z في نهاية اليوم مع إمكانية المساءلة لكل أمين صندوق\nكشف التباين النقدي في الوقت الحقيقي والذي يعزل التناقضات لكل درج\nالفائدة: إيقاف انكماش الدرج، ومنع سرقة الموظفين، وتقليل وقت إغلاق السجل اليومي من ساعات إلى دقائق.',
+      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'تتبع دفعة الأدوية الصيدلانية ودفعتها مع مراقبة صارمة لتاريخ انتهاء الصلاحية\nإدارة سجلات الوصفات الطبية، وإسناد الطبيب، وتعليمات جرعة المريض\nتحويلات مرنة للوحدات (الصندوق، الشريط، الجهاز اللوحي، الزجاجة) مع تحديد التكلفة على مستوى الدُفعة\nالفائدة: الامتثال الكامل للوائح الصحية، وعدم صرف أي أدوية منتهية الصلاحية، وتقليل الانكماش.',
+      'Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'منشئ عروض أسعار احترافي مع خصومات وشروط وتواريخ صلاحية قابلة للتخصيص\nتحويل آلي بنقرة واحدة من عرض الأسعار إلى البيع المؤكد والفاتورة\nتنزيل ملفات PDF ذات العلامة التجارية ومشاركة العملاء مباشرة عبر البريد الإلكتروني أو الرسائل\nالفائدة: تسريع عمليات إغلاق صفقات B2B والجملة، والتخلص من الإدخال اليدوي للبيانات المكررة، وتسريع التدفق النقدي.',
+      'Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'مزامنة المخزون في الوقت الفعلي عبر المتجر عبر الإنترنت والمتاجر الفعلية والمستودعات المركزية\nتتبع الدفعة والدفعة وتاريخ انتهاء الصلاحية من خلال عتبات إعادة الطلب التلقائية للمخزون المنخفض\nشحنات ونقل المخزون بين الفروع مع مسارات تدقيق الإرسال/الاستلام\nالفائدة: يمنع الإفراط في البيع على الويب، ويزيل المخزونات، ويمنع رأس المال من حبس المخزون الزائد.',
+      'Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'تقويم المواعيد المرئية مع جدولة المصمم/المعالج وتخصيص الغرفة\nكتالوج الخدمة يتضمن فترات مخصصة وعلاجات إضافية ومستويات تسعير\nحساب عمولة المصمم التلقائي بناءً على الخدمات المكتملة وزيادة مبيعات منتجات التجزئة\nالفائدة: القضاء على تضارب المواعيد، وتحسين استخدام الكرسي، وتحفيز الموظفين من خلال دفع عمولات دقيقة.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering â guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'مخططات أرضية الطاولة المرئية مع حالة الإشغال وتناول الطعام والفوترة\nطلب قائمة QR للجدول بدون تلامس - يقوم الضيوف بمسح وتصفح وطلب من الهواتف\nيتم توجيه تذاكر طلبات المطبخ (KOT) مباشرةً إلى شاشات نظام عرض المطبخ المباشر (KDS).\nالفائدة: تسريع دوران الطاولة بنسبة 35%، والقضاء على أخطاء ترتيب المطبخ، وخفض النفقات العامة لموظفي الانتظار.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'مخططات أرضية الطاولة المرئية مع حالة الإشغال وتناول الطعام والفوترة\nطلب قائمة QR على الطاولة بدون تلامس - يقوم الضيوف بالمسح والتصفح والطلب من الهواتف\nيتم توجيه تذاكر طلبات المطبخ (KOT) مباشرةً إلى شاشات نظام عرض المطبخ المباشر (KDS).\nالفائدة: تسريع دوران الطاولة بنسبة 35%، والقضاء على أخطاء ترتيب المطبخ، وخفض النفقات العامة لموظفي الانتظار.',
       '& Mobile': 'والجوال',
       '5 Enterprise Capabilities Built for Scale': '5 قدرات مؤسسية مصممة للتوسع',
       '58mm & 80mm ESC/POS': 'طابعات حرارية 58 ملم و80 ملم ESC/POS',
@@ -4411,132 +4303,24 @@ Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lo
       '▼ Configure': '▼ Configurar',
       '🍽️ Dining & Food POS': '🍽️ POS de restaurante y comida',
       '🏪 Retail & Barcode POS': '🏪 POS de retail y código de barras',
-      '360-degree customer purchasing profiles, contact directories, and buying habits
-Sales lead management pipeline with activity logging, follow-up reminders, and stage tracking
-Automated customer loyalty reward points that accumulate and redeem at checkout
-Benefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': 'Perfiles de compra de clientes de 360 grados, directorios de contactos y hábitos de compra
-Canal de gestión de clientes potenciales de ventas con registro de actividad, recordatorios de seguimiento y seguimiento de etapas
-Puntos de recompensa de fidelidad del cliente automatizados que se acumulan y canjean al finalizar la compra
-Beneficio: aumenta el valor de vida del cliente (LTV) y el valor promedio del pedido (AOV) en un 25 % a través de ventajas de fidelidad personalizadas.',
-      'Branch, cashier, and staff sales target monitoring with real-time achievement progress
-Live Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics
-Top-selling products, category contribution, and dead-stock identification
-Benefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Monitoreo de objetivos de ventas de sucursales, cajeros y personal con progreso de logro en tiempo real
-Declaraciones de pérdidas y ganancias (P&L) en vivo, márgenes brutos y análisis de costo de bienes vendidos (COGS)
-Productos más vendidos, contribución de categorías e identificación de existencias muertas
-Beneficio: Brinda a los propietarios de negocios 100% de claridad financiera para eliminar líneas de bajo rendimiento y maximizar la rentabilidad neta.',
-      'Centralized catalog management with branch-specific pricing and localized tax rates
-Inter-branch stock transfer requests with transit tracking and receiving audits
-Consolidated corporate reports with isolated tenant workspace security
-Benefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Gestión de catálogo centralizada con precios específicos de cada sucursal y tasas impositivas localizadas
-Solicitudes de transferencia de stock entre sucursales con seguimiento de tránsito y auditorías de recepción
-Informes corporativos consolidados con seguridad aislada del espacio de trabajo de los inquilinos
-Beneficio: Escale sin esfuerzo desde una tienda local a cientos de franquicias en todo el país.',
-      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)
-Device serial number/IMEI tracking, intake diagnostic notes, and warranty logs
-Integrated spare parts inventory deduction and technician labor invoicing
-Benefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Ciclo de vida completo de la reparación (Recibido -> Diagnóstico -> Piezas solicitadas -> Listo -> Entregado)
-Seguimiento del número de serie/IMEI del dispositivo, notas de diagnóstico de admisión y registros de garantía
-Deducción integrada de inventario de repuestos y facturación de mano de obra de técnicos.
-Beneficio: Libera ingresos por servicios de reparación de alto margen para tiendas de electrónica, informática y bicicletas con total transparencia.',
-      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes
-One-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF
-Thermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices
-Benefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Facturas tributarias compatibles generadas automáticamente con desgloses de impuestos detallados y códigos HSN/SAC
-Envío instantáneo con un solo toque a WhatsApp, SMS y correo electrónico del cliente con PDF de marca
-Recibos térmicos (58 mm/80 mm) junto con facturas de impuestos en PDF A4 con formato empresarial
-Beneficio: 100 % de cumplimiento de impuestos y auditorías, cero desperdicio de papel y tasas de apertura de recibos de WhatsApp del 98 % para volver a interactuar con el cliente.',
-      'Customer credit limits, balance statements, and aged receivables tracking
-Supplier purchase bills, payment schedules, and outstanding ledger balances
-Comprehensive transaction history and automated debit/credit balancing
-Benefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Límites de crédito del cliente, extractos de saldo y seguimiento de cuentas por cobrar vencidas
-Facturas de compra de proveedores, cronogramas de pago y saldos contables pendientes
-Historial de transacciones completo y equilibrio automático de débito/crédito
-Beneficio: Maximiza la visibilidad del capital de trabajo, reduce las deudas incobrables y mantiene sólidos términos comerciales con los proveedores.',
-      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion
-Direct ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet
-Runs on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones
-Benefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'APK nativo dedicado de Android y aplicación de escritorio de Windows para inmersión en el mostrador en pantalla completa
-Comunicación directa de impresora térmica ESC/POS a través de USB, Bluetooth y LAN/Ethernet
-Se ejecuta en hardware existente: tabletas, terminales POS todo en uno, computadoras portátiles o teléfonos móviles.
-Beneficio: Sin costosas cerraduras de hardware patentadas: ahorra miles de dólares en costos iniciales de configuración y mantenimiento.',
-      'Full counter operations, barcode search, cart calculations, and receipt printing without internet
-Automatic background synchronization on reconnect with tamper-proof duplicate prevention
-Continuous local data caching so tills never freeze during network cuts
-Benefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Operaciones completas de mostrador, búsqueda de códigos de barras, cálculos de carritos e impresión de recibos sin Internet
-Sincronización automática en segundo plano al volver a conectarse con prevención de duplicados a prueba de manipulaciones
-Almacenamiento en caché de datos local continuo para que las cajas nunca se congelen durante cortes de red
-Beneficio: Cero tiempo de inactividad y cero pérdidas de ventas cuando Internet cae durante las horas pico de compras.',
-      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)
-Device authorization and terminal registration to prevent unauthorized logins
-Tamper-proof audit trails for every price override, discount, held cart, and refund
-Benefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Permisos granulares por módulo (cajeros, gerentes de tienda, empleados de almacén, contables)
-Autorización del dispositivo y registro del terminal para evitar inicios de sesión no autorizados
-Pistas de auditoría a prueba de manipulaciones para cada anulación de precio, descuento, carrito retenido y reembolso
-Beneficio: Protege los márgenes de ganancias contra el abuso de descuentos en caja y mantiene las operaciones en estricto cumplimiento.',
-      'Instant mobile-friendly digital storefront with category & brand filtering
-One-click WhatsApp product link & cart sharing for direct social commerce
-Direct QR code ordering with instant payment gateway integration
-Benefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Escaparate digital instantáneo apto para dispositivos móviles con filtrado de categorías y marcas
-Enlace de producto de WhatsApp con un solo clic y uso compartido del carrito para comercio social directo
-Pedido directo de códigos QR con integración de pasarela de pago instantánea
-Beneficio: inicie el comercio electrónico en minutos, capture compradores de Internet sin tarifas de mercado y sincronice los pedidos automáticamente.',
-      'Millisecond barcode scanning with quick-access visual favorites & held carts
-Multi-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)
-High-speed thermal receipt printing with automated cash drawer kick pulse
-Benefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Escaneo de códigos de barras en milisegundos con favoritos visuales de acceso rápido y carritos retenidos
-Pagos divididos de múltiples ofertas (efectivo, tarjeta, UPI, billeteras, crédito de la tienda del cliente)
-Impresión térmica de recibos de alta velocidad con pulso de retroceso automático del cajón de efectivo
-Beneficio: Elimina los cuellos de botella en las cajas registradoras, maneja las aglomeraciones máximas durante las festividades sin esfuerzo y registra las ventas 3 veces más rápido.',
-      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts
-Automated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability
-Real-time cash variance detection that isolates discrepancies per drawer
-Benefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Registro de apertura de caja flotante, comprobantes de caja chica pagados/desembolsados y conteos ciegos
-Informes X automatizados a mitad de turno y informes Z al final del día con responsabilidad por cajero
-Detección de variaciones de efectivo en tiempo real que aísla las discrepancias por cajón
-Beneficio: Detiene el encogimiento de los cajones, previene el robo por parte de los empleados y reduce drásticamente el tiempo de cierre diario de la caja registradora de horas a minutos.',
-      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring
-Prescription record management, doctor attribution, and patient dosage instructions
-Flexible unit conversions (box, strip, tablet, bottle) with batch-level costing
-Benefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Seguimiento de lotes y lotes de medicamentos farmacéuticos con estricto control de la fecha de caducidad
-Gestión de registros de recetas, atribución de médicos e instrucciones de dosificación para pacientes
-Conversiones de unidades flexibles (caja, tira, tableta, botella) con cálculo de costos a nivel de lote
-Beneficio: Cumplimiento total de las normativas sanitarias, cero medicamentos caducados dispensados y pérdidas mínimas.',
-      'Professional quotation builder with customizable discounts, terms, and validity dates
-One-click automated conversion from Quote to confirmed Sale and Invoice
-Branded PDF downloads and direct customer sharing via email or messaging
-Benefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Creador de cotizaciones profesional con descuentos, términos y fechas de validez personalizables
-Conversión automatizada con un clic de cotización a venta y factura confirmadas
-Descargas de PDF de marca y uso compartido directo con el cliente por correo electrónico o mensajería
-Beneficio: Acelera el cierre de acuerdos B2B y mayoristas, elimina la entrada de datos manual duplicada y acelera el flujo de caja.',
-      'Real-time stock synchronization across online store, physical shops, and central warehouses
-Batch, lot, and expiry date tracking with automatic low-stock reorder thresholds
-Inter-branch stock consignments and transfers with dispatch/receiving audit trails
-Benefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Sincronización de stock en tiempo real entre tiendas online, tiendas físicas y almacenes centrales
-Seguimiento de lotes, lotes y fechas de vencimiento con umbrales automáticos de reorden de existencias bajas
-Envíos y transferencias de existencias entre sucursales con seguimiento de auditoría de envío/recepción
-Beneficio: evita la sobreventa en la web, elimina el desabastecimiento y evita que el capital se quede atrapado en un exceso de inventario.',
-      'Visual appointment calendar with stylist/therapist scheduling and room assignment
-Service catalog with custom durations, add-on treatments, and pricing tiers
-Automatic stylist commission calculation based on completed services and retail product upsells
-Benefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Calendario de citas visual con programación de estilistas/terapeutas y asignación de habitaciones
-Catálogo de servicios con duraciones personalizadas, tratamientos complementarios y niveles de precios
-Cálculo automático de comisiones de estilista basado en los servicios completados y las ventas adicionales de productos minoristas.
-Beneficio: Elimina conflictos de citas, optimiza la utilización del sillón y motiva al personal con pagos de comisiones precisos.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering â guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Planos de mesa visuales con estado de ocupación, comedor y facturación en vivo
-Pedido de menú QR en mesa sin contacto: los invitados escanean, exploran y realizan pedidos desde teléfonos
-Tickets de pedidos de cocina (KOT) enviados directamente a pantallas en vivo del Kitchen Display System (KDS)
-Beneficio: Acelera los turnos de mesa en un 35 %, elimina los errores en los pedidos de la cocina y reduce los gastos generales del personal de servicio.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering — guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Planos de mesa visuales con estado de ocupación, comedor y facturación en vivo
-Pedido de menú QR en mesa sin contacto: los invitados escanean, exploran y realizan pedidos desde teléfonos
-Tickets de pedidos de cocina (KOT) enviados directamente a pantallas en vivo del Kitchen Display System (KDS)
-Beneficio: Acelera los turnos de mesa en un 35 %, elimina los errores en los pedidos de la cocina y reduce los gastos generales del personal de servicio.',
+      '360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': 'Perfiles de compra de clientes de 360 grados, directorios de contactos y hábitos de compra\nCanal de gestión de clientes potenciales de ventas con registro de actividad, recordatorios de seguimiento y seguimiento de etapas\nPuntos de recompensa de fidelidad del cliente automatizados que se acumulan y canjean al finalizar la compra\nBeneficio: aumenta el valor de vida del cliente (LTV) y el valor promedio del pedido (AOV) en un 25 % a través de ventajas de fidelidad personalizadas.',
+      'Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Monitoreo de objetivos de ventas de sucursales, cajeros y personal con progreso de logro en tiempo real\nDeclaraciones de pérdidas y ganancias (P&L) en vivo, márgenes brutos y análisis de costo de bienes vendidos (COGS)\nProductos más vendidos, contribución de categorías e identificación de existencias muertas\nBeneficio: Brinda a los propietarios de negocios 100% de claridad financiera para eliminar líneas de bajo rendimiento y maximizar la rentabilidad neta.',
+      'Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Gestión de catálogo centralizada con precios específicos de cada sucursal y tasas impositivas localizadas\nSolicitudes de transferencia de stock entre sucursales con seguimiento de tránsito y auditorías de recepción\nInformes corporativos consolidados con seguridad aislada del espacio de trabajo de los inquilinos\nBeneficio: Escale sin esfuerzo desde una tienda local a cientos de franquicias en todo el país.',
+      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Ciclo de vida completo de la reparación (Recibido -> Diagnóstico -> Piezas solicitadas -> Listo -> Entregado)\nSeguimiento del número de serie/IMEI del dispositivo, notas de diagnóstico de admisión y registros de garantía\nDeducción integrada de inventario de repuestos y facturación de mano de obra de técnicos.\nBeneficio: Libera ingresos por servicios de reparación de alto margen para tiendas de electrónica, informática y bicicletas con total transparencia.',
+      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Facturas tributarias compatibles generadas automáticamente con desgloses de impuestos detallados y códigos HSN/SAC\nEnvío instantáneo con un solo toque a WhatsApp, SMS y correo electrónico del cliente con PDF de marca\nRecibos térmicos (58 mm/80 mm) junto con facturas de impuestos en PDF A4 con formato empresarial\nBeneficio: 100 % de cumplimiento de impuestos y auditorías, cero desperdicio de papel y tasas de apertura de recibos de WhatsApp del 98 % para volver a interactuar con el cliente.',
+      'Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Límites de crédito del cliente, extractos de saldo y seguimiento de cuentas por cobrar vencidas\nFacturas de compra de proveedores, cronogramas de pago y saldos contables pendientes\nHistorial de transacciones completo y equilibrio automático de débito/crédito\nBeneficio: Maximiza la visibilidad del capital de trabajo, reduce las deudas incobrables y mantiene sólidos términos comerciales con los proveedores.',
+      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'APK nativo dedicado de Android y aplicación de escritorio de Windows para inmersión en el mostrador en pantalla completa\nComunicación directa de impresora térmica ESC/POS a través de USB, Bluetooth y LAN/Ethernet\nSe ejecuta en hardware existente: tabletas, terminales POS todo en uno, computadoras portátiles o teléfonos móviles.\nBeneficio: Sin costosas cerraduras de hardware patentadas: ahorra miles de dólares en costos iniciales de configuración y mantenimiento.',
+      'Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Operaciones completas de mostrador, búsqueda de códigos de barras, cálculos de carritos e impresión de recibos sin Internet\nSincronización automática en segundo plano al volver a conectarse con prevención de duplicados a prueba de manipulaciones\nAlmacenamiento en caché de datos local continuo para que las cajas nunca se congelen durante cortes de red\nBeneficio: Cero tiempo de inactividad y cero pérdidas de ventas cuando Internet cae durante las horas pico de compras.',
+      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Permisos granulares por módulo (cajeros, gerentes de tienda, empleados de almacén, contables)\nAutorización del dispositivo y registro del terminal para evitar inicios de sesión no autorizados\nPistas de auditoría a prueba de manipulaciones para cada anulación de precio, descuento, carrito retenido y reembolso\nBeneficio: Protege los márgenes de ganancias contra el abuso de descuentos en caja y mantiene las operaciones en estricto cumplimiento.',
+      'Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Escaparate digital instantáneo apto para dispositivos móviles con filtrado de categorías y marcas\nEnlace de producto de WhatsApp con un solo clic y uso compartido del carrito para comercio social directo\nPedido directo de códigos QR con integración de pasarela de pago instantánea\nBeneficio: inicie el comercio electrónico en minutos, capture compradores de Internet sin tarifas de mercado y sincronice los pedidos automáticamente.',
+      'Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Escaneo de códigos de barras en milisegundos con favoritos visuales de acceso rápido y carritos retenidos\nPagos divididos de múltiples ofertas (efectivo, tarjeta, UPI, billeteras, crédito de la tienda del cliente)\nImpresión térmica de recibos de alta velocidad con pulso de retroceso automático del cajón de efectivo\nBeneficio: Elimina los cuellos de botella en las cajas registradoras, maneja las aglomeraciones máximas durante las festividades sin esfuerzo y registra las ventas 3 veces más rápido.',
+      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Registro de apertura de caja flotante, comprobantes de caja chica pagados/desembolsados y conteos ciegos\nInformes X automatizados a mitad de turno y informes Z al final del día con responsabilidad por cajero\nDetección de variaciones de efectivo en tiempo real que aísla las discrepancias por cajón\nBeneficio: Detiene el encogimiento de los cajones, previene el robo por parte de los empleados y reduce drásticamente el tiempo de cierre diario de la caja registradora de horas a minutos.',
+      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Seguimiento de lotes y lotes de medicamentos farmacéuticos con estricto control de la fecha de caducidad\nGestión de registros de recetas, atribución de médicos e instrucciones de dosificación para pacientes\nConversiones de unidades flexibles (caja, tira, tableta, botella) con cálculo de costos a nivel de lote\nBeneficio: Cumplimiento total de las normativas sanitarias, cero medicamentos caducados dispensados y pérdidas mínimas.',
+      'Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Creador de cotizaciones profesional con descuentos, términos y fechas de validez personalizables\nConversión automatizada con un clic de cotización a venta y factura confirmadas\nDescargas de PDF de marca y uso compartido directo con el cliente por correo electrónico o mensajería\nBeneficio: Acelera el cierre de acuerdos B2B y mayoristas, elimina la entrada de datos manual duplicada y acelera el flujo de caja.',
+      'Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Sincronización de stock en tiempo real entre tiendas online, tiendas físicas y almacenes centrales\nSeguimiento de lotes, lotes y fechas de vencimiento con umbrales automáticos de reorden de existencias bajas\nEnvíos y transferencias de existencias entre sucursales con seguimiento de auditoría de envío/recepción\nBeneficio: evita la sobreventa en la web, elimina el desabastecimiento y evita que el capital se quede atrapado en un exceso de inventario.',
+      'Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Calendario de citas visual con programación de estilistas/terapeutas y asignación de habitaciones\nCatálogo de servicios con duraciones personalizadas, tratamientos complementarios y niveles de precios\nCálculo automático de comisiones de estilista basado en los servicios completados y las ventas adicionales de productos minoristas.\nBeneficio: Elimina conflictos de citas, optimiza la utilización del sillón y motiva al personal con pagos de comisiones precisos.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering â guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Planos de mesa visuales con estado de ocupación, comedor y facturación en vivo\nPedido de menú QR en mesa sin contacto: los invitados escanean, exploran y realizan pedidos desde teléfonos\nTickets de pedidos de cocina (KOT) enviados directamente a pantallas en vivo del Kitchen Display System (KDS)\nBeneficio: Acelera los turnos de mesa en un 35 %, elimina los errores en los pedidos de la cocina y reduce los gastos generales del personal de servicio.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Planos de mesa visuales con estado de ocupación, comedor y facturación en vivo\nPedido de menú QR en mesa sin contacto: los invitados escanean, exploran y realizan pedidos desde teléfonos\nTickets de pedidos de cocina (KOT) enviados directamente a pantallas en vivo del Kitchen Display System (KDS)\nBeneficio: Acelera los turnos de mesa en un 35 %, elimina los errores en los pedidos de la cocina y reduce los gastos generales del personal de servicio.',
       '& Mobile': 'y móvil',
       '5 Enterprise Capabilities Built for Scale': 'Cinco capacidades empresariales diseñadas para escalar',
       '58mm & 80mm ESC/POS': 'Térmica 58mm y 80mm ESC/POS',
@@ -4823,7 +4607,7 @@ Beneficio: Acelera los turnos de mesa en un 35 %, elimina los errores en los ped
       'Unify your online storefront, barcode checkout, multi-warehouse stock, and WhatsApp invoicing into one lightning-fast cloud POS. Built to turn internet visitors into repeat buyers and keep counters ringing up sales even offline.': 'Unifique su escaparate en línea, pago con código de barras, stock de múltiples almacenes y facturación de WhatsApp en un punto de venta en la nube ultrarrápido. Creado para convertir a los visitantes de Internet en compradores recurrentes y mantener los mostradores registrando ventas incluso fuera de línea.',
       'Unify your online storefront, barcode checkout, multi-warehouse stock, and WhatsApp invoicing into one lightning-fast cloud POS. Built to turn internet visitors into repeat buyers and keep counters ringing up sales even offline.\',': 'Unifique su escaparate en línea, pago con código de barras, stock de múltiples almacenes y facturación de WhatsApp en un punto de venta en la nube ultrarrápido. Creado para convertir a los visitantes de Internet en compradores recurrentes y mantener los mostradores registrando las ventas incluso fuera de línea.\',',
       'Universal Hardware Compatibility': 'Compatibilidad universal de hardware',
-      'Unlimited Invoices': 'Facturas Ilimitadas',
+      'Unlimited Invoices': 'Facturas ilimitadas',
       'Unlimited POS Devices': 'Dispositivos TPV Ilimitados',
       'Unlimited Products': 'Productos Ilimitados',
       'Unlimited Staff': 'Personal Ilimitado',
@@ -6974,132 +6758,24 @@ Beneficio: Acelera los turnos de mesa en un 35 %, elimina los errores en los ped
       '▼ Configure': '▼ कॉन्फ़िगर करें',
       '🍽️ Dining & Food POS': '🍽️ डाइनिंग और फ़ूड पीओएस',
       '🏪 Retail & Barcode POS': '🏪 रिटेल और बारकोड पीओएस',
-      '360-degree customer purchasing profiles, contact directories, and buying habits
-Sales lead management pipeline with activity logging, follow-up reminders, and stage tracking
-Automated customer loyalty reward points that accumulate and redeem at checkout
-Benefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': '360-डिग्री ग्राहक खरीदारी प्रोफ़ाइल, संपर्क निर्देशिकाएं और खरीदारी की आदतें
-गतिविधि लॉगिंग, अनुवर्ती अनुस्मारक और स्टेज ट्रैकिंग के साथ बिक्री लीड प्रबंधन पाइपलाइन
-स्वचालित ग्राहक वफादारी पुरस्कार बिंदु जो चेकआउट पर जमा होते हैं और भुनाए जाते हैं
-लाभ: वैयक्तिकृत लॉयल्टी भत्तों के माध्यम से ग्राहक जीवनकाल मूल्य (एलटीवी) और औसत ऑर्डर मूल्य (एओवी) को 25% तक बढ़ाता है।',
-      'Branch, cashier, and staff sales target monitoring with real-time achievement progress
-Live Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics
-Top-selling products, category contribution, and dead-stock identification
-Benefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'वास्तविक समय उपलब्धि प्रगति के साथ शाखा, खजांची और कर्मचारी बिक्री लक्ष्य की निगरानी
-लाइव लाभ और हानि (पी एंड एल) विवरण, सकल मार्जिन और बेची गई वस्तुओं की लागत (सीओजीएस) विश्लेषण
-सर्वाधिक बिकने वाले उत्पाद, श्रेणी योगदान और डेड-स्टॉक पहचान
-लाभ: व्यापार मालिकों को खराब प्रदर्शन वाली लाइनों को कम करने और शुद्ध लाभप्रदता को अधिकतम करने के लिए 100% वित्तीय स्पष्टता देता है।',
-      'Centralized catalog management with branch-specific pricing and localized tax rates
-Inter-branch stock transfer requests with transit tracking and receiving audits
-Consolidated corporate reports with isolated tenant workspace security
-Benefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'शाखा-विशिष्ट मूल्य निर्धारण और स्थानीयकृत कर दरों के साथ केंद्रीकृत कैटलॉग प्रबंधन
-पारगमन ट्रैकिंग और ऑडिट प्राप्त करने के साथ अंतर-शाखा स्टॉक स्थानांतरण अनुरोध
-पृथक किरायेदार कार्यक्षेत्र सुरक्षा के साथ समेकित कॉर्पोरेट रिपोर्ट
-लाभ: एक पड़ोस की दुकान से देशभर में सैकड़ों फ्रेंचाइजी स्थानों तक आसानी से पहुंचें।',
-      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)
-Device serial number/IMEI tracking, intake diagnostic notes, and warranty logs
-Integrated spare parts inventory deduction and technician labor invoicing
-Benefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'संपूर्ण मरम्मत जीवनचक्र (प्राप्त -> निदान -> ऑर्डर किए गए हिस्से -> तैयार -> वितरित)
-डिवाइस सीरियल नंबर/आईएमईआई ट्रैकिंग, इनटेक डायग्नोस्टिक नोट्स और वारंटी लॉग
-एकीकृत स्पेयर पार्ट्स इन्वेंट्री कटौती और तकनीशियन श्रम चालान
-लाभ: पूरी पारदर्शिता के साथ इलेक्ट्रॉनिक्स, कंप्यूटर और बाइक की दुकानों के लिए उच्च-मार्जिन वाली मरम्मत सेवा राजस्व को अनलॉक करता है।',
-      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes
-One-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF
-Thermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices
-Benefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'आइटमयुक्त टैक्स ब्रेकडाउन और एचएसएन/एसएसी कोड के साथ अनुपालन कर चालान स्वचालित रूप से उत्पन्न होते हैं
-ब्रांडेड पीडीएफ के साथ ग्राहक के व्हाट्सएप, एसएमएस और ईमेल पर एक-टैप से त्वरित प्रेषण
-एंटरप्राइज़ स्वरूपित A4 PDF टैक्स चालान के साथ थर्मल रसीदें (58 मिमी/80 मिमी)।
-लाभ: 100% कर और लेखापरीक्षा अनुपालन, शून्य कागज अपशिष्ट, और ग्राहक पुनः जुड़ाव के लिए 98% व्हाट्सएप रसीद खुली दरें।',
-      'Customer credit limits, balance statements, and aged receivables tracking
-Supplier purchase bills, payment schedules, and outstanding ledger balances
-Comprehensive transaction history and automated debit/credit balancing
-Benefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'ग्राहक क्रेडिट सीमा, शेष विवरण, और वृद्ध प्राप्य ट्रैकिंग
-आपूर्तिकर्ता खरीद बिल, भुगतान कार्यक्रम और बकाया खाता शेष
-व्यापक लेनदेन इतिहास और स्वचालित डेबिट/क्रेडिट संतुलन
-लाभ: कार्यशील पूंजी की दृश्यता को अधिकतम करता है, खराब ऋणों को कम करता है, और मजबूत आपूर्तिकर्ता व्यापार शर्तों को बनाए रखता है।',
-      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion
-Direct ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet
-Runs on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones
-Benefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'पूर्ण-स्क्रीन काउंटर विसर्जन के लिए समर्पित देशी एंड्रॉइड एपीके और विंडोज डेस्कटॉप ऐप
-यूएसबी, ब्लूटूथ और लैन/ईथरनेट के माध्यम से सीधा ईएससी/पीओएस थर्मल प्रिंटर संचार
-मौजूदा हार्डवेयर - टैबलेट, पीओएस ऑल-इन-वन टर्मिनल, लैपटॉप या मोबाइल फोन पर चलता है
-लाभ: कोई महंगा मालिकाना हार्डवेयर लॉक नहीं - प्रारंभिक सेटअप और रखरखाव लागत में हजारों की बचत होती है।',
-      'Full counter operations, barcode search, cart calculations, and receipt printing without internet
-Automatic background synchronization on reconnect with tamper-proof duplicate prevention
-Continuous local data caching so tills never freeze during network cuts
-Benefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'पूर्ण काउंटर संचालन, बारकोड खोज, कार्ट गणना, और इंटरनेट के बिना रसीद मुद्रण
-छेड़छाड़-रोधी डुप्लिकेट रोकथाम के साथ पुन: कनेक्ट होने पर स्वचालित पृष्ठभूमि सिंक्रनाइज़ेशन
-निरंतर स्थानीय डेटा कैशिंग ताकि नेटवर्क कटौती के दौरान टिल्स कभी भी स्थिर न हों
-लाभ: पीक शॉपिंग घंटों के दौरान इंटरनेट बंद होने पर शून्य डाउनटाइम और शून्य बिक्री हानि।',
-      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)
-Device authorization and terminal registration to prevent unauthorized logins
-Tamper-proof audit trails for every price override, discount, held cart, and refund
-Benefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'ग्रैन्युलर प्रति-मॉड्यूल अनुमतियाँ (कैशियर, स्टोर मैनेजर, स्टॉक क्लर्क, अकाउंटेंट)
-अनधिकृत लॉगिन को रोकने के लिए डिवाइस प्राधिकरण और टर्मिनल पंजीकरण
-प्रत्येक मूल्य ओवरराइड, छूट, होल्ड कार्ट और रिफंड के लिए छेड़छाड़-प्रूफ ऑडिट ट्रेल्स
-लाभ: कैशियर छूट के दुरुपयोग के खिलाफ लाभ मार्जिन की रक्षा करता है और संचालन को सख्ती से अनुपालन में रखता है।',
-      'Instant mobile-friendly digital storefront with category & brand filtering
-One-click WhatsApp product link & cart sharing for direct social commerce
-Direct QR code ordering with instant payment gateway integration
-Benefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'श्रेणी और ब्रांड फ़िल्टरिंग के साथ त्वरित मोबाइल-अनुकूल डिजिटल स्टोरफ्रंट
-प्रत्यक्ष सामाजिक वाणिज्य के लिए एक-क्लिक व्हाट्सएप उत्पाद लिंक और कार्ट शेयरिंग
-तत्काल भुगतान गेटवे एकीकरण के साथ प्रत्यक्ष क्यूआर कोड ऑर्डर करना
-लाभ: मिनटों में ईकॉमर्स लॉन्च करें, शून्य मार्केटप्लेस शुल्क के साथ इंटरनेट खरीदारों को पकड़ें और ऑर्डर को स्वचालित रूप से सिंक करें।',
-      'Millisecond barcode scanning with quick-access visual favorites & held carts
-Multi-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)
-High-speed thermal receipt printing with automated cash drawer kick pulse
-Benefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'त्वरित-पहुँच दृश्य पसंदीदा और आयोजित कार्ट के साथ मिलीसेकंड बारकोड स्कैनिंग
-बहु-निविदा विभाजन भुगतान (नकद, कार्ड, यूपीआई, वॉलेट, ग्राहक स्टोर क्रेडिट)
-स्वचालित कैश ड्रॉअर किक पल्स के साथ हाई-स्पीड थर्मल रसीद प्रिंटिंग
-लाभ: काउंटर चेकआउट बाधाओं को दूर करता है, चरम छुट्टियों की भीड़ को आसानी से संभालता है, और बिक्री में 3 गुना तेजी से वृद्धि करता है।',
-      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts
-Automated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability
-Real-time cash variance detection that isolates discrepancies per drawer
-Benefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'ओपनिंग कैश फ्लोट पंजीकरण, पेड-इन/पेड-आउट छोटे कैश वाउचर, और ब्लाइंड काउंट
-प्रति-कैशियर जवाबदेही के साथ स्वचालित मध्य-शिफ्ट एक्स-रिपोर्ट और दिन के अंत की जेड-रिपोर्ट
-वास्तविक समय में नकदी भिन्नता का पता लगाना जो प्रति दराज विसंगतियों को अलग करता है
-लाभ: दराज सिकुड़न को रोकता है, कर्मचारियों की चोरी को रोकता है, और दैनिक रजिस्टर बंद करने के समय को घंटों से घटाकर मिनटों में कर देता है।',
-      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring
-Prescription record management, doctor attribution, and patient dosage instructions
-Flexible unit conversions (box, strip, tablet, bottle) with batch-level costing
-Benefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'सख्त समाप्ति तिथि की निगरानी के साथ फार्मास्युटिकल दवा बैच और लॉट ट्रैकिंग
-प्रिस्क्रिप्शन रिकॉर्ड प्रबंधन, डॉक्टर एट्रिब्यूशन, और रोगी खुराक निर्देश
-बैच-स्तरीय लागत के साथ लचीले इकाई रूपांतरण (बॉक्स, स्ट्रिप, टैबलेट, बोतल)।
-लाभ: संपूर्ण स्वास्थ्य नियामक अनुपालन, शून्य एक्सपायरी दवा वितरण, और न्यूनतम सिकुड़न।',
-      'Professional quotation builder with customizable discounts, terms, and validity dates
-One-click automated conversion from Quote to confirmed Sale and Invoice
-Branded PDF downloads and direct customer sharing via email or messaging
-Benefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'अनुकूलन योग्य छूट, शर्तों और वैधता तिथियों के साथ पेशेवर कोटेशन बिल्डर
-कोटेशन से पुष्टिकृत बिक्री और चालान तक एक-क्लिक स्वचालित रूपांतरण
-ब्रांडेड पीडीएफ डाउनलोड और ईमेल या मैसेजिंग के माध्यम से सीधे ग्राहक साझाकरण
-लाभ: बी2बी और थोक सौदे के समापन में तेजी लाता है, डुप्लिकेट मैन्युअल डेटा प्रविष्टि को समाप्त करता है, और नकदी प्रवाह को तेज करता है।',
-      'Real-time stock synchronization across online store, physical shops, and central warehouses
-Batch, lot, and expiry date tracking with automatic low-stock reorder thresholds
-Inter-branch stock consignments and transfers with dispatch/receiving audit trails
-Benefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'ऑनलाइन स्टोर, भौतिक दुकानों और केंद्रीय गोदामों में वास्तविक समय स्टॉक सिंक्रनाइज़ेशन
-स्वचालित कम-स्टॉक रीऑर्डर थ्रेशोल्ड के साथ बैच, लॉट और समाप्ति तिथि ट्रैकिंग
-प्रेषण/प्राप्ति ऑडिट ट्रेल्स के साथ अंतर-शाखा स्टॉक खेप और स्थानांतरण
-लाभ: वेब पर अधिक बिक्री को रोकता है, स्टॉकआउट को समाप्त करता है, और पूंजी को अतिरिक्त इन्वेंट्री में लॉक होने से रोकता है।',
-      'Visual appointment calendar with stylist/therapist scheduling and room assignment
-Service catalog with custom durations, add-on treatments, and pricing tiers
-Automatic stylist commission calculation based on completed services and retail product upsells
-Benefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'स्टाइलिस्ट/चिकित्सक शेड्यूलिंग और कक्ष असाइनमेंट के साथ विज़ुअल अपॉइंटमेंट कैलेंडर
-कस्टम अवधि, ऐड-ऑन उपचार और मूल्य निर्धारण स्तरों के साथ सेवा सूची
-पूर्ण सेवाओं और खुदरा उत्पाद की बिक्री के आधार पर स्वचालित स्टाइलिस्ट कमीशन की गणना
-लाभ: नियुक्ति संबंधी विवादों को दूर करता है, कुर्सी के उपयोग को अनुकूलित करता है, और कर्मचारियों को सटीक कमीशन भुगतान के लिए प्रेरित करता है।',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering â guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'लाइव ऑक्यूपाइड, डाइनिंग और बिलिंग स्थिति के साथ विज़ुअल टेबल फ़्लोर योजनाएं
-संपर्क रहित टेबल क्यूआर मेनू ऑर्डरिंग - मेहमान फोन से स्कैन, ब्राउज़ और ऑर्डर करते हैं
-किचन ऑर्डर टिकट (KOT) सीधे लाइव किचन डिस्प्ले सिस्टम (KDS) स्क्रीन पर भेजे जाते हैं
-लाभ: टेबल टर्न को 35% तक तेज करता है, रसोई ऑर्डर त्रुटियों को समाप्त करता है, और वेटस्टाफ ओवरहेड को कम करता है।',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering — guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'लाइव ऑक्यूपाइड, डाइनिंग और बिलिंग स्थिति के साथ विज़ुअल टेबल फ़्लोर योजनाएं
-संपर्क रहित टेबल क्यूआर मेनू ऑर्डरिंग - मेहमान फोन से स्कैन, ब्राउज़ और ऑर्डर करते हैं
-किचन ऑर्डर टिकट (KOT) सीधे लाइव किचन डिस्प्ले सिस्टम (KDS) स्क्रीन पर भेजे जाते हैं
-लाभ: टेबल टर्न को 35% तक तेज करता है, रसोई ऑर्डर त्रुटियों को समाप्त करता है, और वेटस्टाफ ओवरहेड को कम करता है।',
+      '360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': '360-डिग्री ग्राहक खरीदारी प्रोफ़ाइल, संपर्क निर्देशिकाएं और खरीदारी की आदतें\nगतिविधि लॉगिंग, अनुवर्ती अनुस्मारक और स्टेज ट्रैकिंग के साथ बिक्री लीड प्रबंधन पाइपलाइन\nस्वचालित ग्राहक वफादारी पुरस्कार बिंदु जो चेकआउट पर जमा होते हैं और भुनाए जाते हैं\nलाभ: वैयक्तिकृत लॉयल्टी भत्तों के माध्यम से ग्राहक जीवनकाल मूल्य (एलटीवी) और औसत ऑर्डर मूल्य (एओवी) को 25% तक बढ़ाता है।',
+      'Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'वास्तविक समय उपलब्धि प्रगति के साथ शाखा, खजांची और कर्मचारी बिक्री लक्ष्य की निगरानी\nलाइव लाभ और हानि (पी एंड एल) विवरण, सकल मार्जिन और बेची गई वस्तुओं की लागत (सीओजीएस) विश्लेषण\nसर्वाधिक बिकने वाले उत्पाद, श्रेणी योगदान और डेड-स्टॉक पहचान\nलाभ: व्यापार मालिकों को खराब प्रदर्शन वाली लाइनों को कम करने और शुद्ध लाभप्रदता को अधिकतम करने के लिए 100% वित्तीय स्पष्टता देता है।',
+      'Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'शाखा-विशिष्ट मूल्य निर्धारण और स्थानीयकृत कर दरों के साथ केंद्रीकृत कैटलॉग प्रबंधन\nपारगमन ट्रैकिंग और ऑडिट प्राप्त करने के साथ अंतर-शाखा स्टॉक स्थानांतरण अनुरोध\nपृथक किरायेदार कार्यक्षेत्र सुरक्षा के साथ समेकित कॉर्पोरेट रिपोर्ट\nलाभ: एक पड़ोस की दुकान से देशभर में सैकड़ों फ्रेंचाइजी स्थानों तक आसानी से पहुंचें।',
+      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'संपूर्ण मरम्मत जीवनचक्र (प्राप्त -> निदान -> ऑर्डर किए गए हिस्से -> तैयार -> वितरित)\nडिवाइस सीरियल नंबर/आईएमईआई ट्रैकिंग, इनटेक डायग्नोस्टिक नोट्स और वारंटी लॉग\nएकीकृत स्पेयर पार्ट्स इन्वेंट्री कटौती और तकनीशियन श्रम चालान\nलाभ: पूरी पारदर्शिता के साथ इलेक्ट्रॉनिक्स, कंप्यूटर और बाइक की दुकानों के लिए उच्च-मार्जिन वाली मरम्मत सेवा राजस्व को अनलॉक करता है।',
+      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'आइटमयुक्त टैक्स ब्रेकडाउन और एचएसएन/एसएसी कोड के साथ अनुपालन कर चालान स्वचालित रूप से उत्पन्न होते हैं\nब्रांडेड पीडीएफ के साथ ग्राहक के व्हाट्सएप, एसएमएस और ईमेल पर एक-टैप से त्वरित प्रेषण\nएंटरप्राइज़ स्वरूपित A4 PDF टैक्स चालान के साथ थर्मल रसीदें (58 मिमी/80 मिमी)।\nलाभ: 100% कर और लेखापरीक्षा अनुपालन, शून्य कागज अपशिष्ट, और ग्राहक पुनः जुड़ाव के लिए 98% व्हाट्सएप रसीद खुली दरें।',
+      'Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'ग्राहक क्रेडिट सीमा, शेष विवरण, और वृद्ध प्राप्य ट्रैकिंग\nआपूर्तिकर्ता खरीद बिल, भुगतान कार्यक्रम और बकाया खाता शेष\nव्यापक लेनदेन इतिहास और स्वचालित डेबिट/क्रेडिट संतुलन\nलाभ: कार्यशील पूंजी की दृश्यता को अधिकतम करता है, खराब ऋणों को कम करता है, और मजबूत आपूर्तिकर्ता व्यापार शर्तों को बनाए रखता है।',
+      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'पूर्ण-स्क्रीन काउंटर विसर्जन के लिए समर्पित देशी एंड्रॉइड एपीके और विंडोज डेस्कटॉप ऐप\nयूएसबी, ब्लूटूथ और लैन/ईथरनेट के माध्यम से सीधा ईएससी/पीओएस थर्मल प्रिंटर संचार\nमौजूदा हार्डवेयर - टैबलेट, पीओएस ऑल-इन-वन टर्मिनल, लैपटॉप या मोबाइल फोन पर चलता है\nलाभ: कोई महंगा मालिकाना हार्डवेयर लॉक नहीं - प्रारंभिक सेटअप और रखरखाव लागत में हजारों की बचत होती है।',
+      'Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'पूर्ण काउंटर संचालन, बारकोड खोज, कार्ट गणना, और इंटरनेट के बिना रसीद मुद्रण\nछेड़छाड़-रोधी डुप्लिकेट रोकथाम के साथ पुन: कनेक्ट होने पर स्वचालित पृष्ठभूमि सिंक्रनाइज़ेशन\nनिरंतर स्थानीय डेटा कैशिंग ताकि नेटवर्क कटौती के दौरान टिल्स कभी भी स्थिर न हों\nलाभ: पीक शॉपिंग घंटों के दौरान इंटरनेट बंद होने पर शून्य डाउनटाइम और शून्य बिक्री हानि।',
+      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'ग्रैन्युलर प्रति-मॉड्यूल अनुमतियाँ (कैशियर, स्टोर मैनेजर, स्टॉक क्लर्क, अकाउंटेंट)\nअनधिकृत लॉगिन को रोकने के लिए डिवाइस प्राधिकरण और टर्मिनल पंजीकरण\nप्रत्येक मूल्य ओवरराइड, छूट, होल्ड कार्ट और रिफंड के लिए छेड़छाड़-प्रूफ ऑडिट ट्रेल्स\nलाभ: कैशियर छूट के दुरुपयोग के खिलाफ लाभ मार्जिन की रक्षा करता है और संचालन को सख्ती से अनुपालन में रखता है।',
+      'Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'श्रेणी और ब्रांड फ़िल्टरिंग के साथ त्वरित मोबाइल-अनुकूल डिजिटल स्टोरफ्रंट\nप्रत्यक्ष सामाजिक वाणिज्य के लिए एक-क्लिक व्हाट्सएप उत्पाद लिंक और कार्ट शेयरिंग\nतत्काल भुगतान गेटवे एकीकरण के साथ प्रत्यक्ष क्यूआर कोड ऑर्डर करना\nलाभ: मिनटों में ईकॉमर्स लॉन्च करें, शून्य मार्केटप्लेस शुल्क के साथ इंटरनेट खरीदारों को पकड़ें और ऑर्डर को स्वचालित रूप से सिंक करें।',
+      'Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'त्वरित-पहुँच दृश्य पसंदीदा और आयोजित कार्ट के साथ मिलीसेकंड बारकोड स्कैनिंग\nबहु-निविदा विभाजन भुगतान (नकद, कार्ड, यूपीआई, वॉलेट, ग्राहक स्टोर क्रेडिट)\nस्वचालित कैश ड्रॉअर किक पल्स के साथ हाई-स्पीड थर्मल रसीद प्रिंटिंग\nलाभ: काउंटर चेकआउट बाधाओं को दूर करता है, चरम छुट्टियों की भीड़ को आसानी से संभालता है, और बिक्री में 3 गुना तेजी से वृद्धि करता है।',
+      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'ओपनिंग कैश फ्लोट पंजीकरण, पेड-इन/पेड-आउट छोटे कैश वाउचर, और ब्लाइंड काउंट\nप्रति-कैशियर जवाबदेही के साथ स्वचालित मध्य-शिफ्ट एक्स-रिपोर्ट और दिन के अंत की जेड-रिपोर्ट\nवास्तविक समय में नकदी भिन्नता का पता लगाना जो प्रति दराज विसंगतियों को अलग करता है\nलाभ: दराज सिकुड़न को रोकता है, कर्मचारियों की चोरी को रोकता है, और दैनिक रजिस्टर बंद करने के समय को घंटों से घटाकर मिनटों में कर देता है।',
+      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'सख्त समाप्ति तिथि की निगरानी के साथ फार्मास्युटिकल दवा बैच और लॉट ट्रैकिंग\nप्रिस्क्रिप्शन रिकॉर्ड प्रबंधन, डॉक्टर एट्रिब्यूशन, और रोगी खुराक निर्देश\nबैच-स्तरीय लागत के साथ लचीले इकाई रूपांतरण (बॉक्स, स्ट्रिप, टैबलेट, बोतल)।\nलाभ: संपूर्ण स्वास्थ्य नियामक अनुपालन, शून्य एक्सपायरी दवा वितरण, और न्यूनतम सिकुड़न।',
+      'Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'अनुकूलन योग्य छूट, शर्तों और वैधता तिथियों के साथ पेशेवर कोटेशन बिल्डर\nकोटेशन से पुष्टिकृत बिक्री और चालान तक एक-क्लिक स्वचालित रूपांतरण\nब्रांडेड पीडीएफ डाउनलोड और ईमेल या मैसेजिंग के माध्यम से सीधे ग्राहक साझाकरण\nलाभ: बी2बी और थोक सौदे के समापन में तेजी लाता है, डुप्लिकेट मैन्युअल डेटा प्रविष्टि को समाप्त करता है, और नकदी प्रवाह को तेज करता है।',
+      'Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'ऑनलाइन स्टोर, भौतिक दुकानों और केंद्रीय गोदामों में वास्तविक समय स्टॉक सिंक्रनाइज़ेशन\nस्वचालित कम-स्टॉक रीऑर्डर थ्रेशोल्ड के साथ बैच, लॉट और समाप्ति तिथि ट्रैकिंग\nप्रेषण/प्राप्ति ऑडिट ट्रेल्स के साथ अंतर-शाखा स्टॉक खेप और स्थानांतरण\nलाभ: वेब पर अधिक बिक्री को रोकता है, स्टॉकआउट को समाप्त करता है, और पूंजी को अतिरिक्त इन्वेंट्री में लॉक होने से रोकता है।',
+      'Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'स्टाइलिस्ट/चिकित्सक शेड्यूलिंग और कक्ष असाइनमेंट के साथ विज़ुअल अपॉइंटमेंट कैलेंडर\nकस्टम अवधि, ऐड-ऑन उपचार और मूल्य निर्धारण स्तरों के साथ सेवा सूची\nपूर्ण सेवाओं और खुदरा उत्पाद की बिक्री के आधार पर स्वचालित स्टाइलिस्ट कमीशन की गणना\nलाभ: नियुक्ति संबंधी विवादों को दूर करता है, कुर्सी के उपयोग को अनुकूलित करता है, और कर्मचारियों को सटीक कमीशन भुगतान के लिए प्रेरित करता है।',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering â guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'लाइव ऑक्यूपाइड, डाइनिंग और बिलिंग स्थिति के साथ विज़ुअल टेबल फ़्लोर योजनाएं\nसंपर्क रहित टेबल क्यूआर मेनू ऑर्डरिंग - मेहमान फोन से स्कैन, ब्राउज़ और ऑर्डर करते हैं\nकिचन ऑर्डर टिकट (KOT) सीधे लाइव किचन डिस्प्ले सिस्टम (KDS) स्क्रीन पर भेजे जाते हैं\nलाभ: टेबल टर्न को 35% तक तेज करता है, रसोई ऑर्डर त्रुटियों को समाप्त करता है, और वेटस्टाफ ओवरहेड को कम करता है।',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'लाइव ऑक्यूपाइड, डाइनिंग और बिलिंग स्थिति के साथ विज़ुअल टेबल फ़्लोर योजनाएं\nसंपर्क रहित टेबल क्यूआर मेनू ऑर्डरिंग - मेहमान फोन से स्कैन, ब्राउज़ और ऑर्डर करते हैं\nकिचन ऑर्डर टिकट (KOT) सीधे लाइव किचन डिस्प्ले सिस्टम (KDS) स्क्रीन पर भेजे जाते हैं\nलाभ: टेबल टर्न को 35% तक तेज करता है, रसोई ऑर्डर त्रुटियों को समाप्त करता है, और वेटस्टाफ ओवरहेड को कम करता है।',
       '& Mobile': 'और मोबाइल',
       '5 Enterprise Capabilities Built for Scale': 'स्केल के लिए निर्मित 5 उद्यम क्षमताएँ',
       '58mm & 80mm ESC/POS': '58 मिमी और 80 मिमी ESC/POS',
@@ -9528,132 +9204,24 @@ Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lo
       '▼ Configure': '▼ Configurer',
       '🍽️ Dining & Food POS': '🍽️ POS restauration et repas',
       '🏪 Retail & Barcode POS': '🏪 POS commerce et code-barres',
-      '360-degree customer purchasing profiles, contact directories, and buying habits
-Sales lead management pipeline with activity logging, follow-up reminders, and stage tracking
-Automated customer loyalty reward points that accumulate and redeem at checkout
-Benefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': 'Profils d\'achat des clients à 360 degrés, répertoires de contacts et habitudes d\'achat
-Pipeline de gestion des leads commerciaux avec journalisation des activités, rappels de suivi et suivi des étapes
-Points de fidélité client automatisés qui s\'accumulent et s\'échangent à la caisse
-Avantage : augmente la valeur à vie du client (LTV) et la valeur moyenne des commandes (AOV) de 25 % grâce à des avantages de fidélité personnalisés.',
-      'Branch, cashier, and staff sales target monitoring with real-time achievement progress
-Live Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics
-Top-selling products, category contribution, and dead-stock identification
-Benefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Suivi des objectifs de vente des succursales, des caissiers et du personnel avec progression des réalisations en temps réel
-Relevés de profits et pertes (P&L) en direct, marges brutes et analyses du coût des marchandises vendues (COGS)
-Produits les plus vendus, contribution aux catégories et identification des stocks morts
-Avantage : donne aux propriétaires d\'entreprise une clarté financière à 100 % pour supprimer les lignes sous-performantes et maximiser la rentabilité nette.',
-      'Centralized catalog management with branch-specific pricing and localized tax rates
-Inter-branch stock transfer requests with transit tracking and receiving audits
-Consolidated corporate reports with isolated tenant workspace security
-Benefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Gestion centralisée du catalogue avec tarification spécifique à chaque branche et taux de taxe localisés
-Demandes de transfert de stock inter-succursales avec suivi des transits et audits de réception
-Rapports d\'entreprise consolidés avec sécurité de l\'espace de travail des locataires isolés
-Avantage : passez sans effort d’un magasin de quartier à des centaines de franchises à l’échelle nationale.',
-      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)
-Device serial number/IMEI tracking, intake diagnostic notes, and warranty logs
-Integrated spare parts inventory deduction and technician labor invoicing
-Benefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Cycle de vie complet de la réparation (Reçu -> Diagnostic -> Pièces commandées -> Prêt -> Livré)
-Numéro de série de l\'appareil/suivi IMEI, notes de diagnostic d\'admission et journaux de garantie
-Déduction intégrée des stocks de pièces de rechange et facturation de la main d\'œuvre des techniciens
-Avantage : débloque des revenus de services de réparation à forte marge pour les magasins d\'électronique, d\'ordinateurs et de vélos en toute transparence.',
-      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes
-One-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF
-Thermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices
-Benefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Factures fiscales conformes générées automatiquement avec des détails fiscaux détaillés et des codes HSN/SAC
-Envoi instantané en un seul clic au client WhatsApp, SMS et e-mail avec PDF de marque
-Reçus thermiques (58 mm/80 mm) ainsi que des factures fiscales au format PDF A4 d\'entreprise
-Avantage : conformité fiscale et d\'audit à 100 %, zéro gaspillage de papier et taux d\'ouverture de reçus WhatsApp de 98 % pour le réengagement des clients.',
-      'Customer credit limits, balance statements, and aged receivables tracking
-Supplier purchase bills, payment schedules, and outstanding ledger balances
-Comprehensive transaction history and automated debit/credit balancing
-Benefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Limites de crédit client, relevés de solde et suivi des anciennes créances
-Factures d\'achat des fournisseurs, échéanciers de paiement et soldes comptables impayés
-Historique complet des transactions et équilibrage automatique des débits et des crédits
-Avantage : maximise la visibilité du fonds de roulement, réduit les créances irrécouvrables et maintient des conditions commerciales solides avec les fournisseurs.',
-      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion
-Direct ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet
-Runs on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones
-Benefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'APK natif Android dédié et application de bureau Windows pour une immersion en plein écran
-Communication directe de l\'imprimante thermique ESC/POS via USB, Bluetooth et LAN/Ethernet
-Fonctionne sur le matériel existant : tablettes, terminaux POS tout-en-un, ordinateurs portables ou téléphones mobiles
-Avantage : Pas de verrous matériels propriétaires coûteux : vous économisez des milliers de dollars en coûts d\'installation et de maintenance initiaux.',
-      'Full counter operations, barcode search, cart calculations, and receipt printing without internet
-Automatic background synchronization on reconnect with tamper-proof duplicate prevention
-Continuous local data caching so tills never freeze during network cuts
-Benefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Opérations complètes au comptoir, recherche de codes-barres, calculs de panier et impression de reçus sans Internet
-Synchronisation automatique en arrière-plan lors de la reconnexion avec prévention des doublons inviolable
-Mise en cache continue des données locales afin que les caisses ne gèlent jamais lors de coupures de réseau
-Avantage : zéro temps d\'arrêt et zéro perte de ventes en cas de coupure d\'Internet pendant les heures de pointe.',
-      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)
-Device authorization and terminal registration to prevent unauthorized logins
-Tamper-proof audit trails for every price override, discount, held cart, and refund
-Benefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Autorisations granulaires par module (caissiers, gérants de magasin, commis aux stocks, comptables)
-Autorisation de l\'appareil et enregistrement du terminal pour empêcher les connexions non autorisées
-Pistes d\'audit inviolables pour chaque modification de prix, remise, panier retenu et remboursement
-Avantage : protège les marges bénéficiaires contre les abus de remises de caisse et maintient les opérations strictement conformes.',
-      'Instant mobile-friendly digital storefront with category & brand filtering
-One-click WhatsApp product link & cart sharing for direct social commerce
-Direct QR code ordering with instant payment gateway integration
-Benefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Vitrine numérique instantanée adaptée aux mobiles avec filtrage par catégorie et par marque
-Lien de produit WhatsApp et partage de panier en un clic pour le commerce social direct
-Commande directe de code QR avec intégration de passerelle de paiement instantanée
-Avantage : lancez le commerce électronique en quelques minutes, captez les acheteurs Internet sans frais de marché et synchronisez automatiquement les commandes.',
-      'Millisecond barcode scanning with quick-access visual favorites & held carts
-Multi-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)
-High-speed thermal receipt printing with automated cash drawer kick pulse
-Benefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Lecture de codes-barres en millisecondes avec accès rapide aux favoris visuels et aux chariots conservés
-Paiements fractionnés multi-appels d\'offres (espèces, carte, UPI, portefeuilles, crédit du magasin client)
-Impression thermique à grande vitesse des reçus avec impulsion automatique du tiroir-caisse
-Avantage : élimine les goulots d\'étranglement aux caisses, gère sans effort les pics de fréquentation des fêtes et augmente les ventes 3 fois plus rapidement.',
-      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts
-Automated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability
-Real-time cash variance detection that isolates discrepancies per drawer
-Benefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Enregistrement de la caisse d\'ouverture, bons de petite caisse payés/payés et décomptes aveugles
-Rapports X automatisés en milieu de travail et rapports Z de fin de journée avec responsabilité par caissier
-Détection des écarts de trésorerie en temps réel qui isole les écarts par tiroir-caisse
-Avantage : arrête le rétrécissement des tiroirs, prévient le vol des employés et réduit le temps de fermeture quotidien des caisses de quelques heures à quelques minutes.',
-      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring
-Prescription record management, doctor attribution, and patient dosage instructions
-Flexible unit conversions (box, strip, tablet, bottle) with batch-level costing
-Benefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Suivi des lots et des lots de médicaments pharmaceutiques avec surveillance stricte de la date de péremption
-Gestion des dossiers de prescription, attribution des médecins et instructions de dosage pour les patients
-Conversions d\'unités flexibles (boîte, bandelette, comprimé, bouteille) avec calcul des coûts au niveau des lots
-Avantage : Conformité totale aux réglementations en matière de santé, dispense de médicaments périmés et retrait minimisé.',
-      'Professional quotation builder with customizable discounts, terms, and validity dates
-One-click automated conversion from Quote to confirmed Sale and Invoice
-Branded PDF downloads and direct customer sharing via email or messaging
-Benefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Générateur de devis professionnel avec remises, conditions et dates de validité personnalisables
-Conversion automatisée en un clic du devis en vente et facture confirmées
-Téléchargements de PDF de marque et partage direct avec les clients par e-mail ou messagerie
-Avantage : accélère la conclusion de transactions B2B et de gros, élimine la saisie manuelle de données en double et accélère les flux de trésorerie.',
-      'Real-time stock synchronization across online store, physical shops, and central warehouses
-Batch, lot, and expiry date tracking with automatic low-stock reorder thresholds
-Inter-branch stock consignments and transfers with dispatch/receiving audit trails
-Benefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Synchronisation des stocks en temps réel dans la boutique en ligne, les magasins physiques et les entrepôts centraux
-Suivi des lots, des lots et des dates de péremption avec seuils automatiques de réapprovisionnement en cas de faible stock
-Consignations et transferts de stocks inter-succursales avec pistes d\'audit expédition/réception
-Avantage : empêche la survente sur le Web, élimine les ruptures de stock et empêche le capital de s\'accumuler dans les stocks excédentaires.',
-      'Visual appointment calendar with stylist/therapist scheduling and room assignment
-Service catalog with custom durations, add-on treatments, and pricing tiers
-Automatic stylist commission calculation based on completed services and retail product upsells
-Benefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Calendrier de rendez-vous visuel avec planification des stylistes/thérapeutes et attribution des chambres
-Catalogue de services avec durées personnalisées, traitements complémentaires et niveaux de tarification
-Calcul automatique des commissions du styliste en fonction des services complétés et des ventes incitatives de produits au détail
-Avantage : élimine les conflits de rendez-vous, optimise l\'utilisation du fauteuil et motive le personnel grâce à des paiements de commissions précis.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering â guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Plans d\'étage visuels des tables avec statut d\'occupation, de restauration et de facturation
-Commande de menu QR de table sans contact : les invités scannent, parcourent et commandent à partir de téléphones
-Les tickets de commande de cuisine (KOT) sont acheminés directement vers les écrans en direct du système d\'affichage de cuisine (KDS)
-Avantage : accélère les rotations de table de 35 %, élimine les erreurs de commande en cuisine et réduit les frais généraux du personnel de service.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering — guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Plans d\'étage visuels des tables avec statut d\'occupation, de restauration et de facturation
-Commande de menu QR de table sans contact : les invités numérisent, parcourent et commandent à partir de téléphones
-Les tickets de commande de cuisine (KOT) sont acheminés directement vers les écrans en direct du système d\'affichage de cuisine (KDS)
-Avantage : accélère les rotations de table de 35 %, élimine les erreurs de commande en cuisine et réduit les frais généraux du personnel de service.',
+      '360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': 'Profils d\'achat des clients à 360 degrés, répertoires de contacts et habitudes d\'achat\nPipeline de gestion des leads commerciaux avec journalisation des activités, rappels de suivi et suivi des étapes\nPoints de fidélité client automatisés qui s\'accumulent et s\'échangent à la caisse\nAvantage : augmente la valeur à vie du client (LTV) et la valeur moyenne des commandes (AOV) de 25 % grâce à des avantages de fidélité personnalisés.',
+      'Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Suivi des objectifs de vente des succursales, des caissiers et du personnel avec progression des réalisations en temps réel\nRelevés de profits et pertes (P&L) en direct, marges brutes et analyses du coût des marchandises vendues (COGS)\nProduits les plus vendus, contribution aux catégories et identification des stocks morts\nAvantage : donne aux propriétaires d\'entreprise une clarté financière à 100 % pour supprimer les lignes sous-performantes et maximiser la rentabilité nette.',
+      'Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Gestion centralisée du catalogue avec tarification spécifique à chaque branche et taux de taxe localisés\nDemandes de transfert de stock inter-succursales avec suivi des transits et audits de réception\nRapports d\'entreprise consolidés avec sécurité de l\'espace de travail des locataires isolés\nAvantage : passez sans effort d’un magasin de quartier à des centaines de franchises à l’échelle nationale.',
+      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Cycle de vie complet de la réparation (Reçu -> Diagnostic -> Pièces commandées -> Prêt -> Livré)\nNuméro de série de l\'appareil/suivi IMEI, notes de diagnostic d\'admission et journaux de garantie\nDéduction intégrée des stocks de pièces de rechange et facturation de la main d\'œuvre des techniciens\nAvantage : débloque des revenus de services de réparation à forte marge pour les magasins d\'électronique, d\'ordinateurs et de vélos en toute transparence.',
+      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Factures fiscales conformes générées automatiquement avec des détails fiscaux détaillés et des codes HSN/SAC\nEnvoi instantané en un seul clic au client WhatsApp, SMS et e-mail avec PDF de marque\nReçus thermiques (58 mm/80 mm) ainsi que des factures fiscales au format PDF A4 d\'entreprise\nAvantage : conformité fiscale et d\'audit à 100 %, zéro gaspillage de papier et taux d\'ouverture de reçus WhatsApp de 98 % pour le réengagement des clients.',
+      'Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Limites de crédit client, relevés de solde et suivi des anciennes créances\nFactures d\'achat des fournisseurs, échéanciers de paiement et soldes comptables impayés\nHistorique complet des transactions et équilibrage automatique des débits et des crédits\nAvantage : maximise la visibilité du fonds de roulement, réduit les créances irrécouvrables et maintient des conditions commerciales solides avec les fournisseurs.',
+      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'APK natif Android dédié et application de bureau Windows pour une immersion en plein écran\nCommunication directe de l\'imprimante thermique ESC/POS via USB, Bluetooth et LAN/Ethernet\nFonctionne sur le matériel existant : tablettes, terminaux POS tout-en-un, ordinateurs portables ou téléphones mobiles\nAvantage : Pas de verrous matériels propriétaires coûteux : vous économisez des milliers de dollars en coûts d\'installation et de maintenance initiaux.',
+      'Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Opérations complètes au comptoir, recherche de codes-barres, calculs de panier et impression de reçus sans Internet\nSynchronisation automatique en arrière-plan lors de la reconnexion avec prévention des doublons inviolable\nMise en cache continue des données locales afin que les caisses ne gèlent jamais lors de coupures de réseau\nAvantage : zéro temps d\'arrêt et zéro perte de ventes en cas de coupure d\'Internet pendant les heures de pointe.',
+      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Autorisations granulaires par module (caissiers, gérants de magasin, commis aux stocks, comptables)\nAutorisation de l\'appareil et enregistrement du terminal pour empêcher les connexions non autorisées\nPistes d\'audit inviolables pour chaque modification de prix, remise, panier retenu et remboursement\nAvantage : protège les marges bénéficiaires contre les abus de remises de caisse et maintient les opérations strictement conformes.',
+      'Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Vitrine numérique instantanée adaptée aux mobiles avec filtrage par catégorie et par marque\nLien de produit WhatsApp et partage de panier en un clic pour le commerce social direct\nCommande directe de code QR avec intégration de passerelle de paiement instantanée\nAvantage : lancez le commerce électronique en quelques minutes, captez les acheteurs Internet sans frais de marché et synchronisez automatiquement les commandes.',
+      'Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Lecture de codes-barres en millisecondes avec accès rapide aux favoris visuels et aux chariots conservés\nPaiements fractionnés multi-appels d\'offres (espèces, carte, UPI, portefeuilles, crédit du magasin client)\nImpression thermique à grande vitesse des reçus avec impulsion automatique du tiroir-caisse\nAvantage : élimine les goulots d\'étranglement aux caisses, gère sans effort les pics de fréquentation des fêtes et augmente les ventes 3 fois plus rapidement.',
+      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Enregistrement de la caisse d\'ouverture, bons de petite caisse payés/payés et décomptes aveugles\nRapports X automatisés en milieu de travail et rapports Z de fin de journée avec responsabilité par caissier\nDétection des écarts de trésorerie en temps réel qui isole les écarts par tiroir-caisse\nAvantage : arrête le rétrécissement des tiroirs, prévient le vol des employés et réduit le temps de fermeture quotidien des caisses de quelques heures à quelques minutes.',
+      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Suivi des lots et des lots de médicaments pharmaceutiques avec surveillance stricte de la date de péremption\nGestion des dossiers de prescription, attribution des médecins et instructions de dosage pour les patients\nConversions d\'unités flexibles (boîte, bandelette, comprimé, bouteille) avec calcul des coûts au niveau des lots\nAvantage : Conformité totale aux réglementations en matière de santé, dispense de médicaments périmés et retrait minimisé.',
+      'Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Générateur de devis professionnel avec remises, conditions et dates de validité personnalisables\nConversion automatisée en un clic du devis en vente et facture confirmées\nTéléchargements de PDF de marque et partage direct avec les clients par e-mail ou messagerie\nAvantage : accélère la conclusion de transactions B2B et de gros, élimine la saisie manuelle de données en double et accélère les flux de trésorerie.',
+      'Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Synchronisation des stocks en temps réel dans la boutique en ligne, les magasins physiques et les entrepôts centraux\nSuivi des lots, des lots et des dates de péremption avec seuils automatiques de réapprovisionnement en cas de faible stock\nConsignations et transferts de stocks inter-succursales avec pistes d\'audit expédition/réception\nAvantage : empêche la survente sur le Web, élimine les ruptures de stock et empêche le capital de s\'accumuler dans les stocks excédentaires.',
+      'Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Calendrier de rendez-vous visuel avec planification des stylistes/thérapeutes et attribution des chambres\nCatalogue de services avec durées personnalisées, traitements complémentaires et niveaux de tarification\nCalcul automatique des commissions du styliste en fonction des services complétés et des ventes incitatives de produits au détail\nAvantage : élimine les conflits de rendez-vous, optimise l\'utilisation du fauteuil et motive le personnel grâce à des paiements de commissions précis.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering â guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Plans d\'étage visuels des tables avec statut d\'occupation, de restauration et de facturation\nCommande de menu QR de table sans contact : les invités scannent, parcourent et commandent à partir de téléphones\nLes tickets de commande de cuisine (KOT) sont acheminés directement vers les écrans en direct du système d\'affichage de cuisine (KDS)\nAvantage : accélère les rotations de table de 35 %, élimine les erreurs de commande en cuisine et réduit les frais généraux du personnel de service.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Plans d\'étage visuels des tables avec statut d\'occupation, de restauration et de facturation\nCommande de menu QR de table sans contact : les invités numérisent, parcourent et commandent à partir de téléphones\nLes tickets de commande de cuisine (KOT) sont acheminés directement vers les écrans en direct du système d\'affichage de cuisine (KDS)\nAvantage : accélère les rotations de table de 35 %, élimine les erreurs de commande en cuisine et réduit les frais généraux du personnel de service.',
       '& Mobile': '& Mobiles',
       '5 Enterprise Capabilities Built for Scale': '5 fonctionnalités d\'entreprise conçues pour évoluer',
       '58mm & 80mm ESC/POS': 'Thermique 58mm & 80mm ESC/POS',
@@ -12087,132 +11655,24 @@ Avantage : accélère les rotations de table de 35 %, élimine les erreurs de 
       '▼ Configure': '▼ Configurar',
       '🍽️ Dining & Food POS': '🍽️ PDV de restaurante e alimentação',
       '🏪 Retail & Barcode POS': '🏪 PDV de varejo e código de barras',
-      '360-degree customer purchasing profiles, contact directories, and buying habits
-Sales lead management pipeline with activity logging, follow-up reminders, and stage tracking
-Automated customer loyalty reward points that accumulate and redeem at checkout
-Benefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': 'Perfis de compra de clientes em 360 graus, diretórios de contato e hábitos de compra
-Pipeline de gerenciamento de leads de vendas com registro de atividades, lembretes de acompanhamento e rastreamento de estágio
-Pontos automatizados de recompensa de fidelidade do cliente que acumulam e resgatam na finalização da compra
-Benefício: aumenta o valor da vida do cliente (LTV) e o valor médio do pedido (AOV) em 25% por meio de benefícios de fidelidade personalizados.',
-      'Branch, cashier, and staff sales target monitoring with real-time achievement progress
-Live Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics
-Top-selling products, category contribution, and dead-stock identification
-Benefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Monitoramento de metas de vendas de agências, caixas e funcionários com progresso de conquistas em tempo real
-Declarações de lucros e perdas (P&L) em tempo real, margens brutas e análises de custo de produtos vendidos (CPV)
-Produtos mais vendidos, contribuição de categoria e identificação de estoque morto
-Benefício: Oferece aos proprietários de empresas 100% de clareza financeira para cortar linhas de baixo desempenho e maximizar a lucratividade líquida.',
-      'Centralized catalog management with branch-specific pricing and localized tax rates
-Inter-branch stock transfer requests with transit tracking and receiving audits
-Consolidated corporate reports with isolated tenant workspace security
-Benefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Gerenciamento centralizado de catálogos com preços específicos para filiais e taxas de impostos localizadas
-Solicitações de transferência de estoque entre filiais com acompanhamento de trânsito e auditorias de recebimento
-Relatórios corporativos consolidados com segurança de espaço de trabalho de locatário isolado
-Benefício: Escale facilmente de uma loja de bairro para centenas de locais de franquia em todo o país.',
-      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)
-Device serial number/IMEI tracking, intake diagnostic notes, and warranty logs
-Integrated spare parts inventory deduction and technician labor invoicing
-Benefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Ciclo de vida completo do reparo (Recebido -> Diagnóstico -> Peças solicitadas -> Prontas -> Entregues)
-Rastreamento de número de série/IMEI do dispositivo, notas de diagnóstico de admissão e registros de garantia
-Dedução integrada de estoque de peças de reposição e faturamento de mão de obra técnica
-Benefício: Desbloqueia receitas de serviços de reparo de alta margem para lojas de eletrônicos, informática e bicicletas com total transparência.',
-      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes
-One-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF
-Thermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices
-Benefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Faturas fiscais compatíveis geradas automaticamente com detalhamento de impostos e códigos HSN/SAC
-Envio instantâneo com um toque para WhatsApp, SMS e e-mail do cliente com PDF da marca
-Recibos térmicos (58 mm/80 mm) juntamente com faturas fiscais em PDF A4 formatadas para empresas
-Benefício: 100% de conformidade fiscal e de auditoria, zero desperdício de papel e taxas de abertura de recibos de 98% no WhatsApp para reengajamento do cliente.',
-      'Customer credit limits, balance statements, and aged receivables tracking
-Supplier purchase bills, payment schedules, and outstanding ledger balances
-Comprehensive transaction history and automated debit/credit balancing
-Benefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Limites de crédito do cliente, extratos de saldo e rastreamento de contas a receber antigas
-Faturas de compra de fornecedores, cronogramas de pagamento e saldos contábeis pendentes
-Histórico de transações abrangente e balanceamento automático de débito/crédito
-Benefício: Maximiza a visibilidade do capital de giro, reduz dívidas inadimplentes e mantém fortes condições comerciais com fornecedores.',
-      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion
-Direct ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet
-Runs on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones
-Benefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'APK Android nativo dedicado e aplicativo de desktop do Windows para imersão no contador em tela cheia
-Comunicação direta da impressora térmica ESC/POS via USB, Bluetooth e LAN/Ethernet
-Funciona em hardware existente – tablets, terminais multifuncionais POS, laptops ou telefones celulares
-Benefício: Sem bloqueios de hardware proprietários caros – economiza milhares de dólares em custos iniciais de configuração e manutenção.',
-      'Full counter operations, barcode search, cart calculations, and receipt printing without internet
-Automatic background synchronization on reconnect with tamper-proof duplicate prevention
-Continuous local data caching so tills never freeze during network cuts
-Benefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Operações completas de balcão, pesquisa de código de barras, cálculos de carrinho e impressão de recibos sem internet
-Sincronização automática em segundo plano na reconexão com prevenção de duplicação à prova de violação
-Cache de dados local contínuo para que as caixas registradoras nunca congelem durante cortes de rede
-Benefício: Zero tempo de inatividade e zero perda de vendas quando a Internet cai durante os horários de pico de compras.',
-      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)
-Device authorization and terminal registration to prevent unauthorized logins
-Tamper-proof audit trails for every price override, discount, held cart, and refund
-Benefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Permissões granulares por módulo (caixas, gerentes de loja, balconistas, contadores)
-Autorização de dispositivo e registro de terminal para evitar logins não autorizados
-Trilhas de auditoria à prova de adulteração para cada alteração de preço, desconto, carrinho retido e reembolso
-Benefício: Protege as margens de lucro contra o abuso de descontos no caixa e mantém as operações estritamente em conformidade.',
-      'Instant mobile-friendly digital storefront with category & brand filtering
-One-click WhatsApp product link & cart sharing for direct social commerce
-Direct QR code ordering with instant payment gateway integration
-Benefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Vitrine digital instantânea compatível com dispositivos móveis com filtragem de categoria e marca
-Link do produto WhatsApp com um clique e compartilhamento de carrinho para comércio social direto
-Pedido direto de código QR com integração instantânea de gateway de pagamento
-Benefício: lance o comércio eletrônico em minutos, capture compradores na Internet sem taxas de mercado e sincronize pedidos automaticamente.',
-      'Millisecond barcode scanning with quick-access visual favorites & held carts
-Multi-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)
-High-speed thermal receipt printing with automated cash drawer kick pulse
-Benefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Leitura de código de barras em milissegundos com favoritos visuais de acesso rápido e carrinhos retidos
-Pagamentos divididos em várias propostas (dinheiro, cartão, UPI, carteiras, crédito na loja do cliente)
-Impressão térmica de recibos de alta velocidade com pulso automático de acionamento da gaveta de dinheiro
-Benefício: elimina gargalos no caixa, lida com os picos de multidões nos feriados sem esforço e aumenta as vendas 3 vezes mais rápido.',
-      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts
-Automated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability
-Real-time cash variance detection that isolates discrepancies per drawer
-Benefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Abertura de registro de fluxo de caixa, vales de caixa pagos/pagos e contagens cegas
-Relatórios X automatizados no meio do turno e relatórios Z no final do dia com responsabilidade por caixa
-Detecção de variação de caixa em tempo real que isola discrepâncias por gaveta
-Benefício: Impede o encolhimento da gaveta, evita roubos por funcionários e reduz o tempo de fechamento diário de registros de horas para minutos.',
-      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring
-Prescription record management, doctor attribution, and patient dosage instructions
-Flexible unit conversions (box, strip, tablet, bottle) with batch-level costing
-Benefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Rastreamento de lotes e lotes de medicamentos farmacêuticos com monitoramento rigoroso da data de validade
-Gerenciamento de registros de prescrição, atribuição do médico e instruções de dosagem do paciente
-Conversões flexíveis de unidades (caixa, tira, comprimido, frasco) com custo em nível de lote
-Benefício: Conformidade total com as regulamentações de saúde, dispensa de nenhum medicamento vencido e redução minimizada.',
-      'Professional quotation builder with customizable discounts, terms, and validity dates
-One-click automated conversion from Quote to confirmed Sale and Invoice
-Branded PDF downloads and direct customer sharing via email or messaging
-Benefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Construtor de cotações profissional com descontos, termos e datas de validade personalizáveis
-Conversão automatizada com um clique de cotação para venda e fatura confirmadas
-Downloads de PDF de marca e compartilhamento direto com o cliente por e-mail ou mensagens
-Benefício: Acelera o fechamento de negócios B2B e de atacado, elimina a entrada manual duplicada de dados e acelera o fluxo de caixa.',
-      'Real-time stock synchronization across online store, physical shops, and central warehouses
-Batch, lot, and expiry date tracking with automatic low-stock reorder thresholds
-Inter-branch stock consignments and transfers with dispatch/receiving audit trails
-Benefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Sincronização de estoque em tempo real em lojas online, lojas físicas e armazéns centrais
-Rastreamento de lote, lote e data de vencimento com limites automáticos de reabastecimento de estoque baixo
-Remessas e transferências de estoque entre filiais com trilhas de auditoria de expedição/recebimento
-Benefício: Evita vendas excessivas na web, elimina rupturas de estoque e evita que o capital fique preso em excesso de estoque.',
-      'Visual appointment calendar with stylist/therapist scheduling and room assignment
-Service catalog with custom durations, add-on treatments, and pricing tiers
-Automatic stylist commission calculation based on completed services and retail product upsells
-Benefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Calendário visual de compromissos com agendamento de estilista/terapeuta e atribuição de sala
-Catálogo de serviços com durações personalizadas, tratamentos complementares e níveis de preços
-Cálculo automático de comissão de estilista com base em serviços concluídos e vendas adicionais de produtos de varejo
-Benefício: Elimina conflitos de compromissos, otimiza a utilização da cadeira e motiva a equipe com pagamentos de comissões precisos.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering â guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Plantas baixas de mesa visuais com status de ocupação, jantar e cobrança ao vivo
-Pedido de menu QR da mesa sem contato - convidados escaneiam, navegam e fazem pedidos por telefones
-Kitchen Order Tickets (KOT) roteados diretamente para telas ao vivo do Kitchen Display System (KDS)
-Benefício: Acelera o giro da mesa em 35%, elimina erros de pedidos na cozinha e reduz as despesas gerais dos garçons.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering — guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Plantas baixas de mesa visuais com status de ocupação, jantar e cobrança ao vivo
-Pedido de menu QR da mesa sem contato – os hóspedes escaneiam, navegam e fazem pedidos pelos telefones
-Kitchen Order Tickets (KOT) roteados diretamente para telas ao vivo do Kitchen Display System (KDS)
-Benefício: Acelera o giro da mesa em 35%, elimina erros de pedidos na cozinha e reduz as despesas gerais dos garçons.',
+      '360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': 'Perfis de compra de clientes em 360 graus, diretórios de contato e hábitos de compra\nPipeline de gerenciamento de leads de vendas com registro de atividades, lembretes de acompanhamento e rastreamento de estágio\nPontos automatizados de recompensa de fidelidade do cliente que acumulam e resgatam na finalização da compra\nBenefício: aumenta o valor da vida do cliente (LTV) e o valor médio do pedido (AOV) em 25% por meio de benefícios de fidelidade personalizados.',
+      'Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Monitoramento de metas de vendas de agências, caixas e funcionários com progresso de conquistas em tempo real\nDeclarações de lucros e perdas (P&L) em tempo real, margens brutas e análises de custo de produtos vendidos (CPV)\nProdutos mais vendidos, contribuição de categoria e identificação de estoque morto\nBenefício: Oferece aos proprietários de empresas 100% de clareza financeira para cortar linhas de baixo desempenho e maximizar a lucratividade líquida.',
+      'Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Gerenciamento centralizado de catálogos com preços específicos para filiais e taxas de impostos localizadas\nSolicitações de transferência de estoque entre filiais com acompanhamento de trânsito e auditorias de recebimento\nRelatórios corporativos consolidados com segurança de espaço de trabalho de locatário isolado\nBenefício: Escale facilmente de uma loja de bairro para centenas de locais de franquia em todo o país.',
+      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Ciclo de vida completo do reparo (Recebido -> Diagnóstico -> Peças solicitadas -> Prontas -> Entregues)\nRastreamento de número de série/IMEI do dispositivo, notas de diagnóstico de admissão e registros de garantia\nDedução integrada de estoque de peças de reposição e faturamento de mão de obra técnica\nBenefício: Desbloqueia receitas de serviços de reparo de alta margem para lojas de eletrônicos, informática e bicicletas com total transparência.',
+      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Faturas fiscais compatíveis geradas automaticamente com detalhamento de impostos e códigos HSN/SAC\nEnvio instantâneo com um toque para WhatsApp, SMS e e-mail do cliente com PDF da marca\nRecibos térmicos (58 mm/80 mm) juntamente com faturas fiscais em PDF A4 formatadas para empresas\nBenefício: 100% de conformidade fiscal e de auditoria, zero desperdício de papel e taxas de abertura de recibos de 98% no WhatsApp para reengajamento do cliente.',
+      'Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Limites de crédito do cliente, extratos de saldo e rastreamento de contas a receber antigas\nFaturas de compra de fornecedores, cronogramas de pagamento e saldos contábeis pendentes\nHistórico de transações abrangente e balanceamento automático de débito/crédito\nBenefício: Maximiza a visibilidade do capital de giro, reduz dívidas inadimplentes e mantém fortes condições comerciais com fornecedores.',
+      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'APK Android nativo dedicado e aplicativo de desktop do Windows para imersão no contador em tela cheia\nComunicação direta da impressora térmica ESC/POS via USB, Bluetooth e LAN/Ethernet\nFunciona em hardware existente – tablets, terminais multifuncionais POS, laptops ou telefones celulares\nBenefício: Sem bloqueios de hardware proprietários caros – economiza milhares de dólares em custos iniciais de configuração e manutenção.',
+      'Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Operações completas de balcão, pesquisa de código de barras, cálculos de carrinho e impressão de recibos sem internet\nSincronização automática em segundo plano na reconexão com prevenção de duplicação à prova de violação\nCache de dados local contínuo para que as caixas registradoras nunca congelem durante cortes de rede\nBenefício: Zero tempo de inatividade e zero perda de vendas quando a Internet cai durante os horários de pico de compras.',
+      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Permissões granulares por módulo (caixas, gerentes de loja, balconistas, contadores)\nAutorização de dispositivo e registro de terminal para evitar logins não autorizados\nTrilhas de auditoria à prova de adulteração para cada alteração de preço, desconto, carrinho retido e reembolso\nBenefício: Protege as margens de lucro contra o abuso de descontos no caixa e mantém as operações estritamente em conformidade.',
+      'Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Vitrine digital instantânea compatível com dispositivos móveis com filtragem de categoria e marca\nLink do produto WhatsApp com um clique e compartilhamento de carrinho para comércio social direto\nPedido direto de código QR com integração instantânea de gateway de pagamento\nBenefício: lance o comércio eletrônico em minutos, capture compradores na Internet sem taxas de mercado e sincronize pedidos automaticamente.',
+      'Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Leitura de código de barras em milissegundos com favoritos visuais de acesso rápido e carrinhos retidos\nPagamentos divididos em várias propostas (dinheiro, cartão, UPI, carteiras, crédito na loja do cliente)\nImpressão térmica de recibos de alta velocidade com pulso automático de acionamento da gaveta de dinheiro\nBenefício: elimina gargalos no caixa, lida com os picos de multidões nos feriados sem esforço e aumenta as vendas 3 vezes mais rápido.',
+      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Abertura de registro de fluxo de caixa, vales de caixa pagos/pagos e contagens cegas\nRelatórios X automatizados no meio do turno e relatórios Z no final do dia com responsabilidade por caixa\nDetecção de variação de caixa em tempo real que isola discrepâncias por gaveta\nBenefício: Impede o encolhimento da gaveta, evita roubos por funcionários e reduz o tempo de fechamento diário de registros de horas para minutos.',
+      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Rastreamento de lotes e lotes de medicamentos farmacêuticos com monitoramento rigoroso da data de validade\nGerenciamento de registros de prescrição, atribuição do médico e instruções de dosagem do paciente\nConversões flexíveis de unidades (caixa, tira, comprimido, frasco) com custo em nível de lote\nBenefício: Conformidade total com as regulamentações de saúde, dispensa de nenhum medicamento vencido e redução minimizada.',
+      'Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Construtor de cotações profissional com descontos, termos e datas de validade personalizáveis\nConversão automatizada com um clique de cotação para venda e fatura confirmadas\nDownloads de PDF de marca e compartilhamento direto com o cliente por e-mail ou mensagens\nBenefício: Acelera o fechamento de negócios B2B e de atacado, elimina a entrada manual duplicada de dados e acelera o fluxo de caixa.',
+      'Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Sincronização de estoque em tempo real em lojas online, lojas físicas e armazéns centrais\nRastreamento de lote, lote e data de vencimento com limites automáticos de reabastecimento de estoque baixo\nRemessas e transferências de estoque entre filiais com trilhas de auditoria de expedição/recebimento\nBenefício: Evita vendas excessivas na web, elimina rupturas de estoque e evita que o capital fique preso em excesso de estoque.',
+      'Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Calendário visual de compromissos com agendamento de estilista/terapeuta e atribuição de sala\nCatálogo de serviços com durações personalizadas, tratamentos complementares e níveis de preços\nCálculo automático de comissão de estilista com base em serviços concluídos e vendas adicionais de produtos de varejo\nBenefício: Elimina conflitos de compromissos, otimiza a utilização da cadeira e motiva a equipe com pagamentos de comissões precisos.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering â guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Plantas baixas de mesa visuais com status de ocupação, jantar e cobrança ao vivo\nPedido de menu QR da mesa sem contato - convidados escaneiam, navegam e fazem pedidos por telefones\nKitchen Order Tickets (KOT) roteados diretamente para telas ao vivo do Kitchen Display System (KDS)\nBenefício: Acelera o giro da mesa em 35%, elimina erros de pedidos na cozinha e reduz as despesas gerais dos garçons.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Plantas baixas de mesa visuais com status de ocupação, jantar e cobrança ao vivo\nPedido de menu QR da mesa sem contato – os hóspedes escaneiam, navegam e fazem pedidos pelos telefones\nKitchen Order Tickets (KOT) roteados diretamente para telas ao vivo do Kitchen Display System (KDS)\nBenefício: Acelera o giro da mesa em 35%, elimina erros de pedidos na cozinha e reduz as despesas gerais dos garçons.',
       '& Mobile': '& Móvel',
       '5 Enterprise Capabilities Built for Scale': '5 capacidades empresariais desenvolvidas para escala',
       '58mm & 80mm ESC/POS': 'Térmica 58mm e 80mm ESC/POS',
@@ -14683,132 +14143,24 @@ Benefício: Acelera o giro da mesa em 35%, elimina erros de pedidos na cozinha e
       '▼ Configure': '▼ Konfigurieren',
       '🍽️ Dining & Food POS': '🍽️ Gastronomie-POS',
       '🏪 Retail & Barcode POS': '🏪 Einzelhandels- & Barcode-POS',
-      '360-degree customer purchasing profiles, contact directories, and buying habits
-Sales lead management pipeline with activity logging, follow-up reminders, and stage tracking
-Automated customer loyalty reward points that accumulate and redeem at checkout
-Benefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': '360-Grad-Kundenkaufprofile, Kontaktverzeichnisse und Kaufgewohnheiten
-Vertriebs-Lead-Management-Pipeline mit Aktivitätsprotokollierung, Follow-up-Erinnerungen und Phasenverfolgung
-Automatisierte Kundentreue-Prämienpunkte, die an der Kasse gesammelt und eingelöst werden
-Vorteil: Steigert den Customer Lifetime Value (LTV) und den durchschnittlichen Bestellwert (AOV) um 25 % durch personalisierte Treuevorteile.',
-      'Branch, cashier, and staff sales target monitoring with real-time achievement progress
-Live Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics
-Top-selling products, category contribution, and dead-stock identification
-Benefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Überwachung der Filial-, Kassierer- und Mitarbeiter-Verkaufsziele mit Echtzeit-Erfolgsfortschritten
-Live-Gewinn- und Verlustrechnungen (GuV), Bruttomargen und Analysen der Kosten der verkauften Waren (COGS).
-Meistverkaufte Produkte, Kategoriebeitrag und Identifizierung von Lagerbeständen
-Vorteil: Bietet Geschäftsinhabern 100 % finanzielle Klarheit, um leistungsschwache Linien zu reduzieren und die Nettorentabilität zu maximieren.',
-      'Centralized catalog management with branch-specific pricing and localized tax rates
-Inter-branch stock transfer requests with transit tracking and receiving audits
-Consolidated corporate reports with isolated tenant workspace security
-Benefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Zentralisierte Katalogverwaltung mit branchenspezifischen Preisen und lokalisierten Steuersätzen
-Filialübergreifende Umlagerungsanfragen mit Transitverfolgung und Eingangsprüfungen
-Konsolidierte Unternehmensberichte mit isolierter Sicherheit des Mieterarbeitsbereichs
-Vorteil: Skalieren Sie mühelos von einem Laden in der Nähe auf Hunderte von Franchise-Standorten im ganzen Land.',
-      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)
-Device serial number/IMEI tracking, intake diagnostic notes, and warranty logs
-Integrated spare parts inventory deduction and technician labor invoicing
-Benefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Vollständiger Reparaturlebenszyklus (Empfangen -> Diagnose -> Bestellte Teile -> Bereit -> Geliefert)
-Geräteseriennummer/IMEI-Verfolgung, Aufnahmediagnosehinweise und Garantieprotokolle
-Integrierter Ersatzteilabzug und Abrechnung der Technikerarbeit
-Vorteil: Erschließt hochmargige Umsätze aus dem Reparaturservice für Elektronik-, Computer- und Fahrradgeschäfte mit völliger Transparenz.',
-      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes
-One-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF
-Thermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices
-Benefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Konforme Steuerrechnungen werden automatisch mit detaillierten Steueraufschlüsselungen und HSN/SAC-Codes erstellt
-Sofortiger Versand per WhatsApp, SMS und E-Mail mit gebrandetem PDF an den Kunden mit nur einem Tastendruck
-Thermobelege (58 mm/80 mm) zusammen mit Steuerrechnungen im A4-PDF-Format für Unternehmen
-Vorteil: 100 % Steuer- und Audit-Compliance, keine Papierverschwendung und 98 % Öffnungsrate von WhatsApp-Belegen für die erneute Kundenbindung.',
-      'Customer credit limits, balance statements, and aged receivables tracking
-Supplier purchase bills, payment schedules, and outstanding ledger balances
-Comprehensive transaction history and automated debit/credit balancing
-Benefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Kundenkreditlimits, Kontoauszüge und Nachverfolgung alter Forderungen
-Lieferanteneinkaufsrechnungen, Zahlungspläne und ausstehende Buchsalden
-Umfassende Transaktionshistorie und automatischer Soll-Haben-Ausgleich
-Vorteil: Maximiert die Sichtbarkeit des Betriebskapitals, reduziert Forderungsausfälle und sorgt für solide Handelsbedingungen für Lieferanten.',
-      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion
-Direct ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet
-Runs on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones
-Benefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'Spezielle native Android-APK- und Windows-Desktop-App für das Eintauchen in die Theke im Vollbildmodus
-Direkte ESC/POS-Thermodruckerkommunikation über USB, Bluetooth und LAN/Ethernet
-Läuft auf vorhandener Hardware – Tablets, POS-All-in-One-Terminals, Laptops oder Mobiltelefonen
-Vorteil: Keine teuren proprietären Hardware-Sperren – das spart Tausende an anfänglichen Einrichtungs- und Wartungskosten.',
-      'Full counter operations, barcode search, cart calculations, and receipt printing without internet
-Automatic background synchronization on reconnect with tamper-proof duplicate prevention
-Continuous local data caching so tills never freeze during network cuts
-Benefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Vollständiger Schalterbetrieb, Barcode-Suche, Warenkorbberechnungen und Quittungsdruck ohne Internet
-Automatische Hintergrundsynchronisierung bei erneuter Verbindung mit manipulationssicherem Duplikatschutz
-Kontinuierliche lokale Datenzwischenspeicherung, damit die Kassen bei Netzwerkausfällen nie einfrieren
-Vorteil: Keine Ausfallzeiten und keine Umsatzeinbußen, wenn das Internet während der Haupteinkaufszeiten ausfällt.',
-      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)
-Device authorization and terminal registration to prevent unauthorized logins
-Tamper-proof audit trails for every price override, discount, held cart, and refund
-Benefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Detaillierte Berechtigungen pro Modul (Kassierer, Filialleiter, Lagermitarbeiter, Buchhalter)
-Geräteautorisierung und Terminalregistrierung, um unbefugte Anmeldungen zu verhindern
-Manipulationssichere Prüfprotokolle für jede Preisüberschreibung, jeden Rabatt, jeden zurückgehaltenen Warenkorb und jede Rückerstattung
-Vorteil: Schützt die Gewinnmargen vor dem Missbrauch von Kassiererrabatten und sorgt für eine strikte Compliance im Betrieb.',
-      'Instant mobile-friendly digital storefront with category & brand filtering
-One-click WhatsApp product link & cart sharing for direct social commerce
-Direct QR code ordering with instant payment gateway integration
-Benefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Sofort mobilfreundliche digitale Storefront mit Kategorie- und Markenfilterung
-WhatsApp-Produktlink und Warenkorbfreigabe mit einem Klick für direkten Social Commerce
-Direkte QR-Code-Bestellung mit sofortiger Zahlungsgateway-Integration
-Vorteil: Starten Sie E-Commerce in wenigen Minuten, gewinnen Sie Internetkäufer ohne Marktplatzgebühren und synchronisieren Sie Bestellungen automatisch.',
-      'Millisecond barcode scanning with quick-access visual favorites & held carts
-Multi-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)
-High-speed thermal receipt printing with automated cash drawer kick pulse
-Benefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Millisekundenschnelles Barcode-Scannen mit schnellem Zugriff auf visuelle Favoriten und gehaltene Warenkörbe
-Geteilte Zahlungen mit mehreren Zahlungsmitteln (Bargeld, Karte, UPI, Geldbörsen, Kundenguthaben)
-Hochgeschwindigkeits-Thermobondruck mit automatischem Kickimpuls für die Kassenschublade
-Vorteil: Eliminiert Engpässe an der Kasse, bewältigt mühelos Spitzenbesuche an Feiertagen und sorgt für dreimal schnellere Verkaufszahlen.',
-      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts
-Automated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability
-Real-time cash variance detection that isolates discrepancies per drawer
-Benefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Registrierung der Eröffnungskasse, ein-/ausgezahlte Kassenbelege und Blindzählungen
-Automatisierte X-Berichte zur Schichtmitte und Z-Berichte am Ende des Tages mit Verantwortlichkeit pro Kassierer
-Erkennung von Bargeldabweichungen in Echtzeit, die Unstimmigkeiten pro Schublade isoliert
-Vorteil: Verhindert das Schrumpfen der Schubladen, verhindert Mitarbeiterdiebstahl und verkürzt die tägliche Schließzeit der Kasse von Stunden auf Minuten.',
-      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring
-Prescription record management, doctor attribution, and patient dosage instructions
-Flexible unit conversions (box, strip, tablet, bottle) with batch-level costing
-Benefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Verfolgung von Arzneimittelchargen und -chargen mit strenger Überwachung des Verfallsdatums
-Verwaltung von Rezeptunterlagen, Zuordnung zum Arzt und Dosierungsanweisungen für Patienten
-Flexible Einheitenumrechnungen (Box, Streifen, Tablette, Flasche) mit Kalkulation auf Chargenebene
-Vorteil: Vollständige Einhaltung von Gesundheitsvorschriften, keine Abgabe abgelaufener Medikamente und minimierter Warenschwund.',
-      'Professional quotation builder with customizable discounts, terms, and validity dates
-One-click automated conversion from Quote to confirmed Sale and Invoice
-Branded PDF downloads and direct customer sharing via email or messaging
-Benefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Professioneller Angebotsersteller mit anpassbaren Rabatten, Bedingungen und Gültigkeitsdaten
-Automatisierte Konvertierung mit einem Klick vom Angebot zum bestätigten Verkauf und zur Rechnung
-Gebrandete PDF-Downloads und direkte Weitergabe an Kunden per E-Mail oder Messaging
-Vorteil: Beschleunigt den Abschluss von B2B- und Großhandelsgeschäften, eliminiert doppelte manuelle Dateneingaben und beschleunigt den Cashflow.',
-      'Real-time stock synchronization across online store, physical shops, and central warehouses
-Batch, lot, and expiry date tracking with automatic low-stock reorder thresholds
-Inter-branch stock consignments and transfers with dispatch/receiving audit trails
-Benefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Echtzeit-Bestandssynchronisierung im Online-Shop, in physischen Geschäften und in Zentrallagern
-Chargen-, Chargen- und Ablaufdatumsverfolgung mit automatischen Schwellenwerten für die Nachbestellung bei geringem Lagerbestand
-Warenlieferungen und -transfers zwischen Filialen mit Versand-/Empfangsprüfprotokollen
-Vorteil: Verhindert Überverkäufe im Internet, eliminiert Fehlbestände und verhindert, dass Kapital in überschüssigen Lagerbeständen gebunden wird.',
-      'Visual appointment calendar with stylist/therapist scheduling and room assignment
-Service catalog with custom durations, add-on treatments, and pricing tiers
-Automatic stylist commission calculation based on completed services and retail product upsells
-Benefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Visueller Terminkalender mit Stylisten-/Therapeutenplanung und Raumzuweisung
-Servicekatalog mit benutzerdefinierten Laufzeiten, Zusatzbehandlungen und Preisstufen
-Automatische Berechnung der Stylistenprovision basierend auf abgeschlossenen Dienstleistungen und Einzelhandelsprodukt-Upsells
-Vorteil: Eliminiert Terminkonflikte, optimiert die Stuhlauslastung und motiviert die Mitarbeiter durch genaue Provisionsauszahlungen.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering â guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Visuelle Tischgrundrisse mit Live-Belegung, Essen und Rechnungsstatus
-Kontaktlose Tisch-QR-Menübestellung – Gäste können über das Telefon scannen, stöbern und bestellen
-Kitchen Order Tickets (KOT) werden direkt an die Live-Bildschirme des Kitchen Display System (KDS) weitergeleitet
-Vorteil: Beschleunigt das Umdrehen des Tisches um 35 %, eliminiert Fehler bei der Küchenbestellung und senkt den Aufwand für das Bedienungspersonal.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering — guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Visuelle Tischgrundrisse mit Live-Belegung, Essen und Rechnungsstatus
-Kontaktlose Tisch-QR-Menübestellung – Gäste scannen, durchsuchen und bestellen über das Telefon
-Kitchen Order Tickets (KOT) werden direkt an die Live-Bildschirme des Kitchen Display System (KDS) weitergeleitet
-Vorteil: Beschleunigt das Umdrehen des Tisches um 35 %, eliminiert Fehler bei der Küchenbestellung und senkt den Aufwand für das Bedienungspersonal.',
+      '360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': '360-Grad-Kundenkaufprofile, Kontaktverzeichnisse und Kaufgewohnheiten\nVertriebs-Lead-Management-Pipeline mit Aktivitätsprotokollierung, Follow-up-Erinnerungen und Phasenverfolgung\nAutomatisierte Kundentreue-Prämienpunkte, die an der Kasse gesammelt und eingelöst werden\nVorteil: Steigert den Customer Lifetime Value (LTV) und den durchschnittlichen Bestellwert (AOV) um 25 % durch personalisierte Treuevorteile.',
+      'Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Überwachung der Filial-, Kassierer- und Mitarbeiter-Verkaufsziele mit Echtzeit-Erfolgsfortschritten\nLive-Gewinn- und Verlustrechnungen (GuV), Bruttomargen und Analysen der Kosten der verkauften Waren (COGS).\nMeistverkaufte Produkte, Kategoriebeitrag und Identifizierung von Lagerbeständen\nVorteil: Bietet Geschäftsinhabern 100 % finanzielle Klarheit, um leistungsschwache Linien zu reduzieren und die Nettorentabilität zu maximieren.',
+      'Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Zentralisierte Katalogverwaltung mit branchenspezifischen Preisen und lokalisierten Steuersätzen\nFilialübergreifende Umlagerungsanfragen mit Transitverfolgung und Eingangsprüfungen\nKonsolidierte Unternehmensberichte mit isolierter Sicherheit des Mieterarbeitsbereichs\nVorteil: Skalieren Sie mühelos von einem Laden in der Nähe auf Hunderte von Franchise-Standorten im ganzen Land.',
+      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Vollständiger Reparaturlebenszyklus (Empfangen -> Diagnose -> Bestellte Teile -> Bereit -> Geliefert)\nGeräteseriennummer/IMEI-Verfolgung, Aufnahmediagnosehinweise und Garantieprotokolle\nIntegrierter Ersatzteilabzug und Abrechnung der Technikerarbeit\nVorteil: Erschließt hochmargige Umsätze aus dem Reparaturservice für Elektronik-, Computer- und Fahrradgeschäfte mit völliger Transparenz.',
+      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Konforme Steuerrechnungen werden automatisch mit detaillierten Steueraufschlüsselungen und HSN/SAC-Codes erstellt\nSofortiger Versand per WhatsApp, SMS und E-Mail mit gebrandetem PDF an den Kunden mit nur einem Tastendruck\nThermobelege (58 mm/80 mm) zusammen mit Steuerrechnungen im A4-PDF-Format für Unternehmen\nVorteil: 100 % Steuer- und Audit-Compliance, keine Papierverschwendung und 98 % Öffnungsrate von WhatsApp-Belegen für die erneute Kundenbindung.',
+      'Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Kundenkreditlimits, Kontoauszüge und Nachverfolgung alter Forderungen\nLieferanteneinkaufsrechnungen, Zahlungspläne und ausstehende Buchsalden\nUmfassende Transaktionshistorie und automatischer Soll-Haben-Ausgleich\nVorteil: Maximiert die Sichtbarkeit des Betriebskapitals, reduziert Forderungsausfälle und sorgt für solide Handelsbedingungen für Lieferanten.',
+      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'Spezielle native Android-APK- und Windows-Desktop-App für das Eintauchen in die Theke im Vollbildmodus\nDirekte ESC/POS-Thermodruckerkommunikation über USB, Bluetooth und LAN/Ethernet\nLäuft auf vorhandener Hardware – Tablets, POS-All-in-One-Terminals, Laptops oder Mobiltelefonen\nVorteil: Keine teuren proprietären Hardware-Sperren – das spart Tausende an anfänglichen Einrichtungs- und Wartungskosten.',
+      'Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Vollständiger Schalterbetrieb, Barcode-Suche, Warenkorbberechnungen und Quittungsdruck ohne Internet\nAutomatische Hintergrundsynchronisierung bei erneuter Verbindung mit manipulationssicherem Duplikatschutz\nKontinuierliche lokale Datenzwischenspeicherung, damit die Kassen bei Netzwerkausfällen nie einfrieren\nVorteil: Keine Ausfallzeiten und keine Umsatzeinbußen, wenn das Internet während der Haupteinkaufszeiten ausfällt.',
+      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Detaillierte Berechtigungen pro Modul (Kassierer, Filialleiter, Lagermitarbeiter, Buchhalter)\nGeräteautorisierung und Terminalregistrierung, um unbefugte Anmeldungen zu verhindern\nManipulationssichere Prüfprotokolle für jede Preisüberschreibung, jeden Rabatt, jeden zurückgehaltenen Warenkorb und jede Rückerstattung\nVorteil: Schützt die Gewinnmargen vor dem Missbrauch von Kassiererrabatten und sorgt für eine strikte Compliance im Betrieb.',
+      'Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Sofort mobilfreundliche digitale Storefront mit Kategorie- und Markenfilterung\nWhatsApp-Produktlink und Warenkorbfreigabe mit einem Klick für direkten Social Commerce\nDirekte QR-Code-Bestellung mit sofortiger Zahlungsgateway-Integration\nVorteil: Starten Sie E-Commerce in wenigen Minuten, gewinnen Sie Internetkäufer ohne Marktplatzgebühren und synchronisieren Sie Bestellungen automatisch.',
+      'Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Millisekundenschnelles Barcode-Scannen mit schnellem Zugriff auf visuelle Favoriten und gehaltene Warenkörbe\nGeteilte Zahlungen mit mehreren Zahlungsmitteln (Bargeld, Karte, UPI, Geldbörsen, Kundenguthaben)\nHochgeschwindigkeits-Thermobondruck mit automatischem Kickimpuls für die Kassenschublade\nVorteil: Eliminiert Engpässe an der Kasse, bewältigt mühelos Spitzenbesuche an Feiertagen und sorgt für dreimal schnellere Verkaufszahlen.',
+      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Registrierung der Eröffnungskasse, ein-/ausgezahlte Kassenbelege und Blindzählungen\nAutomatisierte X-Berichte zur Schichtmitte und Z-Berichte am Ende des Tages mit Verantwortlichkeit pro Kassierer\nErkennung von Bargeldabweichungen in Echtzeit, die Unstimmigkeiten pro Schublade isoliert\nVorteil: Verhindert das Schrumpfen der Schubladen, verhindert Mitarbeiterdiebstahl und verkürzt die tägliche Schließzeit der Kasse von Stunden auf Minuten.',
+      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Verfolgung von Arzneimittelchargen und -chargen mit strenger Überwachung des Verfallsdatums\nVerwaltung von Rezeptunterlagen, Zuordnung zum Arzt und Dosierungsanweisungen für Patienten\nFlexible Einheitenumrechnungen (Box, Streifen, Tablette, Flasche) mit Kalkulation auf Chargenebene\nVorteil: Vollständige Einhaltung von Gesundheitsvorschriften, keine Abgabe abgelaufener Medikamente und minimierter Warenschwund.',
+      'Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Professioneller Angebotsersteller mit anpassbaren Rabatten, Bedingungen und Gültigkeitsdaten\nAutomatisierte Konvertierung mit einem Klick vom Angebot zum bestätigten Verkauf und zur Rechnung\nGebrandete PDF-Downloads und direkte Weitergabe an Kunden per E-Mail oder Messaging\nVorteil: Beschleunigt den Abschluss von B2B- und Großhandelsgeschäften, eliminiert doppelte manuelle Dateneingaben und beschleunigt den Cashflow.',
+      'Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Echtzeit-Bestandssynchronisierung im Online-Shop, in physischen Geschäften und in Zentrallagern\nChargen-, Chargen- und Ablaufdatumsverfolgung mit automatischen Schwellenwerten für die Nachbestellung bei geringem Lagerbestand\nWarenlieferungen und -transfers zwischen Filialen mit Versand-/Empfangsprüfprotokollen\nVorteil: Verhindert Überverkäufe im Internet, eliminiert Fehlbestände und verhindert, dass Kapital in überschüssigen Lagerbeständen gebunden wird.',
+      'Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Visueller Terminkalender mit Stylisten-/Therapeutenplanung und Raumzuweisung\nServicekatalog mit benutzerdefinierten Laufzeiten, Zusatzbehandlungen und Preisstufen\nAutomatische Berechnung der Stylistenprovision basierend auf abgeschlossenen Dienstleistungen und Einzelhandelsprodukt-Upsells\nVorteil: Eliminiert Terminkonflikte, optimiert die Stuhlauslastung und motiviert die Mitarbeiter durch genaue Provisionsauszahlungen.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering â guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Visuelle Tischgrundrisse mit Live-Belegung, Essen und Rechnungsstatus\nKontaktlose Tisch-QR-Menübestellung – Gäste können über das Telefon scannen, stöbern und bestellen\nKitchen Order Tickets (KOT) werden direkt an die Live-Bildschirme des Kitchen Display System (KDS) weitergeleitet\nVorteil: Beschleunigt das Umdrehen des Tisches um 35 %, eliminiert Fehler bei der Küchenbestellung und senkt den Aufwand für das Bedienungspersonal.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Visuelle Tischgrundrisse mit Live-Belegung, Essen und Rechnungsstatus\nKontaktlose Tisch-QR-Menübestellung – Gäste scannen, durchsuchen und bestellen über das Telefon\nKitchen Order Tickets (KOT) werden direkt an die Live-Bildschirme des Kitchen Display System (KDS) weitergeleitet\nVorteil: Beschleunigt das Umdrehen des Tisches um 35 %, eliminiert Fehler bei der Küchenbestellung und senkt den Aufwand für das Bedienungspersonal.',
       '& Mobile': '& Mobil',
       '5 Enterprise Capabilities Built for Scale': '5 skalierbare Unternehmensfunktionen',
       '58mm & 80mm ESC/POS': 'Thermodruck 58mm & 80mm ESC/POS',
@@ -17237,132 +16589,24 @@ Vorteil: Beschleunigt das Umdrehen des Tisches um 35 %, eliminiert Fehler bei de
       '▼ Configure': '▼ 配置',
       '🍽️ Dining & Food POS': '🍽️ 餐饮POS',
       '🏪 Retail & Barcode POS': '🏪 零售与条形码POS',
-      '360-degree customer purchasing profiles, contact directories, and buying habits
-Sales lead management pipeline with activity logging, follow-up reminders, and stage tracking
-Automated customer loyalty reward points that accumulate and redeem at checkout
-Benefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': '360 度客户购买档案、联系人目录和购买习惯
-具有活动记录、后续提醒和阶段跟踪功能的销售线索管理管道
-自动累积客户忠诚度奖励积分并在结帐时兑换
-优势：通过个性化的忠诚度福利，将客户终身价值 (LTV) 和平均订单价值 (AOV) 提高 25%。',
-      'Branch, cashier, and staff sales target monitoring with real-time achievement progress
-Live Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics
-Top-selling products, category contribution, and dead-stock identification
-Benefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': '分店、收银、员工销售目标监控，实时达成进度
-实时损益 (P&L) 报表、毛利率和销货成本 (COGS) 分析
-最畅销产品、品类贡献和滞销品识别
-好处：为企业主提供 100% 的财务透明度，以削减表现不佳的产品线并最大限度地提高净利润。',
-      'Centralized catalog management with branch-specific pricing and localized tax rates
-Inter-branch stock transfer requests with transit tracking and receiving audits
-Consolidated corporate reports with isolated tenant workspace security
-Benefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': '集中式目录管理，具有特定于分支机构的定价和本地化税率
-具有运输跟踪和接收审核功能的分支机构间库存转移请求
-具有隔离租户工作空间安全性的综合公司报告
-优点：毫不费力地从一家邻里商店扩展到全国数百家特许经营店。',
-      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)
-Device serial number/IMEI tracking, intake diagnostic notes, and warranty logs
-Integrated spare parts inventory deduction and technician labor invoicing
-Benefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': '完整的维修生命周期（已接收 -> 诊断 -> 订购零件 -> 准备就绪 -> 已交付）
-设备序列号/IMEI 跟踪、摄入诊断记录和保修日志
-集成备件库存扣除和技术人员人工发票
-好处：以完全透明的方式为电子产品、计算机和自行车商店释放高利润的维修服务收入。',
-      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes
-One-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF
-Thermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices
-Benefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': '自动生成合规的税务发票，其中包含逐项税务明细和 HSN/SAC 代码
-一键即时发送给客户 WhatsApp、短信和电子邮件以及品牌 PDF
-热敏收据 (58mm/80mm) 以及企业格式的 A4 PDF 税务发票
-优势：100% 税务和审计合规性、零纸张浪费以及 98% 的 WhatsApp 收据打开率以重新吸引客户。',
-      'Customer credit limits, balance statements, and aged receivables tracking
-Supplier purchase bills, payment schedules, and outstanding ledger balances
-Comprehensive transaction history and automated debit/credit balancing
-Benefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': '客户信用限额、余额报表和账龄应收账款跟踪
-供应商采购账单、付款计划和未清账本余额
-全面的交易历史记录和自动借记/贷记平衡
-好处：最大化营运资金可见性、减少坏账并维持良好的供应商贸易条件。',
-      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion
-Direct ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet
-Runs on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones
-Benefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': '专用原生 Android APK 和 Windows 桌面应用程序，实现全屏计数器沉浸式体验
-通过 USB、蓝牙和 LAN/以太网与 ESC/POS 热敏打印机直接通信
-在现有硬件上运行——平板电脑、POS 一体机、笔记本电脑或手机
-优点：无需昂贵的专有硬件锁，可节省数千美元的初始设置和维护成本。',
-      'Full counter operations, barcode search, cart calculations, and receipt printing without internet
-Automatic background synchronization on reconnect with tamper-proof duplicate prevention
-Continuous local data caching so tills never freeze during network cuts
-Benefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': '无需互联网即可进行完整的柜台操作、条形码搜索、购物车计算和收据打印
-重新连接时自动后台同步，防止篡改重复
-连续的本地数据缓存，因此在网络中断期间，直到永远不会冻结
-优点：购物高峰时段网络中断时，零停机时间和零销售损失。',
-      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)
-Device authorization and terminal registration to prevent unauthorized logins
-Tamper-proof audit trails for every price override, discount, held cart, and refund
-Benefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': '每个模块的细化权限（收银员、商店经理、库存职员、会计师）
-设备授权和终端注册，防止非法登录
-对每个价格覆盖、折扣、保留购物车和退款进行防篡改审计跟踪
-好处：保护利润率，防止收银员折扣滥用，并保持运营严格合规。',
-      'Instant mobile-friendly digital storefront with category & brand filtering
-One-click WhatsApp product link & cart sharing for direct social commerce
-Direct QR code ordering with instant payment gateway integration
-Benefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': '具有类别和品牌过滤功能的即时移动友好数字店面
-一键式 WhatsApp 产品链接和购物车共享，实现直接社交商务
-通过即时支付网关集成直接二维码订购
-优点：在几分钟内启动电子商务，以零市场费用吸引互联网买家，并自动同步订单。',
-      'Millisecond barcode scanning with quick-access visual favorites & held carts
-Multi-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)
-High-speed thermal receipt printing with automated cash drawer kick pulse
-Benefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': '毫秒条形码扫描，可快速访问视觉收藏夹和手推车
-多投标分期付款（现金、卡、UPI、钱包、客户商店信用）
-具有自动现金抽屉脉冲脉冲的高速热敏收据打印
-优点：消除柜台结账瓶颈，轻松应对假日高峰人群，并将销售额提高 3 倍。',
-      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts
-Automated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability
-Real-time cash variance detection that isolates discrepancies per drawer
-Benefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': '开放现金流动登记、存入/支出小额现金券和盲点
-自动生成中班 X 报告和日终 Z 报告，并按收银员负责
-实时现金差异检测，隔离每个抽屉的差异
-优点：防止抽屉收缩，防止员工盗窃，并将每日收银机关闭时间从几小时缩短至几分钟。',
-      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring
-Prescription record management, doctor attribution, and patient dosage instructions
-Flexible unit conversions (box, strip, tablet, bottle) with batch-level costing
-Benefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': '药品批次和批号跟踪以及严格的有效期监控
-处方记录管理、医生归属和患者剂量说明
-灵活的单位转换（盒、条、片、瓶）和批次级成本核算
-优点：完全符合健康法规、零分发过期药品并最大限度地减少损耗。',
-      'Professional quotation builder with customizable discounts, terms, and validity dates
-One-click automated conversion from Quote to confirmed Sale and Invoice
-Branded PDF downloads and direct customer sharing via email or messaging
-Benefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': '专业报价生成器，可定制折扣、条款和有效期
-从报价单到确认销售和发票的一键式自动转换
-品牌 PDF 下载并通过电子邮件或消息直接与客户共享
-优点：加快 B2B 和批发交易结束速度，消除重复的手动数据输入，并加速现金流。',
-      'Real-time stock synchronization across online store, physical shops, and central warehouses
-Batch, lot, and expiry date tracking with automatic low-stock reorder thresholds
-Inter-branch stock consignments and transfers with dispatch/receiving audit trails
-Benefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': '网店、实体店、中央仓库库存实时同步
-通过自动低库存再订购阈值跟踪批次、批号和有效期
-分公司间库存托运和转移，带有发送/接收审计跟踪
-好处：防止网络上的超售，消除缺货，并防止资金锁定过多的库存。',
-      'Visual appointment calendar with stylist/therapist scheduling and room assignment
-Service catalog with custom durations, add-on treatments, and pricing tiers
-Automatic stylist commission calculation based on completed services and retail product upsells
-Benefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': '可视化预约日历，包含造型师/治疗师日程安排和房间分配
-具有自定义持续时间、附加治疗和定价等级的服务目录
-根据已完成的服务和零售产品追加销售自动计算造型师佣金
-好处：消除任命冲突，优化椅子利用率，并通过准确的佣金支付激励员工。',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering â guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': '包含居住、就餐和计费状态的可视表格平面图
-非接触式餐桌二维码点餐 — 客人通过手机扫描、浏览和点餐
-厨房订单票 (KOT) 直接发送至现场厨房显示系统 (KDS) 屏幕
-优点：将餐桌周转速度加快 35%，消除厨房订单错误，并降低服务员的管理费用。',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering — guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': '包含居住、就餐和计费状态的可视表格平面图
-非接触式餐桌二维码菜单点餐——客人通过手机扫描、浏览和点餐
-厨房订单票 (KOT) 直接发送至现场厨房显示系统 (KDS) 屏幕
-优点：将餐桌周转速度加快 35%，消除厨房订单错误，并降低服务员的管理费用。',
+      '360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': '360 度客户购买档案、联系人目录和购买习惯\n具有活动记录、后续提醒和阶段跟踪功能的销售线索管理管道\n自动累积客户忠诚度奖励积分并在结帐时兑换\n优势：通过个性化的忠诚度福利，将客户终身价值 (LTV) 和平均订单价值 (AOV) 提高 25%。',
+      'Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': '分店、收银、员工销售目标监控，实时达成进度\n实时损益 (P&L) 报表、毛利率和销货成本 (COGS) 分析\n最畅销产品、品类贡献和滞销品识别\n好处：为企业主提供 100% 的财务透明度，以削减表现不佳的产品线并最大限度地提高净利润。',
+      'Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': '集中式目录管理，具有特定于分支机构的定价和本地化税率\n具有运输跟踪和接收审核功能的分支机构间库存转移请求\n具有隔离租户工作空间安全性的综合公司报告\n优点：毫不费力地从一家邻里商店扩展到全国数百家特许经营店。',
+      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': '完整的维修生命周期（已接收 -> 诊断 -> 订购零件 -> 准备就绪 -> 已交付）\n设备序列号/IMEI 跟踪、摄入诊断记录和保修日志\n集成备件库存扣除和技术人员人工发票\n好处：以完全透明的方式为电子产品、计算机和自行车商店释放高利润的维修服务收入。',
+      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': '自动生成合规的税务发票，其中包含逐项税务明细和 HSN/SAC 代码\n一键即时发送给客户 WhatsApp、短信和电子邮件以及品牌 PDF\n热敏收据 (58mm/80mm) 以及企业格式的 A4 PDF 税务发票\n优势：100% 税务和审计合规性、零纸张浪费以及 98% 的 WhatsApp 收据打开率以重新吸引客户。',
+      'Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': '客户信用限额、余额报表和账龄应收账款跟踪\n供应商采购账单、付款计划和未清账本余额\n全面的交易历史记录和自动借记/贷记平衡\n好处：最大化营运资金可见性、减少坏账并维持良好的供应商贸易条件。',
+      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': '专用原生 Android APK 和 Windows 桌面应用程序，实现全屏计数器沉浸式体验\n通过 USB、蓝牙和 LAN/以太网与 ESC/POS 热敏打印机直接通信\n在现有硬件上运行——平板电脑、POS 一体机、笔记本电脑或手机\n优点：无需昂贵的专有硬件锁，可节省数千美元的初始设置和维护成本。',
+      'Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': '无需互联网即可进行完整的柜台操作、条形码搜索、购物车计算和收据打印\n重新连接时自动后台同步，防止篡改重复\n连续的本地数据缓存，因此在网络中断期间，直到永远不会冻结\n优点：购物高峰时段网络中断时，零停机时间和零销售损失。',
+      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': '每个模块的细化权限（收银员、商店经理、库存职员、会计师）\n设备授权和终端注册，防止非法登录\n对每个价格覆盖、折扣、保留购物车和退款进行防篡改审计跟踪\n好处：保护利润率，防止收银员折扣滥用，并保持运营严格合规。',
+      'Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': '具有类别和品牌过滤功能的即时移动友好数字店面\n一键式 WhatsApp 产品链接和购物车共享，实现直接社交商务\n通过即时支付网关集成直接二维码订购\n优点：在几分钟内启动电子商务，以零市场费用吸引互联网买家，并自动同步订单。',
+      'Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': '毫秒条形码扫描，可快速访问视觉收藏夹和手推车\n多投标分期付款（现金、卡、UPI、钱包、客户商店信用）\n具有自动现金抽屉脉冲脉冲的高速热敏收据打印\n优点：消除柜台结账瓶颈，轻松应对假日高峰人群，并将销售额提高 3 倍。',
+      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': '开放现金流动登记、存入/支出小额现金券和盲点\n自动生成中班 X 报告和日终 Z 报告，并按收银员负责\n实时现金差异检测，隔离每个抽屉的差异\n优点：防止抽屉收缩，防止员工盗窃，并将每日收银机关闭时间从几小时缩短至几分钟。',
+      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': '药品批次和批号跟踪以及严格的有效期监控\n处方记录管理、医生归属和患者剂量说明\n灵活的单位转换（盒、条、片、瓶）和批次级成本核算\n优点：完全符合健康法规、零分发过期药品并最大限度地减少损耗。',
+      'Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': '专业报价生成器，可定制折扣、条款和有效期\n从报价单到确认销售和发票的一键式自动转换\n品牌 PDF 下载并通过电子邮件或消息直接与客户共享\n优点：加快 B2B 和批发交易结束速度，消除重复的手动数据输入，并加速现金流。',
+      'Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': '网店、实体店、中央仓库库存实时同步\n通过自动低库存再订购阈值跟踪批次、批号和有效期\n分公司间库存托运和转移，带有发送/接收审计跟踪\n好处：防止网络上的超售，消除缺货，并防止资金锁定过多的库存。',
+      'Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': '可视化预约日历，包含造型师/治疗师日程安排和房间分配\n具有自定义持续时间、附加治疗和定价等级的服务目录\n根据已完成的服务和零售产品追加销售自动计算造型师佣金\n好处：消除任命冲突，优化椅子利用率，并通过准确的佣金支付激励员工。',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering â guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': '包含居住、就餐和计费状态的可视表格平面图\n非接触式餐桌二维码点餐 — 客人通过手机扫描、浏览和点餐\n厨房订单票 (KOT) 直接发送至现场厨房显示系统 (KDS) 屏幕\n优点：将餐桌周转速度加快 35%，消除厨房订单错误，并降低服务员的管理费用。',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': '包含居住、就餐和计费状态的可视表格平面图\n非接触式餐桌二维码菜单点餐——客人通过手机扫描、浏览和点餐\n厨房订单票 (KOT) 直接发送至现场厨房显示系统 (KDS) 屏幕\n优点：将餐桌周转速度加快 35%，消除厨房订单错误，并降低服务员的管理费用。',
       '& Mobile': '& 手机',
       '5 Enterprise Capabilities Built for Scale': '为规模化而构建的 5 项企业功能',
       '58mm & 80mm ESC/POS': '58mm与80mm热敏小票机',
@@ -19791,132 +19035,24 @@ Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lo
       '▼ Configure': '▼ 設定',
       '🍽️ Dining & Food POS': '🍽️ 飲食店POS',
       '🏪 Retail & Barcode POS': '🏪 小売・バーコードPOS',
-      '360-degree customer purchasing profiles, contact directories, and buying habits
-Sales lead management pipeline with activity logging, follow-up reminders, and stage tracking
-Automated customer loyalty reward points that accumulate and redeem at checkout
-Benefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': '360 度の顧客の購入プロファイル、連絡先ディレクトリ、購買習慣
-アクティビティログ、フォローアップリマインダー、段階追跡を備えたセールスリード管理パイプライン
-自動化された顧客ロイヤルティ報酬ポイントが蓄積され、チェックアウト時に引き換えられます
-メリット: パーソナライズされたロイヤルティ特典により、顧客生涯価値 (LTV) と平均注文額 (AOV) が 25% 向上します。',
-      'Branch, cashier, and staff sales target monitoring with real-time achievement progress
-Live Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics
-Top-selling products, category contribution, and dead-stock identification
-Benefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': '支店、レジ係、スタッフの売上目標をリアルタイムで監視し、達成状況をリアルタイムで把握
-ライブ損益計算書、粗利益、売上原価 (COGS) 分析
-売れ筋商品、カテゴリーへの貢献、デッドストックの特定
-利点: ビジネスオーナーに財務上の 100% の明確性を与え、不採算ラインを削減し、純利益を最大化します。',
-      'Centralized catalog management with branch-specific pricing and localized tax rates
-Inter-branch stock transfer requests with transit tracking and receiving audits
-Consolidated corporate reports with isolated tenant workspace security
-Benefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': '支店固有の価格設定と現地の税率によるカタログの一元管理
-輸送追跡と受領監査を伴う支店間在庫転送リクエスト
-分離されたテナントのワークスペースのセキュリティを備えた統合された企業レポート
-利点: 近所の 1 つの店舗から全国の何百ものフランチャイズ店舗まで簡単に拡張できます。',
-      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)
-Device serial number/IMEI tracking, intake diagnostic notes, and warranty logs
-Integrated spare parts inventory deduction and technician labor invoicing
-Benefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': '完全な修理ライフサイクル (受領 -> 診断 -> 部品の注文 -> 準備完了 -> 納品)
-デバイスのシリアル番号/IMEI追跡、摂取診断メモ、および保証ログ
-統合されたスペアパーツ在庫控除と技術者労務請求書発行
-利点: 完全な透明性により、電子機器、コンピューター、自転車ショップに利益率の高い修理サービス収益をもたらします。',
-      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes
-One-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF
-Thermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices
-Benefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': '税の内訳と HSN/SAC コードを含む準拠した税請求書が自動的に生成されます
-ブランド化された PDF を使用して、ワンタップで顧客の WhatsApp、SMS、電子メールに即座に送信
-エンタープライズ形式の A4 PDF 税請求書と並べて感熱領収書 (58mm/80mm)
-利点: 100% の税金と監査へのコンプライアンス、紙の無駄ゼロ、98% の WhatsApp 受信開封率による顧客再エンゲージメント。',
-      'Customer credit limits, balance statements, and aged receivables tracking
-Supplier purchase bills, payment schedules, and outstanding ledger balances
-Comprehensive transaction history and automated debit/credit balancing
-Benefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': '顧客の与信限度額、残高計算書、期限切れの債権追跡
-サプライヤーの購入請求書、支払スケジュール、および未払いの元帳残高
-包括的な取引履歴と自動借方/貸方バランス
-利点: 運転資本の可視性を最大化し、不良債権を削減し、サプライヤーの強力な取引条件を維持します。',
-      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion
-Direct ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet
-Runs on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones
-Benefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': '専用のネイティブ Android APK と Windows デスクトップ アプリで全画面カウンターの没入感を実現
-USB、Bluetooth、LAN/イーサネットを介した直接ESC/POSサーマルプリンタ通信
-既存のハードウェア - タブレット、POS オールインワン端末、ラップトップ、または携帯電話上で実行
-利点: 高価な独自のハードウェア ロックが不要で、初期セットアップとメンテナンスのコストを数千ドル節約できます。',
-      'Full counter operations, barcode search, cart calculations, and receipt printing without internet
-Automatic background synchronization on reconnect with tamper-proof duplicate prevention
-Continuous local data caching so tills never freeze during network cuts
-Benefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'インターネットを使用せずにカウンター操作、バーコード検索、カート計算、レシート印刷をすべて実行できます。
-改ざん防止重複防止による再接続時の自動バックグラウンド同期
-継続的なローカル データ キャッシュにより、ネットワーク切断中にもフリーズすることがありません
-利点: ショッピングのピーク時にインターネットが切断された場合でも、ダウンタイムや売上損失はゼロです。',
-      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)
-Device authorization and terminal registration to prevent unauthorized logins
-Tamper-proof audit trails for every price override, discount, held cart, and refund
-Benefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'モジュールごとの詳細な権限 (レジ係、店長、在庫担当者、会計士)
-不正ログインを防ぐデバイス認証と端末登録
-すべての価格の上書き、割引、カートの保留、返金に関する改ざん防止の監査証跡
-利点: レジ割引の悪用から利益を守り、業務を厳格に遵守します。',
-      'Instant mobile-friendly digital storefront with category & brand filtering
-One-click WhatsApp product link & cart sharing for direct social commerce
-Direct QR code ordering with instant payment gateway integration
-Benefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'カテゴリとブランドのフィルタリングを備えた即時モバイルフレンドリーなデジタル ストアフロント
-ワンクリックの WhatsApp 製品リンクと直接ソーシャル コマースのためのカート共有
-即時決済ゲートウェイの統合による直接 QR コード注文
-利点: 数分で e コマースを開始し、マーケットプレイス手数料ゼロでインターネット購入者を獲得し、注文を自動的に同期します。',
-      'Millisecond barcode scanning with quick-access visual favorites & held carts
-Multi-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)
-High-speed thermal receipt printing with automated cash drawer kick pulse
-Benefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'ビジュアルなお気に入りと保持されたカートに簡単にアクセスできるミリ秒バーコード スキャン
-複数回の分割支払い (現金、カード、UPI、ウォレット、カスタマー ストア クレジット)
-自動キャッシュドロワーキックパルスによる高速サーマルレシート印刷
-利点: カウンターのチェックアウトのボトルネックを解消し、休日のピーク時の混雑に簡単に対応し、売上を 3 倍の速さで呼び出すことができます。',
-      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts
-Automated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability
-Real-time cash variance detection that isolates discrepancies per drawer
-Benefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': '現金フロート登録、入出金小口現金券、ブラインドカウントの開始
-レジ担当者ごとに責任を負う自動化されたシフト中 X レポートと 1 日の終わりの Z レポート
-引き出しごとに不一致を分離するリアルタイムの現金差異検出
-利点: 引き出しの収縮を防ぎ、従業員の盗難を防止し、毎日のレジ締め時間を数時間から数分に短縮します。',
-      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring
-Prescription record management, doctor attribution, and patient dosage instructions
-Flexible unit conversions (box, strip, tablet, bottle) with batch-level costing
-Benefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': '厳格な有効期限監視による医薬品のバッチおよびロットの追跡
-処方記録管理、医師の帰属、患者への投薬指示
-バッチレベルの原価計算による柔軟な単位変換 (ボックス、ストリップ、タブレット、ボトル)
-利点: 完全な健康法規制への準拠、期限切れの薬剤の投与はゼロ、収縮は最小限に抑えられます。',
-      'Professional quotation builder with customizable discounts, terms, and validity dates
-One-click automated conversion from Quote to confirmed Sale and Invoice
-Branded PDF downloads and direct customer sharing via email or messaging
-Benefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'カスタマイズ可能な割引、条件、有効期限を備えたプロフェッショナルな見積ビルダー
-見積書から確認済みの販売および請求書へのワンクリック自動変換
-ブランド化された PDF のダウンロードと、電子メールまたはメッセージングによる顧客への直接共有
-利点: B2B および卸売取引の完了をスピードアップし、重複した手動データ入力を排除し、キャッシュ フローを加速します。',
-      'Real-time stock synchronization across online store, physical shops, and central warehouses
-Batch, lot, and expiry date tracking with automatic low-stock reorder thresholds
-Inter-branch stock consignments and transfers with dispatch/receiving audit trails
-Benefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'オンラインストア、実店舗、中央倉庫にわたるリアルタイムの在庫同期
-自動低在庫再注文しきい値によるバッチ、ロット、有効期限の追跡
-発送/受け取り監査証跡を伴う支店間の在庫の委託および転送
-利点: ウェブ上での過剰販売を防止し、在庫切れを解消し、資本が過剰在庫に滞留するのを防ぎます。',
-      'Visual appointment calendar with stylist/therapist scheduling and room assignment
-Service catalog with custom durations, add-on treatments, and pricing tiers
-Automatic stylist commission calculation based on completed services and retail product upsells
-Benefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'スタイリスト/セラピストのスケジュールと部屋の割り当てを含む視覚的な予約カレンダー
-カスタム期間、アドオン処理、および価格階層を含むサービス カタログ
-完了したサービスと小売製品のアップセルに基づいてスタイリストコミッションを自動計算
-利点: 予約の競合を排除し、椅子の使用率を最適化し、正確なコミッション支払いでスタッフのモチベーションを高めます。',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering â guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': '居住状況、食事、請求状況を示す視覚的なテーブルフロアプラン
-非接触型テーブルの QR メニュー注文 - ゲストは携帯電話からスキャン、閲覧、注文します
-キッチン オーダー チケット (KOT) はライブ キッチン ディスプレイ システム (KDS) 画面に直接ルーティングされます。
-利点: テーブルの回転が 35% 早くなり、キッチンの注文ミスがなくなり、給仕スタッフのオーバーヘッドが削減されます。',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering — guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': '居住状況、食事、請求状況を示す視覚的なテーブルフロアプラン
-非接触テーブル QR メニューの注文 - ゲストは携帯電話からスキャン、閲覧、注文します
-キッチン オーダー チケット (KOT) はライブ キッチン ディスプレイ システム (KDS) 画面に直接ルーティングされます。
-利点: テーブルの回転が 35% 早くなり、キッチンの注文ミスがなくなり、給仕スタッフのオーバーヘッドが削減されます。',
+      '360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': '360 度の顧客の購入プロファイル、連絡先ディレクトリ、購買習慣\nアクティビティログ、フォローアップリマインダー、段階追跡を備えたセールスリード管理パイプライン\n自動化された顧客ロイヤルティ報酬ポイントが蓄積され、チェックアウト時に引き換えられます\nメリット: パーソナライズされたロイヤルティ特典により、顧客生涯価値 (LTV) と平均注文額 (AOV) が 25% 向上します。',
+      'Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': '支店、レジ係、スタッフの売上目標をリアルタイムで監視し、達成状況をリアルタイムで把握\nライブ損益計算書、粗利益、売上原価 (COGS) 分析\n売れ筋商品、カテゴリーへの貢献、デッドストックの特定\n利点: ビジネスオーナーに財務上の 100% の明確性を与え、不採算ラインを削減し、純利益を最大化します。',
+      'Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': '支店固有の価格設定と現地の税率によるカタログの一元管理\n輸送追跡と受領監査を伴う支店間在庫転送リクエスト\n分離されたテナントのワークスペースのセキュリティを備えた統合された企業レポート\n利点: 近所の 1 つの店舗から全国の何百ものフランチャイズ店舗まで簡単に拡張できます。',
+      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': '完全な修理ライフサイクル (受領 -> 診断 -> 部品の注文 -> 準備完了 -> 納品)\nデバイスのシリアル番号/IMEI追跡、摂取診断メモ、および保証ログ\n統合されたスペアパーツ在庫控除と技術者労務請求書発行\n利点: 完全な透明性により、電子機器、コンピューター、自転車ショップに利益率の高い修理サービス収益をもたらします。',
+      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': '税の内訳と HSN/SAC コードを含む準拠した税請求書が自動的に生成されます\nブランド化された PDF を使用して、ワンタップで顧客の WhatsApp、SMS、電子メールに即座に送信\nエンタープライズ形式の A4 PDF 税請求書と並べて感熱領収書 (58mm/80mm)\n利点: 100% の税金と監査へのコンプライアンス、紙の無駄ゼロ、98% の WhatsApp 受信開封率による顧客再エンゲージメント。',
+      'Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': '顧客の与信限度額、残高計算書、期限切れの債権追跡\nサプライヤーの購入請求書、支払スケジュール、および未払いの元帳残高\n包括的な取引履歴と自動借方/貸方バランス\n利点: 運転資本の可視性を最大化し、不良債権を削減し、サプライヤーの強力な取引条件を維持します。',
+      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': '専用のネイティブ Android APK と Windows デスクトップ アプリで全画面カウンターの没入感を実現\nUSB、Bluetooth、LAN/イーサネットを介した直接ESC/POSサーマルプリンタ通信\n既存のハードウェア - タブレット、POS オールインワン端末、ラップトップ、または携帯電話上で実行\n利点: 高価な独自のハードウェア ロックが不要で、初期セットアップとメンテナンスのコストを数千ドル節約できます。',
+      'Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'インターネットを使用せずにカウンター操作、バーコード検索、カート計算、レシート印刷をすべて実行できます。\n改ざん防止重複防止による再接続時の自動バックグラウンド同期\n継続的なローカル データ キャッシュにより、ネットワーク切断中にもフリーズすることがありません\n利点: ショッピングのピーク時にインターネットが切断された場合でも、ダウンタイムや売上損失はゼロです。',
+      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'モジュールごとの詳細な権限 (レジ係、店長、在庫担当者、会計士)\n不正ログインを防ぐデバイス認証と端末登録\nすべての価格の上書き、割引、カートの保留、返金に関する改ざん防止の監査証跡\n利点: レジ割引の悪用から利益を守り、業務を厳格に遵守します。',
+      'Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'カテゴリとブランドのフィルタリングを備えた即時モバイルフレンドリーなデジタル ストアフロント\nワンクリックの WhatsApp 製品リンクと直接ソーシャル コマースのためのカート共有\n即時決済ゲートウェイの統合による直接 QR コード注文\n利点: 数分で e コマースを開始し、マーケットプレイス手数料ゼロでインターネット購入者を獲得し、注文を自動的に同期します。',
+      'Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'ビジュアルなお気に入りと保持されたカートに簡単にアクセスできるミリ秒バーコード スキャン\n複数回の分割支払い (現金、カード、UPI、ウォレット、カスタマー ストア クレジット)\n自動キャッシュドロワーキックパルスによる高速サーマルレシート印刷\n利点: カウンターのチェックアウトのボトルネックを解消し、休日のピーク時の混雑に簡単に対応し、売上を 3 倍の速さで呼び出すことができます。',
+      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': '現金フロート登録、入出金小口現金券、ブラインドカウントの開始\nレジ担当者ごとに責任を負う自動化されたシフト中 X レポートと 1 日の終わりの Z レポート\n引き出しごとに不一致を分離するリアルタイムの現金差異検出\n利点: 引き出しの収縮を防ぎ、従業員の盗難を防止し、毎日のレジ締め時間を数時間から数分に短縮します。',
+      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': '厳格な有効期限監視による医薬品のバッチおよびロットの追跡\n処方記録管理、医師の帰属、患者への投薬指示\nバッチレベルの原価計算による柔軟な単位変換 (ボックス、ストリップ、タブレット、ボトル)\n利点: 完全な健康法規制への準拠、期限切れの薬剤の投与はゼロ、収縮は最小限に抑えられます。',
+      'Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'カスタマイズ可能な割引、条件、有効期限を備えたプロフェッショナルな見積ビルダー\n見積書から確認済みの販売および請求書へのワンクリック自動変換\nブランド化された PDF のダウンロードと、電子メールまたはメッセージングによる顧客への直接共有\n利点: B2B および卸売取引の完了をスピードアップし、重複した手動データ入力を排除し、キャッシュ フローを加速します。',
+      'Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'オンラインストア、実店舗、中央倉庫にわたるリアルタイムの在庫同期\n自動低在庫再注文しきい値によるバッチ、ロット、有効期限の追跡\n発送/受け取り監査証跡を伴う支店間の在庫の委託および転送\n利点: ウェブ上での過剰販売を防止し、在庫切れを解消し、資本が過剰在庫に滞留するのを防ぎます。',
+      'Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'スタイリスト/セラピストのスケジュールと部屋の割り当てを含む視覚的な予約カレンダー\nカスタム期間、アドオン処理、および価格階層を含むサービス カタログ\n完了したサービスと小売製品のアップセルに基づいてスタイリストコミッションを自動計算\n利点: 予約の競合を排除し、椅子の使用率を最適化し、正確なコミッション支払いでスタッフのモチベーションを高めます。',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering â guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': '居住状況、食事、請求状況を示す視覚的なテーブルフロアプラン\n非接触型テーブルの QR メニュー注文 - ゲストは携帯電話からスキャン、閲覧、注文します\nキッチン オーダー チケット (KOT) はライブ キッチン ディスプレイ システム (KDS) 画面に直接ルーティングされます。\n利点: テーブルの回転が 35% 早くなり、キッチンの注文ミスがなくなり、給仕スタッフのオーバーヘッドが削減されます。',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': '居住状況、食事、請求状況を示す視覚的なテーブルフロアプラン\n非接触テーブル QR メニューの注文 - ゲストは携帯電話からスキャン、閲覧、注文します\nキッチン オーダー チケット (KOT) はライブ キッチン ディスプレイ システム (KDS) 画面に直接ルーティングされます。\n利点: テーブルの回転が 35% 早くなり、キッチンの注文ミスがなくなり、給仕スタッフのオーバーヘッドが削減されます。',
       '& Mobile': '&モバイル',
       '5 Enterprise Capabilities Built for Scale': '5 規模に合わせて構築されたエンタープライズ機能',
       '58mm & 80mm ESC/POS': '58mm/80mm レシートプリンター',
@@ -22345,132 +21481,24 @@ Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lo
       '▼ Configure': '▼ Настроить',
       '🍽️ Dining & Food POS': '🍽️ POS для ресторанов',
       '🏪 Retail & Barcode POS': '🏪 POS для розницы и штрихкодов',
-      '360-degree customer purchasing profiles, contact directories, and buying habits
-Sales lead management pipeline with activity logging, follow-up reminders, and stage tracking
-Automated customer loyalty reward points that accumulate and redeem at checkout
-Benefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': '360-градусные профили покупок клиентов, каталоги контактов и покупательские привычки
-Воронка управления продажами с журналированием активности, последующими напоминаниями и отслеживанием этапов
-Автоматические бонусные баллы за лояльность клиентов, которые накапливаются и используются при оформлении заказа.
-Преимущество: увеличивает пожизненную ценность клиента (LTV) и среднюю стоимость заказа (AOV) на 25 % за счет персонализированных бонусов лояльности.',
-      'Branch, cashier, and staff sales target monitoring with real-time achievement progress
-Live Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics
-Top-selling products, category contribution, and dead-stock identification
-Benefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Мониторинг целевых показателей продаж в филиалах, кассах и персонале с отображением прогресса в режиме реального времени.
-Отчеты о прибылях и убытках (P&L), валовая прибыль и аналитика себестоимости реализованной продукции (COGS) в реальном времени.
-Самые продаваемые продукты, вклад в категорию и идентификация остатков
-Преимущество: дает владельцам бизнеса 100% финансовую ясность, позволяющую сократить неэффективные линии и максимизировать чистую прибыль.',
-      'Centralized catalog management with branch-specific pricing and localized tax rates
-Inter-branch stock transfer requests with transit tracking and receiving audits
-Consolidated corporate reports with isolated tenant workspace security
-Benefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Централизованное управление каталогом с ценами для конкретных отраслей и локализованными налоговыми ставками.
-Заявки на межфилиальное перемещение запасов с отслеживанием транзита и проверкой получения
-Консолидированные корпоративные отчеты с изолированной безопасностью рабочего пространства арендатора
-Преимущество: легкое масштабирование от одного магазина по соседству до сотен франчайзинговых магазинов по всей стране.',
-      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)
-Device serial number/IMEI tracking, intake diagnostic notes, and warranty logs
-Integrated spare parts inventory deduction and technician labor invoicing
-Benefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Полный жизненный цикл ремонта (Получено -> Диагностика -> Заказаны детали -> Готово -> Доставлено)
-Серийный номер устройства/отслеживание IMEI, примечания по диагностике приема и журналы гарантии
-Комплексный вычет запасов запасных частей и выставление счетов за работу технического персонала
-Преимущество: открывает высокорентабельный доход от услуг по ремонту для магазинов электроники, компьютеров и велосипедов с полной прозрачностью.',
-      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes
-One-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF
-Thermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices
-Benefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Соответствующие налоговые счета, генерируемые автоматически с подробной разбивкой налогов и кодами HSN/SAC.
-Мгновенная отправка клиенту в одно касание WhatsApp, SMS и электронной почты с фирменным PDF-файлом.
-Термоквитанции (58/80 мм) вместе с налоговыми счетами в формате A4 в формате PDF.
-Преимущество: 100 % соблюдение налоговых и аудиторских требований, отсутствие бумажных отходов и 98 % открываемости квитанций WhatsApp для повторного вовлечения клиентов.',
-      'Customer credit limits, balance statements, and aged receivables tracking
-Supplier purchase bills, payment schedules, and outstanding ledger balances
-Comprehensive transaction history and automated debit/credit balancing
-Benefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Кредитные лимиты клиентов, балансовые отчеты и отслеживание просроченной дебиторской задолженности
-Счета за закупки поставщиков, графики платежей и непогашенные остатки в бухгалтерской книге
-Полная история транзакций и автоматическое балансирование дебета/кредита
-Преимущество: максимальная прозрачность оборотного капитала, сокращение безнадежных долгов и поддержание выгодных условий торговли с поставщиками.',
-      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion
-Direct ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet
-Runs on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones
-Benefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'Специальное нативное APK-приложение для Android и настольное приложение для Windows для полноэкранного погружения
-Прямая связь с термопринтером ESC/POS через USB, Bluetooth и LAN/Ethernet.
-Работает на существующем оборудовании: планшетах, универсальных POS-терминалах, ноутбуках или мобильных телефонах.
-Преимущество: отсутствие дорогостоящих фирменных аппаратных замков — экономия тысяч долларов на первоначальной настройке и обслуживании.',
-      'Full counter operations, barcode search, cart calculations, and receipt printing without internet
-Automatic background synchronization on reconnect with tamper-proof duplicate prevention
-Continuous local data caching so tills never freeze during network cuts
-Benefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Полные операции со счетчиком, поиск по штрих-коду, расчет корзины и печать чеков без Интернета.
-Автоматическая фоновая синхронизация при повторном подключении с защитой от несанкционированного дублирования
-Непрерывное локальное кэширование данных, поэтому кассы никогда не зависают во время отключений сети.
-Преимущество: нулевое время простоя и нулевые потери продаж при отключении интернета в часы пик покупок.',
-      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)
-Device authorization and terminal registration to prevent unauthorized logins
-Tamper-proof audit trails for every price override, discount, held cart, and refund
-Benefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Детализированные разрешения для каждого модуля (кассиры, менеджеры магазинов, складские служащие, бухгалтеры)
-Авторизация устройства и регистрация терминала для предотвращения несанкционированного входа в систему
-Защищенные от несанкционированного доступа контрольные журналы для каждого изменения цены, скидки, удержания корзины и возврата средств.
-Преимущество: защищает размер прибыли от злоупотребления скидками кассира и обеспечивает строгое соблюдение требований.',
-      'Instant mobile-friendly digital storefront with category & brand filtering
-One-click WhatsApp product link & cart sharing for direct social commerce
-Direct QR code ordering with instant payment gateway integration
-Benefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Мгновенная, удобная для мобильных устройств цифровая витрина с фильтрацией по категориям и брендам.
-Ссылка на продукт WhatsApp одним щелчком мыши и совместное использование корзины для прямой социальной торговли
-Прямой заказ по QR-коду с интеграцией шлюза мгновенной оплаты
-Преимущество: запустите электронную коммерцию за считанные минуты, привлекайте интернет-покупателей без рыночных комиссий и автоматически синхронизируйте заказы.',
-      'Millisecond barcode scanning with quick-access visual favorites & held carts
-Multi-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)
-High-speed thermal receipt printing with automated cash drawer kick pulse
-Benefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Миллисекундное сканирование штрих-кодов с быстрым доступом к избранному и удерживаемым корзинам
-Мультитендерные разделенные платежи (наличные, карта, UPI, кошельки, кредит в магазине клиента)
-Высокоскоростная термопечать чеков с автоматическим импульсом движения денежного ящика
-Преимущество: устраняет узкие места на кассах, легко справляется с пиковым праздничным скоплением людей и увеличивает продажи в 3 раза быстрее.',
-      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts
-Automated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability
-Real-time cash variance detection that isolates discrepancies per drawer
-Benefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Открытие регистрации денежных средств, приходных/выплаченных кассовых чеков и слепой подсчет
-Автоматизированные X-отчеты в середине смены и Z-отчеты в конце дня с подотчетностью каждого кассира
-Обнаружение отклонений денежных средств в режиме реального времени, которое изолирует расхождения по каждому ящику
-Преимущество: предотвращает нехватку ящиков, предотвращает кражи со стороны сотрудников и сокращает ежедневное время закрытия кассы с часов до минут.',
-      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring
-Prescription record management, doctor attribution, and patient dosage instructions
-Flexible unit conversions (box, strip, tablet, bottle) with batch-level costing
-Benefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Отслеживание партий и партий фармацевтических препаратов со строгим контролем срока годности
-Управление записями рецептов, атрибуция врачей и инструкции по дозировке пациентов.
-Гибкое преобразование единиц измерения (коробка, полоска, таблетка, бутылка) с калькуляцией затрат на уровне партии.
-Преимущество: полное соблюдение санитарных норм, отсутствие выдачи лекарств с истекшим сроком годности и минимизация потерь.',
-      'Professional quotation builder with customizable discounts, terms, and validity dates
-One-click automated conversion from Quote to confirmed Sale and Invoice
-Branded PDF downloads and direct customer sharing via email or messaging
-Benefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Профессиональный конструктор предложений с настраиваемыми скидками, условиями и сроками действия.
-Автоматическое преобразование ценового предложения в подтвержденную продажу и счет в один клик.
-Загрузка фирменных PDF-файлов и прямой обмен информацией с клиентами по электронной почте или посредством обмена сообщениями.
-Преимущество: ускоряет закрытие B2B и оптовых сделок, устраняет дублирующий ввод данных вручную и ускоряет движение денежных средств.',
-      'Real-time stock synchronization across online store, physical shops, and central warehouses
-Batch, lot, and expiry date tracking with automatic low-stock reorder thresholds
-Inter-branch stock consignments and transfers with dispatch/receiving audit trails
-Benefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Синхронизация запасов в реальном времени в интернет-магазине, физических магазинах и центральных складах.
-Отслеживание партий, партий и сроков годности с автоматическими пороговыми значениями повторного заказа при низком уровне запасов.
-Межфилиальные отгрузки и перемещения запасов с контролем отправки/приема
-Преимущество: предотвращает перепродажу в Интернете, устраняет дефицит и предотвращает застревание капитала в избыточных запасах.',
-      'Visual appointment calendar with stylist/therapist scheduling and room assignment
-Service catalog with custom durations, add-on treatments, and pricing tiers
-Automatic stylist commission calculation based on completed services and retail product upsells
-Benefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Визуальный календарь встреч с расписанием стилиста/терапевта и назначением кабинета.
-Каталог услуг с индивидуальной продолжительностью, дополнительными процедурами и уровнями цен.
-Автоматический расчет комиссии стилиста на основе выполненных услуг и дополнительных продаж розничных товаров.
-Преимущество: устраняет конфликты при назначении, оптимизирует использование стульев и мотивирует персонал точными выплатами комиссионных.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering â guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Визуальные планы этажей со статусом занятости, питания и выставления счетов.
-Заказ бесконтактного стола по QR-меню — гости сканируют, просматривают и делают заказы с телефонов.
-Билеты на заказ кухни (KOT) направляются непосредственно на живые экраны системы отображения кухни (KDS)
-Преимущество: ускоряет повороты столов на 35 %, устраняет ошибки при заказе на кухне и снижает накладные расходы на официантов.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering — guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Визуальные планы этажей со статусом занятости, питания и выставления счетов.
-Заказ бесконтактного стола по QR-меню — гости сканируют, просматривают и заказывают с телефонов
-Билеты на заказ кухни (KOT) направляются непосредственно на живые экраны системы отображения кухни (KDS)
-Преимущество: ускоряет повороты столов на 35 %, устраняет ошибки при заказе на кухне и снижает накладные расходы на официантов.',
+      '360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': '360-градусные профили покупок клиентов, каталоги контактов и покупательские привычки\nВоронка управления продажами с журналированием активности, последующими напоминаниями и отслеживанием этапов\nАвтоматические бонусные баллы за лояльность клиентов, которые накапливаются и используются при оформлении заказа.\nПреимущество: увеличивает пожизненную ценность клиента (LTV) и среднюю стоимость заказа (AOV) на 25 % за счет персонализированных бонусов лояльности.',
+      'Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Мониторинг целевых показателей продаж в филиалах, кассах и персонале с отображением прогресса в режиме реального времени.\nОтчеты о прибылях и убытках (P&L), валовая прибыль и аналитика себестоимости реализованной продукции (COGS) в реальном времени.\nСамые продаваемые продукты, вклад в категорию и идентификация остатков\nПреимущество: дает владельцам бизнеса 100% финансовую ясность, позволяющую сократить неэффективные линии и максимизировать чистую прибыль.',
+      'Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Централизованное управление каталогом с ценами для конкретных отраслей и локализованными налоговыми ставками.\nЗаявки на межфилиальное перемещение запасов с отслеживанием транзита и проверкой получения\nКонсолидированные корпоративные отчеты с изолированной безопасностью рабочего пространства арендатора\nПреимущество: легкое масштабирование от одного магазина по соседству до сотен франчайзинговых магазинов по всей стране.',
+      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Полный жизненный цикл ремонта (Получено -> Диагностика -> Заказаны детали -> Готово -> Доставлено)\nСерийный номер устройства/отслеживание IMEI, примечания по диагностике приема и журналы гарантии\nКомплексный вычет запасов запасных частей и выставление счетов за работу технического персонала\nПреимущество: открывает высокорентабельный доход от услуг по ремонту для магазинов электроники, компьютеров и велосипедов с полной прозрачностью.',
+      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Соответствующие налоговые счета, генерируемые автоматически с подробной разбивкой налогов и кодами HSN/SAC.\nМгновенная отправка клиенту в одно касание WhatsApp, SMS и электронной почты с фирменным PDF-файлом.\nТермоквитанции (58/80 мм) вместе с налоговыми счетами в формате A4 в формате PDF.\nПреимущество: 100 % соблюдение налоговых и аудиторских требований, отсутствие бумажных отходов и 98 % открываемости квитанций WhatsApp для повторного вовлечения клиентов.',
+      'Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Кредитные лимиты клиентов, балансовые отчеты и отслеживание просроченной дебиторской задолженности\nСчета за закупки поставщиков, графики платежей и непогашенные остатки в бухгалтерской книге\nПолная история транзакций и автоматическое балансирование дебета/кредита\nПреимущество: максимальная прозрачность оборотного капитала, сокращение безнадежных долгов и поддержание выгодных условий торговли с поставщиками.',
+      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'Специальное нативное APK-приложение для Android и настольное приложение для Windows для полноэкранного погружения\nПрямая связь с термопринтером ESC/POS через USB, Bluetooth и LAN/Ethernet.\nРаботает на существующем оборудовании: планшетах, универсальных POS-терминалах, ноутбуках или мобильных телефонах.\nПреимущество: отсутствие дорогостоящих фирменных аппаратных замков — экономия тысяч долларов на первоначальной настройке и обслуживании.',
+      'Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Полные операции со счетчиком, поиск по штрих-коду, расчет корзины и печать чеков без Интернета.\nАвтоматическая фоновая синхронизация при повторном подключении с защитой от несанкционированного дублирования\nНепрерывное локальное кэширование данных, поэтому кассы никогда не зависают во время отключений сети.\nПреимущество: нулевое время простоя и нулевые потери продаж при отключении интернета в часы пик покупок.',
+      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Детализированные разрешения для каждого модуля (кассиры, менеджеры магазинов, складские служащие, бухгалтеры)\nАвторизация устройства и регистрация терминала для предотвращения несанкционированного входа в систему\nЗащищенные от несанкционированного доступа контрольные журналы для каждого изменения цены, скидки, удержания корзины и возврата средств.\nПреимущество: защищает размер прибыли от злоупотребления скидками кассира и обеспечивает строгое соблюдение требований.',
+      'Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Мгновенная, удобная для мобильных устройств цифровая витрина с фильтрацией по категориям и брендам.\nСсылка на продукт WhatsApp одним щелчком мыши и совместное использование корзины для прямой социальной торговли\nПрямой заказ по QR-коду с интеграцией шлюза мгновенной оплаты\nПреимущество: запустите электронную коммерцию за считанные минуты, привлекайте интернет-покупателей без рыночных комиссий и автоматически синхронизируйте заказы.',
+      'Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Миллисекундное сканирование штрих-кодов с быстрым доступом к избранному и удерживаемым корзинам\nМультитендерные разделенные платежи (наличные, карта, UPI, кошельки, кредит в магазине клиента)\nВысокоскоростная термопечать чеков с автоматическим импульсом движения денежного ящика\nПреимущество: устраняет узкие места на кассах, легко справляется с пиковым праздничным скоплением людей и увеличивает продажи в 3 раза быстрее.',
+      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Открытие регистрации денежных средств, приходных/выплаченных кассовых чеков и слепой подсчет\nАвтоматизированные X-отчеты в середине смены и Z-отчеты в конце дня с подотчетностью каждого кассира\nОбнаружение отклонений денежных средств в режиме реального времени, которое изолирует расхождения по каждому ящику\nПреимущество: предотвращает нехватку ящиков, предотвращает кражи со стороны сотрудников и сокращает ежедневное время закрытия кассы с часов до минут.',
+      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Отслеживание партий и партий фармацевтических препаратов со строгим контролем срока годности\nУправление записями рецептов, атрибуция врачей и инструкции по дозировке пациентов.\nГибкое преобразование единиц измерения (коробка, полоска, таблетка, бутылка) с калькуляцией затрат на уровне партии.\nПреимущество: полное соблюдение санитарных норм, отсутствие выдачи лекарств с истекшим сроком годности и минимизация потерь.',
+      'Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Профессиональный конструктор предложений с настраиваемыми скидками, условиями и сроками действия.\nАвтоматическое преобразование ценового предложения в подтвержденную продажу и счет в один клик.\nЗагрузка фирменных PDF-файлов и прямой обмен информацией с клиентами по электронной почте или посредством обмена сообщениями.\nПреимущество: ускоряет закрытие B2B и оптовых сделок, устраняет дублирующий ввод данных вручную и ускоряет движение денежных средств.',
+      'Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Синхронизация запасов в реальном времени в интернет-магазине, физических магазинах и центральных складах.\nОтслеживание партий, партий и сроков годности с автоматическими пороговыми значениями повторного заказа при низком уровне запасов.\nМежфилиальные отгрузки и перемещения запасов с контролем отправки/приема\nПреимущество: предотвращает перепродажу в Интернете, устраняет дефицит и предотвращает застревание капитала в избыточных запасах.',
+      'Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Визуальный календарь встреч с расписанием стилиста/терапевта и назначением кабинета.\nКаталог услуг с индивидуальной продолжительностью, дополнительными процедурами и уровнями цен.\nАвтоматический расчет комиссии стилиста на основе выполненных услуг и дополнительных продаж розничных товаров.\nПреимущество: устраняет конфликты при назначении, оптимизирует использование стульев и мотивирует персонал точными выплатами комиссионных.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering â guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Визуальные планы этажей со статусом занятости, питания и выставления счетов.\nЗаказ бесконтактного стола по QR-меню — гости сканируют, просматривают и делают заказы с телефонов.\nБилеты на заказ кухни (KOT) направляются непосредственно на живые экраны системы отображения кухни (KDS)\nПреимущество: ускоряет повороты столов на 35 %, устраняет ошибки при заказе на кухне и снижает накладные расходы на официантов.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Визуальные планы этажей со статусом занятости, питания и выставления счетов.\nЗаказ бесконтактного стола по QR-меню — гости сканируют, просматривают и заказывают с телефонов\nБилеты на заказ кухни (KOT) направляются непосредственно на живые экраны системы отображения кухни (KDS)\nПреимущество: ускоряет повороты столов на 35 %, устраняет ошибки при заказе на кухне и снижает накладные расходы на официантов.',
       '& Mobile': 'и мобильный',
       '5 Enterprise Capabilities Built for Scale': '5 возможностей предприятия, созданных для масштабирования',
       '58mm & 80mm ESC/POS': 'Термопринтеры 58мм и 80мм ESC/POS',
@@ -24899,132 +23927,24 @@ Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lo
       '▼ Configure': '▼ Configura',
       '🍽️ Dining & Food POS': '🍽️ POS ristorazione',
       '🏪 Retail & Barcode POS': '🏪 POS vendita al dettaglio e codice a barre',
-      '360-degree customer purchasing profiles, contact directories, and buying habits
-Sales lead management pipeline with activity logging, follow-up reminders, and stage tracking
-Automated customer loyalty reward points that accumulate and redeem at checkout
-Benefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': 'Profili di acquisto dei clienti a 360 gradi, directory dei contatti e abitudini di acquisto
-Pipeline di gestione dei lead di vendita con registrazione delle attività, promemoria di follow-up e monitoraggio delle fasi
-Punti premio fedeltà automatizzati dei clienti che si accumulano e vengono riscattati alla cassa
-Vantaggio: aumenta il valore della vita del cliente (LTV) e il valore medio degli ordini (AOV) del 25% attraverso vantaggi fedeltà personalizzati.',
-      'Branch, cashier, and staff sales target monitoring with real-time achievement progress
-Live Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics
-Top-selling products, category contribution, and dead-stock identification
-Benefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Monitoraggio degli obiettivi di vendita di filiali, cassieri e personale con avanzamento dei risultati in tempo reale
-Dichiarazioni di profitti e perdite (P&L) in tempo reale, margini lordi e analisi del costo dei beni venduti (COGS)
-Prodotti più venduti, contributo per categoria e identificazione delle scorte morte
-Vantaggio: offre agli imprenditori la chiarezza finanziaria al 100% per tagliare le linee con prestazioni inferiori e massimizzare la redditività netta.',
-      'Centralized catalog management with branch-specific pricing and localized tax rates
-Inter-branch stock transfer requests with transit tracking and receiving audits
-Consolidated corporate reports with isolated tenant workspace security
-Benefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Gestione centralizzata del catalogo con prezzi specifici per filiale e aliquote fiscali localizzate
-Richieste di trasferimento titoli tra filiali con tracciamento del transito e audit di ricezione
-Report aziendali consolidati con sicurezza dell\'area di lavoro degli inquilini isolati
-Vantaggio: scala facilmente da un negozio di quartiere a centinaia di sedi in franchising a livello nazionale.',
-      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)
-Device serial number/IMEI tracking, intake diagnostic notes, and warranty logs
-Integrated spare parts inventory deduction and technician labor invoicing
-Benefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Ciclo di vita completo della riparazione (Ricevuto -> Diagnosi -> Parti ordinate -> Pronto -> Consegnato)
-Numero di serie del dispositivo/tracciamento IMEI, note diagnostiche di acquisizione e registri di garanzia
-Detrazione integrata dell\'inventario dei pezzi di ricambio e fatturazione della manodopera dei tecnici
-Vantaggio: sblocca ricavi dai servizi di riparazione con margine elevato per negozi di elettronica, computer e biciclette con totale trasparenza.',
-      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes
-One-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF
-Thermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices
-Benefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Fatture fiscali conformi generate automaticamente con ripartizioni fiscali dettagliate e codici HSN/SAC
-Invio istantaneo con un solo tocco ai clienti tramite WhatsApp, SMS ed e-mail con PDF brandizzato
-Ricevute termiche (58 mm/80 mm) insieme a fatture fiscali PDF A4 in formato aziendale
-Vantaggio: conformità fiscale e di controllo al 100%, zero sprechi di carta e tassi di apertura delle ricevute WhatsApp del 98% per il ricoinvolgimento dei clienti.',
-      'Customer credit limits, balance statements, and aged receivables tracking
-Supplier purchase bills, payment schedules, and outstanding ledger balances
-Comprehensive transaction history and automated debit/credit balancing
-Benefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Limiti di credito del cliente, estratti conto e monitoraggio dei crediti scaduti
-Fatture di acquisto dei fornitori, pianificazioni dei pagamenti e saldi contabili in sospeso
-Cronologia completa delle transazioni e bilanciamento debito/credito automatizzato
-Vantaggio: massimizza la visibilità del capitale circolante, riduce i crediti inesigibili e mantiene forti condizioni commerciali con i fornitori.',
-      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion
-Direct ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet
-Runs on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones
-Benefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'APK Android nativo dedicato e app desktop Windows per l\'immersione a schermo intero
-Comunicazione diretta con stampante termica ESC/POS tramite USB, Bluetooth e LAN/Ethernet
-Funziona su hardware esistente: tablet, terminali POS all-in-one, laptop o telefoni cellulari
-Vantaggio: nessun costoso blocco hardware proprietario: consente di risparmiare migliaia di euro sui costi di installazione e manutenzione iniziali.',
-      'Full counter operations, barcode search, cart calculations, and receipt printing without internet
-Automatic background synchronization on reconnect with tamper-proof duplicate prevention
-Continuous local data caching so tills never freeze during network cuts
-Benefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Operazioni di sportello complete, ricerca di codici a barre, calcoli del carrello e stampa di ricevute senza Internet
-Sincronizzazione automatica in background alla riconnessione con prevenzione duplicati a prova di manomissione
-Caching continuo dei dati locali in modo che le casse non si blocchino mai durante le interruzioni della rete
-Vantaggio: zero tempi di inattività e zero vendite perse quando Internet si interrompe durante le ore di punta degli acquisti.',
-      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)
-Device authorization and terminal registration to prevent unauthorized logins
-Tamper-proof audit trails for every price override, discount, held cart, and refund
-Benefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Autorizzazioni granulari per modulo (cassieri, direttori di negozio, addetti al magazzino, contabili)
-Autorizzazione del dispositivo e registrazione del terminale per impedire accessi non autorizzati
-Percorsi di controllo a prova di manomissione per ogni variazione di prezzo, sconto, blocco del carrello e rimborso
-Vantaggio: protegge i margini di profitto dagli abusi degli sconti cassa e mantiene le operazioni rigorosamente conformi.',
-      'Instant mobile-friendly digital storefront with category & brand filtering
-One-click WhatsApp product link & cart sharing for direct social commerce
-Direct QR code ordering with instant payment gateway integration
-Benefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Vetrina digitale istantanea ottimizzata per dispositivi mobili con filtro per categoria e marchio
-Collegamento al prodotto WhatsApp con un clic e condivisione del carrello per il commercio sociale diretto
-Ordinazione diretta tramite codice QR con integrazione del gateway di pagamento istantaneo
-Vantaggio: avvia l\'eCommerce in pochi minuti, acquisisci acquirenti su Internet senza commissioni di mercato e sincronizza gli ordini automaticamente.',
-      'Millisecond barcode scanning with quick-access visual favorites & held carts
-Multi-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)
-High-speed thermal receipt printing with automated cash drawer kick pulse
-Benefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Scansione di codici a barre in millisecondi con preferiti visivi ad accesso rapido e carrelli trattenuti
-Pagamenti frazionati multi-asta (contanti, carta, UPI, portafogli, credito del negozio cliente)
-Stampa termica di ricevute ad alta velocità con impulso di attivazione automatico del cassetto contanti
-Vantaggio: elimina i colli di bottiglia alle casse, gestisce senza problemi l\'afflusso di clienti durante le festività e aumenta le vendite 3 volte più velocemente.',
-      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts
-Automated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability
-Real-time cash variance detection that isolates discrepancies per drawer
-Benefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Apertura della registrazione del fondo cassa, buoni di piccola cassa versati/versati e conteggi alla cieca
-X-Report automatizzati a metà turno e Z-Report a fine giornata con responsabilità per cassiere
-Rilevamento della varianza del contante in tempo reale che isola le discrepanze per cassetto
-Vantaggio: impedisce il restringimento dei cassetti, previene i furti dei dipendenti e riduce il tempo di chiusura giornaliero del registro da ore a minuti.',
-      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring
-Prescription record management, doctor attribution, and patient dosage instructions
-Flexible unit conversions (box, strip, tablet, bottle) with batch-level costing
-Benefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Monitoraggio di lotti e lotti di farmaci con un rigoroso monitoraggio della data di scadenza
-Gestione del registro delle prescrizioni, attribuzione del medico e istruzioni sul dosaggio del paziente
-Conversioni di unità flessibili (scatola, striscia, compressa, flacone) con determinazione dei costi a livello di batch
-Vantaggio: totale conformità alle normative sanitarie, zero medicinali scaduti dispensati e restringimenti ridotti al minimo.',
-      'Professional quotation builder with customizable discounts, terms, and validity dates
-One-click automated conversion from Quote to confirmed Sale and Invoice
-Branded PDF downloads and direct customer sharing via email or messaging
-Benefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Generatore di preventivi professionale con sconti, termini e date di validità personalizzabili
-Conversione automatizzata con un clic da preventivo a vendita e fattura confermate
-Download di PDF brandizzati e condivisione diretta con i clienti tramite e-mail o messaggistica
-Vantaggio: accelera la chiusura di accordi B2B e all\'ingrosso, elimina l\'immissione manuale di dati duplicati e accelera il flusso di cassa.',
-      'Real-time stock synchronization across online store, physical shops, and central warehouses
-Batch, lot, and expiry date tracking with automatic low-stock reorder thresholds
-Inter-branch stock consignments and transfers with dispatch/receiving audit trails
-Benefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Sincronizzazione delle scorte in tempo reale tra negozi online, negozi fisici e magazzini centrali
-Monitoraggio di lotti, lotti e date di scadenza con soglie di riordino automatiche per scorte limitate
-Spedizioni e trasferimenti di stock tra filiali con audit trail di spedizione/ricezione
-Vantaggio: impedisce le vendite eccessive sul Web, elimina le rotture di stock e impedisce al capitale di bloccare scorte in eccesso.',
-      'Visual appointment calendar with stylist/therapist scheduling and room assignment
-Service catalog with custom durations, add-on treatments, and pricing tiers
-Automatic stylist commission calculation based on completed services and retail product upsells
-Benefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Calendario visivo degli appuntamenti con pianificazione dello stilista/terapista e assegnazione della stanza
-Catalogo dei servizi con durate personalizzate, trattamenti aggiuntivi e livelli di prezzo
-Calcolo automatico della commissione dello stilista in base ai servizi completati e agli upselling dei prodotti al dettaglio
-Vantaggio: elimina i conflitti di appuntamento, ottimizza l\'utilizzo della sedia e motiva il personale con pagamenti accurati delle commissioni.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering â guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Planimetrie visive dei tavoli con stato di occupazione, ristorazione e fatturazione dal vivo
-Ordinazione di menu QR senza contatto da tavolo: gli ospiti scansionano, navigano e ordinano dai telefoni
-Kitchen Order Ticket (KOT) indirizzati direttamente agli schermi live del Kitchen Display System (KDS).
-Vantaggio: accelera i turni dei tavoli del 35%, elimina gli errori relativi agli ordini in cucina e riduce le spese generali dei camerieri.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering — guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Planimetrie visive dei tavoli con stato di occupazione, ristorazione e fatturazione dal vivo
-Ordinazione di menu QR senza contatto da tavolo: gli ospiti scansionano, navigano e ordinano dai telefoni
-Kitchen Order Ticket (KOT) indirizzati direttamente agli schermi live del Kitchen Display System (KDS).
-Vantaggio: accelera i turni dei tavoli del 35%, elimina gli errori relativi agli ordini in cucina e riduce le spese generali dei camerieri.',
+      '360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': 'Profili di acquisto dei clienti a 360 gradi, directory dei contatti e abitudini di acquisto\nPipeline di gestione dei lead di vendita con registrazione delle attività, promemoria di follow-up e monitoraggio delle fasi\nPunti premio fedeltà automatizzati dei clienti che si accumulano e vengono riscattati alla cassa\nVantaggio: aumenta il valore della vita del cliente (LTV) e il valore medio degli ordini (AOV) del 25% attraverso vantaggi fedeltà personalizzati.',
+      'Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Monitoraggio degli obiettivi di vendita di filiali, cassieri e personale con avanzamento dei risultati in tempo reale\nDichiarazioni di profitti e perdite (P&L) in tempo reale, margini lordi e analisi del costo dei beni venduti (COGS)\nProdotti più venduti, contributo per categoria e identificazione delle scorte morte\nVantaggio: offre agli imprenditori la chiarezza finanziaria al 100% per tagliare le linee con prestazioni inferiori e massimizzare la redditività netta.',
+      'Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Gestione centralizzata del catalogo con prezzi specifici per filiale e aliquote fiscali localizzate\nRichieste di trasferimento titoli tra filiali con tracciamento del transito e audit di ricezione\nReport aziendali consolidati con sicurezza dell\'area di lavoro degli inquilini isolati\nVantaggio: scala facilmente da un negozio di quartiere a centinaia di sedi in franchising a livello nazionale.',
+      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Ciclo di vita completo della riparazione (Ricevuto -> Diagnosi -> Parti ordinate -> Pronto -> Consegnato)\nNumero di serie del dispositivo/tracciamento IMEI, note diagnostiche di acquisizione e registri di garanzia\nDetrazione integrata dell\'inventario dei pezzi di ricambio e fatturazione della manodopera dei tecnici\nVantaggio: sblocca ricavi dai servizi di riparazione con margine elevato per negozi di elettronica, computer e biciclette con totale trasparenza.',
+      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Fatture fiscali conformi generate automaticamente con ripartizioni fiscali dettagliate e codici HSN/SAC\nInvio istantaneo con un solo tocco ai clienti tramite WhatsApp, SMS ed e-mail con PDF brandizzato\nRicevute termiche (58 mm/80 mm) insieme a fatture fiscali PDF A4 in formato aziendale\nVantaggio: conformità fiscale e di controllo al 100%, zero sprechi di carta e tassi di apertura delle ricevute WhatsApp del 98% per il ricoinvolgimento dei clienti.',
+      'Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Limiti di credito del cliente, estratti conto e monitoraggio dei crediti scaduti\nFatture di acquisto dei fornitori, pianificazioni dei pagamenti e saldi contabili in sospeso\nCronologia completa delle transazioni e bilanciamento debito/credito automatizzato\nVantaggio: massimizza la visibilità del capitale circolante, riduce i crediti inesigibili e mantiene forti condizioni commerciali con i fornitori.',
+      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'APK Android nativo dedicato e app desktop Windows per l\'immersione a schermo intero\nComunicazione diretta con stampante termica ESC/POS tramite USB, Bluetooth e LAN/Ethernet\nFunziona su hardware esistente: tablet, terminali POS all-in-one, laptop o telefoni cellulari\nVantaggio: nessun costoso blocco hardware proprietario: consente di risparmiare migliaia di euro sui costi di installazione e manutenzione iniziali.',
+      'Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Operazioni di sportello complete, ricerca di codici a barre, calcoli del carrello e stampa di ricevute senza Internet\nSincronizzazione automatica in background alla riconnessione con prevenzione duplicati a prova di manomissione\nCaching continuo dei dati locali in modo che le casse non si blocchino mai durante le interruzioni della rete\nVantaggio: zero tempi di inattività e zero vendite perse quando Internet si interrompe durante le ore di punta degli acquisti.',
+      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Autorizzazioni granulari per modulo (cassieri, direttori di negozio, addetti al magazzino, contabili)\nAutorizzazione del dispositivo e registrazione del terminale per impedire accessi non autorizzati\nPercorsi di controllo a prova di manomissione per ogni variazione di prezzo, sconto, blocco del carrello e rimborso\nVantaggio: protegge i margini di profitto dagli abusi degli sconti cassa e mantiene le operazioni rigorosamente conformi.',
+      'Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Vetrina digitale istantanea ottimizzata per dispositivi mobili con filtro per categoria e marchio\nCollegamento al prodotto WhatsApp con un clic e condivisione del carrello per il commercio sociale diretto\nOrdinazione diretta tramite codice QR con integrazione del gateway di pagamento istantaneo\nVantaggio: avvia l\'eCommerce in pochi minuti, acquisisci acquirenti su Internet senza commissioni di mercato e sincronizza gli ordini automaticamente.',
+      'Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Scansione di codici a barre in millisecondi con preferiti visivi ad accesso rapido e carrelli trattenuti\nPagamenti frazionati multi-asta (contanti, carta, UPI, portafogli, credito del negozio cliente)\nStampa termica di ricevute ad alta velocità con impulso di attivazione automatico del cassetto contanti\nVantaggio: elimina i colli di bottiglia alle casse, gestisce senza problemi l\'afflusso di clienti durante le festività e aumenta le vendite 3 volte più velocemente.',
+      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Apertura della registrazione del fondo cassa, buoni di piccola cassa versati/versati e conteggi alla cieca\nX-Report automatizzati a metà turno e Z-Report a fine giornata con responsabilità per cassiere\nRilevamento della varianza del contante in tempo reale che isola le discrepanze per cassetto\nVantaggio: impedisce il restringimento dei cassetti, previene i furti dei dipendenti e riduce il tempo di chiusura giornaliero del registro da ore a minuti.',
+      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Monitoraggio di lotti e lotti di farmaci con un rigoroso monitoraggio della data di scadenza\nGestione del registro delle prescrizioni, attribuzione del medico e istruzioni sul dosaggio del paziente\nConversioni di unità flessibili (scatola, striscia, compressa, flacone) con determinazione dei costi a livello di batch\nVantaggio: totale conformità alle normative sanitarie, zero medicinali scaduti dispensati e restringimenti ridotti al minimo.',
+      'Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Generatore di preventivi professionale con sconti, termini e date di validità personalizzabili\nConversione automatizzata con un clic da preventivo a vendita e fattura confermate\nDownload di PDF brandizzati e condivisione diretta con i clienti tramite e-mail o messaggistica\nVantaggio: accelera la chiusura di accordi B2B e all\'ingrosso, elimina l\'immissione manuale di dati duplicati e accelera il flusso di cassa.',
+      'Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Sincronizzazione delle scorte in tempo reale tra negozi online, negozi fisici e magazzini centrali\nMonitoraggio di lotti, lotti e date di scadenza con soglie di riordino automatiche per scorte limitate\nSpedizioni e trasferimenti di stock tra filiali con audit trail di spedizione/ricezione\nVantaggio: impedisce le vendite eccessive sul Web, elimina le rotture di stock e impedisce al capitale di bloccare scorte in eccesso.',
+      'Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Calendario visivo degli appuntamenti con pianificazione dello stilista/terapista e assegnazione della stanza\nCatalogo dei servizi con durate personalizzate, trattamenti aggiuntivi e livelli di prezzo\nCalcolo automatico della commissione dello stilista in base ai servizi completati e agli upselling dei prodotti al dettaglio\nVantaggio: elimina i conflitti di appuntamento, ottimizza l\'utilizzo della sedia e motiva il personale con pagamenti accurati delle commissioni.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering â guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Planimetrie visive dei tavoli con stato di occupazione, ristorazione e fatturazione dal vivo\nOrdinazione di menu QR senza contatto da tavolo: gli ospiti scansionano, navigano e ordinano dai telefoni\nKitchen Order Ticket (KOT) indirizzati direttamente agli schermi live del Kitchen Display System (KDS).\nVantaggio: accelera i turni dei tavoli del 35%, elimina gli errori relativi agli ordini in cucina e riduce le spese generali dei camerieri.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Planimetrie visive dei tavoli con stato di occupazione, ristorazione e fatturazione dal vivo\nOrdinazione di menu QR senza contatto da tavolo: gli ospiti scansionano, navigano e ordinano dai telefoni\nKitchen Order Ticket (KOT) indirizzati direttamente agli schermi live del Kitchen Display System (KDS).\nVantaggio: accelera i turni dei tavoli del 35%, elimina gli errori relativi agli ordini in cucina e riduce le spese generali dei camerieri.',
       '& Mobile': 'e cellulari',
       '5 Enterprise Capabilities Built for Scale': '5 funzionalità aziendali progettate per la scalabilità',
       '58mm & 80mm ESC/POS': 'Termica 58mm & 80mm ESC/POS',
@@ -27453,132 +26373,24 @@ Vantaggio: accelera i turni dei tavoli del 35%, elimina gli errori relativi agli
       '▼ Configure': '▼ Konfigurasi',
       '🍽️ Dining & Food POS': '🍽️ POS Restoran & Kuliner',
       '🏪 Retail & Barcode POS': '🏪 POS Ritel & Barcode',
-      '360-degree customer purchasing profiles, contact directories, and buying habits
-Sales lead management pipeline with activity logging, follow-up reminders, and stage tracking
-Automated customer loyalty reward points that accumulate and redeem at checkout
-Benefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': 'Profil pembelian pelanggan 360 derajat, direktori kontak, dan kebiasaan membeli
-Saluran manajemen prospek penjualan dengan pencatatan aktivitas, pengingat tindak lanjut, dan pelacakan tahapan
-Poin imbalan loyalitas pelanggan otomatis yang diakumulasikan dan ditukarkan saat pembayaran
-Manfaat: Meningkatkan nilai seumur hidup pelanggan (LTV) dan nilai pesanan rata-rata (AOV) sebesar 25% melalui fasilitas loyalitas yang dipersonalisasi.',
-      'Branch, cashier, and staff sales target monitoring with real-time achievement progress
-Live Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics
-Top-selling products, category contribution, and dead-stock identification
-Benefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Pemantauan target penjualan cabang, kasir, dan staf dengan kemajuan pencapaian secara real-time
-Laporan Untung & Rugi (P&L) langsung, margin kotor, dan analisis harga pokok penjualan (COGS)
-Produk terlaris, kontribusi kategori, dan identifikasi stok mati
-Manfaat: Memberikan kejelasan finansial 100% kepada pemilik bisnis untuk memangkas lini bisnis yang berkinerja buruk dan memaksimalkan profitabilitas bersih.',
-      'Centralized catalog management with branch-specific pricing and localized tax rates
-Inter-branch stock transfer requests with transit tracking and receiving audits
-Consolidated corporate reports with isolated tenant workspace security
-Benefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Manajemen katalog terpusat dengan harga khusus cabang dan tarif pajak lokal
-Permintaan transfer stok antar cabang dengan pelacakan transit dan audit penerimaan
-Laporan perusahaan yang terkonsolidasi dengan keamanan ruang kerja penyewa yang terisolasi
-Manfaat: Berkembang dengan mudah dari satu toko di lingkungan sekitar hingga ratusan lokasi waralaba di seluruh negeri.',
-      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)
-Device serial number/IMEI tracking, intake diagnostic notes, and warranty logs
-Integrated spare parts inventory deduction and technician labor invoicing
-Benefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Siklus hidup perbaikan lengkap (Diterima -> Mendiagnosis -> Suku Cadang Dipesan -> Siap -> Terkirim)
-Nomor seri perangkat/pelacakan IMEI, catatan diagnostik masuk, dan log garansi
-Pengurangan inventaris suku cadang dan faktur tenaga kerja teknisi yang terintegrasi
-Manfaat: Mendapatkan pendapatan layanan perbaikan dengan margin tinggi untuk toko elektronik, komputer, dan sepeda dengan transparansi total.',
-      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes
-One-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF
-Thermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices
-Benefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Faktur pajak yang sesuai dibuat secara otomatis dengan rincian pajak terperinci dan kode HSN/SAC
-Pengiriman instan sekali ketuk ke WhatsApp pelanggan, SMS, dan Email dengan PDF bermerek
-Tanda terima termal (58mm/80mm) bersama faktur pajak PDF A4 berformat perusahaan
-Manfaat: 100% kepatuhan pajak dan audit, tanpa limbah kertas, dan 98% tarif terbuka penerimaan WhatsApp untuk keterlibatan kembali pelanggan.',
-      'Customer credit limits, balance statements, and aged receivables tracking
-Supplier purchase bills, payment schedules, and outstanding ledger balances
-Comprehensive transaction history and automated debit/credit balancing
-Benefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Batas kredit pelanggan, laporan saldo, dan pelacakan umur piutang
-Tagihan pembelian pemasok, jadwal pembayaran, dan saldo buku besar
-Riwayat transaksi yang komprehensif dan penyeimbangan debit/kredit otomatis
-Manfaat: Memaksimalkan visibilitas modal kerja, mengurangi kredit macet, dan mempertahankan persyaratan perdagangan pemasok yang kuat.',
-      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion
-Direct ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet
-Runs on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones
-Benefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'APK Android asli khusus dan aplikasi desktop Windows untuk pencelupan penghitung layar penuh
-Komunikasi printer termal ESC/POS langsung melalui USB, Bluetooth, dan LAN/Ethernet
-Berjalan pada perangkat keras yang ada â tablet, terminal POS all-in-one, laptop, atau ponsel
-Manfaat: Tidak ada kunci perangkat keras berpemilik yang mahal â menghemat ribuan biaya pengaturan dan pemeliharaan awal.',
-      'Full counter operations, barcode search, cart calculations, and receipt printing without internet
-Automatic background synchronization on reconnect with tamper-proof duplicate prevention
-Continuous local data caching so tills never freeze during network cuts
-Benefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Operasi konter penuh, pencarian kode batang, perhitungan keranjang, dan pencetakan tanda terima tanpa internet
-Sinkronisasi latar belakang otomatis saat menyambung kembali dengan pencegahan duplikat anti-rusak
-Caching data lokal yang berkelanjutan sehingga komputer tidak pernah terhenti selama pemutusan jaringan
-Manfaat: Tidak ada downtime dan tidak ada penjualan yang hilang ketika internet terputus selama jam sibuk belanja.',
-      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)
-Device authorization and terminal registration to prevent unauthorized logins
-Tamper-proof audit trails for every price override, discount, held cart, and refund
-Benefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Izin granular per modul (kasir, manajer toko, pegawai stok, akuntan)
-Otorisasi perangkat dan registrasi terminal untuk mencegah login yang tidak sah
-Jalur audit anti kerusakan untuk setiap penggantian harga, diskon, keranjang ditahan, dan pengembalian dana
-Manfaat: Menjaga margin keuntungan dari penyalahgunaan diskon kasir dan menjaga kepatuhan operasional.',
-      'Instant mobile-friendly digital storefront with category & brand filtering
-One-click WhatsApp product link & cart sharing for direct social commerce
-Direct QR code ordering with instant payment gateway integration
-Benefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Etalase digital instan ramah seluler dengan pemfilteran kategori & merek
-Tautan produk WhatsApp sekali klik & berbagi keranjang untuk perdagangan sosial langsung
-Pemesanan kode QR langsung dengan integrasi gateway pembayaran instan
-Manfaat: Luncurkan eCommerce dalam hitungan menit, tangkap pembeli internet tanpa biaya pasar, dan sinkronkan pesanan secara otomatis.',
-      'Millisecond barcode scanning with quick-access visual favorites & held carts
-Multi-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)
-High-speed thermal receipt printing with automated cash drawer kick pulse
-Benefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Pemindaian kode batang milidetik dengan akses cepat favorit visual & gerobak yang dipegang
-Pembayaran split multi-tender (Uang Tunai, Kartu, UPI, Dompet, Kredit Toko Pelanggan)
-Pencetakan tanda terima termal berkecepatan tinggi dengan pulsa tendangan laci kas otomatis
-Manfaat: Menghilangkan hambatan pembayaran di konter, menangani keramaian puncak liburan dengan mudah, dan meningkatkan penjualan 3x lebih cepat.',
-      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts
-Automated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability
-Real-time cash variance detection that isolates discrepancies per drawer
-Benefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Membuka registrasi cash float, voucher kas kecil bayar masuk/bayar, dan blind count
-X-Reports tengah shift otomatis dan Z-Reports akhir hari dengan akuntabilitas per kasir
-Deteksi varians uang tunai secara real-time yang mengisolasi perbedaan per laci
-Manfaat: Menghentikan penyusutan laci, mencegah pencurian oleh karyawan, dan memangkas waktu penutupan register harian dari jam ke menit.',
-      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring
-Prescription record management, doctor attribution, and patient dosage instructions
-Flexible unit conversions (box, strip, tablet, bottle) with batch-level costing
-Benefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Pelacakan batch dan lot obat farmasi dengan pemantauan tanggal kedaluwarsa yang ketat
-Manajemen catatan resep, atribusi dokter, dan instruksi dosis pasien
-Konversi unit yang fleksibel (kotak, strip, tablet, botol) dengan penetapan biaya tingkat batch
-Manfaat: Kepatuhan total terhadap peraturan kesehatan, tidak ada obat kadaluarsa yang dibagikan, dan penyusutan yang minimal.',
-      'Professional quotation builder with customizable discounts, terms, and validity dates
-One-click automated conversion from Quote to confirmed Sale and Invoice
-Branded PDF downloads and direct customer sharing via email or messaging
-Benefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Pembuat kutipan profesional dengan diskon, syarat, dan tanggal validitas yang dapat disesuaikan
-Konversi otomatis sekali klik dari Penawaran ke Penjualan dan Faktur yang dikonfirmasi
-Unduhan PDF bermerek dan berbagi langsung dengan pelanggan melalui email atau pesan
-Manfaat: Mempercepat penutupan transaksi B2B dan grosir, menghilangkan duplikasi entri data manual, dan mempercepat arus kas.',
-      'Real-time stock synchronization across online store, physical shops, and central warehouses
-Batch, lot, and expiry date tracking with automatic low-stock reorder thresholds
-Inter-branch stock consignments and transfers with dispatch/receiving audit trails
-Benefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Sinkronisasi stok real-time di seluruh toko online, toko fisik, dan gudang pusat
-Pelacakan batch, lot, dan tanggal kedaluwarsa dengan ambang pemesanan ulang stok rendah otomatis
-Pengiriman dan transfer stok antar cabang dengan jalur audit pengiriman/penerimaan
-Manfaat: Mencegah penjualan berlebihan di web, menghilangkan kehabisan stok, dan menghentikan modal agar tidak mengunci persediaan berlebih.',
-      'Visual appointment calendar with stylist/therapist scheduling and room assignment
-Service catalog with custom durations, add-on treatments, and pricing tiers
-Automatic stylist commission calculation based on completed services and retail product upsells
-Benefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Kalender janji temu visual dengan penjadwalan stylist/terapis dan penetapan ruangan
-Katalog layanan dengan durasi khusus, perawatan tambahan, dan tingkatan harga
-Perhitungan komisi stylist otomatis berdasarkan layanan yang telah selesai dan peningkatan penjualan produk ritel
-Manfaat: Menghilangkan konflik penunjukan, mengoptimalkan penggunaan kursi, dan memotivasi staf dengan pembayaran komisi yang akurat.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering â guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Denah meja visual dengan status penghuni langsung, ruang makan, dan penagihan
-Pemesanan menu QR Tabel Tanpa Kontak â tamu memindai, menelusuri, dan memesan dari ponsel
-Tiket Pemesanan Dapur (KOT) diarahkan langsung ke layar Live Kitchen Display System (KDS).
-Manfaat: Mempercepat pergantian meja sebesar 35%, menghilangkan kesalahan pesanan dapur, dan menurunkan overhead pelayan.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering — guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Denah meja visual dengan status penghuni langsung, ruang makan, dan penagihan
-Pemesanan menu QR Tabel Tanpa Kontak — tamu memindai, menelusuri, dan memesan dari ponsel
-Tiket Pemesanan Dapur (KOT) diarahkan langsung ke layar Live Kitchen Display System (KDS).
-Manfaat: Mempercepat pergantian meja sebesar 35%, menghilangkan kesalahan pesanan dapur, dan menurunkan overhead pelayan.',
+      '360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': 'Profil pembelian pelanggan 360 derajat, direktori kontak, dan kebiasaan membeli\nSaluran manajemen prospek penjualan dengan pencatatan aktivitas, pengingat tindak lanjut, dan pelacakan tahapan\nPoin imbalan loyalitas pelanggan otomatis yang diakumulasikan dan ditukarkan saat pembayaran\nManfaat: Meningkatkan nilai seumur hidup pelanggan (LTV) dan nilai pesanan rata-rata (AOV) sebesar 25% melalui fasilitas loyalitas yang dipersonalisasi.',
+      'Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Pemantauan target penjualan cabang, kasir, dan staf dengan kemajuan pencapaian secara real-time\nLaporan Untung & Rugi (P&L) langsung, margin kotor, dan analisis harga pokok penjualan (COGS)\nProduk terlaris, kontribusi kategori, dan identifikasi stok mati\nManfaat: Memberikan kejelasan finansial 100% kepada pemilik bisnis untuk memangkas lini bisnis yang berkinerja buruk dan memaksimalkan profitabilitas bersih.',
+      'Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Manajemen katalog terpusat dengan harga khusus cabang dan tarif pajak lokal\nPermintaan transfer stok antar cabang dengan pelacakan transit dan audit penerimaan\nLaporan perusahaan yang terkonsolidasi dengan keamanan ruang kerja penyewa yang terisolasi\nManfaat: Berkembang dengan mudah dari satu toko di lingkungan sekitar hingga ratusan lokasi waralaba di seluruh negeri.',
+      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Siklus hidup perbaikan lengkap (Diterima -> Mendiagnosis -> Suku Cadang Dipesan -> Siap -> Terkirim)\nNomor seri perangkat/pelacakan IMEI, catatan diagnostik masuk, dan log garansi\nPengurangan inventaris suku cadang dan faktur tenaga kerja teknisi yang terintegrasi\nManfaat: Mendapatkan pendapatan layanan perbaikan dengan margin tinggi untuk toko elektronik, komputer, dan sepeda dengan transparansi total.',
+      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Faktur pajak yang sesuai dibuat secara otomatis dengan rincian pajak terperinci dan kode HSN/SAC\nPengiriman instan sekali ketuk ke WhatsApp pelanggan, SMS, dan Email dengan PDF bermerek\nTanda terima termal (58mm/80mm) bersama faktur pajak PDF A4 berformat perusahaan\nManfaat: 100% kepatuhan pajak dan audit, tanpa limbah kertas, dan 98% tarif terbuka penerimaan WhatsApp untuk keterlibatan kembali pelanggan.',
+      'Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Batas kredit pelanggan, laporan saldo, dan pelacakan umur piutang\nTagihan pembelian pemasok, jadwal pembayaran, dan saldo buku besar\nRiwayat transaksi yang komprehensif dan penyeimbangan debit/kredit otomatis\nManfaat: Memaksimalkan visibilitas modal kerja, mengurangi kredit macet, dan mempertahankan persyaratan perdagangan pemasok yang kuat.',
+      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'APK Android asli khusus dan aplikasi desktop Windows untuk pencelupan penghitung layar penuh\nKomunikasi printer termal ESC/POS langsung melalui USB, Bluetooth, dan LAN/Ethernet\nBerjalan pada perangkat keras yang ada â tablet, terminal POS all-in-one, laptop, atau ponsel\nManfaat: Tidak ada kunci perangkat keras berpemilik yang mahal â menghemat ribuan biaya pengaturan dan pemeliharaan awal.',
+      'Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'Operasi konter penuh, pencarian kode batang, perhitungan keranjang, dan pencetakan tanda terima tanpa internet\nSinkronisasi latar belakang otomatis saat menyambung kembali dengan pencegahan duplikat anti-rusak\nCaching data lokal yang berkelanjutan sehingga komputer tidak pernah terhenti selama pemutusan jaringan\nManfaat: Tidak ada downtime dan tidak ada penjualan yang hilang ketika internet terputus selama jam sibuk belanja.',
+      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Izin granular per modul (kasir, manajer toko, pegawai stok, akuntan)\nOtorisasi perangkat dan registrasi terminal untuk mencegah login yang tidak sah\nJalur audit anti kerusakan untuk setiap penggantian harga, diskon, keranjang ditahan, dan pengembalian dana\nManfaat: Menjaga margin keuntungan dari penyalahgunaan diskon kasir dan menjaga kepatuhan operasional.',
+      'Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Etalase digital instan ramah seluler dengan pemfilteran kategori & merek\nTautan produk WhatsApp sekali klik & berbagi keranjang untuk perdagangan sosial langsung\nPemesanan kode QR langsung dengan integrasi gateway pembayaran instan\nManfaat: Luncurkan eCommerce dalam hitungan menit, tangkap pembeli internet tanpa biaya pasar, dan sinkronkan pesanan secara otomatis.',
+      'Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Pemindaian kode batang milidetik dengan akses cepat favorit visual & gerobak yang dipegang\nPembayaran split multi-tender (Uang Tunai, Kartu, UPI, Dompet, Kredit Toko Pelanggan)\nPencetakan tanda terima termal berkecepatan tinggi dengan pulsa tendangan laci kas otomatis\nManfaat: Menghilangkan hambatan pembayaran di konter, menangani keramaian puncak liburan dengan mudah, dan meningkatkan penjualan 3x lebih cepat.',
+      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Membuka registrasi cash float, voucher kas kecil bayar masuk/bayar, dan blind count\nX-Reports tengah shift otomatis dan Z-Reports akhir hari dengan akuntabilitas per kasir\nDeteksi varians uang tunai secara real-time yang mengisolasi perbedaan per laci\nManfaat: Menghentikan penyusutan laci, mencegah pencurian oleh karyawan, dan memangkas waktu penutupan register harian dari jam ke menit.',
+      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Pelacakan batch dan lot obat farmasi dengan pemantauan tanggal kedaluwarsa yang ketat\nManajemen catatan resep, atribusi dokter, dan instruksi dosis pasien\nKonversi unit yang fleksibel (kotak, strip, tablet, botol) dengan penetapan biaya tingkat batch\nManfaat: Kepatuhan total terhadap peraturan kesehatan, tidak ada obat kadaluarsa yang dibagikan, dan penyusutan yang minimal.',
+      'Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Pembuat kutipan profesional dengan diskon, syarat, dan tanggal validitas yang dapat disesuaikan\nKonversi otomatis sekali klik dari Penawaran ke Penjualan dan Faktur yang dikonfirmasi\nUnduhan PDF bermerek dan berbagi langsung dengan pelanggan melalui email atau pesan\nManfaat: Mempercepat penutupan transaksi B2B dan grosir, menghilangkan duplikasi entri data manual, dan mempercepat arus kas.',
+      'Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Sinkronisasi stok real-time di seluruh toko online, toko fisik, dan gudang pusat\nPelacakan batch, lot, dan tanggal kedaluwarsa dengan ambang pemesanan ulang stok rendah otomatis\nPengiriman dan transfer stok antar cabang dengan jalur audit pengiriman/penerimaan\nManfaat: Mencegah penjualan berlebihan di web, menghilangkan kehabisan stok, dan menghentikan modal agar tidak mengunci persediaan berlebih.',
+      'Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Kalender janji temu visual dengan penjadwalan stylist/terapis dan penetapan ruangan\nKatalog layanan dengan durasi khusus, perawatan tambahan, dan tingkatan harga\nPerhitungan komisi stylist otomatis berdasarkan layanan yang telah selesai dan peningkatan penjualan produk ritel\nManfaat: Menghilangkan konflik penunjukan, mengoptimalkan penggunaan kursi, dan memotivasi staf dengan pembayaran komisi yang akurat.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering â guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Denah meja visual dengan status penghuni langsung, ruang makan, dan penagihan\nPemesanan menu QR Tabel Tanpa Kontak â tamu memindai, menelusuri, dan memesan dari ponsel\nTiket Pemesanan Dapur (KOT) diarahkan langsung ke layar Live Kitchen Display System (KDS).\nManfaat: Mempercepat pergantian meja sebesar 35%, menghilangkan kesalahan pesanan dapur, dan menurunkan overhead pelayan.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Denah meja visual dengan status penghuni langsung, ruang makan, dan penagihan\nPemesanan menu QR Tabel Tanpa Kontak — tamu memindai, menelusuri, dan memesan dari ponsel\nTiket Pemesanan Dapur (KOT) diarahkan langsung ke layar Live Kitchen Display System (KDS).\nManfaat: Mempercepat pergantian meja sebesar 35%, menghilangkan kesalahan pesanan dapur, dan menurunkan overhead pelayan.',
       '& Mobile': '& Seluler',
       '5 Enterprise Capabilities Built for Scale': '5 Kemampuan Perusahaan yang Dibangun untuk Skala Besar',
       '58mm & 80mm ESC/POS': 'Printer termal 58mm & 80mm ESC/POS',
@@ -30007,132 +28819,24 @@ Manfaat: Mempercepat pergantian meja sebesar 35%, menghilangkan kesalahan pesana
       '▼ Configure': '▼ Yapılandır',
       '🍽️ Dining & Food POS': '🍽️ Restoran ve Yemek POS',
       '🏪 Retail & Barcode POS': '🏪 Perakende ve Barkod POS',
-      '360-degree customer purchasing profiles, contact directories, and buying habits
-Sales lead management pipeline with activity logging, follow-up reminders, and stage tracking
-Automated customer loyalty reward points that accumulate and redeem at checkout
-Benefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': '360 derece müşteri satın alma profilleri, iletişim dizinleri ve satın alma alışkanlıkları
-Etkinlik günlüğü, takip hatırlatıcıları ve aşama takibi içeren satış lideri yönetimi hattı
-Ödeme sırasında biriken ve kullanılan otomatik müşteri sadakati ödül puanları
-Avantajı: Kişiselleştirilmiş sadakat ayrıcalıkları sayesinde müşteri yaşam boyu değerini (LTV) ve ortalama sipariş değerini (AOV) %25 artırır.',
-      'Branch, cashier, and staff sales target monitoring with real-time achievement progress
-Live Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics
-Top-selling products, category contribution, and dead-stock identification
-Benefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Gerçek zamanlı başarı ilerlemesi ile şube, kasiyer ve personel satış hedeflerinin izlenmesi
-Canlı Kar ve Zarar (P&Z) tabloları, brüt kar marjları ve satılan malların maliyeti (COGS) analitiği
-En çok satan ürünler, kategori katkısı ve ölü stok tanımlama
-Faydası: İşletme sahiplerine, düşük performans gösteren hatları kesmeleri ve net kârlılığı en üst düzeye çıkarmaları için %100 finansal netlik sağlar.',
-      'Centralized catalog management with branch-specific pricing and localized tax rates
-Inter-branch stock transfer requests with transit tracking and receiving audits
-Consolidated corporate reports with isolated tenant workspace security
-Benefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Şubeye özel fiyatlandırma ve yerelleştirilmiş vergi oranlarıyla merkezi katalog yönetimi
-Transit takip ve teslim alma denetimleri ile şubeler arası stok transfer talepleri
-Yalıtılmış kiracı çalışma alanı güvenliğine sahip birleştirilmiş kurumsal raporlar
-Avantajı: Bir mahalle dükkanından ülke çapındaki yüzlerce franchise lokasyonuna kadar zahmetsizce ölçeklendirin.',
-      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)
-Device serial number/IMEI tracking, intake diagnostic notes, and warranty logs
-Integrated spare parts inventory deduction and technician labor invoicing
-Benefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Onarım yaşam döngüsünü tamamlayın (Alındı -> Arıza Tespiti -> Sipariş Edilen Parçalar -> Hazır -> Teslim Edildi)
-Cihaz seri numarası/IMEI takibi, alım teşhis notları ve garanti kayıtları
-Entegre yedek parça stok kesintisi ve teknisyen işçiliği faturalandırması
-Faydası: Elektronik, bilgisayar ve bisiklet mağazaları için tam şeffaflıkla yüksek marjlı onarım hizmeti gelirinin kilidini açar.',
-      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes
-One-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF
-Thermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices
-Benefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Ayrıntılı vergi dökümleri ve HSN/SAC kodları ile otomatik olarak oluşturulan uyumlu vergi faturaları
-Markalı PDF ile müşteriye WhatsApp, SMS ve E-posta ile tek dokunuşla anında gönderim
-Kurumsal formatlı A4 PDF vergi faturalarının yanı sıra termal makbuzlar (58 mm/80 mm)
-Avantajı: %100 vergi ve denetim uyumluluğu, sıfır kağıt israfı ve müşteri yeniden etkileşimi için %98 WhatsApp makbuzu açma oranları.',
-      'Customer credit limits, balance statements, and aged receivables tracking
-Supplier purchase bills, payment schedules, and outstanding ledger balances
-Comprehensive transaction history and automated debit/credit balancing
-Benefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Müşteri kredi limitleri, bakiye ekstreleri ve yaşlandırılmış alacak takibi
-Tedarikçi satın alma faturaları, ödeme planları ve ödenmemiş defter bakiyeleri
-Kapsamlı işlem geçmişi ve otomatik borç/alacak dengeleme
-Faydası: İşletme sermayesi görünürlüğünü en üst düzeye çıkarır, sorunlu borçları azaltır ve güçlü tedarikçi ticaret koşullarını korur.',
-      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion
-Direct ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet
-Runs on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones
-Benefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'Tam ekran sayaç deneyimi için özel yerel Android APK\'sı ve Windows masaüstü uygulaması
-USB, Bluetooth ve LAN/Ethernet aracılığıyla doğrudan ESC/POS termal yazıcı iletişimi
-Mevcut donanımlarda (tabletler, hepsi bir arada POS terminalleri, dizüstü bilgisayarlar veya cep telefonları) çalışır
-Avantajı: Pahalı özel donanım kilitlerine gerek yoktur; ilk kurulum ve bakım maliyetlerinde binlerce tasarruf sağlar.',
-      'Full counter operations, barcode search, cart calculations, and receipt printing without internet
-Automatic background synchronization on reconnect with tamper-proof duplicate prevention
-Continuous local data caching so tills never freeze during network cuts
-Benefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'İnternet olmadan tam sayaç işlemleri, barkod arama, sepet hesaplamaları ve fiş yazdırma
-Kurcalamaya dayanıklı yinelenen kopyaları önleme özelliğiyle yeniden bağlantıda otomatik arka plan senkronizasyonu
-Ağ kesintileri sırasında verilerin asla donmaması için sürekli yerel veri önbelleğe alma
-Faydası: Alışverişin yoğun olduğu saatlerde internet kesildiğinde sıfır kesinti ve sıfır satış kaybı.',
-      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)
-Device authorization and terminal registration to prevent unauthorized logins
-Tamper-proof audit trails for every price override, discount, held cart, and refund
-Benefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Modül başına ayrıntılı izinler (kasiyerler, mağaza yöneticileri, stok memurları, muhasebeciler)
-Yetkisiz oturum açmaları önlemek için cihaz yetkilendirmesi ve terminal kaydı
-Her fiyat geçersiz kılma, indirim, bekletilen sepet ve geri ödeme için kurcalamaya dayanıklı denetim kayıtları
-Faydası: Kâr marjlarını kasiyer indiriminin kötüye kullanılmasına karşı korur ve operasyonların kesinlikle uyumlu olmasını sağlar.',
-      'Instant mobile-friendly digital storefront with category & brand filtering
-One-click WhatsApp product link & cart sharing for direct social commerce
-Direct QR code ordering with instant payment gateway integration
-Benefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Kategori ve marka filtrelemeyle anında mobil uyumlu dijital vitrin
-Doğrudan sosyal ticaret için tek tıklamayla WhatsApp ürün bağlantısı ve sepet paylaşımı
-Anında ödeme ağ geçidi entegrasyonuyla doğrudan QR kod siparişi
-Avantajı: E-ticareti dakikalar içinde başlatın, sıfır pazar yeri ücretiyle internet alıcılarını yakalayın ve siparişleri otomatik olarak senkronize edin.',
-      'Millisecond barcode scanning with quick-access visual favorites & held carts
-Multi-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)
-High-speed thermal receipt printing with automated cash drawer kick pulse
-Benefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Hızlı erişimli görsel favoriler ve tutulan arabalarla milisaniyelik barkod tarama
-Çok ihaleli bölünmüş ödemeler (Nakit, Kart, UPI, Cüzdanlar, Müşteri Mağaza Kredisi)
-Otomatik nakit çekmecesi vuruş darbesiyle yüksek hızlı termal fatura yazdırma
-Faydası: Kasadaki ödeme darboğazlarını ortadan kaldırır, yoğun tatil kalabalıklarıyla zahmetsizce başa çıkar ve satışları 3 kat daha hızlı artırır.',
-      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts
-Automated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability
-Real-time cash variance detection that isolates discrepancies per drawer
-Benefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Nakit para kaydının, ödenmiş/ödenmiş küçük kasa kuponlarının ve kör sayımların açılması
-Kasiyer başına sorumlulukla otomatik vardiya ortası X Raporları ve gün sonu Z Raporları
-Çekmece başına tutarsızlıkları izole eden gerçek zamanlı nakit farkı tespiti
-Faydası: Çekmecenin küçülmesini durdurur, çalışanların çalınmasını önler ve günlük kasa kapanış süresini saatlerden dakikalara indirir.',
-      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring
-Prescription record management, doctor attribution, and patient dosage instructions
-Flexible unit conversions (box, strip, tablet, bottle) with batch-level costing
-Benefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Son kullanma tarihi sıkı izlemeyle farmasötik ilaç partisi ve parti takibi
-Reçete kayıt yönetimi, doktor ilişkilendirme ve hasta dozaj talimatları
-Toplu düzeyde maliyetlendirmeyle esnek birim dönüştürmeler (kutu, şerit, tablet, şişe)
-Faydası: Sağlık mevzuatına tam uyumluluk, son kullanma tarihi geçmiş ilaçların dağıtılması ve küçülmenin en aza indirilmesi.',
-      'Professional quotation builder with customizable discounts, terms, and validity dates
-One-click automated conversion from Quote to confirmed Sale and Invoice
-Branded PDF downloads and direct customer sharing via email or messaging
-Benefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Özelleştirilebilir indirimler, koşullar ve geçerlilik tarihleriyle profesyonel fiyat teklifi oluşturucu
-Tekliften onaylanmış Satış ve Faturaya tek tıklamayla otomatik dönüşüm
-Markalı PDF indirmeleri ve e-posta veya mesajlaşma yoluyla doğrudan müşteri paylaşımı
-Faydası: B2B ve toptan anlaşma kapanışlarını hızlandırır, mükerrer manuel veri girişini ortadan kaldırır ve nakit akışını hızlandırır.',
-      'Real-time stock synchronization across online store, physical shops, and central warehouses
-Batch, lot, and expiry date tracking with automatic low-stock reorder thresholds
-Inter-branch stock consignments and transfers with dispatch/receiving audit trails
-Benefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Çevrimiçi mağaza, fiziksel mağazalar ve merkezi depolar arasında gerçek zamanlı stok senkronizasyonu
-Otomatik düşük stok yeniden sipariş eşikleri ile parti, parti ve son kullanma tarihi takibi
-Şubeler arası stok sevkıyatları ve sevkıyat/alma denetim takibi ile transferler
-Faydası: İnternette aşırı satışı önler, stokları ortadan kaldırır ve sermayenin fazla stokta kalmasını engeller.',
-      'Visual appointment calendar with stylist/therapist scheduling and room assignment
-Service catalog with custom durations, add-on treatments, and pricing tiers
-Automatic stylist commission calculation based on completed services and retail product upsells
-Benefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Stilist/terapist planlaması ve oda ataması içeren görsel randevu takvimi
-Özel süreler, eklenti tedaviler ve fiyatlandırma katmanları içeren hizmet kataloğu
-Tamamlanan hizmetlere ve perakende ürün satışlarına dayalı otomatik stilist komisyonu hesaplaması
-Faydası: Randevu çakışmalarını ortadan kaldırır, koltuk kullanımını optimize eder ve doğru komisyon ödemeleriyle personeli motive eder.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering â guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Canlı kullanım, yemek ve faturalandırma durumlarını içeren görsel masa kat planları
-Temassız Masa QR menü siparişi – misafirler telefonlarını tarayabilir, göz atabilir ve sipariş verebilir
-Mutfak Sipariş Biletleri (KOT) doğrudan canlı Mutfak Görüntüleme Sistemi (KDS) ekranlarına yönlendirilir
-Faydası: Masa dönüşlerini %35 oranında hızlandırır, mutfak siparişi hatalarını ortadan kaldırır ve garsonların yükünü azaltır.',
-      'Visual table floor plans with live occupied, dining, and billing status
-Contactless Table QR menu ordering — guests scan, browse, and order from phones
-Kitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens
-Benefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Canlı kullanım, yemek ve faturalandırma durumlarını içeren görsel masa kat planları
-Temassız Masa QR menü siparişi — konuklar telefonlarını tarayabilir, göz atabilir ve sipariş verebilir
-Mutfak Sipariş Biletleri (KOT) doğrudan canlı Mutfak Görüntüleme Sistemi (KDS) ekranlarına yönlendirilir
-Faydası: Masa dönüşlerini %35 oranında hızlandırır, mutfak siparişi hatalarını ortadan kaldırır ve garsonların yükünü azaltır.',
+      '360-degree customer purchasing profiles, contact directories, and buying habits\nSales lead management pipeline with activity logging, follow-up reminders, and stage tracking\nAutomated customer loyalty reward points that accumulate and redeem at checkout\nBenefit: Boosts customer lifetime value (LTV) and average order value (AOV) by 25% through personalized loyalty perks.': '360 derece müşteri satın alma profilleri, iletişim dizinleri ve satın alma alışkanlıkları\nEtkinlik günlüğü, takip hatırlatıcıları ve aşama takibi içeren satış lideri yönetimi hattı\nÖdeme sırasında biriken ve kullanılan otomatik müşteri sadakati ödül puanları\nAvantajı: Kişiselleştirilmiş sadakat ayrıcalıkları sayesinde müşteri yaşam boyu değerini (LTV) ve ortalama sipariş değerini (AOV) %25 artırır.',
+      'Branch, cashier, and staff sales target monitoring with real-time achievement progress\nLive Profit & Loss (P&L) statements, gross margins, and cost-of-goods-sold (COGS) analytics\nTop-selling products, category contribution, and dead-stock identification\nBenefit: Gives business owners 100% financial clarity to cut underperforming lines and maximize net profitability.': 'Gerçek zamanlı başarı ilerlemesi ile şube, kasiyer ve personel satış hedeflerinin izlenmesi\nCanlı Kar ve Zarar (P&Z) tabloları, brüt kar marjları ve satılan malların maliyeti (COGS) analitiği\nEn çok satan ürünler, kategori katkısı ve ölü stok tanımlama\nFaydası: İşletme sahiplerine, düşük performans gösteren hatları kesmeleri ve net kârlılığı en üst düzeye çıkarmaları için %100 finansal netlik sağlar.',
+      'Centralized catalog management with branch-specific pricing and localized tax rates\nInter-branch stock transfer requests with transit tracking and receiving audits\nConsolidated corporate reports with isolated tenant workspace security\nBenefit: Scale effortlessly from one neighborhood shop to hundreds of franchise locations nationwide.': 'Şubeye özel fiyatlandırma ve yerelleştirilmiş vergi oranlarıyla merkezi katalog yönetimi\nTransit takip ve teslim alma denetimleri ile şubeler arası stok transfer talepleri\nYalıtılmış kiracı çalışma alanı güvenliğine sahip birleştirilmiş kurumsal raporlar\nAvantajı: Bir mahalle dükkanından ülke çapındaki yüzlerce franchise lokasyonuna kadar zahmetsizce ölçeklendirin.',
+      'Complete repair lifecycle (Received -> Diagnosing -> Parts Ordered -> Ready -> Delivered)\nDevice serial number/IMEI tracking, intake diagnostic notes, and warranty logs\nIntegrated spare parts inventory deduction and technician labor invoicing\nBenefit: Unlocks high-margin repair service revenue for electronics, computer, and bike shops with total transparency.': 'Onarım yaşam döngüsünü tamamlayın (Alındı -> Arıza Tespiti -> Sipariş Edilen Parçalar -> Hazır -> Teslim Edildi)\nCihaz seri numarası/IMEI takibi, alım teşhis notları ve garanti kayıtları\nEntegre yedek parça stok kesintisi ve teknisyen işçiliği faturalandırması\nFaydası: Elektronik, bilgisayar ve bisiklet mağazaları için tam şeffaflıkla yüksek marjlı onarım hizmeti gelirinin kilidini açar.',
+      'Compliant tax invoices generated automatically with itemized tax breakdowns and HSN/SAC codes\nOne-tap instant dispatch to customer WhatsApp, SMS, and Email with branded PDF\nThermal receipts (58mm/80mm) alongside enterprise formatted A4 PDF tax invoices\nBenefit: 100% tax and audit compliance, zero paper waste, and 98% WhatsApp receipt open rates for customer re-engagement.': 'Ayrıntılı vergi dökümleri ve HSN/SAC kodları ile otomatik olarak oluşturulan uyumlu vergi faturaları\nMarkalı PDF ile müşteriye WhatsApp, SMS ve E-posta ile tek dokunuşla anında gönderim\nKurumsal formatlı A4 PDF vergi faturalarının yanı sıra termal makbuzlar (58 mm/80 mm)\nAvantajı: %100 vergi ve denetim uyumluluğu, sıfır kağıt israfı ve müşteri yeniden etkileşimi için %98 WhatsApp makbuzu açma oranları.',
+      'Customer credit limits, balance statements, and aged receivables tracking\nSupplier purchase bills, payment schedules, and outstanding ledger balances\nComprehensive transaction history and automated debit/credit balancing\nBenefit: Maximizes working capital visibility, reduces bad debts, and maintains strong supplier trade terms.': 'Müşteri kredi limitleri, bakiye ekstreleri ve yaşlandırılmış alacak takibi\nTedarikçi satın alma faturaları, ödeme planları ve ödenmemiş defter bakiyeleri\nKapsamlı işlem geçmişi ve otomatik borç/alacak dengeleme\nFaydası: İşletme sermayesi görünürlüğünü en üst düzeye çıkarır, sorunlu borçları azaltır ve güçlü tedarikçi ticaret koşullarını korur.',
+      'Dedicated native Android APK and Windows desktop app for full-screen counter immersion\nDirect ESC/POS thermal printer communication via USB, Bluetooth, and LAN/Ethernet\nRuns on existing hardware â tablets, POS all-in-one terminals, laptops, or mobile phones\nBenefit: No expensive proprietary hardware locks â saves thousands in initial setup and maintenance costs.': 'Tam ekran sayaç deneyimi için özel yerel Android APK\'sı ve Windows masaüstü uygulaması\nUSB, Bluetooth ve LAN/Ethernet aracılığıyla doğrudan ESC/POS termal yazıcı iletişimi\nMevcut donanımlarda (tabletler, hepsi bir arada POS terminalleri, dizüstü bilgisayarlar veya cep telefonları) çalışır\nAvantajı: Pahalı özel donanım kilitlerine gerek yoktur; ilk kurulum ve bakım maliyetlerinde binlerce tasarruf sağlar.',
+      'Full counter operations, barcode search, cart calculations, and receipt printing without internet\nAutomatic background synchronization on reconnect with tamper-proof duplicate prevention\nContinuous local data caching so tills never freeze during network cuts\nBenefit: Zero downtime and zero lost sales when internet drops during peak shopping hours.': 'İnternet olmadan tam sayaç işlemleri, barkod arama, sepet hesaplamaları ve fiş yazdırma\nKurcalamaya dayanıklı yinelenen kopyaları önleme özelliğiyle yeniden bağlantıda otomatik arka plan senkronizasyonu\nAğ kesintileri sırasında verilerin asla donmaması için sürekli yerel veri önbelleğe alma\nFaydası: Alışverişin yoğun olduğu saatlerde internet kesildiğinde sıfır kesinti ve sıfır satış kaybı.',
+      'Granular per-module permissions (cashiers, store managers, stock clerks, accountants)\nDevice authorization and terminal registration to prevent unauthorized logins\nTamper-proof audit trails for every price override, discount, held cart, and refund\nBenefit: Guards profit margins against cashier discount abuse and keeps operations strictly compliant.': 'Modül başına ayrıntılı izinler (kasiyerler, mağaza yöneticileri, stok memurları, muhasebeciler)\nYetkisiz oturum açmaları önlemek için cihaz yetkilendirmesi ve terminal kaydı\nHer fiyat geçersiz kılma, indirim, bekletilen sepet ve geri ödeme için kurcalamaya dayanıklı denetim kayıtları\nFaydası: Kâr marjlarını kasiyer indiriminin kötüye kullanılmasına karşı korur ve operasyonların kesinlikle uyumlu olmasını sağlar.',
+      'Instant mobile-friendly digital storefront with category & brand filtering\nOne-click WhatsApp product link & cart sharing for direct social commerce\nDirect QR code ordering with instant payment gateway integration\nBenefit: Launch eCommerce in minutes, capture internet buyers with zero marketplace fees, and sync orders automatically.': 'Kategori ve marka filtrelemeyle anında mobil uyumlu dijital vitrin\nDoğrudan sosyal ticaret için tek tıklamayla WhatsApp ürün bağlantısı ve sepet paylaşımı\nAnında ödeme ağ geçidi entegrasyonuyla doğrudan QR kod siparişi\nAvantajı: E-ticareti dakikalar içinde başlatın, sıfır pazar yeri ücretiyle internet alıcılarını yakalayın ve siparişleri otomatik olarak senkronize edin.',
+      'Millisecond barcode scanning with quick-access visual favorites & held carts\nMulti-tender split payments (Cash, Card, UPI, Wallets, Customer Store Credit)\nHigh-speed thermal receipt printing with automated cash drawer kick pulse\nBenefit: Eliminates counter checkout bottlenecks, handles peak holiday crowds effortlessly, and rings up sales 3x faster.': 'Hızlı erişimli görsel favoriler ve tutulan arabalarla milisaniyelik barkod tarama\nÇok ihaleli bölünmüş ödemeler (Nakit, Kart, UPI, Cüzdanlar, Müşteri Mağaza Kredisi)\nOtomatik nakit çekmecesi vuruş darbesiyle yüksek hızlı termal fatura yazdırma\nFaydası: Kasadaki ödeme darboğazlarını ortadan kaldırır, yoğun tatil kalabalıklarıyla zahmetsizce başa çıkar ve satışları 3 kat daha hızlı artırır.',
+      'Opening cash float registration, paid-in/paid-out petty cash vouchers, and blind counts\nAutomated mid-shift X-Reports and end-of-day Z-Reports with per-cashier accountability\nReal-time cash variance detection that isolates discrepancies per drawer\nBenefit: Stops drawer shrinkage, prevents employee theft, and slashes daily register closing time from hours to minutes.': 'Nakit para kaydının, ödenmiş/ödenmiş küçük kasa kuponlarının ve kör sayımların açılması\nKasiyer başına sorumlulukla otomatik vardiya ortası X Raporları ve gün sonu Z Raporları\nÇekmece başına tutarsızlıkları izole eden gerçek zamanlı nakit farkı tespiti\nFaydası: Çekmecenin küçülmesini durdurur, çalışanların çalınmasını önler ve günlük kasa kapanış süresini saatlerden dakikalara indirir.',
+      'Pharmaceutical drug batch and lot tracking with strict expiration date monitoring\nPrescription record management, doctor attribution, and patient dosage instructions\nFlexible unit conversions (box, strip, tablet, bottle) with batch-level costing\nBenefit: Total health regulatory compliance, zero expired medicine dispensed, and minimized shrinkage.': 'Son kullanma tarihi sıkı izlemeyle farmasötik ilaç partisi ve parti takibi\nReçete kayıt yönetimi, doktor ilişkilendirme ve hasta dozaj talimatları\nToplu düzeyde maliyetlendirmeyle esnek birim dönüştürmeler (kutu, şerit, tablet, şişe)\nFaydası: Sağlık mevzuatına tam uyumluluk, son kullanma tarihi geçmiş ilaçların dağıtılması ve küçülmenin en aza indirilmesi.',
+      'Professional quotation builder with customizable discounts, terms, and validity dates\nOne-click automated conversion from Quote to confirmed Sale and Invoice\nBranded PDF downloads and direct customer sharing via email or messaging\nBenefit: Speeds up B2B and wholesale deal closures, eliminates duplicate manual data entry, and accelerates cash flow.': 'Özelleştirilebilir indirimler, koşullar ve geçerlilik tarihleriyle profesyonel fiyat teklifi oluşturucu\nTekliften onaylanmış Satış ve Faturaya tek tıklamayla otomatik dönüşüm\nMarkalı PDF indirmeleri ve e-posta veya mesajlaşma yoluyla doğrudan müşteri paylaşımı\nFaydası: B2B ve toptan anlaşma kapanışlarını hızlandırır, mükerrer manuel veri girişini ortadan kaldırır ve nakit akışını hızlandırır.',
+      'Real-time stock synchronization across online store, physical shops, and central warehouses\nBatch, lot, and expiry date tracking with automatic low-stock reorder thresholds\nInter-branch stock consignments and transfers with dispatch/receiving audit trails\nBenefit: Prevents overselling on the web, eliminates stockouts, and stops capital from locking up in excess inventory.': 'Çevrimiçi mağaza, fiziksel mağazalar ve merkezi depolar arasında gerçek zamanlı stok senkronizasyonu\nOtomatik düşük stok yeniden sipariş eşikleri ile parti, parti ve son kullanma tarihi takibi\nŞubeler arası stok sevkıyatları ve sevkıyat/alma denetim takibi ile transferler\nFaydası: İnternette aşırı satışı önler, stokları ortadan kaldırır ve sermayenin fazla stokta kalmasını engeller.',
+      'Visual appointment calendar with stylist/therapist scheduling and room assignment\nService catalog with custom durations, add-on treatments, and pricing tiers\nAutomatic stylist commission calculation based on completed services and retail product upsells\nBenefit: Eliminates appointment conflicts, optimizes chair utilization, and motivates staff with accurate commission payouts.': 'Stilist/terapist planlaması ve oda ataması içeren görsel randevu takvimi\nÖzel süreler, eklenti tedaviler ve fiyatlandırma katmanları içeren hizmet kataloğu\nTamamlanan hizmetlere ve perakende ürün satışlarına dayalı otomatik stilist komisyonu hesaplaması\nFaydası: Randevu çakışmalarını ortadan kaldırır, koltuk kullanımını optimize eder ve doğru komisyon ödemeleriyle personeli motive eder.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering â guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Canlı kullanım, yemek ve faturalandırma durumlarını içeren görsel masa kat planları\nTemassız Masa QR menü siparişi – misafirler telefonlarını tarayabilir, göz atabilir ve sipariş verebilir\nMutfak Sipariş Biletleri (KOT) doğrudan canlı Mutfak Görüntüleme Sistemi (KDS) ekranlarına yönlendirilir\nFaydası: Masa dönüşlerini %35 oranında hızlandırır, mutfak siparişi hatalarını ortadan kaldırır ve garsonların yükünü azaltır.',
+      'Visual table floor plans with live occupied, dining, and billing status\nContactless Table QR menu ordering — guests scan, browse, and order from phones\nKitchen Order Tickets (KOT) routed directly to live Kitchen Display System (KDS) screens\nBenefit: Accelerates table turns by 35%, eliminates kitchen order errors, and lowers waitstaff overhead.': 'Canlı kullanım, yemek ve faturalandırma durumlarını içeren görsel masa kat planları\nTemassız Masa QR menü siparişi — konuklar telefonlarını tarayabilir, göz atabilir ve sipariş verebilir\nMutfak Sipariş Biletleri (KOT) doğrudan canlı Mutfak Görüntüleme Sistemi (KDS) ekranlarına yönlendirilir\nFaydası: Masa dönüşlerini %35 oranında hızlandırır, mutfak siparişi hatalarını ortadan kaldırır ve garsonların yükünü azaltır.',
       '& Mobile': 've Mobil',
       '5 Enterprise Capabilities Built for Scale': 'Ölçeklendirmek İçin Geliştirilmiş 5 Kurumsal Yetenek',
       '58mm & 80mm ESC/POS': '58mm ve 80mm Termal ESC/POS',
