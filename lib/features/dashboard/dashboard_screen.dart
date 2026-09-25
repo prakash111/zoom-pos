@@ -23,6 +23,7 @@ import '../../core/sdui/models/sdui_models.dart';
 import '../../core/sdui/sdui_action_dispatcher.dart';
 import '../../core/sdui/sdui_component_registry.dart';
 import '../../core/sdui/sdui_icon_registry.dart';
+import '../../core/services/dynamic_string_service.dart';
 import '../../core/services/sync/sync_status_badge.dart';
 import '../../core/storage/app_preferences.dart';
 import '../../core/stores/store_provider.dart';
@@ -170,7 +171,9 @@ List<_NavSection> _serverDrivenSections() {
               continue;
             }
 
-            final bool isParentContainer = item.children.isNotEmpty;
+            final bool isParentContainer = item.children.isNotEmpty ||
+                item.key == 'nav_storefront_group' ||
+                item.key == 'group_storefront';
             tiles.add(_FeatureTile(
               item.key,
               (l10n) => BootstrapCache.instance.resolveNavigationLabel(
@@ -902,6 +905,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final auth = context.read<AuthProvider>();
     final bootstrap = context.read<BootstrapCache>();
     final feature = _featuresFor(auth.company, auth.user)[index - 1];
+    if (feature.key == 'nav_storefront_group' ||
+        feature.key == 'group_storefront' ||
+        feature.key == 'sec_storefront') {
+      return;
+    }
     if (feature.isExternalUrl || feature.key == 'nav_view_live_store') {
       final targetUrl =
           _resolveLiveStoreUrl(feature.url, auth.company, bootstrap);
@@ -1141,6 +1149,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         void openTile(_FeatureTile tile) {
+          if (tile.key == 'nav_storefront_group' ||
+              tile.key == 'group_storefront' ||
+              tile.key == 'sec_storefront') {
+            return;
+          }
           if (tile.isExternalUrl || tile.key == 'nav_view_live_store') {
             Navigator.of(context).pop();
             final targetUrl =
@@ -1793,59 +1806,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (user != null) ...[
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundColor:
-                          colorScheme.primary.withValues(alpha: 0.12),
-                      child: Text(
-                        (user.name)
-                            .trim()
-                            .split(RegExp(r'\s+'))
-                            .where((part) => part.isNotEmpty)
-                            .take(2)
-                            .map((part) => part[0])
-                            .join()
-                            .toUpperCase(),
-                        style: TextStyle(
-                          color: colorScheme.primary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            user.email,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: colorScheme.onSurfaceVariant,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-              ],
               Builder(
                 builder: (ctx) {
                   final branding = ctx.read<PlatformBrandingProvider>();
@@ -1869,9 +1829,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: const Icon(Icons.support_agent,
                           color: Color(0xFF10B981), size: 16),
                     ),
-                    title: const Text(
-                      'Help & Support',
-                      style: TextStyle(
+                    title: Text(
+                      context.tr('Help & Support'),
+                      style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
                       ),
@@ -2144,14 +2104,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               _buildRedesignedNavItem(
                 icon: Icons.home_rounded,
-                label: 'Home',
+                label: context.tr('Home'),
                 isSelected: _dockIndex == 0,
                 onTap: () => setState(() => _dockIndex = 0),
                 isDark: isDark,
               ),
               _buildRedesignedNavItem(
                 icon: Icons.receipt_long_outlined,
-                label: 'Sales',
+                label: context.tr('Sales'),
                 isSelected: false,
                 onTap: () => openRoute('sales'),
                 isDark: isDark,
@@ -2186,14 +2146,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               _buildRedesignedNavItem(
                 icon: Icons.shopping_bag_outlined,
-                label: 'Orders',
+                label: context.tr('Orders'),
                 isSelected: false,
                 onTap: () => openRoute('orders'),
                 isDark: isDark,
               ),
               _buildRedesignedNavItem(
                 icon: Icons.grid_view_rounded,
-                label: 'More',
+                label: context.tr('More'),
                 isSelected: false,
                 onTap: () {
                   if (_scaffoldKey.currentState?.hasEndDrawer == true) {
@@ -2259,6 +2219,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Rebuild the whole shell (drawer / rail / bars included) when the display
     // language changes, so nav labels re-resolve without reopening the drawer.
     context.watch<LocaleProvider>();
+    context.watch<DynamicStringService>();
     final company = auth.company;
     final l10n = AppLocalizations.of(context);
     final dock = context.watch<NavDockProvider>().position;

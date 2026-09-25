@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/models/dashboard_summary_model.dart';
 import '../../../core/providers/dashboard_provider.dart';
+import '../../../core/services/dynamic_string_service.dart';
 import '../../../core/stores/store_provider.dart';
 
 /// Redesigned Metric & Transaction Dashboard layout (reference: 1000592601.png).
@@ -171,9 +172,9 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Text(
-              'DEMO MODE',
-              style: TextStyle(
+            child: Text(
+              context.tr('DEMO MODE'),
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
@@ -182,10 +183,10 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Sample data active. Explore live web POS interface.',
-              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+              context.tr('Sample data active. Explore live web POS interface.'),
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -199,12 +200,12 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('🚀 Try Flutter Web', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-                SizedBox(width: 4),
-                Icon(Icons.open_in_new, size: 12),
+                Text('🚀 ${context.tr('Try Flutter Web')}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                const SizedBox(width: 4),
+                const Icon(Icons.open_in_new, size: 12),
               ],
             ),
           ),
@@ -217,12 +218,33 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
     final greeting = widget.summary.greeting;
     final badges = widget.summary.statusBadges;
 
+    String displayTitle = greeting.title;
+    final match = RegExp(r'^(Good Morning|Good Afternoon|Good Evening),\s*(.*)$')
+        .firstMatch(greeting.title);
+    if (match != null) {
+      final salute = context.tr(match.group(1)!);
+      final rest = match.group(2)!;
+      displayTitle = '$salute, $rest';
+    } else {
+      displayTitle = context.tr(greeting.title);
+    }
+
+    String displayWeather = badges.weather;
+    final weatherMatch = RegExp(r'^(\d+°C)\s*(.*)$').firstMatch(badges.weather);
+    if (weatherMatch != null) {
+      final temp = weatherMatch.group(1)!;
+      final condition = context.tr(weatherMatch.group(2)!);
+      displayWeather = '$temp $condition';
+    } else {
+      displayWeather = context.tr(badges.weather);
+    }
+
     final greetingCol = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          greeting.title,
+          displayTitle,
           style: TextStyle(
             fontSize: isWide ? 22 : 18,
             fontWeight: FontWeight.w900,
@@ -232,7 +254,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
         ),
         const SizedBox(height: 2),
         Text(
-          greeting.subtitle,
+          context.tr(greeting.subtitle),
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
@@ -288,7 +310,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
               const Icon(Icons.wb_sunny_outlined, size: 13, color: Color(0xFFF59E0B)),
               const SizedBox(width: 6),
               Text(
-                badges.weather,
+                displayWeather,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -327,7 +349,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
 
     final cards = [
       _MetricCardSpec(
-        title: 'Total Sales',
+        title: context.tr('Total Sales'),
         formattedValue: m.totalSales.formatted,
         trend: m.totalSales.trend,
         isPositive: m.totalSales.isPositive,
@@ -339,7 +361,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
         },
       ),
       _MetricCardSpec(
-        title: 'Total Orders',
+        title: context.tr('Total Orders'),
         formattedValue: m.totalOrders.formatted,
         trend: m.totalOrders.trend,
         isPositive: m.totalOrders.isPositive,
@@ -351,7 +373,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
         },
       ),
       _MetricCardSpec(
-        title: 'Total Customers',
+        title: context.tr('Total Customers'),
         formattedValue: m.totalCustomers.formatted,
         trend: m.totalCustomers.trend,
         isPositive: m.totalCustomers.isPositive,
@@ -363,7 +385,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
         },
       ),
       _MetricCardSpec(
-        title: 'Low Stock Items',
+        title: context.tr('Low Stock Items'),
         formattedValue: m.lowStockItems.formatted,
         trend: m.lowStockItems.trend,
         isPositive: m.lowStockItems.isPositive,
@@ -606,7 +628,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                     Row(
                       children: [
                         Text(
-                          'Sales Overview',
+                          context.tr('Sales Overview'),
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
@@ -627,7 +649,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                       ],
                     ),
                     Text(
-                      'Revenue trend with area gradient',
+                      context.tr('Revenue trend with area gradient'),
                       style: TextStyle(
                         fontSize: 11,
                         color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -645,9 +667,9 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _buildRangePill('Last 7 Days', 'last_7_days', isDark),
-                            _buildRangePill('This Month', 'this_month', isDark),
-                            _buildRangePill('Quarter', 'quarter', isDark),
+                            _buildRangePill(context.tr('Last 7 Days'), 'last_7_days', isDark),
+                            _buildRangePill(context.tr('This Month'), 'this_month', isDark),
+                            _buildRangePill(context.tr('Quarter'), 'quarter', isDark),
                           ],
                         ),
                       ),
@@ -665,7 +687,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                         Row(
                           children: [
                             Text(
-                              'Sales Overview',
+                              context.tr('Sales Overview'),
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
@@ -686,7 +708,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                           ],
                         ),
                         Text(
-                          'Revenue trend with area gradient',
+                          context.tr('Revenue trend with area gradient'),
                           style: TextStyle(
                             fontSize: 11,
                             color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -705,9 +727,9 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildRangePill('Last 7 Days', 'last_7_days', isDark),
-                        _buildRangePill('This Month', 'this_month', isDark),
-                        _buildRangePill('Quarter', 'quarter', isDark),
+                        _buildRangePill(context.tr('Last 7 Days'), 'last_7_days', isDark),
+                        _buildRangePill(context.tr('This Month'), 'this_month', isDark),
+                        _buildRangePill(context.tr('Quarter'), 'quarter', isDark),
                       ],
                     ),
                   ),
@@ -796,9 +818,9 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                       ],
                     ),
                   )
-                : const Center(
-                    child: Text('No chart data available for selected range',
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                : Center(
+                    child: Text(context.tr('No chart data available for selected range'),
+                        style: const TextStyle(fontSize: 12, color: Colors.grey)),
                   ),
           ),
         ],
@@ -874,7 +896,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
             runSpacing: 6,
             children: [
               Text(
-                'Amount Receivable',
+                context.tr('Amount Receivable'),
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
@@ -888,7 +910,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '${r.outstandingInvoicesCount} Invoices',
+                  '${r.outstandingInvoicesCount} ${context.tr('Invoices')}',
                   style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -911,7 +933,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
             ),
           ),
           Text(
-            'Total outstanding pending customer payment',
+            context.tr('Total outstanding pending customer payment'),
             style: TextStyle(
               fontSize: 11,
               color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -925,7 +947,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
           _buildReceivableBreakdownRow(
             icon: Icons.error_outline,
             iconColor: const Color(0xFFEF4444),
-            label: 'Overdue Amount',
+            label: context.tr('Overdue Amount'),
             value: r.formattedOverdue,
             isDark: isDark,
             onTap: () {
@@ -940,7 +962,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
           _buildReceivableBreakdownRow(
             icon: Icons.schedule,
             iconColor: const Color(0xFFF59E0B),
-            label: 'Due Today',
+            label: context.tr('Due Today'),
             value: r.formattedDueToday,
             isDark: isDark,
             onTap: () {
@@ -959,7 +981,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
             child: OutlinedButton.icon(
               onPressed: widget.onOpenTransactions,
               icon: const Icon(Icons.send_outlined, size: 14),
-              label: const Text('Send Payment Reminders', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              label: Text(context.tr('Send Payment Reminders'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF2563EB),
                 side: const BorderSide(color: Color(0xFF2563EB)),
@@ -1038,17 +1060,17 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
 
   Widget _buildQuickActionsGrid(BuildContext context, bool isDark) {
     final actions = [
-      _QuickActionSpec('Add Product', Icons.add_box_outlined, const Color(0xFF06B6D4), widget.onAddProduct),
-      _QuickActionSpec('Create Order', Icons.point_of_sale_outlined, const Color(0xFF2563EB), widget.onCreateOrder),
-      _QuickActionSpec('Add Customer', Icons.person_add_outlined, const Color(0xFF8B5CF6), widget.onAddCustomer),
-      _QuickActionSpec('View Reports', Icons.insert_chart_outlined_rounded, const Color(0xFFF59E0B), widget.onViewReports),
+      _QuickActionSpec(context.tr('Add Product'), Icons.add_box_outlined, const Color(0xFF06B6D4), widget.onAddProduct),
+      _QuickActionSpec(context.tr('Create Order'), Icons.point_of_sale_outlined, const Color(0xFF2563EB), widget.onCreateOrder),
+      _QuickActionSpec(context.tr('Add Customer'), Icons.person_add_outlined, const Color(0xFF8B5CF6), widget.onAddCustomer),
+      _QuickActionSpec(context.tr('View Reports'), Icons.insert_chart_outlined_rounded, const Color(0xFFF59E0B), widget.onViewReports),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Quick Actions',
+          context.tr('Quick Actions'),
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w800,
@@ -1138,7 +1160,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
             runSpacing: 6,
             children: [
               Text(
-                'Recent Transactions',
+                context.tr('Recent Transactions'),
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
@@ -1148,17 +1170,17 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
               if (widget.onOpenTransactions != null)
                 TextButton(
                   onPressed: widget.onOpenTransactions,
-                  child: const Text('View All', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  child: Text(context.tr('View All'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
             ],
           ),
           const SizedBox(height: 10),
           if (txList.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
               child: Center(
-                child: Text('No recent transactions recorded',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                child: Text(context.tr('No recent transactions recorded'),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ),
             )
           else
@@ -1172,6 +1194,9 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
               ),
               itemBuilder: (context, index) {
                 final tx = txList[index];
+                final displayName = tx.customerName == 'Walk-in'
+                    ? context.tr('Walk-in')
+                    : tx.customerName;
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Row(
@@ -1198,7 +1223,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              tx.customerName,
+                              displayName,
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -1235,12 +1260,12 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: tx.isCompleted
-                                  ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                   ? const Color(0xFF10B981).withValues(alpha: 0.12)
                                   : const Color(0xFFF59E0B).withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              tx.status,
+                              context.tr(tx.status),
                               style: TextStyle(
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,

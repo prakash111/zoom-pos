@@ -12,6 +12,7 @@ import 'app_strings_ja.dart';
 import 'app_strings_pt.dart';
 import 'app_strings_ru.dart';
 import 'app_strings_tr.dart';
+import '../features/landing/models/landing_translations.dart';
 import 'app_strings_zh.dart';
 import 'translations_cache.dart';
 
@@ -55,13 +56,27 @@ class AppLocalizations {
 
   static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
 
-  String _s(String key) =>
-      TranslationsCache.instance.forLocale(localeName)[key] ?? _strings[key] ?? kEnStrings[key] ?? key;
+  String _s(String key) {
+    final cached = TranslationsCache.instance.forLocale(localeName)[key];
+    if (cached != null && cached.trim().isNotEmpty) return cached;
+    final bundled = _strings[key];
+    if (bundled != null && bundled.trim().isNotEmpty) return bundled;
+    final landing = LandingTranslations.tr(key, localeName);
+    if (landing != key && landing.trim().isNotEmpty) return landing;
+    return kEnStrings[key] ?? key;
+  }
 
   /// Resolves any dynamic key delivered from the server payload,
   /// checking server translation cache, bundled locale dictionary, and English fallback.
-  String text(String key, {String? fallback}) =>
-      TranslationsCache.instance.forLocale(localeName)[key] ?? _strings[key] ?? kEnStrings[key] ?? fallback ?? key;
+  String text(String key, {String? fallback}) {
+    final cached = TranslationsCache.instance.forLocale(localeName)[key];
+    if (cached != null && cached.trim().isNotEmpty) return cached;
+    final bundled = _strings[key];
+    if (bundled != null && bundled.trim().isNotEmpty) return bundled;
+    final landing = LandingTranslations.tr(key, localeName);
+    if (landing != key && landing.trim().isNotEmpty) return landing;
+    return kEnStrings[key] ?? fallback ?? key;
+  }
 
   String s(String key, {String? fallback}) => text(key, fallback: fallback);
 

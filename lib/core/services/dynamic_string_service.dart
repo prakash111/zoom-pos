@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
+import '../../features/landing/models/landing_translations.dart';
 import '../api/api_client.dart';
 import 'translations_cache.dart';
 
@@ -36,7 +37,13 @@ class DynamicStringService extends ChangeNotifier {
   }
 
   String translate(String key, [Map<String, Object?> args = const {}]) {
-    var value = TranslationsCache.instance.forLocale(_locale)[key] ?? key;
+    var value = TranslationsCache.instance.forLocale(_locale)[key];
+    if (value == null || value.trim().isEmpty) {
+      value = LandingTranslations.tr(key, _locale);
+    }
+    if (value == null || value.trim().isEmpty) {
+      value = key;
+    }
     for (final entry in args.entries) {
       final replacement = entry.value?.toString() ?? '';
       value = value

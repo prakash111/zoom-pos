@@ -334,7 +334,7 @@ class SduiSideDrawerContainer extends StatelessWidget {
         children: [
           for (final child in children) buildNode(child, depth + 1),
         ],
-        onTap: () => onItemTap(item),
+        onTap: children.isNotEmpty ? null : () => onItemTap(item),
       );
     }
 
