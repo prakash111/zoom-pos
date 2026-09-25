@@ -37,20 +37,21 @@ class DynamicStringService extends ChangeNotifier {
   }
 
   String translate(String key, [Map<String, Object?> args = const {}]) {
-    var value = TranslationsCache.instance.forLocale(_locale)[key];
-    if (value == null || value.trim().isEmpty) {
-      value = LandingTranslations.tr(key, _locale);
-    }
-    if (value == null || value.trim().isEmpty) {
-      value = key;
+    final cached = TranslationsCache.instance.forLocale(_locale)[key];
+    String resolved;
+    if (cached != null && cached.trim().isNotEmpty) {
+      resolved = cached;
+    } else {
+      final landing = LandingTranslations.tr(key, _locale);
+      resolved = landing.trim().isNotEmpty ? landing : key;
     }
     for (final entry in args.entries) {
       final replacement = entry.value?.toString() ?? '';
-      value = value
+      resolved = resolved
           .replaceAll('{${entry.key}}', replacement)
           .replaceAll(':${entry.key}', replacement);
     }
-    return value;
+    return resolved;
   }
 
   static String _normalize(String locale) =>
