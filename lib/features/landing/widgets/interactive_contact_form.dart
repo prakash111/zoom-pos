@@ -6,6 +6,8 @@ import '../../../core/config/bootstrap_cache.dart';
 import '../../../core/config/countries.dart';
 import '../../../widgets/inputs/phone_number_field.dart';
 import '../models/landing_data.dart';
+import '../models/landing_translations.dart';
+import '../../locale/locale_provider.dart';
 import '../services/contact_form_service.dart';
 
 class InteractiveContactForm extends StatefulWidget {
@@ -201,6 +203,11 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
 
   @override
   Widget build(BuildContext context) {
+    final localeProvider = Provider.of<LocaleProvider>(context);
+    final localeCode = localeProvider.currentLocale.languageCode;
+    String _t(String text) =>
+        LandingTranslations.tr(text, localeCode: localeCode);
+
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
@@ -230,7 +237,7 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'Inquiry Received!',
+                  _t('Inquiry Received!'),
                   style: TextStyle(
                     color: widget.textPrimary,
                     fontWeight: FontWeight.w800,
@@ -241,7 +248,7 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 480),
                   child: Text(
-                    'Thank you for reaching out. Our business solutions team has received your message and will contact you via email or phone shortly.',
+                    _t('Thank you for reaching out. Our business solutions team has received your message and will contact you via email or phone shortly.'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: widget.textSecondary,
@@ -266,7 +273,7 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                     });
                   },
                   icon: const Icon(Icons.refresh, size: 18),
-                  label: const Text('Send Another Message'),
+                  label: Text(_t('Send Another Message')),
                 ),
               ],
             )
@@ -276,7 +283,7 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Get in Touch with Our Team',
+                    _t('Get in Touch with Our Team'),
                     style: TextStyle(
                       color: widget.textPrimary,
                       fontWeight: FontWeight.w800,
@@ -285,7 +292,7 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Have questions about onboarding, hardware compatibility, or pricing? Fill out the form below.',
+                    _t('Have questions about onboarding, hardware compatibility, or pricing? Fill out the form below.'),
                     style: TextStyle(
                       color: widget.textSecondary,
                       fontSize: 13,
@@ -306,13 +313,13 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                                     controller: _nameController,
                                     style: TextStyle(color: widget.textPrimary),
                                     decoration: _inputDecoration(
-                                      label: 'Full Name *',
+                                      label: _t('Full Name *'),
                                       hint: 'John Doe',
                                       prefixIcon: Icons.person_outline,
                                     ),
                                     validator: (val) {
                                       if (val == null || val.trim().isEmpty) {
-                                        return 'Please enter your name';
+                                        return _t('Please enter your name');
                                       }
                                       return null;
                                     },
@@ -325,17 +332,17 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                                     keyboardType: TextInputType.emailAddress,
                                     style: TextStyle(color: widget.textPrimary),
                                     decoration: _inputDecoration(
-                                      label: 'Business Email *',
+                                      label: _t('Business Email *'),
                                       hint: 'you@store.com',
                                       prefixIcon: Icons.email_outlined,
                                     ),
                                     validator: (val) {
                                       if (val == null || val.trim().isEmpty) {
-                                        return 'Please enter your email';
+                                        return _t('Please enter your email');
                                       }
                                       if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
                                           .hasMatch(val.trim())) {
-                                        return 'Please enter a valid email address';
+                                        return _t('Please enter a valid email address');
                                       }
                                       return null;
                                     },
@@ -350,7 +357,7 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                                 Expanded(
                                   child: PhoneNumberField(
                                     controller: _phoneController,
-                                    label: 'Phone Number',
+                                    label: _t('Phone Number'),
                                     fillColor: widget.isDark
                                         ? const Color(0xFF0F172A)
                                         : const Color(0xFFF1F5F9),
@@ -372,14 +379,14 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                                     dropdownColor: widget.surfaceCard,
                                     style: TextStyle(color: widget.textPrimary),
                                     decoration: _inputDecoration(
-                                      label: 'Store / Business Type',
-                                      hint: 'Select business type…',
+                                      label: _t('Store / Business Type'),
+                                      hint: _t('Select business type…'),
                                       prefixIcon: Icons.storefront_outlined,
                                     ),
                                     items: _storeTypes.map((type) {
                                       return DropdownMenuItem<String>(
                                         value: type,
-                                        child: Text(type),
+                                        child: Text(_t(type)),
                                       );
                                     }).toList(),
                                     onChanged: (val) {
@@ -401,13 +408,13 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                             controller: _nameController,
                             style: TextStyle(color: widget.textPrimary),
                             decoration: _inputDecoration(
-                              label: 'Full Name *',
+                              label: _t('Full Name *'),
                               hint: 'John Doe',
                               prefixIcon: Icons.person_outline,
                             ),
                             validator: (val) {
                               if (val == null || val.trim().isEmpty) {
-                                return 'Please enter your name';
+                                return _t('Please enter your name');
                               }
                               return null;
                             },
@@ -418,17 +425,17 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                             keyboardType: TextInputType.emailAddress,
                             style: TextStyle(color: widget.textPrimary),
                             decoration: _inputDecoration(
-                              label: 'Business Email *',
+                              label: _t('Business Email *'),
                               hint: 'you@store.com',
                               prefixIcon: Icons.email_outlined,
                             ),
                             validator: (val) {
                               if (val == null || val.trim().isEmpty) {
-                                return 'Please enter your email';
+                                return _t('Please enter your email');
                               }
                               if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
                                   .hasMatch(val.trim())) {
-                                return 'Please enter a valid email address';
+                                return _t('Please enter a valid email address');
                               }
                               return null;
                             },
@@ -436,7 +443,7 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                           const SizedBox(height: 16),
                           PhoneNumberField(
                             controller: _phoneController,
-                            label: 'Phone Number',
+                            label: _t('Phone Number'),
                             fillColor: widget.isDark
                                 ? const Color(0xFF0F172A)
                                 : const Color(0xFFF1F5F9),
@@ -456,14 +463,14 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                             dropdownColor: widget.surfaceCard,
                             style: TextStyle(color: widget.textPrimary),
                             decoration: _inputDecoration(
-                              label: 'Store / Business Type',
-                              hint: 'Select business type…',
+                              label: _t('Store / Business Type'),
+                              hint: _t('Select business type…'),
                               prefixIcon: Icons.storefront_outlined,
                             ),
                             items: _storeTypes.map((type) {
                               return DropdownMenuItem<String>(
                                 value: type,
-                                child: Text(type),
+                                child: Text(_t(type)),
                               );
                             }).toList(),
                             onChanged: (val) {
@@ -481,8 +488,8 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                     controller: _subjectController,
                     style: TextStyle(color: widget.textPrimary),
                     decoration: _inputDecoration(
-                      label: 'Subject',
-                      hint: 'Questions before signing up',
+                      label: _t('Subject'),
+                      hint: _t('Questions before signing up'),
                       prefixIcon: Icons.help_outline_rounded,
                     ),
                   ),
@@ -492,15 +499,15 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                     maxLines: 4,
                     style: TextStyle(color: widget.textPrimary),
                     decoration: _inputDecoration(
-                      label: 'Message *',
-                      hint: "Tell us a bit about your business requirements…",
+                      label: _t('Message *'),
+                      hint: _t("Tell us a bit about your business requirements…"),
                     ),
                     validator: (val) {
                       if (val == null || val.trim().isEmpty) {
-                        return 'Please enter your message';
+                        return _t('Please enter your message');
                       }
                       if (val.trim().length < 5) {
-                        return 'Message must be at least 5 characters long';
+                        return _t('Message must be at least 5 characters long');
                       }
                       return null;
                     },
@@ -528,14 +535,14 @@ class _InteractiveContactFormState extends State<InteractiveContactForm> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Row(
+                          : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.send_rounded, size: 18),
-                                SizedBox(width: 8),
+                                const Icon(Icons.send_rounded, size: 18),
+                                const SizedBox(width: 8),
                                 Text(
-                                  'Send Inquiry',
-                                  style: TextStyle(
+                                  _t('Send Inquiry'),
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
                                   ),

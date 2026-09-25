@@ -7,7 +7,7 @@ class SplitNavigationTile extends StatefulWidget {
   const SplitNavigationTile({
     super.key,
     required this.title,
-    required this.onTap,
+    this.onTap,
     this.mainTileKey,
     this.expandButtonKey,
     this.leading,
@@ -35,7 +35,7 @@ class SplitNavigationTile extends StatefulWidget {
   final bool initiallyExpanded;
   final String expandTooltip;
   final String collapseTooltip;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   State<SplitNavigationTile> createState() => _SplitNavigationTileState();
@@ -54,6 +54,14 @@ class _SplitNavigationTileState extends State<SplitNavigationTile> {
 
   void _toggleExpanded() {
     setState(() => _expanded = !_expanded);
+  }
+
+  void _handleTileTap() {
+    if (widget.onTap != null) {
+      widget.onTap!();
+    } else if (widget.children.isNotEmpty) {
+      _toggleExpanded();
+    }
   }
 
   @override
@@ -75,7 +83,7 @@ class _SplitNavigationTileState extends State<SplitNavigationTile> {
                 title: widget.title,
                 selected: widget.selected,
                 selectedColor: widget.selectedColor,
-                onTap: widget.onTap,
+                onTap: _handleTileTap,
               ),
             ),
             if (widget.children.isNotEmpty)

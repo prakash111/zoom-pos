@@ -12,6 +12,7 @@ import '../../auth/auth_provider.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../dashboard/dashboard_screen.dart';
 import '../models/landing_data.dart';
+import '../models/landing_translations.dart';
 import '../services/landing_provider.dart';
 import '../widgets/interactive_contact_form.dart';
 
@@ -97,6 +98,12 @@ class _LandingScreenState extends State<LandingScreen> {
   final GlobalKey _contactKey = GlobalKey();
 
   late final LandingProvider _landingProvider;
+  LocaleProvider? _currentLocaleProvider;
+
+  String _t(String text) {
+    final code = _currentLocaleProvider?.locale.languageCode ?? 'en';
+    return LandingTranslations.tr(text, code);
+  }
 
   static const List<Map<String, String>> _languages = [
     {'code': 'en', 'label': 'English', 'flag': '🇺🇸'},
@@ -204,7 +211,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Icon(icon, size: 14, color: tokens.primaryColor),
           const SizedBox(width: 6),
           Text(
-            label,
+            _t(label),
             style: TextStyle(
               color:
                   tokens.isDark ? tokens.textPrimary : const Color(0xFF065F46),
@@ -289,6 +296,7 @@ class _LandingScreenState extends State<LandingScreen> {
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
     final localeProvider = context.watch<LocaleProvider>();
+    _currentLocaleProvider = localeProvider;
 
     return ChangeNotifierProvider<LandingProvider>.value(
       value: _landingProvider,
@@ -423,16 +431,16 @@ class _LandingScreenState extends State<LandingScreen> {
       actions: [
         if (isDesktop) ...[
           _navTextButton(
-              'Features', () => _scrollToSection(_featuresKey), tokens),
+              _t('Features'), () => _scrollToSection(_featuresKey), tokens),
           _navTextButton(
-              'Solutions', () => _scrollToSection(_solutionsKey), tokens),
+              _t('Solutions'), () => _scrollToSection(_solutionsKey), tokens),
           _navTextButton(
-              'Hardware', () => _scrollToSection(_hardwareKey), tokens),
+              _t('Hardware'), () => _scrollToSection(_hardwareKey), tokens),
           _navTextButton(
-              'Pricing', () => _scrollToSection(_pricingKey), tokens),
-          _navTextButton('FAQs', () => _scrollToSection(_faqsKey), tokens),
+              _t('Pricing'), () => _scrollToSection(_pricingKey), tokens),
+          _navTextButton(_t('FAQs'), () => _scrollToSection(_faqsKey), tokens),
           _navTextButton(
-              'Contact', () => _scrollToSection(_contactKey), tokens),
+              _t('Contact'), () => _scrollToSection(_contactKey), tokens),
           const SizedBox(width: 12),
           _buildLanguageDropdown(context, localeProvider, tokens),
           const SizedBox(width: 6),
@@ -450,9 +458,9 @@ class _LandingScreenState extends State<LandingScreen> {
                     borderRadius: BorderRadius.circular(10)),
               ),
               icon: const Icon(Icons.login, size: 16),
-              label: const Text(
-                'Sign In / POS',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              label: Text(
+                _t('Sign In / POS'),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               ),
               onPressed: () => _navigateToAuth(context),
             ),
@@ -461,7 +469,7 @@ class _LandingScreenState extends State<LandingScreen> {
           _buildLanguageDropdown(context, localeProvider, tokens),
           _buildThemeToggle(context, themeProvider, tokens),
           IconButton(
-            tooltip: 'Sign In',
+            tooltip: _t('Sign In'),
             icon: Icon(Icons.login, color: tokens.textPrimary),
             onPressed: () => _navigateToAuth(context),
           ),
@@ -536,27 +544,27 @@ class _LandingScreenState extends State<LandingScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
-                  _drawerNavItem('Features', Icons.stars_outlined, () {
+                  _drawerNavItem(_t('Features'), Icons.stars_outlined, () {
                     Navigator.of(context).pop();
                     _scrollToSection(_featuresKey);
                   }, tokens),
-                  _drawerNavItem('Solutions', Icons.grid_view_outlined, () {
+                  _drawerNavItem(_t('Solutions'), Icons.grid_view_outlined, () {
                     Navigator.of(context).pop();
                     _scrollToSection(_solutionsKey);
                   }, tokens),
-                  _drawerNavItem('Hardware', Icons.devices_other_outlined, () {
+                  _drawerNavItem(_t('Hardware'), Icons.devices_other_outlined, () {
                     Navigator.of(context).pop();
                     _scrollToSection(_hardwareKey);
                   }, tokens),
-                  _drawerNavItem('Pricing', Icons.payments_outlined, () {
+                  _drawerNavItem(_t('Pricing'), Icons.payments_outlined, () {
                     Navigator.of(context).pop();
                     _scrollToSection(_pricingKey);
                   }, tokens),
-                  _drawerNavItem('FAQs', Icons.help_outline, () {
+                  _drawerNavItem(_t('FAQs'), Icons.help_outline, () {
                     Navigator.of(context).pop();
                     _scrollToSection(_faqsKey);
                   }, tokens),
-                  _drawerNavItem('Contact', Icons.contact_support_outlined, () {
+                  _drawerNavItem(_t('Contact'), Icons.contact_support_outlined, () {
                     Navigator.of(context).pop();
                     _scrollToSection(_contactKey);
                   }, tokens),
@@ -572,7 +580,7 @@ class _LandingScreenState extends State<LandingScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Language',
+                        _t('Language'),
                         style: TextStyle(
                           color: tokens.textSecondary,
                           fontWeight: FontWeight.w600,
@@ -587,7 +595,7 @@ class _LandingScreenState extends State<LandingScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        tokens.isDark ? 'Dark Mode' : 'Light Mode',
+                        _t(tokens.isDark ? 'Dark Mode' : 'Light Mode'),
                         style: TextStyle(
                           color: tokens.textSecondary,
                           fontWeight: FontWeight.w600,
@@ -617,9 +625,9 @@ class _LandingScreenState extends State<LandingScreen> {
                             borderRadius: BorderRadius.circular(10)),
                       ),
                       icon: const Icon(Icons.login, size: 18),
-                      label: const Text(
-                        'Sign In to POS',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      label: Text(
+                        _t('Sign In to POS'),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       onPressed: () {
                         Navigator.of(context).pop();
@@ -731,7 +739,7 @@ class _LandingScreenState extends State<LandingScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                hero.badge,
+                _t(hero.badge),
                 style: TextStyle(
                   color: tokens.primaryColor,
                   fontWeight: FontWeight.w700,
@@ -743,7 +751,7 @@ class _LandingScreenState extends State<LandingScreen> {
         ),
         const SizedBox(height: 18),
         Text(
-          hero.title,
+          _t(hero.title),
           style: TextStyle(
             color: tokens.textPrimary,
             fontWeight: FontWeight.w900,
@@ -754,7 +762,7 @@ class _LandingScreenState extends State<LandingScreen> {
         ),
         const SizedBox(height: 18),
         Text(
-          hero.subtitle,
+          _t(hero.subtitle),
           style: TextStyle(
             color: tokens.textSecondary,
             fontSize: 16,
@@ -778,9 +786,9 @@ class _LandingScreenState extends State<LandingScreen> {
               ),
               icon: const Icon(Icons.rocket_launch, size: 18),
               label: Text(
-                hero.ctaPrimaryText.isNotEmpty
+                _t(hero.ctaPrimaryText.isNotEmpty
                     ? hero.ctaPrimaryText
-                    : 'Start Free Trial',
+                    : 'Start Free Trial'),
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
@@ -799,9 +807,9 @@ class _LandingScreenState extends State<LandingScreen> {
               ),
               icon: const Icon(Icons.visibility_outlined, size: 18),
               label: Text(
-                hero.ctaSecondaryText.isNotEmpty
+                _t(hero.ctaSecondaryText.isNotEmpty
                     ? hero.ctaSecondaryText
-                    : 'Explore Pricing',
+                    : 'Explore Pricing'),
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
@@ -817,7 +825,7 @@ class _LandingScreenState extends State<LandingScreen> {
             Icon(Icons.check_circle, color: tokens.primaryColor, size: 16),
             const SizedBox(width: 6),
             Text(
-              'No credit card required',
+              _t('No credit card required'),
               style: TextStyle(
                 color: tokens.textSecondary,
                 fontSize: 12,
@@ -827,7 +835,7 @@ class _LandingScreenState extends State<LandingScreen> {
             Icon(Icons.check_circle, color: tokens.primaryColor, size: 16),
             const SizedBox(width: 6),
             Text(
-              'Instant setup',
+              _t('Instant setup'),
               style: TextStyle(
                 color: tokens.textSecondary,
                 fontSize: 12,
@@ -914,7 +922,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Live Counter',
+                  _t('Live Counter'),
                   style: TextStyle(
                     color: tokens.primaryColor,
                     fontSize: 11,
@@ -937,7 +945,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Today\'s Revenue',
+                      Text(_t('Today\'s Revenue'),
                           style: TextStyle(
                               color: tokens.textSecondary, fontSize: 11)),
                       const SizedBox(height: 4),
@@ -961,11 +969,11 @@ class _LandingScreenState extends State<LandingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Completed Orders',
+                      Text(_t('Completed Orders'),
                           style: TextStyle(
                               color: tokens.textSecondary, fontSize: 11)),
                       const SizedBox(height: 4),
-                      Text('184 sales',
+                      Text('184 ${_t("sales")}',
                           style: TextStyle(
                               color: tokens.textPrimary,
                               fontSize: 18,
@@ -992,7 +1000,7 @@ class _LandingScreenState extends State<LandingScreen> {
                       size: 48, color: tokens.primaryColor),
                   const SizedBox(height: 10),
                   Text(
-                    'High-Speed Omnichannel POS Engine',
+                    _t('High-Speed Omnichannel POS Engine'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                         color: tokens.textPrimary,
@@ -1001,7 +1009,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Barcode Scanning · Cash Register · WhatsApp Digital Receipts',
+                    _t('Barcode Scanning · Cash Register · WhatsApp Digital Receipts'),
                     textAlign: TextAlign.center,
                     style:
                         TextStyle(color: tokens.textSecondary, fontSize: 11),
@@ -1033,7 +1041,7 @@ class _LandingScreenState extends State<LandingScreen> {
           child: Column(
             children: [
               Text(
-                'COMPATIBLE WITH STANDARD RETAIL & RESTAURANT HARDWARE',
+                _t('COMPATIBLE WITH STANDARD RETAIL & RESTAURANT HARDWARE'),
                 style: TextStyle(
                   color: tokens.primaryColor,
                   fontWeight: FontWeight.w700,
@@ -1064,7 +1072,7 @@ class _LandingScreenState extends State<LandingScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              item.title,
+                              _t(item.title),
                               style: TextStyle(
                                 color: tokens.textPrimary,
                                 fontWeight: FontWeight.bold,
@@ -1072,7 +1080,7 @@ class _LandingScreenState extends State<LandingScreen> {
                               ),
                             ),
                             Text(
-                              item.tag,
+                              _t(item.tag),
                               style: TextStyle(
                                 color: tokens.primaryColor,
                                 fontSize: 10,
@@ -1137,7 +1145,7 @@ class _LandingScreenState extends State<LandingScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          s.label,
+                          _t(s.label),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: tokens.textSecondary,
@@ -1219,7 +1227,7 @@ class _LandingScreenState extends State<LandingScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    sol.title,
+                                    _t(sol.title),
                                     style: TextStyle(
                                       color: tokens.textPrimary,
                                       fontWeight: FontWeight.bold,
@@ -1228,7 +1236,7 @@ class _LandingScreenState extends State<LandingScreen> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    sol.desc,
+                                    _t(sol.desc),
                                     style: TextStyle(
                                       color: tokens.textSecondary,
                                       fontSize: 13,
@@ -1314,7 +1322,7 @@ class _LandingScreenState extends State<LandingScreen> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              feat.title,
+                              _t(feat.title),
                               style: TextStyle(
                                 color: tokens.textPrimary,
                                 fontWeight: FontWeight.bold,
@@ -1323,7 +1331,7 @@ class _LandingScreenState extends State<LandingScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              feat.body,
+                              _t(feat.body),
                               style: TextStyle(
                                 color: tokens.textSecondary,
                                 fontSize: 13,
@@ -1416,9 +1424,9 @@ class _LandingScreenState extends State<LandingScreen> {
                                   color: tokens.primaryColor,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: const Text(
-                                  'MOST POPULAR',
-                                  style: TextStyle(
+                                child: Text(
+                                  _t('MOST POPULAR'),
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
@@ -1428,7 +1436,7 @@ class _LandingScreenState extends State<LandingScreen> {
                               const SizedBox(height: 12),
                             ],
                             Text(
-                              plan.name.toUpperCase(),
+                              _t(plan.name).toUpperCase(),
                               style: TextStyle(
                                 color: tokens.textPrimary,
                                 fontWeight: FontWeight.bold,
@@ -1439,7 +1447,7 @@ class _LandingScreenState extends State<LandingScreen> {
                                 plan.description!.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
-                                plan.description!,
+                                _t(plan.description!),
                                 style: TextStyle(
                                   color: tokens.textSecondary,
                                   fontSize: 12,
@@ -1461,7 +1469,7 @@ class _LandingScreenState extends State<LandingScreen> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '/${plan.billingPeriod}',
+                                  _t('/${plan.billingPeriod}'),
                                   style: TextStyle(
                                     color: tokens.textSecondary,
                                     fontSize: 14,
@@ -1477,29 +1485,29 @@ class _LandingScreenState extends State<LandingScreen> {
                                 _buildLimitChip(
                                   icon: Icons.receipt_long_outlined,
                                   label: plan.invoiceLimit == -1
-                                      ? 'Unlimited Invoices'
-                                      : '${plan.invoiceLimit} Invoices/mo',
+                                      ? _t('Unlimited Invoices')
+                                      : '${plan.invoiceLimit} ${_t('Invoices/mo')}',
                                   tokens: tokens,
                                 ),
                                 _buildLimitChip(
                                   icon: Icons.inventory_2_outlined,
                                   label: plan.productsLimit == -1
-                                      ? 'Unlimited Products'
-                                      : '${plan.productsLimit} Products',
+                                      ? _t('Unlimited Products')
+                                      : '${plan.productsLimit} ${_t('Products')}',
                                   tokens: tokens,
                                 ),
                                 _buildLimitChip(
                                   icon: Icons.devices_outlined,
                                   label: plan.deviceLimit == -1
-                                      ? 'Unlimited POS Devices'
-                                      : '${plan.deviceLimit} Devices',
+                                      ? _t('Unlimited POS Devices')
+                                      : '${plan.deviceLimit} ${_t('Devices')}',
                                   tokens: tokens,
                                 ),
                                 _buildLimitChip(
                                   icon: Icons.people_outline,
                                   label: plan.staffLimit == -1
-                                      ? 'Unlimited Staff'
-                                      : '${plan.staffLimit} Staff',
+                                      ? _t('Unlimited Staff')
+                                      : '${plan.staffLimit} ${_t('Staff')}',
                                   tokens: tokens,
                                 ),
                               ],
@@ -1533,7 +1541,7 @@ class _LandingScreenState extends State<LandingScreen> {
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          label,
+                                          _t(label),
                                           style: TextStyle(
                                             color: tokens.accentColor,
                                             fontSize: 11,
@@ -1561,7 +1569,7 @@ class _LandingScreenState extends State<LandingScreen> {
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
-                                          f,
+                                          _t(f),
                                           style: TextStyle(
                                             color: tokens.textSecondary,
                                             fontSize: 13,
@@ -1595,8 +1603,8 @@ class _LandingScreenState extends State<LandingScreen> {
                                 onPressed: () => _navigateToAuth(context),
                                 child: Text(
                                   plan.isFeatured
-                                      ? 'Get Started Now'
-                                      : 'Select Plan',
+                                      ? _t('Get Started Now')
+                                      : _t('Select Plan'),
                                   style: const TextStyle(
                                       fontWeight: FontWeight.bold),
                                 ),
@@ -1669,7 +1677,7 @@ class _LandingScreenState extends State<LandingScreen> {
                             ),
                             const SizedBox(height: 14),
                             Text(
-                              '"${t.quote}"',
+                              '"${_t(t.quote)}"',
                               style: TextStyle(
                                 color: tokens.textSecondary,
                                 fontSize: 13,
@@ -1708,7 +1716,7 @@ class _LandingScreenState extends State<LandingScreen> {
                                         ),
                                       ),
                                       Text(
-                                        t.role,
+                                        _t(t.role),
                                         style: TextStyle(
                                           color: tokens.textSecondary,
                                           fontSize: 11,
@@ -1774,7 +1782,7 @@ class _LandingScreenState extends State<LandingScreen> {
                       iconColor: tokens.primaryColor,
                       collapsedIconColor: tokens.textSecondary,
                       title: Text(
-                        faq.question,
+                        _t(faq.question),
                         style: TextStyle(
                           color: tokens.textPrimary,
                           fontWeight: FontWeight.w700,
@@ -1786,7 +1794,7 @@ class _LandingScreenState extends State<LandingScreen> {
                           padding: const EdgeInsets.only(
                               left: 16, right: 16, bottom: 18),
                           child: Text(
-                            faq.answer,
+                            _t(faq.answer),
                             style: TextStyle(
                               color: tokens.textSecondary,
                               fontSize: 13,
@@ -1837,7 +1845,7 @@ class _LandingScreenState extends State<LandingScreen> {
                     size: 40, color: tokens.primaryColor),
                 const SizedBox(height: 14),
                 Text(
-                  'Download Native Counter Apps',
+                  _t('Download Native Counter Apps'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: tokens.textPrimary,
@@ -1847,7 +1855,7 @@ class _LandingScreenState extends State<LandingScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Experience blazing-fast offline performance with direct thermal printer and scanner hardware drivers.',
+                  _t('Experience blazing-fast offline performance with direct thermal printer and scanner hardware drivers.'),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: tokens.textSecondary, fontSize: 13),
                 ),
@@ -1869,8 +1877,8 @@ class _LandingScreenState extends State<LandingScreen> {
                               borderRadius: BorderRadius.circular(10)),
                         ),
                         icon: const Icon(Icons.android),
-                        label: const Text('Download Android APK',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: Text(_t('Download Android APK'),
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
                         onPressed: () =>
                             _launchExternalUrl(downloads.playstoreUrl),
                       ),
@@ -1886,8 +1894,8 @@ class _LandingScreenState extends State<LandingScreen> {
                               borderRadius: BorderRadius.circular(10)),
                         ),
                         icon: const Icon(Icons.desktop_windows),
-                        label: const Text('Download Windows App',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: Text(_t('Download Windows App'),
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
                         onPressed: () =>
                             _launchExternalUrl(downloads.windowsUrl),
                       ),
@@ -1919,11 +1927,11 @@ class _LandingScreenState extends State<LandingScreen> {
               _buildSectionHeader(
                 badge: 'CONTACT & INQUIRIES',
                 title: contact.pageTitle.isNotEmpty
-                    ? contact.pageTitle
-                    : 'Connect with Our Sales & Support Team',
+                    ? _t(contact.pageTitle)
+                    : _t('Connect with Our Sales & Support Team'),
                 subtitle: contact.pageSubtitle.isNotEmpty
-                    ? contact.pageSubtitle
-                    : 'Have questions before signing up? Send us a message and our team will get in touch.',
+                    ? _t(contact.pageSubtitle)
+                    : _t('Have questions before signing up? Send us a message and our team will get in touch.'),
                 tokens: tokens,
               ),
               const SizedBox(height: 36),
@@ -2029,7 +2037,7 @@ class _LandingScreenState extends State<LandingScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            item.title,
+                            _t(item.title),
                             style: TextStyle(
                               color: tokens.textPrimary,
                               fontWeight: FontWeight.w700,
@@ -2038,7 +2046,7 @@ class _LandingScreenState extends State<LandingScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            item.content,
+                            _t(item.content),
                             style: TextStyle(
                               color: tokens.textSecondary,
                               fontSize: 13,
@@ -2101,7 +2109,7 @@ class _LandingScreenState extends State<LandingScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                '© ${DateTime.now().year} ${branding.platformName}. All rights reserved. Cloud & Offline Enterprise POS Architecture.',
+                '© ${DateTime.now().year} ${branding.platformName}. ${_t('All rights reserved.')} ${_t('Cloud & Offline Enterprise POS Architecture.')}',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: tokens.textSecondary.withValues(alpha: 0.8),
@@ -2130,7 +2138,7 @@ class _LandingScreenState extends State<LandingScreen> {
             borderRadius: BorderRadius.circular(16),
           ),
           child: Text(
-            badge,
+            _t(badge),
             style: TextStyle(
               color: tokens.primaryColor,
               fontWeight: FontWeight.bold,
@@ -2141,7 +2149,7 @@ class _LandingScreenState extends State<LandingScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          title,
+          _t(title),
           textAlign: TextAlign.center,
           style: TextStyle(
             color: tokens.textPrimary,
@@ -2154,7 +2162,7 @@ class _LandingScreenState extends State<LandingScreen> {
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
           child: Text(
-            subtitle,
+            _t(subtitle),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: tokens.textSecondary,

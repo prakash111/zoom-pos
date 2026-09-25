@@ -6,7 +6,7 @@ on:
       base_href:
         description: 'Base href for Flutter web (e.g. / or /zoom-pos/)'
         required: false
-        default: '/'
+        default: '/pos-web/'
         type: string
       deploy_to_pages:
         description: 'Deploy to GitHub Pages'
@@ -82,7 +82,7 @@ jobs:
 
       - name: Build Flutter Web release
         run: |
-          BASE_HREF="${{ inputs.base_href || '/' }}"
+          BASE_HREF="${{ inputs.base_href || '/pos-web/' }}"
           echo "Building Flutter Web release with base-href: $BASE_HREF"
           flutter build web --release --base-href "$BASE_HREF"
 

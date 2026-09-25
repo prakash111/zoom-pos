@@ -93,6 +93,12 @@ class DrawerItemParser {
                   ? Icons.subdirectory_arrow_right
                   : Icons.circle_outlined));
 
+      final bool isExternal = item['is_external'] == true ||
+          item['is_external_url'] == true ||
+          item['target'] == '_blank' ||
+          item['action_type'] == 'external_url' ||
+          item['action'] == 'external_url';
+
       return ListTile(
         key: ValueKey('drawer-item-${item['key'] ?? item['id'] ?? title}'),
         contentPadding: padding,
@@ -129,6 +135,13 @@ class DrawerItemParser {
                 : (isNested ? FontWeight.w500 : FontWeight.w600),
           ),
         ),
+        trailing: isExternal
+            ? Icon(
+                Icons.open_in_new,
+                size: 16,
+                color: effectiveColor.withValues(alpha: 0.7),
+              )
+            : null,
         selected: isSelected,
         selectedColor: selectedColor ?? activeColor,
         onTap: onTap,
@@ -136,41 +149,46 @@ class DrawerItemParser {
     }
 
     // Expandable ExpansionTile ONLY when children is strictly a non-empty List
-    return ExpansionTile(
-      key: PageStorageKey(
-          'drawer-expandable-${item['key'] ?? item['id'] ?? title}'),
-      initiallyExpanded:
-          item['initially_expanded'] == true || item['expanded'] == true,
-      tilePadding: EdgeInsets.only(
-        left: 16.0 + (indent * 24.0),
-        right: 16.0,
+    return Theme(
+      data: Theme.of(context).copyWith(
+        dividerColor: Colors.transparent,
       ),
-      leading: Icon(
-        iconData ?? (icon is IconData ? icon : Icons.circle_outlined),
-        size: 22,
-        color: isSelected ? (selectedColor ?? activeColor) : activeColor,
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isSelected ? (selectedColor ?? activeColor) : activeColor,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
+      child: ExpansionTile(
+        key: PageStorageKey(
+            'drawer-expandable-${item['key'] ?? item['id'] ?? title}'),
+        initiallyExpanded:
+            item['initially_expanded'] == true || item['expanded'] == true,
+        tilePadding: EdgeInsets.only(
+          left: 16.0 + (indent * 24.0),
+          right: 16.0,
         ),
+        leading: Icon(
+          iconData ?? (icon is IconData ? icon : Icons.circle_outlined),
+          size: 22,
+          color: isSelected ? (selectedColor ?? activeColor) : activeColor,
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? (selectedColor ?? activeColor) : activeColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        children: validChildren.map((childMap) {
+          if (!childMap.containsKey('indent') && !childMap.containsKey('level')) {
+            childMap['indent'] = indent + 1;
+          }
+          return buildDrawerMenuItem(
+            context,
+            childMap,
+            activeColor: activeColor,
+            selectedColor: selectedColor,
+            onTap: () => onChildTap?.call(childMap),
+            onChildTap: onChildTap,
+          );
+        }).toList(),
       ),
-      children: validChildren.map((childMap) {
-        if (!childMap.containsKey('indent') && !childMap.containsKey('level')) {
-          childMap['indent'] = indent + 1;
-        }
-        return buildDrawerMenuItem(
-          context,
-          childMap,
-          activeColor: activeColor,
-          selectedColor: selectedColor,
-          onTap: () => onChildTap?.call(childMap),
-          onChildTap: onChildTap,
-        );
-      }).toList(),
     );
   }
 }

@@ -170,6 +170,7 @@ List<_NavSection> _serverDrivenSections() {
               continue;
             }
 
+            final bool isParentContainer = item.children.isNotEmpty;
             tiles.add(_FeatureTile(
               item.key,
               (l10n) => BootstrapCache.instance.resolveNavigationLabel(
@@ -177,14 +178,16 @@ List<_NavSection> _serverDrivenSections() {
                 l10n.text(item.title, fallback: item.title),
               ),
               SduiIconRegistry.resolve(item.icon),
-              SduiComponentRegistry.instance.resolve(
-                item.component ?? item.key,
-                targetEndpoint: item.targetEndpoint,
-                title: item.title,
-              ),
+              isParentContainer
+                  ? null
+                  : SduiComponentRegistry.instance.resolve(
+                      item.component ?? item.key,
+                      targetEndpoint: item.targetEndpoint,
+                      title: item.title,
+                    ),
               item.permission,
-              item.isExternalUrl,
-              item.url ?? item.targetEndpoint,
+              isParentContainer ? false : item.isExternalUrl,
+              isParentContainer ? null : (item.url ?? item.targetEndpoint),
               item.badge,
             ));
             final parent = item.effectiveParentId ?? defaultParent;
@@ -1279,61 +1282,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
               );
             }
 
-            return SplitNavigationTile(
-              key: PageStorageKey<String>(
-                'drawer-branch-${section.key}-${tile.key}',
+            return Theme(
+              data: Theme.of(context).copyWith(
+                dividerColor: Colors.transparent,
               ),
-              mainTileKey: ValueKey('drawer-item-${tile.key}'),
-              expandButtonKey: ValueKey('drawer-expand-${tile.key}'),
-              contentPadding: padding,
-              iconColor: unselectedIconColor,
-              selectedColor: selectedItemColor,
-              selected: isSelected,
-              dense: depth > 0,
-              leading: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (depth > 0) ...[
-                    Text(
-                      '↳',
-                      style: TextStyle(
-                        color: unselectedIconColor,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-                  Icon(
-                    tile.icon,
-                    size: sectionParent ? 22 : (depth == 0 ? 24 : 20),
-                    color: isSelected
-                        ? selectedItemColor
-                        : (depth > 0
-                            ? unselectedIconColor.withValues(alpha: 0.85)
-                            : unselectedIconColor),
-                  ),
-                ],
-              ),
-              initiallyExpanded: false,
-              title: Text(
-                bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
-                style: TextStyle(
-                  fontWeight: sectionParent || isSelected
-                      ? FontWeight.w700
-                      : FontWeight.w500,
-                  letterSpacing: sectionParent ? 0.2 : null,
-                  color: isSelected ? selectedItemColor : unselectedItemColor,
+              child: SplitNavigationTile(
+                key: PageStorageKey<String>(
+                  'drawer-branch-${section.key}-${tile.key}',
                 ),
-              ),
-              children: [
-                for (final child in nested)
-                  buildBranch(
-                    child,
-                    math.min(depth + 1, _maximumNavigationDepth),
+                mainTileKey: ValueKey('drawer-item-${tile.key}'),
+                expandButtonKey: ValueKey('drawer-expand-${tile.key}'),
+                contentPadding: padding,
+                iconColor: unselectedIconColor,
+                selectedColor: selectedItemColor,
+                selected: isSelected,
+                dense: depth > 0,
+                leading: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (depth > 0) ...[
+                      Text(
+                        '↳',
+                        style: TextStyle(
+                          color: unselectedIconColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Icon(
+                      tile.icon,
+                      size: sectionParent ? 22 : (depth == 0 ? 24 : 20),
+                      color: isSelected
+                          ? selectedItemColor
+                          : (depth > 0
+                              ? unselectedIconColor.withValues(alpha: 0.85)
+                              : unselectedIconColor),
+                    ),
+                  ],
+                ),
+                initiallyExpanded: false,
+                title: Text(
+                  bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
+                  style: TextStyle(
+                    fontWeight: sectionParent || isSelected
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                    letterSpacing: sectionParent ? 0.2 : null,
+                    color: isSelected ? selectedItemColor : unselectedItemColor,
                   ),
-              ],
-              onTap: () => openTile(tile),
+                ),
+                children: [
+                  for (final child in nested)
+                    buildBranch(
+                      child,
+                      math.min(depth + 1, _maximumNavigationDepth),
+                    ),
+                ],
+                // Parent accordion tiles only toggle expansion; no direct navigation
+                onTap: null,
+              ),
             );
           }
 
@@ -1687,23 +1696,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
 
-        return SplitNavigationTile(
-          key: PageStorageKey<String>('rail-branch-${section.key}-${tile.key}'),
-          mainTileKey: ValueKey('rail-item-${tile.key}'),
-          expandButtonKey: ValueKey('rail-expand-${tile.key}'),
-          contentPadding: pad,
-          dense: true,
-          selected: selected,
-          selectedColor: Theme.of(context).colorScheme.primary,
-          iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
-          initiallyExpanded: true,
-          leading: leading,
-          title: label,
-          children: [
-            for (final child in nested)
-              branch(child, math.min(depth + 1, _maximumNavigationDepth)),
-          ],
-          onTap: () => _onDockItemSelected(context, index),
+        return Theme(
+          data: Theme.of(context).copyWith(
+            dividerColor: Colors.transparent,
+          ),
+          child: SplitNavigationTile(
+            key: PageStorageKey<String>('rail-branch-${section.key}-${tile.key}'),
+            mainTileKey: ValueKey('rail-item-${tile.key}'),
+            expandButtonKey: ValueKey('rail-expand-${tile.key}'),
+            contentPadding: pad,
+            dense: true,
+            selected: selected,
+            selectedColor: Theme.of(context).colorScheme.primary,
+            iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            initiallyExpanded: true,
+            leading: leading,
+            title: label,
+            children: [
+              for (final child in nested)
+                branch(child, math.min(depth + 1, _maximumNavigationDepth)),
+            ],
+            onTap: null,
+          ),
         );
       }
 

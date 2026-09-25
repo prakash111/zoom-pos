@@ -746,5 +746,126 @@ void main() {
       expect(tenantSchema.resolveLiveStoreUrl(),
           'https://online-shop.saas.zoomnearby.com');
     });
+
+    testWidgets(
+        'Tapping parent accordion tile directly toggles expansion without navigating',
+        (tester) async {
+      final user = UserModel(
+        id: 'u2',
+        companyId: 'c2',
+        name: 'Store Owner',
+        email: 'owner@example.com',
+        role: 'admin',
+        permissions: const {'*': true},
+      );
+
+      final company = CompanyModel(
+        id: 'c2',
+        name: 'Demo Mart',
+        tradeName: 'Demo Mart',
+        currency: 'USD',
+        currencySymbol: '\$',
+        planName: 'pro',
+        slug: 'demo-mart',
+      );
+
+      BootstrapCache.instance.menuStructure = const [
+        SduiNavSectionSchema(
+          key: 'administration',
+          title: 'Administration & Settings',
+          items: [
+            SduiNavItemSchema(
+              key: 'settings_group',
+              title: 'Store Settings',
+              icon: 'settings',
+            ),
+            SduiNavItemSchema(
+              key: 'settings_profile',
+              title: 'Store Profile',
+              icon: 'storefront',
+            ),
+            SduiNavItemSchema(
+              key: 'view_live_store',
+              title: 'View Live Store',
+              icon: 'open_in_new',
+              isExternalUrl: true,
+              url: 'https://demo-mart.saas.zoomnearby.com',
+            ),
+          ],
+        ),
+      ];
+      addTearDown(() => BootstrapCache.instance.menuStructure = []);
+
+      BootstrapCache.instance.navConfig = NavConfig(
+        sections: const [NavSectionOrder(key: 'administration', order: 0)],
+        items: const [
+          NavItemConfig(
+            key: 'settings_group',
+            section: 'administration',
+            level: 0,
+            order: 1,
+            visible: true,
+          ),
+          NavItemConfig(
+            key: 'settings_profile',
+            section: 'administration',
+            parent: 'settings_group',
+            level: 1,
+            order: 1,
+            visible: true,
+          ),
+          NavItemConfig(
+            key: 'view_live_store',
+            section: 'administration',
+            parent: 'settings_group',
+            level: 1,
+            order: 2,
+            visible: true,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(_buildTestApp(user: user, company: company));
+      await tester.pumpAndSettle();
+
+      final scaffoldState = tester.state<ScaffoldState>(find.byType(Scaffold));
+      scaffoldState.openDrawer();
+      await tester.pumpAndSettle();
+
+      // Parent tile is visible, children are not yet visible
+      expect(find.byKey(const ValueKey('drawer-item-settings_group')),
+          findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-item-settings_profile')),
+          findsNothing);
+      expect(find.byKey(const ValueKey('drawer-item-view_live_store')),
+          findsNothing);
+
+      // Tapping the parent tile directly (not just expand button) expands the accordion
+      await tester
+          .tap(find.byKey(const ValueKey('drawer-item-settings_group')));
+      await tester.pumpAndSettle();
+
+      // Children are now visible!
+      expect(find.byKey(const ValueKey('drawer-item-settings_profile')),
+          findsOneWidget);
+      expect(find.byKey(const ValueKey('drawer-item-view_live_store')),
+          findsOneWidget);
+
+      // Verify external icon is present for view_live_store child
+      final liveStoreTile = tester.widget<ListTile>(
+          find.byKey(const ValueKey('drawer-item-view_live_store')));
+      expect(liveStoreTile.trailing, isNotNull);
+
+      // Tapping the parent tile directly again collapses the accordion
+      await tester
+          .tap(find.byKey(const ValueKey('drawer-item-settings_group')));
+      await tester.pumpAndSettle();
+
+      // Children are hidden again
+      expect(find.byKey(const ValueKey('drawer-item-settings_profile')),
+          findsNothing);
+      expect(find.byKey(const ValueKey('drawer-item-view_live_store')),
+          findsNothing);
+    });
   });
 }

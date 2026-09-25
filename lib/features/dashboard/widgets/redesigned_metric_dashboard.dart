@@ -84,7 +84,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
       widget.onTryFlutterDemo!();
       return;
     }
-    final uri = Uri.parse('https://web.zoomnearby.com/demo');
+    final uri = Uri.parse('https://saas.zoomnearby.com/pos-web/');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
