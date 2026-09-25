@@ -294,18 +294,8 @@ class _LandingScreenState extends State<LandingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ThemeProvider? themeProvider;
-    LocaleProvider? localeProvider;
-    try {
-      themeProvider = context.watch<ThemeProvider>();
-    } catch (_) {
-      themeProvider = null;
-    }
-    try {
-      localeProvider = context.watch<LocaleProvider>();
-    } catch (_) {
-      localeProvider = null;
-    }
+    final themeProvider = context.watch<ThemeProvider>();
+    final localeProvider = context.watch<LocaleProvider>();
     _currentLocaleProvider = localeProvider;
 
     return ChangeNotifierProvider<LandingProvider>.value(
