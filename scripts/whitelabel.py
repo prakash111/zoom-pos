@@ -234,9 +234,9 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
     print(f"[*] Applying Flutter Code & Theme Customizations...")
     pubspec_file = os.path.join(project_root, 'pubspec.yaml')
     if os.path.exists(pubspec_file):
-        safe_replace(pubspec_file, r'name:\s*[a-zA-Z0-9_]+', f'name: {short_snake}')
+        # Keep internal package name intact to preserve Dart package resolution across all internal imports
         safe_replace(pubspec_file, r'description:\s*"[^"]*"', f'description: "{product_name} client — {company_name}."')
-        print("    ✓ Updated pubspec.yaml name and description")
+        print("    ✓ Updated pubspec.yaml description")
 
     app_config = os.path.join(project_root, 'lib/core/config/app_config.dart')
     if os.path.exists(app_config):
