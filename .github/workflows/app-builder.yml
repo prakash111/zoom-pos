@@ -333,42 +333,8 @@ jobs:
             cp web/.htaccess build/web/.htaccess
           fi
 
-          # Ensure built index.html has universal dynamic base resolver and no hardcoded base tag
-          python3 -c '
-          import os, re
-          p = "build/web/index.html"
-          if os.path.exists(p):
-              with open(p, "r", encoding="utf-8") as f:
-                  html = f.read()
-              # Strip static base tag if inserted by flutter build
-              html = re.sub(r"<base\s+href=[\"\x27][^\"\x27]*[\"\x27]\s*/?>\s*", "", html)
-              if "Universal Directory & Subfolder Base Path Resolver" not in html:
-                  resolver = """<head>
-  <script>
-    // Universal Directory & Subfolder Base Path Resolver
-    (function () {
-      var loc = window.location;
-      var path = loc.pathname;
-      var lastSeg = path.split("/").pop();
-      if (path.length > 1 && !path.endsWith("/") && !lastSeg.includes(".")) {
-        window.location.replace(loc.protocol + "//" + loc.host + path + "/" + loc.search + loc.hash);
-        return;
-      }
-      if (!path.endsWith("/")) {
-        path = path.substring(0, path.lastIndexOf("/") + 1);
-      }
-      var baseEl = document.querySelector("base");
-      if (!baseEl) {
-        baseEl = document.createElement("base");
-        document.head.prepend(baseEl);
-      }
-      baseEl.setAttribute("href", path || "/");
-    })();
-  </script>"""
-                  html = re.sub(r"<head>", resolver, html, count=1)
-              with open(p, "w", encoding="utf-8") as f:
-                  f.write(html)
-          '
+          # Ensure built index.html has static base tag removed so universal dynamic resolver controls baseURI
+          python3 -c "import os, re; p='build/web/index.html'; (lambda h: open(p,'w').write(re.sub(r'<base\s+href=[^>]*>\s*', '', h))) (open(p).read()) if os.path.exists(p) else None"
 
           cd build/web
           zip -r "../../builder-output/${BRAND_SLUG}-web.zip" .
