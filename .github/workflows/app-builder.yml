@@ -1,0 +1,328 @@
+name: App Builder CI/CD Engine
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: 'Unique Build Request ID'
+        required: true
+        type: string
+      platform:
+        description: 'Target compilation platform (android, web, windows, ios)'
+        required: true
+        default: 'android'
+        type: choice
+        options:
+          - android
+          - web
+          - windows
+          - ios
+      app_name:
+        description: 'Application Display Name'
+        required: false
+        default: 'Zoom Sales POS'
+        type: string
+      package_id:
+        description: 'Package / Bundle Identifier (e.g. com.company.pos)'
+        required: false
+        default: 'com.zoomnearby.zoompos'
+        type: string
+      server_url:
+        description: 'Backend API Server URL (e.g. https://saas.zoomnearby.com)'
+        required: false
+        default: 'https://saas.zoomnearby.com'
+        type: string
+      primary_color:
+        description: 'Primary Theme Color Hex (e.g. #4F46E5)'
+        required: false
+        default: '#4F46E5'
+        type: string
+      custom_logo_base64:
+        description: 'Base64 encoded custom logo PNG'
+        required: false
+        default: ''
+        type: string
+      custom_source_url:
+        description: 'Download URL for custom uploaded source ZIP'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  # ============================================================================
+  # ANDROID BUILD JOB
+  # ============================================================================
+  build-android:
+    name: Build Android (${{ inputs.build_id }})
+    if: inputs.platform == 'android'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Flutter (stable, cached)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Extract app version
+        id: version
+        run: |
+          APP_VERSION=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          BUILD_NUMBER=$(grep -m1 '^version:' pubspec.yaml | sed -nE 's/.*\+([0-9]+).*/\1/p')
+          echo "APP_VERSION=${APP_VERSION:-1.0.5}" >> $GITHUB_ENV
+          echo "BUILD_NUMBER=${BUILD_NUMBER:-1}" >> $GITHUB_ENV
+
+      - name: Set up Android Keystore
+        env:
+          STORE_PASS: ${{ secrets.KEYSTORE_PASSWORD || '123456789' }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD || '123456789' }}
+          ALIAS: ${{ secrets.KEY_ALIAS || 'zoom-pos' }}
+        run: |
+          KEYSTORE_PATH="$GITHUB_WORKSPACE/zoom-pos.jks"
+          if [ ! -s "$KEYSTORE_PATH" ]; then
+            keytool -genkeypair -v -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASS" -keypass "$KEY_PASS" -alias "$ALIAS" -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=ZoomNearby CI, OU=Build, O=ZoomNearby, C=IN"
+          fi
+          cat <<KEYPROP > android/key.properties
+          storePassword=$STORE_PASS
+          keyPassword=$KEY_PASS
+          keyAlias=$ALIAS
+          storeFile=$KEYSTORE_PATH
+          KEYPROP
+
+      - name: Apply Customizations
+        run: |
+          echo "Applying customizations for Build ${{ inputs.build_id }}..."
+          
+          # 1. Package ID / Application ID
+          if [ -n "${{ inputs.package_id }}" ]; then
+            sed -i 's/applicationId = "[^"]*"/applicationId = "${{ inputs.package_id }}"/g' android/app/build.gradle.kts || true
+            sed -i 's/namespace = "[^"]*"/namespace = "${{ inputs.package_id }}"/g' android/app/build.gradle.kts || true
+          fi
+
+          # 2. App Name
+          if [ -n "${{ inputs.app_name }}" ]; then
+            sed -i 's/android:label="[^"]*"/android:label="${{ inputs.app_name }}"/g' android/app/src/main/AndroidManifest.xml || true
+          fi
+
+          # 3. Server URL injection
+          if [ -n "${{ inputs.server_url }}" ]; then
+            CLEAN_URL=$(echo "${{ inputs.server_url }}" | sed 's:/*$::')
+            sed -i "s|defaultBaseUrl = '[^']*'|defaultBaseUrl = '$CLEAN_URL'|g" lib/core/config/app_config.dart || true
+          fi
+
+          # 4. Primary Theme Color injection
+          if [ -n "${{ inputs.primary_color }}" ]; then
+            HEX_VAL=$(echo "${{ inputs.primary_color }}" | tr -d '#' | tr '[:lower:]' '[:upper:]')
+            sed -i "s|Color primary = Color(0x[0-9A-Fa-f]*)|Color primary = Color(0xFF$HEX_VAL)|g" lib/core/config/theme.dart || true
+          fi
+
+          # 5. Custom Logo
+          if [ -n "${{ inputs.custom_logo_base64 }}" ]; then
+            echo "${{ inputs.custom_logo_base64 }}" | base64 --decode > assets/icons/app_icon.png || true
+            echo "${{ inputs.custom_logo_base64 }}" | base64 --decode > assets/images/app_logo.png || true
+          fi
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build signed Android release APK
+        run: flutter build apk --release --android-skip-build-dependency-validation
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p builder-output
+          cp build/app/outputs/flutter-apk/app-release.apk builder-output/app-builder-${{ inputs.build_id }}-android.apk
+          cd builder-output && zip -r app-builder-${{ inputs.build_id }}-android.zip app-builder-${{ inputs.build_id }}-android.apk
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-builder-${{ inputs.build_id }}-android
+          path: builder-output/app-builder-${{ inputs.build_id }}-android.zip
+          retention-days: 7
+
+  # ============================================================================
+  # WEB BUILD JOB
+  # ============================================================================
+  build-web:
+    name: Build Web (${{ inputs.build_id }})
+    if: inputs.platform == 'web'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter (stable, cached)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Ensure Web platform scaffold exists
+        run: |
+          flutter config --enable-web
+          flutter create --platforms=web .
+
+      - name: Apply Customizations
+        run: |
+          echo "Applying customizations for Web Build ${{ inputs.build_id }}..."
+
+          # 1. Server URL injection
+          if [ -n "${{ inputs.server_url }}" ]; then
+            CLEAN_URL=$(echo "${{ inputs.server_url }}" | sed 's:/*$::')
+            sed -i "s|defaultBaseUrl = '[^']*'|defaultBaseUrl = '$CLEAN_URL'|g" lib/core/config/app_config.dart || true
+          fi
+
+          # 2. Primary Theme Color injection
+          if [ -n "${{ inputs.primary_color }}" ]; then
+            HEX_VAL=$(echo "${{ inputs.primary_color }}" | tr -d '#' | tr '[:lower:]' '[:upper:]')
+            sed -i "s|Color primary = Color(0x[0-9A-Fa-f]*)|Color primary = Color(0xFF$HEX_VAL)|g" lib/core/config/theme.dart || true
+          fi
+
+          # 3. Web Title & Manifest
+          if [ -n "${{ inputs.app_name }}" ]; then
+            sed -i "s|<title>.*</title>|<title>${{ inputs.app_name }}</title>|g" web/index.html || true
+            sed -i 's/"name": "[^"]*"/"name": "${{ inputs.app_name }}"/g' web/manifest.json || true
+          fi
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build Flutter Web release
+        run: flutter build web --release --base-href "/"
+
+      - name: Prepare Web Artifact
+        run: |
+          mkdir -p builder-output
+          cd build/web && zip -r ../../builder-output/app-builder-${{ inputs.build_id }}-web.zip .
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-builder-${{ inputs.build_id }}-web
+          path: builder-output/app-builder-${{ inputs.build_id }}-web.zip
+          retention-days: 7
+
+  # ============================================================================
+  # WINDOWS BUILD JOB
+  # ============================================================================
+  build-windows:
+    name: Build Windows (${{ inputs.build_id }})
+    if: inputs.platform == 'windows'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter (stable, cached)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Ensure Windows platform scaffold exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "windows")) {
+            flutter config --enable-windows-desktop
+            flutter create --platforms=windows .
+          }
+
+      - name: Apply Customizations
+        shell: pwsh
+        run: |
+          Write-Host "Applying Windows customizations..."
+          if ("${{ inputs.server_url }}") {
+            $cleanUrl = "${{ inputs.server_url }}".TrimEnd('/')
+            (Get-Content lib/core/config/app_config.dart) -replace "defaultBaseUrl = '.*'", "defaultBaseUrl = '$cleanUrl'" | Set-Content lib/core/config/app_config.dart
+          }
+          if ("${{ inputs.primary_color }}") {
+            $hex = "${{ inputs.primary_color }}".Replace('#', '').ToUpper()
+            (Get-Content lib/core/config/theme.dart) -replace 'Color primary = Color\(0x[0-9A-Fa-f]+\)', "Color primary = Color(0xFF$hex)" | Set-Content lib/core/config/theme.dart
+          }
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Package Windows Artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path builder-output
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath builder-output\app-builder-${{ inputs.build_id }}-windows.zip -Force
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-builder-${{ inputs.build_id }}-windows
+          path: builder-output\app-builder-${{ inputs.build_id }}-windows.zip
+          retention-days: 7
+
+  # ============================================================================
+  # IOS BUILD JOB
+  # ============================================================================
+  build-ios:
+    name: Build iOS (${{ inputs.build_id }})
+    if: inputs.platform == 'ios'
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter (stable, cached)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Apply Customizations
+        run: |
+          echo "Applying iOS customizations..."
+          if [ -n "${{ inputs.package_id }}" ]; then
+            sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = ${{ inputs.package_id }};/g' ios/Runner.xcodeproj/project.pbxproj || true
+          fi
+          if [ -n "${{ inputs.server_url }}" ]; then
+            CLEAN_URL=$(echo "${{ inputs.server_url }}" | sed 's:/*$::')
+            sed -i '' "s|defaultBaseUrl = '[^']*'|defaultBaseUrl = '$CLEAN_URL'|g" lib/core/config/app_config.dart || true
+          fi
+          if [ -n "${{ inputs.primary_color }}" ]; then
+            HEX_VAL=$(echo "${{ inputs.primary_color }}" | tr -d '#' | tr '[:lower:]' '[:upper:]')
+            sed -i '' "s|Color primary = Color(0x[0-9A-Fa-f]*)|Color primary = Color(0xFF$HEX_VAL)|g" lib/core/config/theme.dart || true
+          fi
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build iOS release bundle (no codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package iOS Artifact
+        run: |
+          mkdir -p builder-output
+          cd build/ios/iphoneos && zip -r ../../../builder-output/app-builder-${{ inputs.build_id }}-ios.zip Runner.app
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-builder-${{ inputs.build_id }}-ios
+          path: builder-output/app-builder-${{ inputs.build_id }}-ios.zip
+          retention-days: 7
