@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <base href="$FLUTTER_BASE_HREF">
   <script>
     // Universal Directory & Subfolder Base Path Resolver
     (function () {
@@ -50,6 +51,7 @@
       --primary: #3b82f6;
       --primary-track: rgba(59, 130, 246, 0.18);
       --primary-shadow: rgba(59, 130, 246, 0.35);
+      --card-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
     }
 
     @media (prefers-color-scheme: light) {
@@ -62,6 +64,7 @@
         --primary: #2563eb;
         --primary-track: rgba(37, 99, 235, 0.14);
         --primary-shadow: rgba(37, 99, 235, 0.25);
+        --card-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
       }
     }
 
@@ -101,7 +104,7 @@
       border-radius: 20px;
       background-color: var(--card-bg);
       border: 1px solid var(--card-border);
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+      box-shadow: var(--card-shadow);
       max-width: 340px;
       width: 86%;
       text-align: center;

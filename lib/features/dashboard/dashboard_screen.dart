@@ -666,7 +666,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final id = _storeProvider?.current?.id;
     if (!mounted || id == _analyticsStoreId) return;
     _analyticsStoreId = id;
-    setState(() => _analyticsFuture = _loadAnalytics());
+    setState(() {
+      _analyticsFuture = _loadAnalytics();
+    });
     _loadDashboardChrome();
   }
 
@@ -1886,6 +1888,166 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildDrawerTopbarHeader(
+    BuildContext context, {
+    required CompanyModel? company,
+    required BootstrapCache bootstrap,
+    required StoreBranch? currentStore,
+    required double railWidth,
+  }) {
+    final storeTitle = (currentStore?.fullName.isNotEmpty == true
+            ? currentStore!.fullName
+            : currentStore?.name) ??
+        company?.tradeName ??
+        company?.name ??
+        bootstrap.tenant?.businessName ??
+        bootstrap.config['store_name']?.toString() ??
+        'Zoom Sales CRM & Inventory';
+    final logoUrl = company?.logoUrl ??
+        bootstrap.logoUrl ??
+        bootstrap.tenant?.logoUrl ??
+        bootstrap.config['logo_url']?.toString();
+
+    final badge = _resolveTenantBadge(company, bootstrap);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    if (railWidth < 180) {
+      return Container(
+        width: railWidth,
+        height: kToolbarHeight,
+        decoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(
+              color: theme.dividerColor,
+              width: 1,
+            ),
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: Tooltip(
+            message: storeTitle,
+            child: InkWell(
+              onTap: _openStoreSwitcher,
+              child: Center(
+                child: TenantLogoAvatar(
+                  logoUrl: logoUrl,
+                  tenantName: storeTitle,
+                  size: 32,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: railWidth,
+      height: kToolbarHeight,
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(
+            color: theme.dividerColor,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _openStoreSwitcher,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                TenantLogoAvatar(
+                  logoUrl: logoUrl,
+                  tenantName: storeTitle,
+                  size: 32,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              storeTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: theme.appBarTheme.foregroundColor ??
+                                    (isDark
+                                        ? Colors.white
+                                        : const Color(0xFF0F172A)),
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
+                          if (badge.isNotEmpty) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(
+                                  color: theme.colorScheme.primary
+                                      .withValues(alpha: 0.3),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                badge,
+                                style: TextStyle(
+                                  color: theme.colorScheme.primary,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        'Switch store',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildUserAccountMenu(BuildContext context, UserModel? user) {
     return ProfileMenuPopup(
       user: user,
@@ -2144,43 +2306,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
+    final extended = MediaQuery.sizeOf(context).width >= Breakpoints.desktop;
+    final isDesktopRail = railOnLeft && extended;
+    final railWidth = dockRailWidth(MediaQuery.sizeOf(context).width);
+
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        title: InkWell(
-          onTap: _openStoreSwitcher,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TenantLogoAvatar(
-                imageUrl: company?.logoUrl ?? bootstrap.logoUrl,
-                tenantName: company?.tradeName ?? company?.name,
-                size: 28,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  () {
-                    final rawHeaderStoreName =
-                        currentStore?.shortName.isNotEmpty == true
-                            ? currentStore!.shortName
-                            : (currentStore?.name ??
-                                company?.tradeName ??
-                                company?.name ??
-                                'Zoom Sales CRM & Inventory');
-                    return rawHeaderStoreName.length > 4
-                        ? rawHeaderStoreName.substring(0, 4)
-                        : rawHeaderStoreName;
-                  }(),
-                  overflow: TextOverflow.ellipsis,
+        leadingWidth: isDesktopRail ? railWidth : null,
+        automaticallyImplyLeading: !isDesktopRail,
+        leading: isDesktopRail
+            ? _buildDrawerTopbarHeader(
+                context,
+                company: company,
+                bootstrap: bootstrap,
+                currentStore: currentStore,
+                railWidth: railWidth,
+              )
+            : null,
+        title: isDesktopRail
+            ? null
+            : InkWell(
+                onTap: _openStoreSwitcher,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TenantLogoAvatar(
+                      imageUrl: company?.logoUrl ?? bootstrap.logoUrl,
+                      tenantName: company?.tradeName ?? company?.name,
+                      size: 28,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        () {
+                          final rawHeaderStoreName =
+                              currentStore?.shortName.isNotEmpty == true
+                                  ? currentStore!.shortName
+                                  : (currentStore?.name ??
+                                      company?.tradeName ??
+                                      company?.name ??
+                                      'Zoom Sales CRM & Inventory');
+                          return rawHeaderStoreName.length > 4
+                              ? rawHeaderStoreName.substring(0, 4)
+                              : rawHeaderStoreName;
+                        }(),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.keyboard_arrow_down, size: 18),
+                  ],
                 ),
               ),
-              const SizedBox(width: 2),
-              const Icon(Icons.keyboard_arrow_down, size: 18),
-            ],
-          ),
-        ),
         elevation: 0,
         bottom: appBarBottom,
         actions: [

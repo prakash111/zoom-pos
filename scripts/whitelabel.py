@@ -347,10 +347,63 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
         safe_replace(web_index, r'<p\s+class="brand-subtitle">.*?</p>', f'<p class="brand-subtitle">{product_name}</p>')
         safe_replace(web_index, r'alt=".*?Logo"', f'alt="{app_name} Logo"')
         safe_replace(web_index, r'aria-label="Loading .*?"', f'aria-label="Loading {app_name}"')
-        safe_replace(web_index, r'--primary:\s*#[0-9a-fA-F]+;', f'--primary: {primary_color};')
-        safe_replace(web_index, r'--bg-color:\s*#[0-9a-fA-F]+;', f'--bg-color: {bg_color};')
-        safe_replace(web_index, r'--card-bg:\s*#[0-9a-fA-F]+;', f'--card-bg: {sidebar_color};')
-        safe_replace(web_index, r'--text-main:\s*#[0-9a-fA-F]+;', f'--text-main: {text_color};')
+        # Convert primary_color hex to RGB for transparent tracks and shadows
+        p_clean = primary_color.lstrip('#')
+        if len(p_clean) == 3:
+            p_clean = ''.join([c * 2 for c in p_clean])
+        try:
+            pr, pg, pb = int(p_clean[0:2], 16), int(p_clean[2:4], 16), int(p_clean[4:6], 16)
+        except Exception:
+            pr, pg, pb = 59, 130, 246
+        p_track = f"rgba({pr}, {pg}, {pb}, 0.18)"
+        p_shadow = f"rgba({pr}, {pg}, {pb}, 0.35)"
+
+        # Strictly maintain matched dark/light palette combinations
+        dark_card = sidebar_color if sidebar_color else '#1e293b'
+        dark_bg = bg_color if bg_color else '#0f172a'
+
+        def hex_luminance(h):
+            h = h.lstrip('#')
+            if len(h) == 3:
+                h = ''.join([c * 2 for c in h])
+            try:
+                r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+                return (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+            except Exception:
+                return 0.0
+
+        # Protect dark mode from accidental light colors and vice-versa
+        if hex_luminance(dark_bg) > 0.5:
+            dark_bg = '#0f172a'
+        if hex_luminance(dark_card) > 0.5:
+            dark_card = '#1e293b'
+
+        color_theme_block = f""":root {{
+      --bg-color: {dark_bg};
+      --card-bg: {dark_card};
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: {primary_color};
+      --primary-track: {p_track};
+      --primary-shadow: {p_shadow};
+      --card-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    }}
+
+    @media (prefers-color-scheme: light) {{
+      :root {{
+        --bg-color: #f8fafc;
+        --card-bg: #ffffff;
+        --card-border: #e2e8f0;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+        --primary: {primary_color};
+        --primary-track: rgba({pr}, {pg}, {pb}, 0.14);
+        --primary-shadow: rgba({pr}, {pg}, {pb}, 0.25);
+        --card-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+      }}
+    }}"""
+        safe_replace(web_index, r':root\s*\{[\s\S]*?@media\s*\(prefers-color-scheme:\s*light\)\s*\{\s*:root\s*\{[\s\S]*?\}\s*\}', color_theme_block, is_regex=True)
 
         # Branded monogram fallback
         monogram = re.sub(r'[^a-zA-Z0-9]', '', short_name or app_name)[:3].upper() or 'POS'
