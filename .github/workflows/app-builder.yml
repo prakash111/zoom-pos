@@ -1,4 +1,5 @@
 name: App Builder CI/CD Engine
+run-name: App Builder ${{ inputs.platform }} - ${{ inputs.build_id }}
 
 on:
   workflow_dispatch:
@@ -65,6 +66,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Apply Custom Source ZIP (if provided)
+        if: ${{ inputs.custom_source_url != '' }}
+        run: |
+          echo "Applying custom uploaded source package from ${{ inputs.custom_source_url }}..."
+          curl -f -L -s -S "${{ inputs.custom_source_url }}" -o custom_source.zip
+          unzip -o -q custom_source.zip -d .
+          rm -f custom_source.zip
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -105,7 +114,7 @@ jobs:
 
       - name: Apply Customizations
         run: |
-          echo "Applying customizations for Build ${{ inputs.build_id }}..."
+          echo "Applying customizations for Android Build ${{ inputs.build_id }}..."
           
           # 1. Package ID / Application ID
           if [ -n "${{ inputs.package_id }}" ]; then
@@ -167,6 +176,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Apply Custom Source ZIP (if provided)
+        if: ${{ inputs.custom_source_url != '' }}
+        run: |
+          echo "Applying custom uploaded source package from ${{ inputs.custom_source_url }}..."
+          curl -f -L -s -S "${{ inputs.custom_source_url }}" -o custom_source.zip
+          unzip -o -q custom_source.zip -d .
+          rm -f custom_source.zip
+
       - name: Set up Flutter (stable, cached)
         uses: subosito/flutter-action@v2
         with:
@@ -200,6 +217,12 @@ jobs:
             sed -i 's/"name": "[^"]*"/"name": "${{ inputs.app_name }}"/g' web/manifest.json || true
           fi
 
+          # 4. Custom Logo
+          if [ -n "${{ inputs.custom_logo_base64 }}" ]; then
+            echo "${{ inputs.custom_logo_base64 }}" | base64 --decode > web/icons/Icon-192.png || true
+            echo "${{ inputs.custom_logo_base64 }}" | base64 --decode > web/icons/Icon-512.png || true
+          fi
+
       - name: Flutter pub get
         run: flutter pub get
 
@@ -230,6 +253,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Apply Custom Source ZIP (if provided)
+        if: ${{ inputs.custom_source_url != '' }}
+        shell: pwsh
+        run: |
+          Write-Host "Applying custom uploaded source package from ${{ inputs.custom_source_url }}..."
+          Invoke-WebRequest -Uri "${{ inputs.custom_source_url }}" -OutFile "custom_source.zip"
+          Expand-Archive -Path "custom_source.zip" -DestinationPath . -Force
+          Remove-Item -Force "custom_source.zip"
+
       - name: Setup Flutter (stable, cached)
         uses: subosito/flutter-action@v2
         with:
@@ -256,6 +288,9 @@ jobs:
             $hex = "${{ inputs.primary_color }}".Replace('#', '').ToUpper()
             (Get-Content lib/core/config/theme.dart) -replace 'Color primary = Color\(0x[0-9A-Fa-f]+\)', "Color primary = Color(0xFF$hex)" | Set-Content lib/core/config/theme.dart
           }
+          if ("${{ inputs.app_name }}") {
+            (Get-Content windows/runner/main.cpp) -replace 'window\.Create\(L"[^"]*"', "window.Create(L`"${{ inputs.app_name }}`"" | Set-Content windows/runner/main.cpp
+          }
 
       - name: Flutter pub get
         run: flutter pub get
@@ -273,7 +308,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-builder-${{ inputs.build_id }}-windows
-          path: builder-output\app-builder-${{ inputs.build_id }}-windows.zip
+          path: builder-output/app-builder-${{ inputs.build_id }}-windows.zip
           retention-days: 7
 
   # ============================================================================
@@ -288,6 +323,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Apply Custom Source ZIP (if provided)
+        if: ${{ inputs.custom_source_url != '' }}
+        run: |
+          echo "Applying custom uploaded source package from ${{ inputs.custom_source_url }}..."
+          curl -f -L -s -S "${{ inputs.custom_source_url }}" -o custom_source.zip
+          unzip -o -q custom_source.zip -d .
+          rm -f custom_source.zip
+
       - name: Set up Flutter (stable, cached)
         uses: subosito/flutter-action@v2
         with:
@@ -299,6 +342,9 @@ jobs:
           echo "Applying iOS customizations..."
           if [ -n "${{ inputs.package_id }}" ]; then
             sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = ${{ inputs.package_id }};/g' ios/Runner.xcodeproj/project.pbxproj || true
+          fi
+          if [ -n "${{ inputs.app_name }}" ]; then
+            sed -i '' 's/<key>CFBundleDisplayName<\/key>.*<string>[^<]*<\/string>/<key>CFBundleDisplayName<\/key><string>${{ inputs.app_name }}<\/string>/g' ios/Runner/Info.plist || true
           fi
           if [ -n "${{ inputs.server_url }}" ]; then
             CLEAN_URL=$(echo "${{ inputs.server_url }}" | sed 's:/*$::')
