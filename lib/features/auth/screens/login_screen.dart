@@ -12,6 +12,7 @@ import '../../settings/server_settings_screen.dart';
 import '../auth_provider.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_widgets.dart';
+import 'auth_gate.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 import 'verify_otp_screen.dart';
@@ -92,7 +93,15 @@ class _LoginScreenState extends State<LoginScreen> {
       accountId: _accountIdController.text.trim(),
     );
 
-    if (success || !mounted) return;
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthGate()),
+        (route) => false,
+      );
+      return;
+    }
 
     // Valid credentials, but the account never finished email verification —
     // route to the OTP screen instead of surfacing it as a sign-in error.
@@ -167,6 +176,17 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.watch<AuthProvider>();
     final l10n = AppLocalizations.of(context);
     final hasSocial = _googleEnabled || _facebookEnabled;
+
+    if (auth.status == AuthStatus.authenticated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const AuthGate()),
+            (route) => false,
+          );
+        }
+      });
+    }
 
     return AuthScaffold(
       // Logo + headline + description come from the Superadmin global

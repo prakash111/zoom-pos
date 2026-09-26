@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../auth_provider.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_widgets.dart';
+import 'auth_gate.dart';
 
 class VerifyOtpScreen extends StatefulWidget {
   const VerifyOtpScreen({
@@ -89,7 +90,10 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
             backgroundColor: _green,
           ),
         );
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthGate()),
+          (route) => false,
+        );
       } else if (auth.errorMessage != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(auth.errorMessage!)),
@@ -128,6 +132,17 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    if (auth.status == AuthStatus.authenticated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const AuthGate()),
+            (route) => false,
+          );
+        }
+      });
+    }
     return AuthScaffold(
       heading: 'Verify Your Email',
       headerIcon: Icons.mark_email_read_outlined,

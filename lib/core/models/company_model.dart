@@ -225,7 +225,11 @@ class CompanyModel {
     }
     if (storefrontUrl != null && storefrontUrl!.trim().isNotEmpty) {
       final su = storefrontUrl!.trim();
-      if (!su.contains('://saas.zoomnearby.com') && !su.endsWith('://saas.zoomnearby.com/')) {
+      final uri = Uri.tryParse(su);
+      final isGenericRoot = uri != null &&
+          (uri.path.isEmpty || uri.path == '/') &&
+          (uri.host == fallbackHost || uri.host == 'saas.zoomnearby.com');
+      if (!isGenericRoot) {
         return su;
       }
     }

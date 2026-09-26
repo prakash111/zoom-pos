@@ -10,6 +10,7 @@ import '../../../core/sdui/sdui_icon_registry.dart';
 import '../auth_provider.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_widgets.dart';
+import 'auth_gate.dart';
 import 'verify_otp_screen.dart';
 
 /// Curated ISO-4217 set for the sign-up currency picker — the codes a new
@@ -98,6 +99,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _storeNameController = TextEditingController();
   final _subdomainController = TextEditingController();
+  bool _enableDomainSetup = true;
 
   bool _userEditedSubdomain = false;
   bool? _subdomainAvailable;
@@ -127,6 +129,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _onStoreNameChanged() {
+    if (!_enableDomainSetup) {
+      final slug = _slugify(_storeNameController.text);
+      if (_subdomainController.text != slug) {
+        _subdomainController.text = slug;
+      }
+      setState(() {});
+      return;
+    }
     if (!_userEditedSubdomain) {
       final slug = _slugify(_storeNameController.text);
       if (_subdomainController.text != slug) {
@@ -205,6 +215,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     fetch().then((response) {
       if (!mounted) return;
+      if (response['enable_registration_domain_setup'] != null) {
+        setState(() {
+          _enableDomainSetup = response['enable_registration_domain_setup'] == true;
+        });
+      }
       final rawModes =
           response['registration_modes'] ?? response['active_modules'];
       if (rawModes is List && rawModes.isNotEmpty) {
@@ -332,7 +347,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthGate()),
+        (route) => false,
+      );
       return;
     }
 
@@ -345,6 +363,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final isLastStep = _step == 2;
+
+    if (auth.status == AuthStatus.authenticated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const AuthGate()),
+            (route) => false,
+          );
+        }
+      });
+    }
 
     return AuthScaffold(
       marketingHeader: true,
@@ -546,141 +575,126 @@ class _RegisterScreenState extends State<RegisterScreen> {
             validator: (value) =>
                 (value == null || value.trim().isEmpty) ? 'Required' : null,
           ),
-          const SizedBox(height: 16),
-          const AuthFieldLabel('Store Subdomain'),
-          TextFormField(
-            controller: _subdomainController,
-            textInputAction: TextInputAction.next,
-            decoration: authInputDecoration(
-              hint: 'e.g. my-store',
-              icon: Icons.link,
-              suffixIcon: Padding(
-                padding: const EdgeInsets.only(right: 12.0),
-                child: Center(
-                  widthFactor: 1.0,
-                  child: Text(
-                    '.saas.zoomnearby.com',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.5),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            onChanged: (val) {
-              _userEditedSubdomain = true;
-              if (val.trim().isNotEmpty) {
-                _checkSubdomain(val.trim());
-              } else {
-                setState(() {
-                  _subdomainAvailable = null;
-                  _subdomainStatusText = null;
-                });
-              }
-            },
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) return 'Required';
-              final clean = _slugify(value);
-              if (clean.length < 3) return 'At least 3 characters';
-              return null;
-            },
-          ),
-          if (_subdomainController.text.trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerHighest
-                    .withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: _subdomainAvailable == true
-                      ? Colors.green.withValues(alpha: 0.5)
-                      : (_subdomainAvailable == false
-                          ? Colors.red.withValues(alpha: 0.5)
-                          : Theme.of(context).dividerColor.withValues(alpha: 0.3)),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Text('🌐', style: TextStyle(fontSize: 14)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: RichText(
-                      overflow: TextOverflow.ellipsis,
-                      text: TextSpan(
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontFamily: 'monospace',
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                        children: [
-                          const TextSpan(
-                            text: 'https://',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                          TextSpan(
-                            text: _slugify(_subdomainController.text).isNotEmpty
-                                ? _slugify(_subdomainController.text)
-                                : 'your-store',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: _subdomainAvailable == true
-                                  ? Colors.green
-                                  : Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          const TextSpan(
-                            text: '.saas.zoomnearby.com',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ],
+          if (_enableDomainSetup) ...[
+            const SizedBox(height: 16),
+            const AuthFieldLabel('Store Subdomain'),
+            TextFormField(
+              controller: _subdomainController,
+              textInputAction: TextInputAction.next,
+              decoration: authInputDecoration(
+                hint: 'e.g. my-store',
+                icon: Icons.link,
+                suffixIcon: Padding(
+                  padding: const EdgeInsets.only(right: 12.0),
+                  child: Center(
+                    widthFactor: 1.0,
+                    child: Text(
+                      '.saas.zoomnearby.com',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.5),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
+              onChanged: (val) {
+                _userEditedSubdomain = true;
+                if (val.trim().isNotEmpty) {
+                  _checkSubdomain(val.trim());
+                } else {
+                  setState(() {
+                    _subdomainAvailable = null;
+                    _subdomainStatusText = null;
+                  });
+                }
+              },
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) return 'Required';
+                final clean = _slugify(value);
+                if (clean.length < 3) return 'At least 3 characters';
+                return null;
+              },
             ),
-          ],
-          if (_subdomainStatusText != null) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                if (_checkingSubdomain)
-                  const SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  Icon(
-                    _subdomainAvailable == true
-                        ? Icons.check_circle_outline
-                        : Icons.info_outline,
-                    size: 14,
+            if (_subdomainController.text.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest
+                      .withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
                     color: _subdomainAvailable == true
-                        ? Colors.green
+                        ? Colors.green.withValues(alpha: 0.5)
                         : (_subdomainAvailable == false
-                            ? Colors.red
-                            : Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.6)),
+                            ? Colors.red.withValues(alpha: 0.5)
+                            : Theme.of(context).dividerColor.withValues(alpha: 0.3)),
                   ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    _subdomainStatusText!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                ),
+                child: Row(
+                  children: [
+                    const Text('🌐', style: TextStyle(fontSize: 14)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: RichText(
+                        overflow: TextOverflow.ellipsis,
+                        text: TextSpan(
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontFamily: 'monospace',
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                          children: [
+                            const TextSpan(
+                              text: 'https://',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                            TextSpan(
+                              text: _slugify(_subdomainController.text).isNotEmpty
+                                  ? _slugify(_subdomainController.text)
+                                  : 'your-store',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: _subdomainAvailable == true
+                                    ? Colors.green
+                                    : Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                            const TextSpan(
+                              text: '.saas.zoomnearby.com',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (_subdomainStatusText != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  if (_checkingSubdomain)
+                    const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    Icon(
+                      _subdomainAvailable == true
+                          ? Icons.check_circle_outline
+                          : Icons.info_outline,
+                      size: 14,
                       color: _subdomainAvailable == true
                           ? Colors.green
                           : (_subdomainAvailable == false
@@ -688,11 +702,93 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               : Theme.of(context)
                                   .colorScheme
                                   .onSurface
-                                  .withValues(alpha: 0.7)),
+                                  .withValues(alpha: 0.6)),
+                    ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _subdomainStatusText!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: _subdomainAvailable == true
+                            ? Colors.green
+                            : (_subdomainAvailable == false
+                                ? Colors.red
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.7)),
+                      ),
                     ),
                   ),
+                ],
+              ),
+            ],
+          ] else ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest
+                    .withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.25),
                 ),
-              ],
+              ),
+              child: Row(
+                children: [
+                  const Text('🛍️', style: TextStyle(fontSize: 16)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Store Link (Sub-directory)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.6),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        RichText(
+                          overflow: TextOverflow.ellipsis,
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontFamily: 'monospace',
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                            children: [
+                              const TextSpan(
+                                text: 'https://saas.zoomnearby.com/',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                              TextSpan(
+                                text: _storeNameController.text.trim().isNotEmpty
+                                    ? _storeNameController.text.trim()
+                                    : 'your-store',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
           const SizedBox(height: 18),

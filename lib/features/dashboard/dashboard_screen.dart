@@ -898,6 +898,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final cd = customDomain.trim();
         return cd.startsWith('http') ? cd : 'https://$cd';
       }
+      final storefrontUrl = bootstrap.tenant?.storefrontUrl ??
+          bootstrap.config['storefront_url']?.toString();
+      if (storefrontUrl != null && storefrontUrl.trim().isNotEmpty) {
+        final su = storefrontUrl.trim();
+        final uri = Uri.tryParse(su);
+        final isRoot = uri != null &&
+            (uri.path.isEmpty || uri.path == '/') &&
+            (uri.host == centralHost || uri.host == 'saas.zoomnearby.com');
+        if (!isRoot) return su;
+      }
       final sub = bootstrap.tenant?.subdomain ??
           bootstrap.tenant?.slug ??
           bootstrap.config['subdomain']?.toString() ??

@@ -82,7 +82,7 @@ class _ServerSettingsScreenState extends State<ServerSettingsScreen> {
           title: 'Unauthorized Server',
           message: result['message'] ?? 'Your domain is not registered. You are not authorized to access. Buy a valid core script license to continue.',
           actionLabel: 'Buy License',
-          actionUrl: result['buy_url'] ?? 'https://zoomnearby.com/pricing',
+          actionUrl: result['buy_url'] ?? 'https://pos.zoomnearby.com/public/marketing',
         );
         return;
       }
