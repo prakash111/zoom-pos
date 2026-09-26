@@ -134,6 +134,8 @@ class TenantNavRegistry
                 $key = strtolower(trim((string) ($item['key'] ?? $item['id'] ?? '')));
                 $component = strtolower(trim((string) ($item['component'] ?? '')));
                 $target = strtolower(trim((string) ($item['target_endpoint'] ?? '')));
+                $title = strtolower(trim((string) ($item['title'] ?? $item['label'] ?? '')));
+
                 // Language switcher is relocated to profile menu popup
                 if (in_array($key, ['languages', 'language'], true) || str_contains($title, 'languages & translations') || str_contains($title, 'भाषाएँ और अनुवाद')) {
                     continue;
@@ -804,6 +806,7 @@ class TenantNavRegistry
             $decorated['component'] = $meta['component'] ?? $k;
             $decorated['target_endpoint'] = $meta['target_endpoint'] ?? ('/api/tenant/views/'.str_replace('_', '-', $k));
             $decorated['permission'] = $meta['permission'] ?? null;
+            $decorated['route'] = $meta['route'] ?? $node['route'] ?? $decorated['target_endpoint'] ?? null;
             if (isset($meta['is_external_url'])) {
                 $decorated['is_external_url'] = (bool) $meta['is_external_url'];
             }
@@ -1257,13 +1260,9 @@ class TenantNavRegistry
             'icon' => 'storefront',
             'component' => 'storefront_group',
             'type' => 'accordion',
-            'route' => null,
-            'target_endpoint' => null,
-            'action_type' => null,
-            'action' => null,
-            'url' => null,
-            'is_external_url' => false,
-            'is_external' => false,
+            'route' => '/settings/storefront',
+            'target_endpoint' => '/api/tenant/views/settings-storefront',
+            'action_type' => 'NAVIGATE_TO',
             'permission' => 'storefront.manage',
             'is_expandable' => true,
             'initially_expanded' => false,
@@ -1757,19 +1756,6 @@ class TenantNavRegistry
                 $itemType = $isAccordion ? 'accordion' : ($isExt ? 'external_link' : 'list_tile');
                 $actionType = $isExt ? 'OPEN_URL' : 'NAVIGATE_TO';
 
-                if ($isAccordion) {
-                    return array_merge($item, [
-                        'type' => 'accordion',
-                        'route' => null,
-                        'target_endpoint' => null,
-                        'action_type' => null,
-                        'action' => null,
-                        'url' => null,
-                        'is_external_url' => false,
-                        'is_external' => false,
-                    ]);
-                }
-
                 return array_merge($item, [
                     'type' => $itemType,
                     'route' => $route,
@@ -1788,6 +1774,21 @@ class TenantNavRegistry
             $firstItem = isset($items[0]) ? $asActionableItem($items[0]) : null;
             if ($firstItem !== null) {
                 $firstItem['type'] = 'list_tile';
+                if (empty($firstItem['action_type']) || empty($firstItem['route'])) {
+                    $fallbackRoute = ! empty($firstItem['target_endpoint'])
+                        ? $firstItem['target_endpoint']
+                        : (! empty($items[1]['route']) ? $items[1]['route'] : '/settings/storefront');
+                    $firstItem['route'] = $fallbackRoute;
+                    $firstItem['target_endpoint'] = $fallbackRoute;
+                    $firstItem['action_type'] = 'NAVIGATE_TO';
+                    $firstItem['action'] = [
+                        'type' => 'NAVIGATE_TO',
+                        'action_type' => 'NAVIGATE_TO',
+                        'route' => $fallbackRoute,
+                        'endpoint' => $fallbackRoute,
+                        'url' => $fallbackRoute,
+                    ];
+                }
                 $firstItem['style'] = array_merge([
                     'fontWeight' => 'bold',
                     'textColor' => $textColor,

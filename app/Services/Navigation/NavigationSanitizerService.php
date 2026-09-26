@@ -38,7 +38,15 @@ class NavigationSanitizerService
                 $section['sub_items'] = self::sanitizeItems($section['sub_items']);
             }
             if (isset($section['first_item']) && is_array($section['first_item'])) {
-                $section['first_item'] = self::sanitizeItem($section['first_item']);
+                $origFirst = $section['first_item'];
+                $sanitizedFirst = self::sanitizeItem($origFirst);
+                if (! empty($origFirst['action_type']) && empty($sanitizedFirst['action_type'])) {
+                    $sanitizedFirst['action_type'] = $origFirst['action_type'];
+                    $sanitizedFirst['route'] = $origFirst['route'] ?? null;
+                    $sanitizedFirst['target_endpoint'] = $origFirst['target_endpoint'] ?? null;
+                    $sanitizedFirst['action'] = $origFirst['action'] ?? null;
+                }
+                $section['first_item'] = $sanitizedFirst;
             }
 
             $sanitized[] = $section;
@@ -90,8 +98,22 @@ class NavigationSanitizerService
             $item['badge'] = (string) $item['badge'];
         }
 
-        if (($item['key'] ?? '') === 'nav_view_live_store') {
+        // If the item has child sub-menu items (accordion container),
+        // ensure the parent object does not send a default url or route
+        // so client apps do not execute navigation on parent tap.
+        if (! empty($item['children'])) {
+            $item['route'] = null;
+            $item['url'] = null;
+            $item['target_endpoint'] = null;
+            $item['action'] = null;
+            $item['action_type'] = null;
+            $item['is_external_url'] = false;
+            $item['is_external'] = false;
+        }
+
+        if (($item['key'] ?? '') === 'nav_view_live_store' || ($item['id'] ?? '') === 'view_live_store') {
             $item['is_external_url'] = true;
+            $item['is_external'] = true;
             $url = trim((string) ($item['url'] ?? ''));
             $centralHost = config('tenancy.central_domain')
                 ?: config('app.domain')
