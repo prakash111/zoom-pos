@@ -329,6 +329,15 @@ class _SalesScreenState extends State<SalesScreen> {
                   }
 
                   final sales = (snapshot.data ?? []).where((s) {
+                    if (_selectedFilter == 'overdue') {
+                      final now = DateTime.now();
+                      final today = DateTime(now.year, now.month, now.day);
+                      if (s.dueAmount <= 0) return false;
+                      if (s.paymentStatus.toLowerCase() == 'paid') return false;
+                      if (s.dueDate == null) return false;
+                      final d = DateTime(s.dueDate!.year, s.dueDate!.month, s.dueDate!.day);
+                      if (!d.isBefore(today)) return false;
+                    }
                     if (_query.isEmpty) return true;
                     if (s.saleNumber.toLowerCase().contains(_query) ||
                         (s.customerName ?? '').toLowerCase().contains(_query)) {

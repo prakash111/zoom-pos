@@ -135,6 +135,7 @@ void main() {
       expect(find.text('Last 7 Days'), findsOneWidget);
       expect(find.text('This Month'), findsOneWidget);
       expect(find.text('Quarter'), findsOneWidget);
+      expect(find.text('Custom'), findsOneWidget);
 
       // Tap "This Month"
       await tester.tap(find.text('This Month'));

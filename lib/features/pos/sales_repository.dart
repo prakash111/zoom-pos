@@ -105,10 +105,12 @@ class SalesRepository {
     switch (filter) {
       case 'overdue':
         result = result.where((s) {
+          if (s.dueAmount <= 0) return false;
+          if (s.paymentStatus.toLowerCase() == 'paid') return false;
           if (s.dueDate == null) return false;
           final d =
               DateTime(s.dueDate!.year, s.dueDate!.month, s.dueDate!.day);
-          return d.isBefore(today) && s.paymentStatus.toLowerCase() != 'paid';
+          return d.isBefore(today);
         }).toList();
         break;
       case 'due_today':

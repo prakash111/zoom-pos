@@ -577,9 +577,9 @@ void main() {
               icon: 'storefront',
             ),
             SduiNavItemSchema(
-              key: 'languages',
-              title: 'Languages & Translations',
-              icon: 'translate',
+              key: 'user_management',
+              title: 'Users & Roles',
+              icon: 'group',
             ),
             SduiNavItemSchema(
               key: 'staff',
@@ -622,7 +622,7 @@ void main() {
             visible: true,
           ),
           const NavItemConfig(
-            key: 'languages',
+            key: 'user_management',
             section: 'administration',
             level: 0,
             order: 1,
@@ -631,7 +631,7 @@ void main() {
           const NavItemConfig(
             key: 'staff',
             section: 'administration',
-            parent: 'languages',
+            parent: 'user_management',
             level: 1,
             order: 2,
             visible: true,
@@ -639,7 +639,7 @@ void main() {
           const NavItemConfig(
             key: 'roles',
             section: 'administration',
-            parent: 'languages',
+            parent: 'user_management',
             level: 1,
             order: 3,
             visible: true,
@@ -681,21 +681,24 @@ void main() {
       expect(find.byKey(const ValueKey('drawer-expand-settings_profile')),
           findsNothing);
 
-      // Languages & Translations, Devices, Hardware Printer, Change Password are all visible at root level
+      // Languages & Translations is removed from drawer
+      expect(find.byKey(const ValueKey('drawer-item-languages')), findsNothing);
+
+      // User Management, Devices, Hardware Printer, Change Password are all visible at root level
       expect(
-          find.byKey(const ValueKey('drawer-item-languages')), findsOneWidget);
+          find.byKey(const ValueKey('drawer-item-user_management')), findsOneWidget);
       expect(find.byKey(const ValueKey('drawer-item-devices')), findsOneWidget);
       expect(find.byKey(const ValueKey('drawer-item-hardware_printer')),
           findsOneWidget);
       expect(find.byKey(const ValueKey('drawer-item-change_password')),
           findsOneWidget);
 
-      // Sub-items of languages (staff, roles) are not visible until languages is expanded
+      // Sub-items of user_management (staff, roles) are not visible until user_management is expanded
       expect(find.byKey(const ValueKey('drawer-item-staff')), findsNothing);
       expect(find.byKey(const ValueKey('drawer-item-roles')), findsNothing);
 
-      // Expand languages
-      await tester.tap(find.byKey(const ValueKey('drawer-expand-languages')));
+      // Expand user_management
+      await tester.tap(find.byKey(const ValueKey('drawer-expand-user_management')));
       await tester.pumpAndSettle();
 
       // Now staff and roles appear

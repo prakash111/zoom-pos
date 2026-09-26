@@ -25,6 +25,28 @@ class DrawerItemParser {
     return result;
   }
 
+  /// Returns true if an item is a language switcher item that should be excluded from drawer.
+  static bool isLanguageItem(dynamic item) {
+    if (item == null) return false;
+    final key = (item is Map
+            ? item['key'] ?? item['id']
+            : (item is NavItem ? item.key : ''))
+        .toString()
+        .toLowerCase();
+    final title = (item is Map
+            ? item['title'] ?? item['custom_title'] ?? item['label']
+            : (item is NavItem ? item.title : ''))
+        .toString()
+        .toLowerCase();
+    return key == 'languages' ||
+        key == 'language' ||
+        key == 'lang' ||
+        title.contains('languages & translations') ||
+        title.contains('भाषाएँ और अनुवाद') ||
+        title.contains('भाषा और अनुवाद') ||
+        title.contains('languages and translations');
+  }
+
   /// Returns true if the menu item payload contains a non-empty children list.
   static bool hasChildren(Map<String, dynamic> item) {
     final children = item['children'];
@@ -405,17 +427,18 @@ class AppDrawer extends StatelessWidget {
                           ),
                         ),
                       for (final item in section.items)
-                        DrawerItemParser.buildDrawerMenuItem(
-                          context,
-                          item.toJson(),
-                          activeColor: activeColor,
-                          isSelected: item.key == selectedKey,
-                          onTap: () => onItemTap?.call(item),
-                          onChildTap: (childMap) {
-                            final childItem = NavItem.fromJson(childMap);
-                            onItemTap?.call(childItem);
-                          },
-                        ),
+                        if (!DrawerItemParser.isLanguageItem(item))
+                          DrawerItemParser.buildDrawerMenuItem(
+                            context,
+                            item.toJson(),
+                            activeColor: activeColor,
+                            isSelected: item.key == selectedKey,
+                            onTap: () => onItemTap?.call(item),
+                            onChildTap: (childMap) {
+                              final childItem = NavItem.fromJson(childMap);
+                              onItemTap?.call(childItem);
+                            },
+                          ),
                     ],
                 ],
               ),

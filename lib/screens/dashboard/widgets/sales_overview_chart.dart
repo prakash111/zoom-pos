@@ -27,6 +27,19 @@ class SalesOverviewChart extends StatefulWidget {
 class _SalesOverviewChartState extends State<SalesOverviewChart> {
   late String _selectedPeriod;
 
+  DateTimeRange? _customDateRange;
+
+  String get _customLabel {
+    if (_customDateRange != null) {
+      final start = _customDateRange!.start;
+      final end = _customDateRange!.end;
+      final s = '${start.day.toString().padLeft(2, '0')}/${start.month.toString().padLeft(2, '0')}';
+      final e = '${end.day.toString().padLeft(2, '0')}/${end.month.toString().padLeft(2, '0')}';
+      return '$s - $e';
+    }
+    return 'Custom';
+  }
+
   static const List<Map<String, String>> _periods = [
     {'label': 'Last 7 Days', 'key': 'last_7_days'},
     {'label': 'This Month', 'key': 'this_month'},
@@ -48,7 +61,55 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
     });
   }
 
+  Future<void> _pickCustomDateRange() async {
+    final now = DateTime.now();
+    final initialRange = _customDateRange ??
+        DateTimeRange(
+          start: now.subtract(const Duration(days: 7)),
+          end: now,
+        );
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 2),
+      initialDateRange: initialRange,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context),
+          child: child ?? const SizedBox(),
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _customDateRange = picked;
+        _selectedPeriod = 'custom';
+      });
+
+      final currentStoreId = widget.storeId ??
+          context.read<StoreProvider?>()?.current?.id;
+      final startDateStr = picked.start.toIso8601String().split('T').first;
+      final endDateStr = picked.end.toIso8601String().split('T').first;
+
+      context.read<DashboardProvider>().fetchSalesOverview(
+            period: 'custom',
+            storeId: currentStoreId,
+            startDate: startDateStr,
+            endDate: endDateStr,
+          );
+
+      widget.onPeriodChanged?.call('custom');
+    }
+  }
+
   void _handlePeriodSelected(String periodKey) {
+    if (periodKey == 'custom') {
+      _pickCustomDateRange();
+      return;
+    }
+
     setState(() {
       _selectedPeriod = periodKey;
     });
@@ -150,14 +211,22 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: _periods.map((p) {
-                    return _buildFilterPill(
-                      label: p['label']!,
-                      periodKey: p['key']!,
-                      isSelected: activeRange == p['key'],
+                  children: [
+                    ..._periods.map((p) {
+                      return _buildFilterPill(
+                        label: p['label']!,
+                        periodKey: p['key']!,
+                        isSelected: activeRange == p['key'],
+                        isDark: isDark,
+                      );
+                    }),
+                    _buildFilterPill(
+                      label: _customLabel,
+                      periodKey: 'custom',
+                      isSelected: activeRange == 'custom',
                       isDark: isDark,
-                    );
-                  }).toList(),
+                    ),
+                  ],
                 ),
               );
 

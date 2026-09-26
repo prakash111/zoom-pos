@@ -22,12 +22,15 @@ class DashboardProvider extends ChangeNotifier {
   bool isLoading = false;
   String? error;
 
-  /// Fetches sales overview series and metrics filtered by [period] and [storeId].
+  /// Fetches sales overview series and metrics filtered by [period], [storeId],
+  /// and optional [startDate] and [endDate] for custom date ranges.
   ///
-  /// Valid periods: 'last_7_days', 'this_month', 'quarter'.
+  /// Valid periods: 'last_7_days', 'this_month', 'quarter', 'custom'.
   Future<void> fetchSalesOverview({
     required String period,
     int? storeId,
+    String? startDate,
+    String? endDate,
   }) async {
     currentPeriod = period;
     currentStoreId = storeId;
@@ -42,6 +45,14 @@ class DashboardProvider extends ChangeNotifier {
       if (storeId != null) {
         queryParams['store_id'] = storeId.toString();
       }
+      if (startDate != null && startDate.isNotEmpty) {
+        queryParams['startDate'] = startDate;
+        queryParams['start_date'] = startDate;
+      }
+      if (endDate != null && endDate.isNotEmpty) {
+        queryParams['endDate'] = endDate;
+        queryParams['end_date'] = endDate;
+      }
 
       final response = await _api.getAbsolute(
         '/api/v1/dashboard/sales-chart',
@@ -55,7 +66,7 @@ class DashboardProvider extends ChangeNotifier {
             .toList();
 
         salesOverview = SalesOverviewData(
-          ranges: const ['last_7_days', 'this_month', 'quarter'],
+          ranges: const ['last_7_days', 'this_month', 'quarter', 'custom'],
           currentRange: period,
           series: rawSeries,
         );

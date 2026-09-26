@@ -10,7 +10,20 @@ class SalesProvider extends ChangeNotifier {
   final SalesRepository _repository;
 
   List<SaleModel> _sales = [];
-  List<SaleModel> get sales => _sales;
+  List<SaleModel> get sales {
+    if (_filter == 'overdue') {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      return _sales.where((s) {
+        if (s.dueAmount <= 0) return false;
+        if (s.paymentStatus.toLowerCase() == 'paid') return false;
+        if (s.dueDate == null) return false;
+        final d = DateTime(s.dueDate!.year, s.dueDate!.month, s.dueDate!.day);
+        return d.isBefore(today);
+      }).toList();
+    }
+    return _sales;
+  }
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -52,13 +65,27 @@ class SalesProvider extends ChangeNotifier {
     if (notify) notifyListeners();
 
     try {
-      _sales = await _repository.fetchSales(
+      final fetched = await _repository.fetchSales(
         query: _query,
         filter: _filter,
         startDate: _startDate,
         endDate: _endDate,
         storeId: _storeId,
       );
+
+      if (_filter == 'overdue') {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        _sales = fetched.where((s) {
+          if (s.dueAmount <= 0) return false;
+          if (s.paymentStatus.toLowerCase() == 'paid') return false;
+          if (s.dueDate == null) return false;
+          final d = DateTime(s.dueDate!.year, s.dueDate!.month, s.dueDate!.day);
+          return d.isBefore(today);
+        }).toList();
+      } else {
+        _sales = fetched;
+      }
     } catch (e) {
       _error = e.toString();
     } finally {

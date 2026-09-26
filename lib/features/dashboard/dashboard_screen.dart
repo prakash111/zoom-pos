@@ -25,7 +25,6 @@ import '../../core/sdui/sdui_component_registry.dart';
 import '../../core/sdui/sdui_icon_registry.dart';
 import '../../core/services/dynamic_string_service.dart';
 import '../../core/services/sync/sync_status_badge.dart';
-import '../../core/storage/app_preferences.dart';
 import '../../core/stores/store_provider.dart';
 import '../../core/providers/dashboard_provider.dart';
 import '../../core/utils/currency_formatter.dart';
@@ -44,10 +43,9 @@ import '../auth/auth_provider.dart';
 import '../navigation/presentation/widgets/app_drawer.dart';
 import '../sales/screens/sales_screen.dart';
 import '../stores/store_switcher_sheet.dart';
-import '../settings/screens/app_preferences_screen.dart';
 import '../settings/screens/change_password_screen.dart';
-import '../settings/server_settings_screen.dart';
 import '../settings/settings_repository.dart';
+import '../../screens/dashboard/widgets/profile_menu_popup.dart';
 
 const int _maximumNavigationDepth = 2;
 
@@ -159,6 +157,16 @@ List<_NavSection> _serverDrivenSections() {
             }
             if (!seenKeys.add(item.key)) continue;
 
+            // Relocate Language Switcher: remove from sidebar navigation drawer
+            if (item.key == 'languages' ||
+                item.key == 'language' ||
+                item.key == 'languages_translations' ||
+                item.title.toLowerCase().contains('languages & translations') ||
+                item.title.contains('भाषाएँ और अनुवाद') ||
+                item.title.contains('भाषा और अनुवाद')) {
+              continue;
+            }
+
             // Lead Management is a separate vertical module (lead_ops) and must NEVER be inside cashier_sales
             if (section.key == 'cashier_sales' &&
                 (item.key == 'lead_management' ||
@@ -265,6 +273,14 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
     for (var index = 0; index < section.tiles.length; index++) {
       final tile = section.tiles[index];
       if (!tile.visibleTo(user)) continue;
+
+      // Relocate Language Switcher: remove from sidebar navigation drawer
+      if (tile.key == 'languages' ||
+          tile.key == 'language' ||
+          tile.key == 'languages_translations' ||
+          tile.key.contains('languages')) {
+        continue;
+      }
 
       final override = itemOverrides[tile.key];
       if (override != null && !override.visible) continue;
@@ -1777,7 +1793,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
-    final user = auth.user;
     final colorScheme = Theme.of(context).colorScheme;
 
     // Width is owned by the enclosing [DockRailSlot] (viewport-clamped);
@@ -1858,159 +1873,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildUserAccountMenu(BuildContext context, UserModel? user) {
-    final initials = (user?.name ?? '')
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .take(2)
-        .map((part) => part[0])
-        .join()
-        .toUpperCase();
-
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final l10n = AppLocalizations.of(context);
-
-    return PopupMenuButton<String>(
-      tooltip: 'Account & Settings',
-      offset: const Offset(0, 48),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      icon: CircleAvatar(
-        radius: 16,
-        backgroundColor: colorScheme.primaryContainer,
-        child: Text(
-          initials.isNotEmpty ? initials : 'U',
-          style: TextStyle(
-            color: colorScheme.onPrimaryContainer,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      onSelected: (value) {
-        switch (value) {
-          case 'preferences':
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AppPreferencesScreen()),
-            );
-            break;
-          case 'change_password':
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
-            );
-            break;
-          case 'server':
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ServerSettingsScreen(
-                  preferences: context.read<AppPreferences>(),
-                ),
-              ),
-            );
-            break;
-          case 'logout':
-            _confirmLogout(context);
-            break;
-        }
-      },
-      itemBuilder: (context) => [
-        if (user != null) ...[
-          PopupMenuItem<String>(
-            enabled: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  user.name,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  user.email,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (user.role.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        user.role.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const PopupMenuDivider(),
-        ],
-        const PopupMenuItem<String>(
-          value: 'preferences',
-          child: Row(
-            children: [
-              Icon(Icons.tune, size: 20),
-              SizedBox(width: 12),
-              Text('Preferences'),
-            ],
-          ),
-        ),
-        const PopupMenuItem<String>(
-          value: 'change_password',
-          child: Row(
-            children: [
-              Icon(Icons.lock_outline, size: 20),
-              SizedBox(width: 12),
-              Text('Change Password'),
-            ],
-          ),
-        ),
-        PopupMenuItem<String>(
-          value: 'server',
-          child: Row(
-            children: [
-              const Icon(Icons.dns_outlined, size: 20),
-              const SizedBox(width: 12),
-              Text(l10n.serverAddress),
-            ],
-          ),
-        ),
-        const PopupMenuDivider(),
-        const PopupMenuItem<String>(
-          value: 'logout',
-          child: Row(
-            children: [
-              Icon(Icons.logout, color: Color(0xFFEF4444), size: 20),
-              SizedBox(width: 12),
-              Text(
-                'Log Out',
-                style: TextStyle(
-                  color: Color(0xFFEF4444),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+    return ProfileMenuPopup(
+      user: user,
+      onLogout: () => _confirmLogout(context),
     );
   }
 
@@ -2298,7 +2163,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         bottom: appBarBottom,
         actions: [
           const SyncStatusBadge(),
-          const _ThemeModeButton(),
           IconButton(
             tooltip: l10n.refresh,
             icon: const Icon(Icons.refresh),
@@ -2771,52 +2635,6 @@ class _DashboardAnalytics extends StatelessWidget {
   }
 }
 
-/// Header toggle for the app-wide light / dark / system theme, mirroring the
-/// same control in Settings ▸ Appearance so it's reachable from anywhere.
-class _ThemeModeButton extends StatelessWidget {
-  const _ThemeModeButton();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.watch<ThemeProvider>();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return PopupMenuButton<ThemeMode>(
-      tooltip: 'Theme',
-      icon: Icon(isDark ? Icons.dark_mode : Icons.light_mode),
-      initialValue: theme.themeMode,
-      onSelected: theme.setThemeMode,
-      itemBuilder: (context) => const [
-        PopupMenuItem(
-          value: ThemeMode.system,
-          child: ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.brightness_auto_outlined),
-            title: Text('Match device'),
-          ),
-        ),
-        PopupMenuItem(
-          value: ThemeMode.light,
-          child: ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.light_mode_outlined),
-            title: Text('Light'),
-          ),
-        ),
-        PopupMenuItem(
-          value: ThemeMode.dark,
-          child: ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.dark_mode_outlined),
-            title: Text('Dark'),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 /// Actionable quick-launch shortcuts across the top of the dashboard — each
 /// pushes straight into its module. Restaurant-only shortcuts (Pending KOTs,
