@@ -434,8 +434,13 @@ class DashboardController extends Controller
         $tz = method_exists($company, 'resolveTimezone') ? $company->resolveTimezone() : ($company->timezone ?: 'UTC');
         $now = Carbon::now($tz);
 
+        $startDateInput = $request->input('startDate') ?? $request->input('start_date');
+        $endDateInput = $request->input('endDate') ?? $request->input('end_date');
+
         $period = (string) ($request->input('period') ?? $request->input('range') ?? 'last_7_days');
-        if (! in_array($period, ['last_7_days', 'this_month', 'quarter'], true)) {
+        if ($startDateInput && $endDateInput) {
+            $period = 'custom';
+        } elseif (! in_array($period, ['last_7_days', 'this_month', 'quarter', 'custom'], true)) {
             $period = 'last_7_days';
         }
 
@@ -456,7 +461,42 @@ class DashboardController extends Controller
         $totalSales = 0.0;
         $totalOrders = 0;
 
-        if ($period === 'this_month') {
+        if ($period === 'custom') {
+            $customStart = $startDateInput ? Carbon::parse($startDateInput, $tz)->startOfDay() : (clone $now)->subDays(6)->startOfDay();
+            $customEnd = $endDateInput ? Carbon::parse($endDateInput, $tz)->endOfDay() : (clone $now)->endOfDay();
+
+            if ($customStart->gt($customEnd)) {
+                $temp = clone $customStart;
+                $customStart = clone $customEnd;
+                $customEnd = $temp;
+            }
+
+            $customSalesGrouped = (clone $salesBase)
+                ->whereBetween('created_at', [$customStart, $customEnd])
+                ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'), DB::raw('COUNT(*) as c'))
+                ->groupBy('d')
+                ->get()
+                ->keyBy('d');
+
+            $cursor = (clone $customStart);
+            while ($cursor->lte($customEnd)) {
+                $d = $cursor->format('Y-m-d');
+                $row = $customSalesGrouped->get($d);
+                $amt = $row ? (float) $row->t : 0.0;
+                $cnt = $row ? (int) $row->c : 0;
+                $totalSales += $amt;
+                $totalOrders += $cnt;
+
+                $overviewSeries[] = [
+                    'date' => $d,
+                    'label' => $cursor->format('j M'),
+                    'day' => $cursor->format('D'),
+                    'amount' => round($amt, 2),
+                    'orders' => $cnt,
+                ];
+                $cursor->addDay();
+            }
+        } elseif ($period === 'this_month') {
             // this_month: startOfMonth() to endOfMonth()
             $monthStart = (clone $now)->startOfMonth();
             $monthEnd = (clone $now)->endOfMonth();

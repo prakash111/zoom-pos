@@ -134,7 +134,10 @@ class TenantNavRegistry
                 $key = strtolower(trim((string) ($item['key'] ?? $item['id'] ?? '')));
                 $component = strtolower(trim((string) ($item['component'] ?? '')));
                 $target = strtolower(trim((string) ($item['target_endpoint'] ?? '')));
-                $title = strtolower(trim((string) ($item['title'] ?? $item['label'] ?? '')));
+                // Language switcher is relocated to profile menu popup
+                if (in_array($key, ['languages', 'language'], true) || str_contains($title, 'languages & translations') || str_contains($title, 'भाषाएँ और अनुवाद')) {
+                    continue;
+                }
 
                 // Core commerce actions on root links are always flat siblings.
                 if (in_array($key, ['pos', 'pharmacy_pos', 'salon_pos', 'restaurant_pos', 'consignments'], true)) {
@@ -1254,9 +1257,13 @@ class TenantNavRegistry
             'icon' => 'storefront',
             'component' => 'storefront_group',
             'type' => 'accordion',
-            'route' => '/settings/storefront',
-            'target_endpoint' => '/api/tenant/views/settings-storefront',
-            'action_type' => 'NAVIGATE_TO',
+            'route' => null,
+            'target_endpoint' => null,
+            'action_type' => null,
+            'action' => null,
+            'url' => null,
+            'is_external_url' => false,
+            'is_external' => false,
             'permission' => 'storefront.manage',
             'is_expandable' => true,
             'initially_expanded' => false,
@@ -1749,6 +1756,19 @@ class TenantNavRegistry
                 $isAccordion = (($item['type'] ?? '') === 'accordion' || ! empty($item['children']));
                 $itemType = $isAccordion ? 'accordion' : ($isExt ? 'external_link' : 'list_tile');
                 $actionType = $isExt ? 'OPEN_URL' : 'NAVIGATE_TO';
+
+                if ($isAccordion) {
+                    return array_merge($item, [
+                        'type' => 'accordion',
+                        'route' => null,
+                        'target_endpoint' => null,
+                        'action_type' => null,
+                        'action' => null,
+                        'url' => null,
+                        'is_external_url' => false,
+                        'is_external' => false,
+                    ]);
+                }
 
                 return array_merge($item, [
                     'type' => $itemType,
@@ -2510,11 +2530,19 @@ class TenantNavRegistry
                 ['key' => 'subscription', 'label' => 'Subscription & Billing', 'title' => 'Subscription & Billing', 'icon' => 'workspace_premium', 'component' => 'subscription', 'type' => 'link', 'permission' => null],
                 [
                     'key' => 'settings',
+                    'id' => 'settings',
                     'label' => 'Store Settings',
                     'title' => 'Store Settings',
                     'icon' => 'settings',
                     'component' => 'settings',
                     'type' => 'accordion',
+                    'route' => null,
+                    'target_endpoint' => null,
+                    'action_type' => null,
+                    'action' => null,
+                    'url' => null,
+                    'is_external_url' => false,
+                    'is_external' => false,
                     'permission' => 'settings',
                     'children' => $tabs,
                 ],
@@ -2522,7 +2550,6 @@ class TenantNavRegistry
                 // older clients. Current SDUI clients de-duplicate by key and
                 // use the canonical children tree above for drawer rendering.
                 ...$tabs,
-                ['key' => 'languages', 'label' => 'Languages & Translations', 'title' => 'Languages & Translations', 'icon' => 'translate', 'component' => 'languages', 'type' => 'link', 'permission' => 'settings'],
                 ['key' => 'staff', 'label' => 'Users & Permissions', 'title' => 'Users & Permissions', 'icon' => 'badge', 'component' => 'staff', 'type' => 'link', 'permission' => 'users'],
                 ['key' => 'roles', 'label' => 'Roles & Access Levels', 'title' => 'Roles & Access Levels', 'icon' => 'admin_panel_settings', 'component' => 'roles', 'type' => 'link', 'permission' => 'users', 'target_endpoint' => '/api/tenant/views/roles'],
                 ['key' => 'devices', 'label' => 'Terminals & Devices', 'title' => 'Terminals & Devices', 'icon' => 'devices_other', 'component' => 'devices', 'type' => 'link', 'permission' => null],

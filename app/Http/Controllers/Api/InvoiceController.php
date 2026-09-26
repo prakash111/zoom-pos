@@ -79,14 +79,10 @@ class InvoiceController extends Controller
         $status = $request->get('status');
         $filter = $request->get('filter');
 
-        if ($filter === 'overdue') {
-            // Returns all unpaid dues with overdue placed first (Flutter filter chip)
-            $query->where(function ($q) {
-                $q->whereIn('payment_status', ['unpaid', 'partial', 'pending'])
-                    ->orWhere('due_amount', '>', 0);
-            });
-        } elseif ($status === 'overdue') {
-            $query->where('payment_status', '!=', 'paid')
+        if ($filter === 'overdue' || $status === 'overdue') {
+            $query->where('due_amount', '>', 0)
+                ->where('payment_status', '!=', 'paid')
+                ->whereNotNull('due_date')
                 ->whereDate('due_date', '<', $today);
         } elseif ($status === 'due_today' || $filter === 'due_today') {
             $query->where('payment_status', '!=', 'paid')

@@ -92,15 +92,26 @@ class SalesEndpointFilterTest extends TestCase
             'created_at' => $today,
         ]);
 
-        // 5. Test Filter: overdue (returns all unpaid dues with overdue placed first)
+        // 4b. Paid Past-Due Sale (should be strictly excluded from overdue)
+        Sale::withoutGlobalScopes()->create([
+            'company_id' => $company->id,
+            'store_id' => $store->id,
+            'sale_number' => 'SALE-PAID-PAST-DUE',
+            'total' => 250.00,
+            'paid_amount' => 250.00,
+            'due_amount' => 0.00,
+            'due_date' => (clone $today)->subDays(5)->toDateString(),
+            'payment_status' => 'paid',
+            'status' => 'completed',
+            'created_at' => (clone $today)->subDays(10),
+        ]);
+
+        // 5. Test Filter: overdue (strictly requires due_amount > 0, payment_status != 'paid', and past due_date)
         $resOverdue = $this->actingAs($user, 'sanctum')->getJson('/api/v1/tenant/sales?filter=overdue');
         $resOverdue->assertStatus(200);
         $dataOverdue = $resOverdue->json('data');
-        $this->assertCount(4, $dataOverdue);
+        $this->assertCount(1, $dataOverdue);
         $this->assertEquals('SALE-OVERDUE', $dataOverdue[0]['sale_number']);
-        $this->assertEquals('SALE-TODAY', $dataOverdue[1]['sale_number']);
-        $this->assertEquals('SALE-DUE-5D', $dataOverdue[2]['sale_number']);
-        $this->assertEquals('SALE-DUE-12D', $dataOverdue[3]['sale_number']);
 
         // 6. Test Filter: due_today
         $resToday = $this->actingAs($user, 'sanctum')->getJson('/api/v1/tenant/sales?filter=due_today');

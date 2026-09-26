@@ -977,8 +977,6 @@
                                 </div>
                             @endif
 
-                            <x-nav.drawer-link item-key="languages" :route="route('tenant.languages.index')" dot="emerald" :title="__('Languages & Translations')" :badge="__('Multi-Lang')" badge-color="emerald" />
-
                             @if ($canUsers)
                                 <x-nav.drawer-link item-key="staff" :route="route('tenant.users.index')" :title="__('Users & Permissions')" />
                             @endif
@@ -1235,10 +1233,17 @@
                 </button>
 
                 <div class="mt-auto border-t border-slate-200 dark:border-slate-800 p-3 flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <div class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-bold text-xs flex-shrink-0 border border-slate-200 dark:border-slate-700">
-                            {{ strtoupper(substr(auth()->user()?->name ?? 'U', 0, 2)) }}
-                        </div>
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                        <!-- ONLY the profile avatar/button carries this onclick -->
+                        <button type="button" 
+                                onclick="openChangePasswordModal(event)"
+                                class="flex items-center gap-2 p-0.5 rounded-full hover:ring-2 hover:ring-emerald-500/40 transition focus:outline-none flex-shrink-0 cursor-pointer"
+                                title="{{ __('Change Password') }}"
+                                aria-label="{{ __('Change Password') }}">
+                            <div class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs uppercase shadow flex-shrink-0">
+                                {{ substr(auth()->user()?->name ?? 'Z', 0, 1) }}
+                            </div>
+                        </button>
                         <div class="text-xs min-w-0 flex-1">
                             <p class="font-bold text-slate-800 dark:text-slate-200 truncate leading-tight">{{ auth()->user()?->name }}</p>
                             <p class="text-slate-400 truncate leading-normal">{{ auth()->user()?->email }}</p>
@@ -1279,7 +1284,7 @@
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] sm:text-xs font-black bg-white/20 text-white tracking-wide uppercase">Demo Workspace</span>
                         <span>{{ __('Exploring demo store with sample inventory and transactions.') }}</span>
                     </div>
-                    <a href="https://web.zoomnearby.com/demo" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white hover:bg-amber-50 text-amber-900 font-extrabold text-xs shadow transition active:scale-95">
+                    <a href="https://saas.zoomnearby.com/pos-web/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white hover:bg-amber-50 text-amber-900 font-extrabold text-xs shadow transition active:scale-95">
                         <span>🚀</span>
                         <span>{{ __('Try Flutter Web Version (Live POS Demo)') }}</span>
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
@@ -1434,16 +1439,22 @@
                         </span>
                     </button>
 
-                    <!-- User identity; sign-out is intentionally in the drawer footer. -->
+                    <!-- User identity & Change Password Trigger -->
                     <div class="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
-                        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-black text-xs flex items-center justify-center shadow-sm">
-                            {{ substr(auth()->user()?->name ?? 'U', 0, 1) }}
-                        </div>
+                        <!-- ONLY the profile avatar/button carries this onclick -->
+                        <button type="button" 
+                                onclick="openChangePasswordModal(event)"
+                                class="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-emerald-500/40 transition focus:outline-none cursor-pointer"
+                                title="{{ __('Change Password') }}"
+                                aria-label="{{ __('Change Password') }}">
+                            <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs uppercase shadow">
+                                {{ substr(auth()->user()?->name ?? 'Z', 0, 1) }}
+                            </div>
+                        </button>
                         <div class="hidden sm:block text-left">
                             <div class="text-xs font-bold text-slate-800 dark:text-slate-200 leading-none">{{ auth()->user()?->name }}</div>
                             <div class="text-[10px] text-slate-400 capitalize mt-0.5">{{ auth()->user()?->role }}</div>
                         </div>
-
                     </div>
                 </div>
             </header>
@@ -1467,6 +1478,9 @@
 
     <!-- Shared invoice and quotation preview modal -->
     @include('layouts.partials.document-print-preview-modal')
+
+    <!-- Account Password Change Modal -->
+    @include('tenant.partials.change-password-modal')
 
     <!-- Shared Server-Driven UI renderer for notifications and document dispatch. -->
     @include('layouts.partials.sdui-bottom-sheet')
