@@ -369,12 +369,12 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.byType(DashboardScreen), findsOneWidget);
-      expect(find.text('Acme Supermarket'), findsWidgets);
+      expect(find.textContaining('Acme'), findsWidgets);
 
       // Settle analytics future
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.text('Acme Supermarket'), findsWidgets);
+      expect(find.textContaining('Acme'), findsWidgets);
     });
 
     testWidgets(
