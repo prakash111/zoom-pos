@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use App\Http\Resources\Tenant\StoreResource;
 
 class StoreController extends Controller
 {
@@ -49,22 +50,9 @@ class StoreController extends Controller
         return $store;
     }
 
-    private function resource(Store $store, Company $company, ?int $currentId): array
+    private function resource(Store $store, Company $company, ?int $currentId, ?Request $request = null): array
     {
-        return array_merge($store->only([
-            'id', 'tenant_id', 'company_id', 'name', 'code', 'branch_code',
-            'phone', 'email', 'address', 'tax_id',
-            'address_line_1', 'address_line_2', 'city', 'state', 'pincode',
-            'receipt_header', 'receipt_footer', 'invoice_prefix',
-            'is_primary', 'is_active',
-        ]), [
-            'effective_address' => $store->effective_address,
-            'effective_phone' => $store->effective_phone,
-            'effective_tax_id' => $store->effective_tax_id,
-            'subdomain' => $company->slug,
-            'is_current' => $store->is_active && (int) $store->id === $currentId,
-            'receipt_prefix' => $store->invoice_prefix ?: ($store->settings['invoice_prefix'] ?? $company->invoice_prefix),
-        ]);
+        return (new StoreResource($store, $company, $currentId))->resolve($request ?? request());
     }
 
     public function index(Request $request): JsonResponse
@@ -82,7 +70,7 @@ class StoreController extends Controller
         }
         $currentId = (int) ($request->attributes->get('store_id') ?? $user->current_store_id);
         $stores = $query->orderByDesc('is_primary')->orderBy('name')->get()
-            ->map(fn (Store $store) => $this->resource($store, $company, $currentId))->values();
+            ->map(fn (Store $store) => $this->resource($store, $company, $currentId, $request))->values();
         $limit = (int) ($company->plan?->store_limit ?? 1);
         $count = Store::where('company_id', $company->id)->count();
         $canCreate = PermissionChecker::can($user, 'stores', 'create');
@@ -141,6 +129,15 @@ class StoreController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if (config('app.demo_mode')) {
+            return response()->json([
+                'success' => false,
+                'status' => 'error',
+                'error' => 'Action disabled: Modifications are restricted in demo mode.',
+                'message' => 'Action disabled: Modifications are restricted in demo mode.',
+            ], 403);
+        }
+
         $this->authorizeAction($request, 'create');
         $company = $this->company($request);
         $data = $this->validatedDetails($request, $company);
@@ -195,13 +192,22 @@ class StoreController extends Controller
         if ($store instanceof JsonResponse) {
             return $store;
         }
-        $resource = $this->resource($store, $company, (int) $store->id);
+        $resource = $this->resource($store, $company, (int) $store->id, $request);
         return response()->json(['success' => true, 'data' => $resource, 'store' => $resource,
             'current_store' => $resource, 'current_store_id' => $store->id], 201);
     }
 
     public function update(Request $request, string $id): JsonResponse
     {
+        if (config('app.demo_mode')) {
+            return response()->json([
+                'success' => false,
+                'status' => 'error',
+                'error' => 'Action disabled: Modifications are restricted in demo mode.',
+                'message' => 'Action disabled: Modifications are restricted in demo mode.',
+            ], 403);
+        }
+
         abort_unless($this->canManage($request->user()), 403);
         $store = $this->branch($request, $id);
         $company = $this->company($request);
@@ -223,7 +229,7 @@ class StoreController extends Controller
             }
             $store->update($data);
         });
-        $resource = $this->resource($store->fresh(), $company, (int) $request->user()->current_store_id);
+        $resource = $this->resource($store->fresh(), $company, (int) $request->user()->current_store_id, $request);
         return response()->json(['success' => true, 'store' => $resource, 'data' => $resource]);
     }
 
@@ -236,7 +242,7 @@ class StoreController extends Controller
         $request->user()->update(['current_store_id' => $store->id]);
         // TenantApiKey / TenantSession authentication resolves the user on
         // every request; this application does not embed store claims in JWTs.
-        $resource = $this->resource($store, $this->company($request), (int) $store->id);
+        $resource = $this->resource($store, $this->company($request), (int) $store->id, $request);
         return response()->json(['success' => true,
             'message' => "Switched to {$store->name} successfully",
             'store' => $resource, 'current_store' => $resource, 'current_store_id' => $store->id]);
@@ -251,6 +257,10 @@ class StoreController extends Controller
 
     public function webStore(Request $request)
     {
+        if (config('app.demo_mode')) {
+            return back()->with('error', 'Action disabled: Modifications are restricted in demo mode.');
+        }
+
         $response = $this->store($request);
         if ($response->getStatusCode() >= 400) {
             return back()->withErrors(['name' => $response->getData(true)['message']])->withInput();
@@ -260,6 +270,10 @@ class StoreController extends Controller
 
     public function webUpdate(Request $request, string $id)
     {
+        if (config('app.demo_mode')) {
+            return back()->with('error', 'Action disabled: Modifications are restricted in demo mode.');
+        }
+
         $this->update($request, $id);
         return redirect()->route('tenant.settings.stores')->with('status', 'Store details saved.');
     }
@@ -284,6 +298,15 @@ class StoreController extends Controller
 
     public function assignStaff(Request $request, string $id): JsonResponse
     {
+        if (config('app.demo_mode')) {
+            return response()->json([
+                'success' => false,
+                'status' => 'error',
+                'error' => 'Action disabled: Modifications are restricted in demo mode.',
+                'message' => 'Action disabled: Modifications are restricted in demo mode.',
+            ], 403);
+        }
+
         abort_unless($this->canManage($request->user()), 403);
         abort_unless(PermissionChecker::can($request->user(), 'users', 'edit'), 403);
         $company = $this->company($request);

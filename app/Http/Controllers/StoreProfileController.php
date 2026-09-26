@@ -7,6 +7,8 @@ use App\Models\AuditLog;
 use App\Models\Company;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Http\Resources\Tenant\StoreResource;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
@@ -21,28 +23,38 @@ class StoreProfileController extends Controller
     {
         $company = $this->resolveCompany($request);
         $drawerHeader = $company->getDrawerHeaderPayload();
+        $fullName = (string) $company->display_name;
+        $isMobile = StoreResource::isMobileClient($request);
+        $displayName = $isMobile ? Str::limit($fullName, 3, '') : $fullName;
 
         return response()->json([
             'success' => true,
-            'store_name' => $company->display_name,
-            'business_name' => $company->display_name,
-            'tenant_name' => $company->display_name,
-            'title' => $company->display_name,
+            'name' => $displayName,
+            'full_name' => $fullName,
+            'store_name' => $displayName,
+            'full_store_name' => $fullName,
+            'business_name' => $displayName,
+            'full_business_name' => $fullName,
+            'tenant_name' => $displayName,
+            'title' => $displayName,
             'trading_name' => $company->getEffectiveTradeName(),
             'trade_name' => $company->getEffectiveTradeName(),
-            'display_name' => $company->display_name,
+            'display_name' => $displayName,
             'header' => $drawerHeader,
             'drawer_header' => $drawerHeader,
             'tenant' => [
                 'id' => (string) $company->id,
-                'name' => $company->display_name,
-                'business_name' => $company->display_name,
-                'tenant_name' => $company->display_name,
-                'title' => $company->display_name,
+                'name' => $displayName,
+                'full_name' => $fullName,
+                'business_name' => $displayName,
+                'full_business_name' => $fullName,
+                'tenant_name' => $displayName,
+                'title' => $displayName,
                 'trade_name' => $company->getEffectiveTradeName(),
                 'trading_name' => $company->getEffectiveTradeName(),
-                'display_name' => $company->display_name,
-                'store_name' => $company->display_name,
+                'display_name' => $displayName,
+                'store_name' => $displayName,
+                'full_store_name' => $fullName,
                 'header' => $drawerHeader,
                 'drawer_header' => $drawerHeader,
             ],
@@ -58,6 +70,15 @@ class StoreProfileController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
+        if (config('app.demo_mode')) {
+            return response()->json([
+                'success' => false,
+                'status' => 'error',
+                'error' => 'Action disabled: Modifications are restricted in demo mode.',
+                'message' => 'Action disabled: Modifications are restricted in demo mode.',
+            ], 403);
+        }
+
         $company = $this->resolveCompany($request);
         $user = $this->resolveUser($request, $company);
 
@@ -155,30 +176,40 @@ class StoreProfileController extends Controller
         AuditLog::record('company.settings_updated', $company->id, $user?->id, ['section' => 'store-profile']);
 
         $drawerHeader = $freshCompany->getDrawerHeaderPayload();
+        $fullName = (string) $freshCompany->display_name;
+        $isMobile = StoreResource::isMobileClient($request);
+        $displayName = $isMobile ? Str::limit($fullName, 3, '') : $fullName;
 
         return response()->json([
             'success' => true,
             'message' => 'Store profile updated successfully.',
-            'store_name' => $freshCompany->display_name,
-            'business_name' => $freshCompany->display_name,
-            'tenant_name' => $freshCompany->display_name,
-            'title' => $freshCompany->display_name,
+            'name' => $displayName,
+            'full_name' => $fullName,
+            'store_name' => $displayName,
+            'full_store_name' => $fullName,
+            'business_name' => $displayName,
+            'full_business_name' => $fullName,
+            'tenant_name' => $displayName,
+            'title' => $displayName,
             'trading_name' => $freshCompany->getEffectiveTradeName(),
             'trade_name' => $freshCompany->getEffectiveTradeName(),
-            'display_name' => $freshCompany->display_name,
+            'display_name' => $displayName,
             'header' => $drawerHeader,
             'drawer_header' => $drawerHeader,
             'company' => $freshCompany,
             'tenant' => [
                 'id' => (string) $freshCompany->id,
-                'name' => $freshCompany->display_name,
-                'business_name' => $freshCompany->display_name,
-                'tenant_name' => $freshCompany->display_name,
-                'title' => $freshCompany->display_name,
+                'name' => $displayName,
+                'full_name' => $fullName,
+                'business_name' => $displayName,
+                'full_business_name' => $fullName,
+                'tenant_name' => $displayName,
+                'title' => $displayName,
                 'trade_name' => $freshCompany->getEffectiveTradeName(),
                 'trading_name' => $freshCompany->getEffectiveTradeName(),
-                'display_name' => $freshCompany->display_name,
-                'store_name' => $freshCompany->display_name,
+                'display_name' => $displayName,
+                'store_name' => $displayName,
+                'full_store_name' => $fullName,
                 'header' => $drawerHeader,
                 'drawer_header' => $drawerHeader,
             ],

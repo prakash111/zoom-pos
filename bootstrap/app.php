@@ -11,6 +11,8 @@ use App\Http\Middleware\EnsureTenantExtension;
 use App\Http\Middleware\EnsureTenantPosMode;
 use App\Http\Middleware\EnsureTenantSubscriptionActive;
 use App\Http\Middleware\EnsureTenantVertical;
+use App\Http\Middleware\FormatMobileStoreName;
+use App\Http\Middleware\PreventDemoChanges;
 use App\Http\Middleware\PreventDemoModifications;
 use App\Http\Middleware\ResolveTenantContext;
 use App\Http\Middleware\SecurityHeaders;
@@ -55,7 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // (see LocalizationService::getActiveLocale) so validation errors
             // and any translated strings in API responses match the client's
             // chosen locale.
-            Route::middleware([EnsureAppIsInstalled::class, CheckMaintenanceMode::class, SetLocale::class, ClearStoreContext::class])
+            Route::middleware([EnsureAppIsInstalled::class, CheckMaintenanceMode::class, SetLocale::class, ClearStoreContext::class, PreventDemoChanges::class, FormatMobileStoreName::class])
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));
         },
@@ -66,6 +68,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ResolveTenantContext::class,
             SetLocale::class,
             SecurityHeaders::class,
+            PreventDemoChanges::class,
         ]);
 
         // The public landing page is served from a whole-response cache shared
@@ -110,6 +113,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.verified' => EnsureTenantEmailIsVerified::class,
             'entitled' => EnsureTenantExtension::class,
             'demo.guard' => PreventDemoModifications::class,
+            'prevent_demo_changes' => PreventDemoChanges::class,
+            'prevent.demo' => PreventDemoChanges::class,
+            'format_mobile_store_name' => FormatMobileStoreName::class,
         ]);
 
         // There is no single named "login" route — two separate guards each
