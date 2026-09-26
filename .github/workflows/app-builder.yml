@@ -83,9 +83,11 @@ jobs:
 
       - name: Apply Custom Source ZIP (if provided)
         if: ${{ inputs.custom_source_url != '' }}
+        env:
+          CUSTOM_SOURCE_URL: ${{ inputs.custom_source_url }}
         run: |
-          echo "Applying custom uploaded source package from ${{ inputs.custom_source_url }}..."
-          curl -f -L -s -S "${{ inputs.custom_source_url }}" -o custom_source.zip
+          echo "Applying custom uploaded source package from $CUSTOM_SOURCE_URL..."
+          curl -f -L -s -S "$CUSTOM_SOURCE_URL" -o custom_source.zip
           unzip -o -q custom_source.zip -d .
           rm -f custom_source.zip
 
@@ -120,10 +122,11 @@ jobs:
           STORE_PASS: ${{ secrets.KEYSTORE_PASSWORD || '123456789' }}
           KEY_PASS: ${{ secrets.KEY_PASSWORD || '123456789' }}
           ALIAS: ${{ inputs.short_name || 'app' }}
+          APP_NAME: ${{ inputs.app_name || 'Zoom Sales POS' }}
         run: |
           KEYSTORE_PATH="$GITHUB_WORKSPACE/app-release-key.jks"
           if [ ! -s "$KEYSTORE_PATH" ]; then
-            keytool -genkeypair -v -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASS" -keypass "$KEY_PASS" -alias "$ALIAS" -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=${{ inputs.app_name }}, OU=Production, O=${{ inputs.app_name }}, C=US"
+            keytool -genkeypair -v -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASS" -keypass "$KEY_PASS" -alias "$ALIAS" -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=$APP_NAME, OU=Production, O=$APP_NAME, C=US"
           fi
           cat <<KEYPROP > android/key.properties
           storePassword=$STORE_PASS
@@ -133,34 +136,34 @@ jobs:
           KEYPROP
 
       - name: Apply Complete White-Label Branding
+        env:
+          INPUT_BRANDING_JSON: ${{ inputs.branding_json }}
+          INPUT_BRANDING_BUNDLE_URL: ${{ inputs.branding_bundle_url }}
+          INPUT_APP_NAME: ${{ inputs.app_name }}
+          INPUT_SHORT_NAME: ${{ inputs.short_name }}
+          INPUT_PACKAGE_ID: ${{ inputs.package_id }}
+          INPUT_SERVER_URL: ${{ inputs.server_url }}
+          INPUT_PRIMARY_COLOR: ${{ inputs.primary_color }}
+          INPUT_BUILD_ID: ${{ inputs.build_id }}
         run: |
-          echo "Starting complete White-Label Branding System for ${{ inputs.build_id }}..."
+          echo "Starting complete White-Label Branding System for $INPUT_BUILD_ID..."
           mkdir -p branding_workspace
 
           # 1. Fetch Branding Assets Bundle if provided
-          if [ -n "${{ inputs.branding_bundle_url }}" ]; then
-            echo "Fetching branding assets bundle from ${{ inputs.branding_bundle_url }}..."
-            curl -f -L -s -S "${{ inputs.branding_bundle_url }}" -o branding_workspace/bundle.zip || true
+          if [ -n "$INPUT_BRANDING_BUNDLE_URL" ]; then
+            echo "Fetching branding assets bundle from $INPUT_BRANDING_BUNDLE_URL..."
+            curl -f -L -s -S "$INPUT_BRANDING_BUNDLE_URL" -o branding_workspace/bundle.zip || true
             if [ -s "branding_workspace/bundle.zip" ]; then
               unzip -o -q branding_workspace/bundle.zip -d branding_workspace/
             fi
           fi
 
-          # 2. Prepare Config JSON
+          # 2. Prepare Config JSON safely via environment variables
           if [ ! -f "branding_workspace/branding_config.json" ]; then
-            if [ -n "${{ inputs.branding_json }}" ]; then
-              echo '${{ inputs.branding_json }}' > branding_workspace/branding_config.json
+            if [ -n "$INPUT_BRANDING_JSON" ]; then
+              printf "%s" "$INPUT_BRANDING_JSON" > branding_workspace/branding_config.json
             else
-              cat <<EOF > branding_workspace/branding_config.json
-              {
-                "app_name": "${{ inputs.app_name }}",
-                "short_name": "${{ inputs.short_name }}",
-                "display_name": "${{ inputs.app_name }}",
-                "package_id": "${{ inputs.package_id }}",
-                "server_url": "${{ inputs.server_url }}",
-                "primary_color": "${{ inputs.primary_color }}"
-              }
-          EOF
+              printf "{\"app_name\":\"%s\",\"short_name\":\"%s\",\"display_name\":\"%s\",\"package_id\":\"%s\",\"server_url\":\"%s\",\"primary_color\":\"%s\"}" "$INPUT_APP_NAME" "$INPUT_SHORT_NAME" "$INPUT_APP_NAME" "$INPUT_PACKAGE_ID" "$INPUT_SERVER_URL" "$INPUT_PRIMARY_COLOR" > branding_workspace/branding_config.json
             fi
           fi
 
@@ -175,9 +178,9 @@ jobs:
             python3 scripts/whitelabel.py . branding_workspace/branding_config.json branding_workspace/assets
           else
             echo "Fallback white-label replacement..."
-            sed -i 's/applicationId = "[^"]*"/applicationId = "${{ inputs.package_id }}"/g' android/app/build.gradle.kts || true
-            sed -i 's/namespace = "[^"]*"/namespace = "${{ inputs.package_id }}"/g' android/app/build.gradle.kts || true
-            sed -i 's/android:label="[^"]*"/android:label="${{ inputs.app_name }}"/g' android/app/src/main/AndroidManifest.xml || true
+            sed -i "s/applicationId = \"[^\"]*\"/applicationId = \"$INPUT_PACKAGE_ID\"/g" android/app/build.gradle.kts || true
+            sed -i "s/namespace = \"[^\"]*\"/namespace = \"$INPUT_PACKAGE_ID\"/g" android/app/build.gradle.kts || true
+            sed -i "s/android:label=\"[^\"]*\"/android:label=\"$INPUT_APP_NAME\"/g" android/app/src/main/AndroidManifest.xml || true
           fi
 
       - name: Flutter pub get
@@ -191,8 +194,11 @@ jobs:
         run: flutter build appbundle --release --android-skip-build-dependency-validation
 
       - name: Prepare White-Labeled Artifacts
+        env:
+          SHORT_NAME: ${{ inputs.short_name }}
+          BUILD_ID: ${{ inputs.build_id }}
         run: |
-          BRAND_SLUG="${{ inputs.short_name || 'App' }}"
+          BRAND_SLUG="${SHORT_NAME:-App}"
           mkdir -p builder-output
           
           # Rename output APK to brand name
@@ -205,7 +211,7 @@ jobs:
           
           # Bundle for user download
           cd builder-output
-          zip -r "app-builder-${{ inputs.build_id }}-android.zip" *
+          zip -r "app-builder-${BUILD_ID}-android.zip" *
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -228,9 +234,11 @@ jobs:
 
       - name: Apply Custom Source ZIP (if provided)
         if: ${{ inputs.custom_source_url != '' }}
+        env:
+          CUSTOM_SOURCE_URL: ${{ inputs.custom_source_url }}
         run: |
-          echo "Applying custom uploaded source package from ${{ inputs.custom_source_url }}..."
-          curl -f -L -s -S "${{ inputs.custom_source_url }}" -o custom_source.zip
+          echo "Applying custom uploaded source package from $CUSTOM_SOURCE_URL..."
+          curl -f -L -s -S "$CUSTOM_SOURCE_URL" -o custom_source.zip
           unzip -o -q custom_source.zip -d .
           rm -f custom_source.zip
 
@@ -251,31 +259,31 @@ jobs:
           flutter create --platforms=web .
 
       - name: Apply Complete White-Label Branding
+        env:
+          INPUT_BRANDING_JSON: ${{ inputs.branding_json }}
+          INPUT_BRANDING_BUNDLE_URL: ${{ inputs.branding_bundle_url }}
+          INPUT_APP_NAME: ${{ inputs.app_name }}
+          INPUT_SHORT_NAME: ${{ inputs.short_name }}
+          INPUT_PACKAGE_ID: ${{ inputs.package_id }}
+          INPUT_SERVER_URL: ${{ inputs.server_url }}
+          INPUT_PRIMARY_COLOR: ${{ inputs.primary_color }}
+          INPUT_BUILD_ID: ${{ inputs.build_id }}
         run: |
-          echo "Starting complete White-Label Branding System for Web ${{ inputs.build_id }}..."
+          echo "Starting complete White-Label Branding System for Web $INPUT_BUILD_ID..."
           mkdir -p branding_workspace
 
-          if [ -n "${{ inputs.branding_bundle_url }}" ]; then
-            curl -f -L -s -S "${{ inputs.branding_bundle_url }}" -o branding_workspace/bundle.zip || true
+          if [ -n "$INPUT_BRANDING_BUNDLE_URL" ]; then
+            curl -f -L -s -S "$INPUT_BRANDING_BUNDLE_URL" -o branding_workspace/bundle.zip || true
             if [ -s "branding_workspace/bundle.zip" ]; then
               unzip -o -q branding_workspace/bundle.zip -d branding_workspace/
             fi
           fi
 
           if [ ! -f "branding_workspace/branding_config.json" ]; then
-            if [ -n "${{ inputs.branding_json }}" ]; then
-              echo '${{ inputs.branding_json }}' > branding_workspace/branding_config.json
+            if [ -n "$INPUT_BRANDING_JSON" ]; then
+              printf "%s" "$INPUT_BRANDING_JSON" > branding_workspace/branding_config.json
             else
-              cat <<EOF > branding_workspace/branding_config.json
-              {
-                "app_name": "${{ inputs.app_name }}",
-                "short_name": "${{ inputs.short_name }}",
-                "display_name": "${{ inputs.app_name }}",
-                "package_id": "${{ inputs.package_id }}",
-                "server_url": "${{ inputs.server_url }}",
-                "primary_color": "${{ inputs.primary_color }}"
-              }
-          EOF
+              printf "{\"app_name\":\"%s\",\"short_name\":\"%s\",\"display_name\":\"%s\",\"package_id\":\"%s\",\"server_url\":\"%s\",\"primary_color\":\"%s\"}" "$INPUT_APP_NAME" "$INPUT_SHORT_NAME" "$INPUT_APP_NAME" "$INPUT_PACKAGE_ID" "$INPUT_SERVER_URL" "$INPUT_PRIMARY_COLOR" > branding_workspace/branding_config.json
             fi
           fi
 
@@ -295,12 +303,15 @@ jobs:
         run: flutter build web --release --base-href "/"
 
       - name: Prepare White-Labeled Web Artifact
+        env:
+          SHORT_NAME: ${{ inputs.short_name }}
+          BUILD_ID: ${{ inputs.build_id }}
         run: |
-          BRAND_SLUG="${{ inputs.short_name || 'App' }}"
+          BRAND_SLUG="${SHORT_NAME:-App}"
           mkdir -p builder-output
           cd build/web
           zip -r "../../builder-output/${BRAND_SLUG}-web.zip" .
-          cp "../../builder-output/${BRAND_SLUG}-web.zip" "../../builder-output/app-builder-${{ inputs.build_id }}-web.zip"
+          cp "../../builder-output/${BRAND_SLUG}-web.zip" "../../builder-output/app-builder-${BUILD_ID}-web.zip"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -324,9 +335,11 @@ jobs:
       - name: Apply Custom Source ZIP (if provided)
         if: ${{ inputs.custom_source_url != '' }}
         shell: pwsh
+        env:
+          CUSTOM_SOURCE_URL: ${{ inputs.custom_source_url }}
         run: |
-          Write-Host "Applying custom uploaded source package from ${{ inputs.custom_source_url }}..."
-          Invoke-WebRequest -Uri "${{ inputs.custom_source_url }}" -OutFile "custom_source.zip"
+          Write-Host "Applying custom uploaded source package from $env:CUSTOM_SOURCE_URL..."
+          Invoke-WebRequest -Uri "$env:CUSTOM_SOURCE_URL" -OutFile "custom_source.zip"
           Expand-Archive -Path "custom_source.zip" -DestinationPath . -Force
           Remove-Item -Force "custom_source.zip"
 
@@ -351,13 +364,22 @@ jobs:
 
       - name: Apply Complete White-Label Branding
         shell: pwsh
+        env:
+          INPUT_BRANDING_JSON: ${{ inputs.branding_json }}
+          INPUT_BRANDING_BUNDLE_URL: ${{ inputs.branding_bundle_url }}
+          INPUT_APP_NAME: ${{ inputs.app_name }}
+          INPUT_SHORT_NAME: ${{ inputs.short_name }}
+          INPUT_PACKAGE_ID: ${{ inputs.package_id }}
+          INPUT_SERVER_URL: ${{ inputs.server_url }}
+          INPUT_PRIMARY_COLOR: ${{ inputs.primary_color }}
+          INPUT_BUILD_ID: ${{ inputs.build_id }}
         run: |
-          Write-Host "Starting complete White-Label Branding System for Windows ${{ inputs.build_id }}..."
+          Write-Host "Starting complete White-Label Branding System for Windows $env:INPUT_BUILD_ID..."
           New-Item -ItemType Directory -Force -Path branding_workspace
 
-          if ("${{ inputs.branding_bundle_url }}") {
+          if ($env:INPUT_BRANDING_BUNDLE_URL) {
             try {
-              Invoke-WebRequest -Uri "${{ inputs.branding_bundle_url }}" -OutFile "branding_workspace/bundle.zip"
+              Invoke-WebRequest -Uri "$env:INPUT_BRANDING_BUNDLE_URL" -OutFile "branding_workspace/bundle.zip"
               Expand-Archive -Path "branding_workspace/bundle.zip" -DestinationPath "branding_workspace" -Force
             } catch {
               Write-Host "Could not download bundle. Continuing with parameters..."
@@ -365,18 +387,18 @@ jobs:
           }
 
           if (-not (Test-Path "branding_workspace/branding_config.json")) {
-            if ("${{ inputs.branding_json }}") {
-              Set-Content -Path "branding_workspace/branding_config.json" -Value '${{ inputs.branding_json }}'
+            if ($env:INPUT_BRANDING_JSON) {
+              [System.IO.File]::WriteAllText("branding_workspace/branding_config.json", $env:INPUT_BRANDING_JSON, [System.Text.Encoding]::UTF8)
             } else {
               $defaultJson = @{
-                app_name = "${{ inputs.app_name }}"
-                short_name = "${{ inputs.short_name }}"
-                display_name = "${{ inputs.app_name }}"
-                package_id = "${{ inputs.package_id }}"
-                server_url = "${{ inputs.server_url }}"
-                primary_color = "${{ inputs.primary_color }}"
+                app_name = $env:INPUT_APP_NAME
+                short_name = $env:INPUT_SHORT_NAME
+                display_name = $env:INPUT_APP_NAME
+                package_id = $env:INPUT_PACKAGE_ID
+                server_url = $env:INPUT_SERVER_URL
+                primary_color = $env:INPUT_PRIMARY_COLOR
               } | ConvertTo-Json
-              Set-Content -Path "branding_workspace/branding_config.json" -Value $defaultJson
+              [System.IO.File]::WriteAllText("branding_workspace/branding_config.json", $defaultJson, [System.Text.Encoding]::UTF8)
             }
           }
 
@@ -397,8 +419,11 @@ jobs:
 
       - name: Package White-Labeled Windows Artifact
         shell: pwsh
+        env:
+          SHORT_NAME: ${{ inputs.short_name }}
+          BUILD_ID: ${{ inputs.build_id }}
         run: |
-          $brand = "${{ inputs.short_name }}"
+          $brand = $env:SHORT_NAME
           if (-not $brand) { $brand = "App" }
           New-Item -ItemType Directory -Force -Path builder-output
           
@@ -409,7 +434,7 @@ jobs:
           }
           
           Compress-Archive -Path "$releaseDir\*" -DestinationPath "builder-output\$brand-windows.zip" -Force
-          Copy-Item "builder-output\$brand-windows.zip" "builder-output\app-builder-${{ inputs.build_id }}-windows.zip"
+          Copy-Item "builder-output\$brand-windows.zip" "builder-output\app-builder-$env:BUILD_ID-windows.zip"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -432,9 +457,11 @@ jobs:
 
       - name: Apply Custom Source ZIP (if provided)
         if: ${{ inputs.custom_source_url != '' }}
+        env:
+          CUSTOM_SOURCE_URL: ${{ inputs.custom_source_url }}
         run: |
-          echo "Applying custom uploaded source package from ${{ inputs.custom_source_url }}..."
-          curl -f -L -s -S "${{ inputs.custom_source_url }}" -o custom_source.zip
+          echo "Applying custom uploaded source package from $CUSTOM_SOURCE_URL..."
+          curl -f -L -s -S "$CUSTOM_SOURCE_URL" -o custom_source.zip
           unzip -o -q custom_source.zip -d .
           rm -f custom_source.zip
 
@@ -450,31 +477,31 @@ jobs:
           cache: true
 
       - name: Apply Complete White-Label Branding
+        env:
+          INPUT_BRANDING_JSON: ${{ inputs.branding_json }}
+          INPUT_BRANDING_BUNDLE_URL: ${{ inputs.branding_bundle_url }}
+          INPUT_APP_NAME: ${{ inputs.app_name }}
+          INPUT_SHORT_NAME: ${{ inputs.short_name }}
+          INPUT_PACKAGE_ID: ${{ inputs.package_id }}
+          INPUT_SERVER_URL: ${{ inputs.server_url }}
+          INPUT_PRIMARY_COLOR: ${{ inputs.primary_color }}
+          INPUT_BUILD_ID: ${{ inputs.build_id }}
         run: |
-          echo "Starting complete White-Label Branding System for iOS ${{ inputs.build_id }}..."
+          echo "Starting complete White-Label Branding System for iOS $INPUT_BUILD_ID..."
           mkdir -p branding_workspace
 
-          if [ -n "${{ inputs.branding_bundle_url }}" ]; then
-            curl -f -L -s -S "${{ inputs.branding_bundle_url }}" -o branding_workspace/bundle.zip || true
+          if [ -n "$INPUT_BRANDING_BUNDLE_URL" ]; then
+            curl -f -L -s -S "$INPUT_BRANDING_BUNDLE_URL" -o branding_workspace/bundle.zip || true
             if [ -s "branding_workspace/bundle.zip" ]; then
               unzip -o -q branding_workspace/bundle.zip -d branding_workspace/
             fi
           fi
 
           if [ ! -f "branding_workspace/branding_config.json" ]; then
-            if [ -n "${{ inputs.branding_json }}" ]; then
-              echo '${{ inputs.branding_json }}' > branding_workspace/branding_config.json
+            if [ -n "$INPUT_BRANDING_JSON" ]; then
+              printf "%s" "$INPUT_BRANDING_JSON" > branding_workspace/branding_config.json
             else
-              cat <<EOF > branding_workspace/branding_config.json
-              {
-                "app_name": "${{ inputs.app_name }}",
-                "short_name": "${{ inputs.short_name }}",
-                "display_name": "${{ inputs.app_name }}",
-                "package_id": "${{ inputs.package_id }}",
-                "server_url": "${{ inputs.server_url }}",
-                "primary_color": "${{ inputs.primary_color }}"
-              }
-          EOF
+              printf "{\"app_name\":\"%s\",\"short_name\":\"%s\",\"display_name\":\"%s\",\"package_id\":\"%s\",\"server_url\":\"%s\",\"primary_color\":\"%s\"}" "$INPUT_APP_NAME" "$INPUT_SHORT_NAME" "$INPUT_APP_NAME" "$INPUT_PACKAGE_ID" "$INPUT_SERVER_URL" "$INPUT_PRIMARY_COLOR" > branding_workspace/branding_config.json
             fi
           fi
 
@@ -494,12 +521,15 @@ jobs:
         run: flutter build ios --release --no-codesign
 
       - name: Package White-Labeled iOS Artifact
+        env:
+          SHORT_NAME: ${{ inputs.short_name }}
+          BUILD_ID: ${{ inputs.build_id }}
         run: |
-          BRAND_SLUG="${{ inputs.short_name || 'App' }}"
+          BRAND_SLUG="${SHORT_NAME:-App}"
           mkdir -p builder-output
           cd build/ios/iphoneos
           zip -r "../../../builder-output/${BRAND_SLUG}-ios.ipa" Runner.app
-          zip -r "../../../builder-output/app-builder-${{ inputs.build_id }}-ios.zip" Runner.app
+          zip -r "../../../builder-output/app-builder-${BUILD_ID}-ios.zip" Runner.app
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
