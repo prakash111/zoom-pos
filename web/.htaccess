@@ -1,0 +1,29 @@
+<IfModule mod_mime.c>
+  AddType application/wasm .wasm
+  AddType application/javascript .js
+  AddType application/json .json
+  AddType image/png .png
+  AddType image/svg+xml .svg
+  AddType image/x-icon .ico
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase ./
+  
+  # Allow direct access to actual files and directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Redirect all SPA routes to index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "(index\.html|version\.json|flutter_service_worker\.js)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires 0
+  </FilesMatch>
+</IfModule>

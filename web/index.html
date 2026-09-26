@@ -1,7 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <base href="$FLUTTER_BASE_HREF">
+  <script>
+    // Universal Directory & Subfolder Base Path Resolver
+    (function () {
+      var loc = window.location;
+      var path = loc.pathname;
+      var lastSeg = path.split('/').pop();
+      if (path.length > 1 && !path.endsWith('/') && !lastSeg.includes('.')) {
+        window.location.replace(loc.protocol + '//' + loc.host + path + '/' + loc.search + loc.hash);
+        return;
+      }
+      if (!path.endsWith('/')) {
+        path = path.substring(0, path.lastIndexOf('/') + 1);
+      }
+      var baseEl = document.querySelector('base');
+      if (!baseEl) {
+        baseEl = document.createElement('base');
+        document.head.prepend(baseEl);
+      }
+      baseEl.setAttribute('href', path || '/');
+    })();
+  </script>
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
@@ -172,10 +192,14 @@
     <div class="loading-panel">
       <img
         class="brand-icon"
+        id="loading-brand-icon"
         src="icons/Icon-192.png"
-        alt="Zoom Sales CRM &amp; Inventory Logo"
-        onerror="this.onerror=null; this.src='favicon.png';"
+        alt="Logo"
+        onerror="this.onerror=null; this.src='favicon.png'; this.onerror=function(){ this.style.display='none'; var fb=document.getElementById('brand-fallback-icon'); if(fb) fb.style.display='flex'; };"
       />
+      <div id="brand-fallback-icon" style="display:none;width:68px;height:68px;border-radius:16px;background:var(--primary);color:#fff;font-size:26px;font-weight:800;align-items:center;justify-content:center;margin-bottom:18px;box-shadow:0 6px 16px var(--primary-shadow);">
+        POS
+      </div>
       <h1 class="brand-title">Zoom Sales CRM &amp; Inventory</h1>
       <p class="brand-subtitle">Zoom Sales CRM &amp; Inventory Management</p>
       <div class="progress-bar-track">
@@ -218,8 +242,8 @@
       });
       observer.observe(document.body, { childList: true, subtree: true });
 
-      // Fallback: dismiss after 25s in case engine renders silently
-      setTimeout(dismissLoadingScreen, 25000);
+      // Fallback: dismiss after 7s so users are never stuck indefinitely
+      setTimeout(dismissLoadingScreen, 7000);
     })();
   </script>
 

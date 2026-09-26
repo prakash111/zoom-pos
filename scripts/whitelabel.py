@@ -2,6 +2,7 @@
 """
 Complete White Label Branding System - Engine
 Replaces all branding references across Android, Web, Windows, iOS, and Flutter code.
+Guarantees 100% white-labeled assets, icons, base paths, and runtime metadata.
 """
 
 import sys
@@ -9,11 +10,21 @@ import os
 import re
 import json
 import shutil
+import base64
+from io import BytesIO
 from pathlib import Path
+
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+
 
 def sanitize_slug(name):
     clean = re.sub(r'[^a-zA-Z0-9_]+', '_', name.strip()).lower().strip('_')
     return clean if clean else 'app'
+
 
 def safe_replace(file_path, pattern, replacement, is_regex=True):
     if not os.path.exists(file_path):
@@ -35,6 +46,176 @@ def safe_replace(file_path, pattern, replacement, is_regex=True):
         print(f"[WARN] Error updating {file_path}: {e}")
     return False
 
+
+def get_or_create_master_image(assets_dir, config_path, cfg, primary_color, app_name, short_name):
+    if not PIL_AVAILABLE:
+        print("    [INFO] PIL (Pillow) not installed; using pre-bundled assets directly.")
+        return None
+
+    # Priority 1: Check pre-extracted asset files in assets_dir
+    candidate_paths = []
+    if assets_dir:
+        candidate_paths.extend([
+            os.path.join(assets_dir, 'assets/images/app_logo.png'),
+            os.path.join(assets_dir, 'assets/images/app_logo_light.png'),
+            os.path.join(assets_dir, 'assets/images/splash_logo.png'),
+            os.path.join(assets_dir, 'app_logo.png'),
+            os.path.join(assets_dir, 'main_logo.png'),
+            os.path.join(assets_dir, 'assets/icon/launcher.png'),
+            os.path.join(assets_dir, 'web/icons/Icon-512.png'),
+        ])
+
+    # Priority 2: Check workspace directory of config
+    config_dir = os.path.dirname(os.path.abspath(config_path))
+    candidate_paths.extend([
+        os.path.join(config_dir, 'master_logo.png'),
+        os.path.join(config_dir, 'app_logo.png'),
+        os.path.join(config_dir, 'assets/app_logo.png'),
+        os.path.join(config_dir, 'assets/main_logo.png'),
+    ])
+
+    for p in candidate_paths:
+        if os.path.isfile(p):
+            try:
+                img = Image.open(p).convert('RGBA')
+                print(f"    ✓ Loaded master branding image from {p}")
+                return img
+            except Exception as e:
+                print(f"    [WARN] Could not load image from {p}: {e}")
+
+    # Priority 3: Base64 custom logo from config
+    b64_logo = (cfg.get('custom_logo_base64') or '').strip()
+    if b64_logo:
+        try:
+            img_data = base64.b64decode(b64_logo)
+            img = Image.open(BytesIO(img_data)).convert('RGBA')
+            print(f"    ✓ Decoded master branding image from base64 configuration")
+            return img
+        except Exception as e:
+            print(f"    [WARN] Failed decoding base64 custom logo: {e}")
+
+    # Priority 4: Generate crisp, high-resolution branded monogram master icon
+    try:
+        size = 512
+        img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+
+        # Parse primary color
+        clean_hex = primary_color.lstrip('#')
+        if len(clean_hex) == 3:
+            clean_hex = ''.join([c*2 for c in clean_hex])
+        r = int(clean_hex[0:2], 16) if len(clean_hex) >= 2 else 79
+        g = int(clean_hex[2:4], 16) if len(clean_hex) >= 4 else 70
+        b = int(clean_hex[4:6], 16) if len(clean_hex) >= 6 else 229
+
+        # Draw rounded rectangle container
+        radius = 110
+        draw.rounded_rectangle([0, 0, size, size], radius=radius, fill=(r, g, b, 255))
+
+        # Brand monogram text (1 to 3 characters)
+        initials = re.sub(r'[^a-zA-Z0-9]', '', short_name or app_name)[:3].upper()
+        if not initials:
+            initials = 'POS'
+
+        # Load font or draw geometric monogram
+        font = None
+        font_size = 200 if len(initials) == 1 else (160 if len(initials) == 2 else 120)
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "C:\\Windows\\Fonts\\arialbd.ttf",
+            "C:\\Windows\\Fonts\\segoeuib.ttf",
+            "/System/Library/Fonts/SFPro-Bold.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+        ]
+        for fp in font_paths:
+            if os.path.exists(fp):
+                try:
+                    font = ImageFont.truetype(fp, font_size)
+                    break
+                except Exception:
+                    pass
+
+        if font:
+            bbox = draw.textbbox((0, 0), initials, font=font)
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+            text_x = (size - text_w) / 2 - bbox[0]
+            text_y = (size - text_h) / 2 - bbox[1]
+            draw.text((text_x, text_y), initials, fill=(255, 255, 255, 255), font=font)
+        else:
+            try:
+                def_font = ImageFont.load_default()
+                temp_img = Image.new('RGBA', (60, 20), (0, 0, 0, 0))
+                temp_draw = ImageDraw.Draw(temp_img)
+                temp_draw.text((0, 0), initials, fill=(255, 255, 255, 255), font=def_font)
+                scaled_text = temp_img.resize((300, 100), resample=Image.Resampling.NEAREST)
+                img.paste(scaled_text, ((size - 300) // 2, (size - 100) // 2), scaled_text)
+            except Exception:
+                pass
+
+        print(f"    ✓ Generated dynamic branded monogram master icon ({initials})")
+        return img
+    except Exception as e:
+        print(f"    [WARN] Failed to generate dynamic branded master icon: {e}")
+        return None
+
+
+def generate_all_icons_from_master(project_root, master_img):
+    if not PIL_AVAILABLE or master_img is None:
+        return
+
+    def fit_square(src_img, target_size):
+        w, h = src_img.size
+        square = Image.new('RGBA', (target_size, target_size), (0, 0, 0, 0))
+        if w >= h:
+            new_w = target_size
+            new_h = int(round((h / w) * target_size))
+            resized = src_img.resize((new_w, new_h), resample=Image.Resampling.LANCZOS)
+            square.paste(resized, (0, (target_size - new_h) // 2))
+        else:
+            new_h = target_size
+            new_w = int(round((w / h) * target_size))
+            resized = src_img.resize((new_w, new_h), resample=Image.Resampling.LANCZOS)
+            square.paste(resized, ((target_size - new_w) // 2, 0))
+        return square
+
+    targets = {
+        'web/favicon.png': 32,
+        'web/icons/Icon-192.png': 192,
+        'web/icons/Icon-512.png': 512,
+        'web/icons/Icon-maskable-192.png': 192,
+        'web/icons/Icon-maskable-512.png': 512,
+        'assets/images/app_logo.png': 512,
+        'assets/images/app_logo_light.png': 512,
+        'assets/images/app_logo_dark.png': 512,
+        'assets/images/splash_logo.png': 512,
+        'assets/icon/launcher.png': 512,
+        'android/app/src/main/res/mipmap-mdpi/ic_launcher.png': 48,
+        'android/app/src/main/res/mipmap-hdpi/ic_launcher.png': 72,
+        'android/app/src/main/res/mipmap-xhdpi/ic_launcher.png': 96,
+        'android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png': 144,
+        'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png': 192,
+    }
+
+    for rel_path, sz in targets.items():
+        dst = os.path.join(project_root, rel_path)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        img_resized = fit_square(master_img, sz)
+        img_resized.save(dst, format='PNG')
+        print(f"    ✓ Generated {sz}x{sz} icon: {rel_path}")
+
+    # Multi-resolution Windows ICO
+    ico_dst = os.path.join(project_root, 'windows/runner/resources/app_icon.ico')
+    if os.path.exists(os.path.dirname(ico_dst)):
+        try:
+            ico_sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+            master_img.save(ico_dst, format='ICO', sizes=ico_sizes)
+            print(f"    ✓ Generated Windows multi-res app_icon.ico")
+        except Exception as e:
+            print(f"    [WARN] Failed to write windows ICO: {e}")
+
+
 def apply_whitelabel(project_root, config_path, assets_dir=None):
     project_root = os.path.abspath(project_root)
     print(f"=================================================================")
@@ -45,26 +226,26 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
         cfg = json.load(f)
 
     # Core metadata
-    company_name = cfg.get('company_name', 'Zoom Nearby').strip()
-    product_name = cfg.get('product_name', 'Zoom Sales CRM').strip()
-    app_name = cfg.get('app_name', 'Zoom Sales POS').strip()
-    short_name = cfg.get('short_name', re.sub(r'[^a-zA-Z0-9]+', '', app_name)).strip()
-    display_name = cfg.get('display_name', app_name).strip()
-    org_name = cfg.get('org_name', company_name).strip()
-    copyright_text = cfg.get('copyright', f"Copyright (C) 2026 {company_name}. All rights reserved.").strip()
-    support_email = cfg.get('support_email', 'support@zoomnearby.com').strip()
-    support_phone = cfg.get('support_phone', '+918535075196').strip()
-    website_url = cfg.get('website_url', 'https://zoomnearby.com').strip()
-    server_url = cfg.get('server_url', 'https://saas.zoomnearby.com').rstrip('/')
-    package_id = cfg.get('package_id', 'com.zoomnearby.zoompos').strip().lower()
+    company_name = (cfg.get('company_name') or 'Zoom Nearby').strip()
+    product_name = (cfg.get('product_name') or 'Zoom Sales CRM').strip()
+    app_name = (cfg.get('app_name') or 'Zoom Sales POS').strip()
+    short_name = (cfg.get('short_name') or re.sub(r'[^a-zA-Z0-9]+', '', app_name)).strip()
+    display_name = (cfg.get('display_name') or app_name).strip()
+    org_name = (cfg.get('org_name') or company_name).strip()
+    copyright_text = (cfg.get('copyright') or f"Copyright (C) 2026 {company_name}. All rights reserved.").strip()
+    support_email = (cfg.get('support_email') or 'support@zoomnearby.com').strip()
+    support_phone = (cfg.get('support_phone') or '+918535075196').strip()
+    website_url = (cfg.get('website_url') or 'https://zoomnearby.com').strip()
+    server_url = (cfg.get('server_url') or 'https://saas.zoomnearby.com').rstrip('/')
+    package_id = (cfg.get('package_id') or 'com.zoomnearby.zoompos').strip().lower()
 
     # Colors
-    primary_color = cfg.get('primary_color', '#4F46E5').strip()
-    secondary_color = cfg.get('secondary_color', '#06B6D4').strip()
-    accent_color = cfg.get('accent_color', '#10B981').strip()
-    bg_color = cfg.get('bg_color', '#0F172A').strip()
-    sidebar_color = cfg.get('sidebar_color', '#1E293B').strip()
-    text_color = cfg.get('text_color', '#F8FAFC').strip()
+    primary_color = (cfg.get('primary_color') or '#4F46E5').strip()
+    secondary_color = (cfg.get('secondary_color') or '#06B6D4').strip()
+    accent_color = (cfg.get('accent_color') or '#10B981').strip()
+    bg_color = (cfg.get('bg_color') or '#0F172A').strip()
+    sidebar_color = (cfg.get('sidebar_color') or '#1E293B').strip()
+    text_color = (cfg.get('text_color') or '#F8FAFC').strip()
 
     short_snake = sanitize_slug(short_name)
     primary_hex = primary_color.lstrip('#').upper()
@@ -80,11 +261,9 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
     print(f"    - Server URL:  {server_url}")
     print(f"    - Primary Col: {primary_color}")
 
-    # 1. COPY VISUAL ASSETS & ICONS
+    # 1. COPY PRE-BUNDLED VISUAL ASSETS (if available)
     if assets_dir and os.path.isdir(assets_dir):
-        print(f"[*] Copying generated white-label visual assets from {assets_dir}...")
-        
-        # Mappings of source file -> destination path in project_root
+        print(f"[*] Copying available white-label visual assets from {assets_dir}...")
         asset_mappings = {
             'android/mipmap-mdpi/ic_launcher.png': 'android/app/src/main/res/mipmap-mdpi/ic_launcher.png',
             'android/mipmap-hdpi/ic_launcher.png': 'android/app/src/main/res/mipmap-hdpi/ic_launcher.png',
@@ -110,9 +289,15 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
             if os.path.exists(src_full):
                 os.makedirs(os.path.dirname(dst_full), exist_ok=True)
                 shutil.copy2(src_full, dst_full)
-                print(f"    ✓ Replaced icon: {dst_rel}")
+                print(f"    ✓ Replaced asset: {dst_rel}")
 
-    # 2. ANDROID WHITE LABEL
+    # 2. GENERATE COMPLETE ICON SET VIA PILLOW
+    print(f"[*] Ensuring complete icon suite generation via Pillow...")
+    master_img = get_or_create_master_image(assets_dir, config_path, cfg, primary_color, app_name, short_name)
+    if master_img is not None:
+        generate_all_icons_from_master(project_root, master_img)
+
+    # 3. ANDROID WHITE LABEL
     print(f"[*] Applying Android White-Label Customizations...")
     gradle_file = os.path.join(project_root, 'android/app/build.gradle.kts')
     if not os.path.exists(gradle_file):
@@ -128,7 +313,6 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
         safe_replace(manifest_file, r'android:label="[^"]*"', f'android:label="{display_name}"')
         print("    ✓ Updated AndroidManifest.xml app label")
 
-    # Strings.xml
     res_dir = os.path.join(project_root, 'android/app/src/main/res/values')
     os.makedirs(res_dir, exist_ok=True)
     strings_file = os.path.join(res_dir, 'strings.xml')
@@ -136,7 +320,6 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
         f.write(f'<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">{display_name}</string>\n</resources>\n')
     print("    ✓ Created/updated res/values/strings.xml")
 
-    # Kotlin package statement and directory refactor
     kotlin_root = os.path.join(project_root, 'android/app/src/main/kotlin')
     if os.path.exists(kotlin_root):
         pkg_parts = package_id.split('.')
@@ -153,13 +336,13 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
                         shutil.move(filepath, dest_file)
                         print(f"    ✓ Moved {file} to {package_id} directory")
 
-    # 3. WEB WHITE LABEL
+    # 4. WEB WHITE LABEL
     print(f"[*] Applying Web White-Label Customizations...")
     web_index = os.path.join(project_root, 'web/index.html')
     if os.path.exists(web_index):
         safe_replace(web_index, r'<title>.*?</title>', f'<title>{display_name}</title>')
-        safe_replace(web_index, r'<meta\s+name="description"\s+content="[^"]*"', f'<meta name="description" content="{product_name} client — {company_name}"')
-        safe_replace(web_index, r'<meta\s+name="apple-mobile-web-app-title"\s+content="[^"]*"', f'<meta name="apple-mobile-web-app-title" content="{short_name}"')
+        safe_replace(web_index, r'<meta\s+name="description"\s+content="[^"]*"', f'<meta name="description" content="{product_name} client — {company_name}">')
+        safe_replace(web_index, r'<meta\s+name="apple-mobile-web-app-title"\s+content="[^"]*"', f'<meta name="apple-mobile-web-app-title" content="{short_name}">')
         safe_replace(web_index, r'<h1\s+class="brand-title">.*?</h1>', f'<h1 class="brand-title">{app_name}</h1>')
         safe_replace(web_index, r'<p\s+class="brand-subtitle">.*?</p>', f'<p class="brand-subtitle">{product_name}</p>')
         safe_replace(web_index, r'alt=".*?Logo"', f'alt="{app_name} Logo"')
@@ -168,6 +351,45 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
         safe_replace(web_index, r'--bg-color:\s*#[0-9a-fA-F]+;', f'--bg-color: {bg_color};')
         safe_replace(web_index, r'--card-bg:\s*#[0-9a-fA-F]+;', f'--card-bg: {sidebar_color};')
         safe_replace(web_index, r'--text-main:\s*#[0-9a-fA-F]+;', f'--text-main: {text_color};')
+
+        # Branded monogram fallback
+        monogram = re.sub(r'[^a-zA-Z0-9]', '', short_name or app_name)[:3].upper() or 'POS'
+        safe_replace(web_index, r'<div id="brand-fallback-icon"[^>]*>.*?</div>', f'<div id="brand-fallback-icon" style="display:none;width:68px;height:68px;border-radius:16px;background:var(--primary);color:#fff;font-size:24px;font-weight:800;align-items:center;justify-content:center;margin-bottom:18px;box-shadow:0 6px 16px var(--primary-shadow);">{monogram}</div>')
+
+        # Ensure universal dynamic base href resolver is in <head> and remove static base tag
+        try:
+            with open(web_index, 'r', encoding='utf-8') as f:
+                html = f.read()
+            html = re.sub(r'<base\s+href=[\"\'][^\"\']*[\"\']\s*/?>\s*', '', html)
+            if 'Universal Directory & Subfolder Base Path Resolver' not in html:
+                resolver_snippet = """<head>
+  <script>
+    // Universal Directory & Subfolder Base Path Resolver
+    (function () {
+      var loc = window.location;
+      var path = loc.pathname;
+      var lastSeg = path.split('/').pop();
+      if (path.length > 1 && !path.endsWith('/') && !lastSeg.includes('.')) {
+        window.location.replace(loc.protocol + '//' + loc.host + path + '/' + loc.search + loc.hash);
+        return;
+      }
+      if (!path.endsWith('/')) {
+        path = path.substring(0, path.lastIndexOf('/') + 1);
+      }
+      var baseEl = document.querySelector('base');
+      if (!baseEl) {
+        baseEl = document.createElement('base');
+        document.head.prepend(baseEl);
+      }
+      baseEl.setAttribute('href', path || '/');
+    })();
+  </script>"""
+                html = re.sub(r'<head>', resolver_snippet, html, count=1)
+            with open(web_index, 'w', encoding='utf-8') as f:
+                f.write(html)
+        except Exception as e:
+            print(f"    [WARN] Error ensuring dynamic base resolver: {e}")
+
         print("    ✓ Updated web/index.html title, meta tags, and loading screen")
 
     web_manifest = os.path.join(project_root, 'web/manifest.json')
@@ -186,7 +408,46 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
         except Exception as e:
             print(f"[WARN] Error updating web/manifest.json: {e}")
 
-    # 4. WINDOWS WHITE LABEL
+    # Write Apache .htaccess for Web
+    web_htaccess = os.path.join(project_root, 'web/.htaccess')
+    htaccess_content = """<IfModule mod_mime.c>
+  AddType application/wasm .wasm
+  AddType application/javascript .js
+  AddType application/json .json
+  AddType image/png .png
+  AddType image/svg+xml .svg
+  AddType image/x-icon .ico
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase ./
+  
+  # Allow direct access to actual files and directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Redirect all SPA routes to index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "(index\\.html|version\\.json|flutter_service_worker\\.js)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires 0
+  </FilesMatch>
+</IfModule>
+"""
+    try:
+        with open(web_htaccess, 'w', encoding='utf-8') as f:
+            f.write(htaccess_content)
+        print("    ✓ Created/updated web/.htaccess")
+    except Exception as e:
+        print(f"[WARN] Error writing web/.htaccess: {e}")
+
+    # 5. WINDOWS WHITE LABEL
     print(f"[*] Applying Windows White-Label Customizations...")
     win_cmake = os.path.join(project_root, 'windows/CMakeLists.txt')
     if os.path.exists(win_cmake):
@@ -217,7 +478,7 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
         safe_replace(iss_file, r'#define MyAppExeName\s+"[^"]*"', f'#define MyAppExeName "{short_snake}.exe"')
         print("    ✓ Updated installer.iss InnoSetup script")
 
-    # 5. IOS WHITE LABEL
+    # 6. IOS WHITE LABEL
     print(f"[*] Applying iOS White-Label Customizations...")
     pbx_file = os.path.join(project_root, 'ios/Runner.xcodeproj/project.pbxproj')
     if os.path.exists(pbx_file):
@@ -230,11 +491,10 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
         safe_replace(plist_file, r'<key>CFBundleName</key>\s*<string>[^<]*</string>', f'<key>CFBundleName</key><string>{short_name}</string>')
         print("    ✓ Updated iOS CFBundleDisplayName & CFBundleName")
 
-    # 6. FLUTTER CONFIG & GLOBAL DART REPLACEMENTS
+    # 7. FLUTTER CONFIG & GLOBAL DART REPLACEMENTS
     print(f"[*] Applying Flutter Code & Theme Customizations...")
     pubspec_file = os.path.join(project_root, 'pubspec.yaml')
     if os.path.exists(pubspec_file):
-        # Keep internal package name intact to preserve Dart package resolution across all internal imports
         safe_replace(pubspec_file, r'description:\s*"[^"]*"', f'description: "{product_name} client — {company_name}."')
         print("    ✓ Updated pubspec.yaml description")
 
@@ -287,6 +547,7 @@ def apply_whitelabel(project_root, config_path, assets_dir=None):
     print(f"=================================================================")
     print(f"White-Label Transformation Completed Successfully!")
     print(f"=================================================================")
+
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
