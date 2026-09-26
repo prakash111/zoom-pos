@@ -1,4 +1,5 @@
 name: App Builder CI/CD Engine
+run-name: App Builder ${{ inputs.platform }} - ${{ inputs.build_id }}
 
 on:
   workflow_dispatch:
@@ -22,6 +23,11 @@ on:
         required: false
         default: 'Zoom Sales POS'
         type: string
+      short_name:
+        description: 'Short Application Name / Executable Slug'
+        required: false
+        default: 'ZoomPOS'
+        type: string
       package_id:
         description: 'Package / Bundle Identifier (e.g. com.company.pos)'
         required: false
@@ -36,6 +42,16 @@ on:
         description: 'Primary Theme Color Hex (e.g. #4F46E5)'
         required: false
         default: '#4F46E5'
+        type: string
+      branding_bundle_url:
+        description: 'URL to download the generated icons and white-label branding bundle'
+        required: false
+        default: ''
+        type: string
+      branding_json:
+        description: 'Raw JSON containing complete branding configuration'
+        required: false
+        default: ''
         type: string
       custom_logo_base64:
         description: 'Base64 encoded custom logo PNG'
@@ -65,12 +81,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Apply Custom Source ZIP (if provided)
+        if: ${{ inputs.custom_source_url != '' }}
+        run: |
+          echo "Applying custom uploaded source package from ${{ inputs.custom_source_url }}..."
+          curl -f -L -s -S "${{ inputs.custom_source_url }}" -o custom_source.zip
+          unzip -o -q custom_source.zip -d .
+          rm -f custom_source.zip
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
       - name: Set up Flutter (stable, cached)
         uses: subosito/flutter-action@v2
@@ -90,11 +119,11 @@ jobs:
         env:
           STORE_PASS: ${{ secrets.KEYSTORE_PASSWORD || '123456789' }}
           KEY_PASS: ${{ secrets.KEY_PASSWORD || '123456789' }}
-          ALIAS: ${{ secrets.KEY_ALIAS || 'zoom-pos' }}
+          ALIAS: ${{ inputs.short_name || 'app' }}
         run: |
-          KEYSTORE_PATH="$GITHUB_WORKSPACE/zoom-pos.jks"
+          KEYSTORE_PATH="$GITHUB_WORKSPACE/app-release-key.jks"
           if [ ! -s "$KEYSTORE_PATH" ]; then
-            keytool -genkeypair -v -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASS" -keypass "$KEY_PASS" -alias "$ALIAS" -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=ZoomNearby CI, OU=Build, O=ZoomNearby, C=IN"
+            keytool -genkeypair -v -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASS" -keypass "$KEY_PASS" -alias "$ALIAS" -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=${{ inputs.app_name }}, OU=Production, O=${{ inputs.app_name }}, C=US"
           fi
           cat <<KEYPROP > android/key.properties
           storePassword=$STORE_PASS
@@ -103,37 +132,52 @@ jobs:
           storeFile=$KEYSTORE_PATH
           KEYPROP
 
-      - name: Apply Customizations
+      - name: Apply Complete White-Label Branding
         run: |
-          echo "Applying customizations for Build ${{ inputs.build_id }}..."
-          
-          # 1. Package ID / Application ID
-          if [ -n "${{ inputs.package_id }}" ]; then
+          echo "Starting complete White-Label Branding System for ${{ inputs.build_id }}..."
+          mkdir -p branding_workspace
+
+          # 1. Fetch Branding Assets Bundle if provided
+          if [ -n "${{ inputs.branding_bundle_url }}" ]; then
+            echo "Fetching branding assets bundle from ${{ inputs.branding_bundle_url }}..."
+            curl -f -L -s -S "${{ inputs.branding_bundle_url }}" -o branding_workspace/bundle.zip || true
+            if [ -s "branding_workspace/bundle.zip" ]; then
+              unzip -o -q branding_workspace/bundle.zip -d branding_workspace/
+            fi
+          fi
+
+          # 2. Prepare Config JSON
+          if [ ! -f "branding_workspace/branding_config.json" ]; then
+            if [ -n "${{ inputs.branding_json }}" ]; then
+              echo '${{ inputs.branding_json }}' > branding_workspace/branding_config.json
+            else
+              cat <<EOF > branding_workspace/branding_config.json
+              {
+                "app_name": "${{ inputs.app_name }}",
+                "short_name": "${{ inputs.short_name }}",
+                "display_name": "${{ inputs.app_name }}",
+                "package_id": "${{ inputs.package_id }}",
+                "server_url": "${{ inputs.server_url }}",
+                "primary_color": "${{ inputs.primary_color }}"
+              }
+          EOF
+            fi
+          fi
+
+          # 3. Ensure whitelabel.py script exists
+          if [ ! -f "scripts/whitelabel.py" ]; then
+            mkdir -p scripts
+            curl -f -L -s -S "https://saas.zoomnearby.com/app-builder/scripts/whitelabel.py" -o scripts/whitelabel.py || true
+          fi
+
+          # 4. Execute White-Label Engine
+          if [ -f "scripts/whitelabel.py" ]; then
+            python3 scripts/whitelabel.py . branding_workspace/branding_config.json branding_workspace/assets
+          else
+            echo "Fallback white-label replacement..."
             sed -i 's/applicationId = "[^"]*"/applicationId = "${{ inputs.package_id }}"/g' android/app/build.gradle.kts || true
             sed -i 's/namespace = "[^"]*"/namespace = "${{ inputs.package_id }}"/g' android/app/build.gradle.kts || true
-          fi
-
-          # 2. App Name
-          if [ -n "${{ inputs.app_name }}" ]; then
             sed -i 's/android:label="[^"]*"/android:label="${{ inputs.app_name }}"/g' android/app/src/main/AndroidManifest.xml || true
-          fi
-
-          # 3. Server URL injection
-          if [ -n "${{ inputs.server_url }}" ]; then
-            CLEAN_URL=$(echo "${{ inputs.server_url }}" | sed 's:/*$::')
-            sed -i "s|defaultBaseUrl = '[^']*'|defaultBaseUrl = '$CLEAN_URL'|g" lib/core/config/app_config.dart || true
-          fi
-
-          # 4. Primary Theme Color injection
-          if [ -n "${{ inputs.primary_color }}" ]; then
-            HEX_VAL=$(echo "${{ inputs.primary_color }}" | tr -d '#' | tr '[:lower:]' '[:upper:]')
-            sed -i "s|Color primary = Color(0x[0-9A-Fa-f]*)|Color primary = Color(0xFF$HEX_VAL)|g" lib/core/config/theme.dart || true
-          fi
-
-          # 5. Custom Logo
-          if [ -n "${{ inputs.custom_logo_base64 }}" ]; then
-            echo "${{ inputs.custom_logo_base64 }}" | base64 --decode > assets/icons/app_icon.png || true
-            echo "${{ inputs.custom_logo_base64 }}" | base64 --decode > assets/images/app_logo.png || true
           fi
 
       - name: Flutter pub get
@@ -142,11 +186,26 @@ jobs:
       - name: Build signed Android release APK
         run: flutter build apk --release --android-skip-build-dependency-validation
 
-      - name: Prepare Artifacts
+      - name: Build Android App Bundle (AAB)
+        continue-on-error: true
+        run: flutter build appbundle --release --android-skip-build-dependency-validation
+
+      - name: Prepare White-Labeled Artifacts
         run: |
+          BRAND_SLUG="${{ inputs.short_name || 'App' }}"
           mkdir -p builder-output
-          cp build/app/outputs/flutter-apk/app-release.apk builder-output/app-builder-${{ inputs.build_id }}-android.apk
-          cd builder-output && zip -r app-builder-${{ inputs.build_id }}-android.zip app-builder-${{ inputs.build_id }}-android.apk
+          
+          # Rename output APK to brand name
+          cp build/app/outputs/flutter-apk/app-release.apk "builder-output/${BRAND_SLUG}-v${{ env.APP_VERSION }}-android.apk"
+          
+          # Rename AAB if created
+          if [ -f "build/app/outputs/bundle/release/app-release.aab" ]; then
+            cp build/app/outputs/bundle/release/app-release.aab "builder-output/${BRAND_SLUG}-v${{ env.APP_VERSION }}-android.aab"
+          fi
+          
+          # Bundle for user download
+          cd builder-output
+          zip -r "app-builder-${{ inputs.build_id }}-android.zip" *
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -167,6 +226,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Apply Custom Source ZIP (if provided)
+        if: ${{ inputs.custom_source_url != '' }}
+        run: |
+          echo "Applying custom uploaded source package from ${{ inputs.custom_source_url }}..."
+          curl -f -L -s -S "${{ inputs.custom_source_url }}" -o custom_source.zip
+          unzip -o -q custom_source.zip -d .
+          rm -f custom_source.zip
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Set up Flutter (stable, cached)
         uses: subosito/flutter-action@v2
         with:
@@ -178,26 +250,42 @@ jobs:
           flutter config --enable-web
           flutter create --platforms=web .
 
-      - name: Apply Customizations
+      - name: Apply Complete White-Label Branding
         run: |
-          echo "Applying customizations for Web Build ${{ inputs.build_id }}..."
+          echo "Starting complete White-Label Branding System for Web ${{ inputs.build_id }}..."
+          mkdir -p branding_workspace
 
-          # 1. Server URL injection
-          if [ -n "${{ inputs.server_url }}" ]; then
-            CLEAN_URL=$(echo "${{ inputs.server_url }}" | sed 's:/*$::')
-            sed -i "s|defaultBaseUrl = '[^']*'|defaultBaseUrl = '$CLEAN_URL'|g" lib/core/config/app_config.dart || true
+          if [ -n "${{ inputs.branding_bundle_url }}" ]; then
+            curl -f -L -s -S "${{ inputs.branding_bundle_url }}" -o branding_workspace/bundle.zip || true
+            if [ -s "branding_workspace/bundle.zip" ]; then
+              unzip -o -q branding_workspace/bundle.zip -d branding_workspace/
+            fi
           fi
 
-          # 2. Primary Theme Color injection
-          if [ -n "${{ inputs.primary_color }}" ]; then
-            HEX_VAL=$(echo "${{ inputs.primary_color }}" | tr -d '#' | tr '[:lower:]' '[:upper:]')
-            sed -i "s|Color primary = Color(0x[0-9A-Fa-f]*)|Color primary = Color(0xFF$HEX_VAL)|g" lib/core/config/theme.dart || true
+          if [ ! -f "branding_workspace/branding_config.json" ]; then
+            if [ -n "${{ inputs.branding_json }}" ]; then
+              echo '${{ inputs.branding_json }}' > branding_workspace/branding_config.json
+            else
+              cat <<EOF > branding_workspace/branding_config.json
+              {
+                "app_name": "${{ inputs.app_name }}",
+                "short_name": "${{ inputs.short_name }}",
+                "display_name": "${{ inputs.app_name }}",
+                "package_id": "${{ inputs.package_id }}",
+                "server_url": "${{ inputs.server_url }}",
+                "primary_color": "${{ inputs.primary_color }}"
+              }
+          EOF
+            fi
           fi
 
-          # 3. Web Title & Manifest
-          if [ -n "${{ inputs.app_name }}" ]; then
-            sed -i "s|<title>.*</title>|<title>${{ inputs.app_name }}</title>|g" web/index.html || true
-            sed -i 's/"name": "[^"]*"/"name": "${{ inputs.app_name }}"/g' web/manifest.json || true
+          if [ ! -f "scripts/whitelabel.py" ]; then
+            mkdir -p scripts
+            curl -f -L -s -S "https://saas.zoomnearby.com/app-builder/scripts/whitelabel.py" -o scripts/whitelabel.py || true
+          fi
+
+          if [ -f "scripts/whitelabel.py" ]; then
+            python3 scripts/whitelabel.py . branding_workspace/branding_config.json branding_workspace/assets
           fi
 
       - name: Flutter pub get
@@ -206,10 +294,13 @@ jobs:
       - name: Build Flutter Web release
         run: flutter build web --release --base-href "/"
 
-      - name: Prepare Web Artifact
+      - name: Prepare White-Labeled Web Artifact
         run: |
+          BRAND_SLUG="${{ inputs.short_name || 'App' }}"
           mkdir -p builder-output
-          cd build/web && zip -r ../../builder-output/app-builder-${{ inputs.build_id }}-web.zip .
+          cd build/web
+          zip -r "../../builder-output/${BRAND_SLUG}-web.zip" .
+          cp "../../builder-output/${BRAND_SLUG}-web.zip" "../../builder-output/app-builder-${{ inputs.build_id }}-web.zip"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -230,6 +321,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Apply Custom Source ZIP (if provided)
+        if: ${{ inputs.custom_source_url != '' }}
+        shell: pwsh
+        run: |
+          Write-Host "Applying custom uploaded source package from ${{ inputs.custom_source_url }}..."
+          Invoke-WebRequest -Uri "${{ inputs.custom_source_url }}" -OutFile "custom_source.zip"
+          Expand-Archive -Path "custom_source.zip" -DestinationPath . -Force
+          Remove-Item -Force "custom_source.zip"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Setup Flutter (stable, cached)
         uses: subosito/flutter-action@v2
         with:
@@ -244,17 +349,44 @@ jobs:
             flutter create --platforms=windows .
           }
 
-      - name: Apply Customizations
+      - name: Apply Complete White-Label Branding
         shell: pwsh
         run: |
-          Write-Host "Applying Windows customizations..."
-          if ("${{ inputs.server_url }}") {
-            $cleanUrl = "${{ inputs.server_url }}".TrimEnd('/')
-            (Get-Content lib/core/config/app_config.dart) -replace "defaultBaseUrl = '.*'", "defaultBaseUrl = '$cleanUrl'" | Set-Content lib/core/config/app_config.dart
+          Write-Host "Starting complete White-Label Branding System for Windows ${{ inputs.build_id }}..."
+          New-Item -ItemType Directory -Force -Path branding_workspace
+
+          if ("${{ inputs.branding_bundle_url }}") {
+            try {
+              Invoke-WebRequest -Uri "${{ inputs.branding_bundle_url }}" -OutFile "branding_workspace/bundle.zip"
+              Expand-Archive -Path "branding_workspace/bundle.zip" -DestinationPath "branding_workspace" -Force
+            } catch {
+              Write-Host "Could not download bundle. Continuing with parameters..."
+            }
           }
-          if ("${{ inputs.primary_color }}") {
-            $hex = "${{ inputs.primary_color }}".Replace('#', '').ToUpper()
-            (Get-Content lib/core/config/theme.dart) -replace 'Color primary = Color\(0x[0-9A-Fa-f]+\)', "Color primary = Color(0xFF$hex)" | Set-Content lib/core/config/theme.dart
+
+          if (-not (Test-Path "branding_workspace/branding_config.json")) {
+            if ("${{ inputs.branding_json }}") {
+              Set-Content -Path "branding_workspace/branding_config.json" -Value '${{ inputs.branding_json }}'
+            } else {
+              $defaultJson = @{
+                app_name = "${{ inputs.app_name }}"
+                short_name = "${{ inputs.short_name }}"
+                display_name = "${{ inputs.app_name }}"
+                package_id = "${{ inputs.package_id }}"
+                server_url = "${{ inputs.server_url }}"
+                primary_color = "${{ inputs.primary_color }}"
+              } | ConvertTo-Json
+              Set-Content -Path "branding_workspace/branding_config.json" -Value $defaultJson
+            }
+          }
+
+          if (-not (Test-Path "scripts/whitelabel.py")) {
+            New-Item -ItemType Directory -Force -Path scripts
+            Invoke-WebRequest -Uri "https://saas.zoomnearby.com/app-builder/scripts/whitelabel.py" -OutFile "scripts/whitelabel.py"
+          }
+
+          if (Test-Path "scripts/whitelabel.py") {
+            python scripts/whitelabel.py . branding_workspace/branding_config.json branding_workspace/assets
           }
 
       - name: Flutter pub get
@@ -263,17 +395,27 @@ jobs:
       - name: Build Windows release
         run: flutter build windows --release
 
-      - name: Package Windows Artifact
+      - name: Package White-Labeled Windows Artifact
         shell: pwsh
         run: |
+          $brand = "${{ inputs.short_name }}"
+          if (-not $brand) { $brand = "App" }
           New-Item -ItemType Directory -Force -Path builder-output
-          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath builder-output\app-builder-${{ inputs.build_id }}-windows.zip -Force
+          
+          # Find output directory
+          $releaseDir = "build\windows\x64\runner\Release"
+          if (-not (Test-Path $releaseDir)) {
+            $releaseDir = (Get-ChildItem -Path "build\windows" -Recurse -Directory -Filter "Release" | Select-Object -First 1).FullName
+          }
+          
+          Compress-Archive -Path "$releaseDir\*" -DestinationPath "builder-output\$brand-windows.zip" -Force
+          Copy-Item "builder-output\$brand-windows.zip" "builder-output\app-builder-${{ inputs.build_id }}-windows.zip"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-builder-${{ inputs.build_id }}-windows
-          path: builder-output\app-builder-${{ inputs.build_id }}-windows.zip
+          path: builder-output/app-builder-${{ inputs.build_id }}-windows.zip
           retention-days: 7
 
   # ============================================================================
@@ -288,25 +430,61 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Apply Custom Source ZIP (if provided)
+        if: ${{ inputs.custom_source_url != '' }}
+        run: |
+          echo "Applying custom uploaded source package from ${{ inputs.custom_source_url }}..."
+          curl -f -L -s -S "${{ inputs.custom_source_url }}" -o custom_source.zip
+          unzip -o -q custom_source.zip -d .
+          rm -f custom_source.zip
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Set up Flutter (stable, cached)
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
-      - name: Apply Customizations
+      - name: Apply Complete White-Label Branding
         run: |
-          echo "Applying iOS customizations..."
-          if [ -n "${{ inputs.package_id }}" ]; then
-            sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = ${{ inputs.package_id }};/g' ios/Runner.xcodeproj/project.pbxproj || true
+          echo "Starting complete White-Label Branding System for iOS ${{ inputs.build_id }}..."
+          mkdir -p branding_workspace
+
+          if [ -n "${{ inputs.branding_bundle_url }}" ]; then
+            curl -f -L -s -S "${{ inputs.branding_bundle_url }}" -o branding_workspace/bundle.zip || true
+            if [ -s "branding_workspace/bundle.zip" ]; then
+              unzip -o -q branding_workspace/bundle.zip -d branding_workspace/
+            fi
           fi
-          if [ -n "${{ inputs.server_url }}" ]; then
-            CLEAN_URL=$(echo "${{ inputs.server_url }}" | sed 's:/*$::')
-            sed -i '' "s|defaultBaseUrl = '[^']*'|defaultBaseUrl = '$CLEAN_URL'|g" lib/core/config/app_config.dart || true
+
+          if [ ! -f "branding_workspace/branding_config.json" ]; then
+            if [ -n "${{ inputs.branding_json }}" ]; then
+              echo '${{ inputs.branding_json }}' > branding_workspace/branding_config.json
+            else
+              cat <<EOF > branding_workspace/branding_config.json
+              {
+                "app_name": "${{ inputs.app_name }}",
+                "short_name": "${{ inputs.short_name }}",
+                "display_name": "${{ inputs.app_name }}",
+                "package_id": "${{ inputs.package_id }}",
+                "server_url": "${{ inputs.server_url }}",
+                "primary_color": "${{ inputs.primary_color }}"
+              }
+          EOF
+            fi
           fi
-          if [ -n "${{ inputs.primary_color }}" ]; then
-            HEX_VAL=$(echo "${{ inputs.primary_color }}" | tr -d '#' | tr '[:lower:]' '[:upper:]')
-            sed -i '' "s|Color primary = Color(0x[0-9A-Fa-f]*)|Color primary = Color(0xFF$HEX_VAL)|g" lib/core/config/theme.dart || true
+
+          if [ ! -f "scripts/whitelabel.py" ]; then
+            mkdir -p scripts
+            curl -f -L -s -S "https://saas.zoomnearby.com/app-builder/scripts/whitelabel.py" -o scripts/whitelabel.py || true
+          fi
+
+          if [ -f "scripts/whitelabel.py" ]; then
+            python3 scripts/whitelabel.py . branding_workspace/branding_config.json branding_workspace/assets
           fi
 
       - name: Flutter pub get
@@ -315,10 +493,13 @@ jobs:
       - name: Build iOS release bundle (no codesign)
         run: flutter build ios --release --no-codesign
 
-      - name: Package iOS Artifact
+      - name: Package White-Labeled iOS Artifact
         run: |
+          BRAND_SLUG="${{ inputs.short_name || 'App' }}"
           mkdir -p builder-output
-          cd build/ios/iphoneos && zip -r ../../../builder-output/app-builder-${{ inputs.build_id }}-ios.zip Runner.app
+          cd build/ios/iphoneos
+          zip -r "../../../builder-output/${BRAND_SLUG}-ios.ipa" Runner.app
+          zip -r "../../../builder-output/app-builder-${{ inputs.build_id }}-ios.zip" Runner.app
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
