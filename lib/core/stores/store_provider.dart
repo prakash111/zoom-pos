@@ -18,6 +18,8 @@ class StoreBranch {
   const StoreBranch(
       {required this.id,
       required this.name,
+      this.fullName = '',
+      this.shortName = '',
       required this.code,
       required this.isPrimary,
       this.address = '',
@@ -27,16 +29,33 @@ class StoreBranch {
       this.isCurrent = false});
 
   final int id;
-  final String name, code, address, phone, taxId;
+  final String name, fullName, shortName, code, address, phone, taxId;
   final bool isPrimary, isActive, isCurrent;
+
+  String get effectiveFullName => fullName.isNotEmpty ? fullName : name;
+  String get effectiveShortName => shortName.isNotEmpty
+      ? (shortName.length > 4 ? shortName.substring(0, 4) : shortName)
+      : (effectiveFullName.length > 4
+          ? effectiveFullName.substring(0, 4)
+          : effectiveFullName);
 
   factory StoreBranch.fromJson(Map<String, dynamic> json) {
     final id = _asInt(json['id']);
-    if (id == null)
+    if (id == null) {
       throw const FormatException('Store response has an invalid ID.');
+    }
+    final rawName = json['name']?.toString() ?? '';
+    final fullName = json['full_name']?.toString() ?? (rawName.isNotEmpty ? rawName : '');
+    final shortName = json['short_name']?.toString() ??
+        (fullName.isNotEmpty
+            ? (fullName.length > 4 ? fullName.substring(0, 4) : fullName)
+            : (rawName.length > 4 ? rawName.substring(0, 4) : rawName));
+
     return StoreBranch(
         id: id,
-        name: json['name']?.toString() ?? '',
+        name: rawName,
+        fullName: fullName,
+        shortName: shortName,
         code: json['code']?.toString() ?? '',
         address: json['address']?.toString() ?? '',
         phone: json['phone']?.toString() ?? '',
@@ -49,6 +68,8 @@ class StoreBranch {
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
+        'full_name': fullName,
+        'short_name': shortName,
         'code': code,
         'address': address,
         'phone': phone,
@@ -64,6 +85,7 @@ class StoreProvider extends ChangeNotifier {
   final ApiClient _api;
   List<StoreBranch> stores = const [];
   StoreBranch? current;
+  StoreBranch? get currentStore => current;
   int storeLimit = 1, storeCount = 0;
   bool canCreate = false, canManage = false, loading = false, fromCache = false;
   String? error, _loadedCacheKey, defaultDialCode;

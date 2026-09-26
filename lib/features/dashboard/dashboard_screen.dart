@@ -45,6 +45,7 @@ import '../sales/screens/sales_screen.dart';
 import '../stores/store_switcher_sheet.dart';
 import '../settings/screens/change_password_screen.dart';
 import '../settings/settings_repository.dart';
+import '../../core/widgets/date_range_picker.dart';
 import '../../screens/dashboard/widgets/profile_menu_popup.dart';
 
 const int _maximumNavigationDepth = 2;
@@ -640,7 +641,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     DateTimeRange? custom;
     if (selected == AnalyticsRange.custom) {
       final now = DateTime.now();
-      custom = await showDateRangePicker(
+      custom = await showPosDateRangePicker(
         context: context,
         firstDate: DateTime(now.year - 5),
         lastDate: now,
@@ -1000,7 +1001,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             bootstrap.logoUrl ??
             bootstrap.tenant?.logoUrl ??
             bootstrap.config['logo_url']?.toString();
-        final storeTitle = context.watch<StoreProvider>().current?.name ??
+        final currentBranch = context.watch<StoreProvider>().current;
+        final storeTitle = (currentBranch?.fullName.isNotEmpty == true
+                ? currentBranch!.fullName
+                : currentBranch?.name) ??
             company?.tradeName ??
             company?.name ??
             bootstrap.tenant?.businessName ??
@@ -2147,10 +2151,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  currentStore?.name ??
-                      company?.tradeName ??
-                      company?.name ??
-                      'Zoom Sales CRM & Inventory',
+                  () {
+                    final rawHeaderStoreName =
+                        currentStore?.shortName.isNotEmpty == true
+                            ? currentStore!.shortName
+                            : (currentStore?.name ??
+                                company?.tradeName ??
+                                company?.name ??
+                                'Zoom Sales CRM & Inventory');
+                    return rawHeaderStoreName.length > 4
+                        ? rawHeaderStoreName.substring(0, 4)
+                        : rawHeaderStoreName;
+                  }(),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

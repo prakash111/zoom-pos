@@ -1,10 +1,13 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/dashboard_summary_model.dart';
 import '../../../core/providers/dashboard_provider.dart';
+import '../../../core/services/dynamic_string_service.dart';
 import '../../../core/stores/store_provider.dart';
+import '../../../core/widgets/date_range_picker.dart';
 
 /// Sales Overview interactive chart with responsive segmented date filter pills
 /// and dynamic store-scoped metrics.
@@ -33,11 +36,11 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
     if (_customDateRange != null) {
       final start = _customDateRange!.start;
       final end = _customDateRange!.end;
-      final s = '${start.day.toString().padLeft(2, '0')}/${start.month.toString().padLeft(2, '0')}';
-      final e = '${end.day.toString().padLeft(2, '0')}/${end.month.toString().padLeft(2, '0')}';
-      return '$s - $e';
+      final s = DateFormat('MMM d').format(start);
+      final e = DateFormat('MMM d').format(end);
+      return '$s – $e';
     }
-    return 'Custom';
+    return context.tr('Custom');
   }
 
   static const List<Map<String, String>> _periods = [
@@ -54,14 +57,25 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
     // Seed initial data to DashboardProvider if provider has no data yet
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final provider = context.read<DashboardProvider>();
-      if (provider.salesOverview == null && widget.initialData != null) {
-        provider.setSalesOverview(widget.initialData!);
+      final provider = context.read<DashboardProvider?>();
+      if (provider?.salesOverview == null && widget.initialData != null) {
+        provider?.setSalesOverview(widget.initialData!);
       }
     });
   }
 
-  Future<void> _pickCustomDateRange() async {
+  @override
+  void didUpdateWidget(covariant SalesOverviewChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialData != null &&
+        widget.initialData?.currentRange != oldWidget.initialData?.currentRange) {
+      _selectedPeriod = widget.initialData!.currentRange;
+    }
+  }
+
+  /// Reuses the exact dark-themed date range picker modal matching the Sales screen.
+  Future<void> _openSalesOverviewDatePicker([BuildContext? ctx]) async {
+    final targetContext = ctx ?? context;
     final now = DateTime.now();
     final initialRange = _customDateRange ??
         DateTimeRange(
@@ -69,17 +83,11 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
           end: now,
         );
 
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(now.year + 2),
+    final picked = await showPosDateRangePicker(
+      context: targetContext,
       initialDateRange: initialRange,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context),
-          child: child ?? const SizedBox(),
-        );
-      },
+      firstDate: DateTime(now.year - 2),
+      lastDate: now,
     );
 
     if (picked != null) {
@@ -93,12 +101,14 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
       final startDateStr = picked.start.toIso8601String().split('T').first;
       final endDateStr = picked.end.toIso8601String().split('T').first;
 
-      context.read<DashboardProvider>().fetchSalesOverview(
-            period: 'custom',
-            storeId: currentStoreId,
-            startDate: startDateStr,
-            endDate: endDateStr,
-          );
+      try {
+        context.read<DashboardProvider?>()?.fetchSalesOverview(
+              period: 'custom',
+              storeId: currentStoreId,
+              startDate: startDateStr,
+              endDate: endDateStr,
+            );
+      } catch (_) {}
 
       widget.onPeriodChanged?.call('custom');
     }
@@ -106,7 +116,7 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
 
   void _handlePeriodSelected(String periodKey) {
     if (periodKey == 'custom') {
-      _pickCustomDateRange();
+      _openSalesOverviewDatePicker(context);
       return;
     }
 
@@ -117,9 +127,11 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
     final currentStoreId = widget.storeId ??
         context.read<StoreProvider?>()?.current?.id;
 
-    context
-        .read<DashboardProvider>()
-        .fetchSalesOverview(period: periodKey, storeId: currentStoreId);
+    try {
+      context
+          .read<DashboardProvider?>()
+          ?.fetchSalesOverview(period: periodKey, storeId: currentStoreId);
+    } catch (_) {}
 
     widget.onPeriodChanged?.call(periodKey);
   }
@@ -127,13 +139,17 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dashboardProvider = context.watch<DashboardProvider>();
+    final dashboardProvider = context.watch<DashboardProvider?>();
 
-    final overview = dashboardProvider.salesOverview ?? widget.initialData;
-    final activeRange = dashboardProvider.currentPeriod.isNotEmpty
-        ? dashboardProvider.currentPeriod
+    final overview = (dashboardProvider?.salesOverview != null &&
+            (dashboardProvider?.currentPeriod.isEmpty == true ||
+             dashboardProvider?.currentPeriod == _selectedPeriod))
+        ? dashboardProvider!.salesOverview!
+        : (widget.initialData ?? dashboardProvider?.salesOverview);
+    final activeRange = (dashboardProvider?.currentPeriod.isNotEmpty == true)
+        ? dashboardProvider!.currentPeriod
         : _selectedPeriod;
-    final isLoading = dashboardProvider.isLoading;
+    final isLoading = dashboardProvider?.isLoading ?? false;
 
     final series = overview?.series ?? [];
     final spots = <FlSpot>[];
@@ -166,14 +182,16 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
           // Header + Range Selector Pills
           LayoutBuilder(
             builder: (context, headerConstraints) {
-              final isHeaderCompact = headerConstraints.maxWidth < 460;
+              final isHeaderCompact = headerConstraints.maxWidth < 560;
               final headerInfo = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Sales Overview',
+                        context.tr('Sales Overview'),
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
@@ -194,7 +212,7 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
                     ],
                   ),
                   Text(
-                    'Revenue trend with area gradient',
+                    context.tr('Revenue trend with area gradient'),
                     style: TextStyle(
                       fontSize: 11,
                       color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -203,30 +221,35 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
                 ],
               );
 
-              final pillsRow = Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ..._periods.map((p) {
-                      return _buildFilterPill(
-                        label: p['label']!,
-                        periodKey: p['key']!,
-                        isSelected: activeRange == p['key'],
+              final pillsRow = SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ..._periods.map((p) {
+                        return _buildFilterPill(
+                          label: context.tr(p['label']!),
+                          periodKey: p['key']!,
+                          isSelected: activeRange == p['key'],
+                          isDark: isDark,
+                        );
+                      }),
+                      _buildFilterPill(
+                        label: _customLabel,
+                        periodKey: 'custom',
+                        isSelected: activeRange == 'custom',
                         isDark: isDark,
-                      );
-                    }),
-                    _buildFilterPill(
-                      label: _customLabel,
-                      periodKey: 'custom',
-                      isSelected: activeRange == 'custom',
-                      isDark: isDark,
-                    ),
-                  ],
+                        icon: Icons.calendar_today_outlined,
+                      ),
+                    ],
+                  ),
                 ),
               );
 
@@ -236,8 +259,8 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
                   children: [
                     headerInfo,
                     const SizedBox(height: 10),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                    SizedBox(
+                      width: double.infinity,
                       child: pillsRow,
                     ),
                   ],
@@ -245,11 +268,15 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
               }
 
               return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(child: headerInfo),
+                  headerInfo,
                   const SizedBox(width: 8),
-                  pillsRow,
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: pillsRow,
+                    ),
+                  ),
                 ],
               );
             },
@@ -377,8 +404,8 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
                 : Center(
                     child: Text(
                       isLoading
-                          ? 'Loading sales overview...'
-                          : 'No sales recorded for this period',
+                          ? context.tr('Loading sales overview...')
+                          : context.tr('No sales recorded for this period'),
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark
@@ -398,6 +425,7 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
     required String periodKey,
     required bool isSelected,
     required bool isDark,
+    IconData? icon,
   }) {
     return InkWell(
       onTap: () => _handlePeriodSelected(periodKey),
@@ -420,15 +448,30 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
                 ]
               : null,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected
-                ? (isDark ? Colors.white : const Color(0xFF0F172A))
-                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 13,
+                color: isSelected
+                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              ),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected
+                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              ),
+            ),
+          ],
         ),
       ),
     );

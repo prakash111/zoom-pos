@@ -9,6 +9,7 @@ import '../../../core/services/tenant_time_service.dart';
 import '../../../core/stores/store_provider.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/widgets/date_range_picker.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/responsive/desktop_content_area.dart';
@@ -105,24 +106,9 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   Future<void> _pickCustomDateRange() async {
-    final now = DateTime.now();
-    final initialRange = _customDateRange ??
-        DateTimeRange(
-          start: now.subtract(const Duration(days: 7)),
-          end: now,
-        );
-
-    final picked = await showDateRangePicker(
+    final picked = await showPosDateRangePicker(
       context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(now.year + 2),
-      initialDateRange: initialRange,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context),
-          child: child ?? const SizedBox(),
-        );
-      },
+      initialDateRange: _customDateRange,
     );
 
     if (picked != null) {

@@ -153,6 +153,67 @@ void main() {
       expect(mockApi.lastStoreId, '42');
       expect(dashboardProvider.currentPeriod, 'quarter');
     });
+
+    testWidgets(
+        'Tapping "Custom" opens the POS date range picker dialog and fetches custom range',
+        (tester) async {
+      final mockApi = _MockApiClient();
+      final dashboardProvider = DashboardProvider(mockApi);
+
+      const initialData = SalesOverviewData(
+        ranges: ['last_7_days', 'this_month', 'quarter'],
+        currentRange: 'last_7_days',
+        series: [
+          SalesOverviewPoint(
+              date: '2026-09-20', label: 'Sun', day: 'Sun', amount: 100),
+          SalesOverviewPoint(
+              date: '2026-09-21', label: 'Mon', day: 'Mon', amount: 200),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<DashboardProvider>.value(
+              value: dashboardProvider,
+            ),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: SalesOverviewChart(
+                  initialData: initialData,
+                  storeId: 42,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final customFinder = find.text('Custom');
+      await tester.ensureVisible(customFinder);
+      await tester.pumpAndSettle();
+
+      // Tap "Custom" pill
+      await tester.tap(customFinder);
+      await tester.pumpAndSettle();
+
+      // Verify DateRangePickerDialog is launched
+      expect(find.byType(DateRangePickerDialog), findsOneWidget);
+      final saveFinder = find.textContaining(RegExp(r'Save', caseSensitive: false));
+      expect(saveFinder, findsOneWidget);
+
+      // Tap Save to confirm date selection
+      await tester.tap(saveFinder);
+      await tester.pumpAndSettle();
+
+      expect(mockApi.lastPeriod, 'custom');
+      expect(mockApi.lastStoreId, '42');
+      expect(dashboardProvider.currentPeriod, 'custom');
+    });
   });
 
   group('POS Preview Direct Unified Dispatch Routing Tests', () {

@@ -84,6 +84,20 @@ class DashboardProvider extends ChangeNotifier {
     }
   }
 
+  /// Alias for [fetchSalesOverview] allowing callers to fetch chart data by period and dates
+  Future<void> fetchSalesChart({
+    required String period,
+    int? storeId,
+    String? startDate,
+    String? endDate,
+  }) =>
+      fetchSalesOverview(
+        period: period,
+        storeId: storeId,
+        startDate: startDate,
+        endDate: endDate,
+      );
+
   /// Sets sales overview data from external sources (e.g. initial dashboard summary)
   void setSalesOverview(SalesOverviewData data) {
     salesOverview = data;

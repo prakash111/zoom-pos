@@ -10,6 +10,7 @@ import '../../../core/models/report_models.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/file_download/file_download.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/widgets/date_range_picker.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../auth/auth_provider.dart';
@@ -87,7 +88,7 @@ class _ReportsScreenBodyState extends State<_ReportsScreenBody> with SingleTicke
 
   Future<void> _pickDateRange(BuildContext context) async {
     final reports = context.read<ReportsProvider>();
-    final picked = await showDateRangePicker(
+    final picked = await showPosDateRangePicker(
       context: context,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),

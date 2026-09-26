@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/dashboard_summary_model.dart';
+import '../../../core/services/dynamic_string_service.dart';
 
 class AmountReceivableCard extends StatelessWidget {
   const AmountReceivableCard({
@@ -42,7 +43,7 @@ class AmountReceivableCard extends StatelessWidget {
             runSpacing: 6,
             children: [
               Text(
-                'Amount Receivable',
+                context.tr('Amount Receivable'),
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
@@ -56,7 +57,7 @@ class AmountReceivableCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '${receivables.outstandingInvoicesCount} Invoices',
+                  '${receivables.outstandingInvoicesCount} ${context.tr('Invoices')}',
                   style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -79,7 +80,7 @@ class AmountReceivableCard extends StatelessWidget {
             ),
           ),
           Text(
-            'Total outstanding pending customer payment',
+            context.tr('Total outstanding pending customer payment'),
             style: TextStyle(
               fontSize: 11,
               color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -112,7 +113,7 @@ class AmountReceivableCard extends StatelessWidget {
                     child: const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 15),
                   ),
                   const SizedBox(width: 8),
-                  const Text('Overdue Amount', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                  Text(context.tr('Overdue Amount'), style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
                   const Spacer(),
                   Text(
                     receivables.formattedOverdue,
@@ -150,7 +151,7 @@ class AmountReceivableCard extends StatelessWidget {
                     child: const Icon(Icons.access_time, color: Color(0xFFF59E0B), size: 15),
                   ),
                   const SizedBox(width: 8),
-                  const Text('Due Today', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                  Text(context.tr('Due Today'), style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
                   const Spacer(),
                   Text(
                     receivables.formattedDueToday,
@@ -171,7 +172,7 @@ class AmountReceivableCard extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onOpenTransactions,
                 icon: const Icon(Icons.send_outlined, size: 14),
-                label: const Text('Send Payment Reminders', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                label: Text(context.tr('Send Payment Reminders'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF2563EB),
                   side: const BorderSide(color: Color(0xFF2563EB)),
