@@ -305,9 +305,13 @@ class StorefrontSettingsController extends Controller
         $subdomain = $company->subdomain ?? '';
         $customDomain = $company->custom_domain ?? '';
 
-        $liveStoreUrl = ! empty($customDomain)
+        $domainSetupEnabled = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
+        $liveStoreUrl = $company->getStorefrontUrl();
+        $subdomainUrl = ! empty($customDomain)
             ? 'https://'.$customDomain
-            : (! empty($subdomain) ? 'https://'.$subdomain.'.'.$baseHost : url('/'));
+            : (! $domainSetupEnabled
+                ? $liveStoreUrl
+                : (! empty($subdomain) ? 'https://'.$subdomain.'.'.$baseHost : ''));
 
         $cnameTarget = 'cname.'.$baseHost;
 
@@ -315,9 +319,10 @@ class StorefrontSettingsController extends Controller
             'success' => true,
             'data' => [
                 'subdomain' => $subdomain,
-                'subdomain_url' => ! empty($subdomain) ? 'https://'.$subdomain.'.'.$baseHost : '',
+                'subdomain_url' => $subdomainUrl,
                 'custom_domain' => $customDomain,
                 'live_store_url' => $liveStoreUrl,
+                'domain_setup_enabled' => $domainSetupEnabled,
                 'cname_target' => $cnameTarget,
                 'dns_records' => [
                     [
@@ -389,7 +394,7 @@ class StorefrontSettingsController extends Controller
             if (! empty($cleanSub) && $cleanSub !== $company->subdomain) {
                 $conflict = Company::withoutGlobalScopes()
                     ->where('id', '!=', $company->id)
-                    ->where('subdomain', $cleanSub)
+                    ->where('slug', $cleanSub)
                     ->exists();
 
                 if ($conflict) {
@@ -399,7 +404,7 @@ class StorefrontSettingsController extends Controller
                         'message' => 'This subdomain is already taken.',
                     ], 422);
                 }
-                $updates['subdomain'] = $cleanSub;
+                $updates['slug'] = $cleanSub;
             }
         }
 

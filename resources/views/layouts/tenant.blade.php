@@ -31,8 +31,10 @@
     @if ($tenantFaviconUrl)
         <link rel="icon" href="{{ $tenantFaviconUrl }}">
     @endif
+    @if (\App\Models\DynamicSetting::get('pwa_enabled', true))
     <link rel="manifest" href="{{ route('tenant.pwa.manifest') }}" crossorigin="use-credentials">
     <link rel="apple-touch-icon" href="{{ asset('pwa/icon-192.png') }}">
+    @endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     {{-- ApexCharts now loads lazily via Vite (resources/js/charts-loader.js),
          only when the reports dashboard's own DOM marker is present, instead
@@ -1504,6 +1506,7 @@
         <button type="button" x-on:click="$store.fullscreen.dismiss()" class="text-slate-400 hover:text-white transition cursor-pointer" title="Dismiss">&times;</button>
     </div>
 
+    @if (\App\Models\DynamicSetting::get('pwa_enabled', true))
     <!-- Install/update controls only appear when the browser reports an actionable PWA event. -->
     <div x-data
          x-show="$store.pwa.canInstall || $store.pwa.updateAvailable"
@@ -1528,6 +1531,7 @@
                 class="rounded-lg px-2 py-1 text-slate-400 hover:text-white transition"
                 aria-label="{{ __('Dismiss') }}">&times;</button>
     </div>
+    @endif
 
     <!-- Global Dynamic Flash Toast Notifications with Slide-Down Physics & Auto-Dismiss Progress Bar -->
     <div x-data="{

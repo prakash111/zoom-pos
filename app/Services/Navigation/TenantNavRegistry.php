@@ -1109,16 +1109,22 @@ class TenantNavRegistry
                 ?: config('app.domain')
                 ?: parse_url(config('app.url', 'https://saas.zoomnearby.com'), PHP_URL_HOST)
                 ?: 'saas.zoomnearby.com';
+            $domainSetupEnabled = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
             $liveStoreUrl = ! empty($customDomain)
                 ? (str_starts_with($customDomain, 'http') ? $customDomain : 'https://'.$customDomain)
-                : (! empty($subdomain) ? 'https://'.$subdomain.'.'.$domainHost : 'https://store.'.$domainHost);
+                : (! $domainSetupEnabled
+                    ? (! empty($subdomain) ? 'https://'.$domainHost.'/'.$subdomain : 'https://'.$domainHost.'/store')
+                    : (! empty($subdomain) ? 'https://'.$subdomain.'.'.$domainHost : 'https://store.'.$domainHost));
         } else {
             $domainHost = config('tenancy.central_domain')
                 ?: config('app.domain')
                 ?: parse_url(config('app.url', 'https://saas.zoomnearby.com'), PHP_URL_HOST)
                 ?: 'saas.zoomnearby.com';
             $subdomain = is_string($tenant) && $tenant !== '' ? $tenant : 'store';
-            $liveStoreUrl = 'https://'.$subdomain.'.'.$domainHost;
+            $domainSetupEnabled = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
+            $liveStoreUrl = ! $domainSetupEnabled
+                ? 'https://'.$domainHost.'/'.$subdomain
+                : 'https://'.$subdomain.'.'.$domainHost;
         }
 
         $items = [

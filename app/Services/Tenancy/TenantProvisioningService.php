@@ -34,13 +34,18 @@ class TenantProvisioningService
     {
         return DB::transaction(function () use ($data) {
             $storeName = trim($data['store_name'] ?? $data['name'] ?? 'My Store');
-            $slug = ! empty($data['slug'])
+            $baseSlug = ! empty($data['slug'])
                 ? Str::slug($data['slug'])
-                : Str::slug($storeName).'-'.strtolower(Str::random(4));
+                : (Str::slug($storeName) ?: 'store');
 
-            // Ensure unique slug
-            if (Company::where('slug', $slug)->exists()) {
-                $slug = Str::slug($storeName).'-'.strtolower(Str::random(6));
+            $slug = $baseSlug;
+            if (Company::where('slug', $slug)->exists() || in_array($slug, Company::RESERVED_SLUGS, true)) {
+                $counter = 2;
+                $slug = "{$baseSlug}-{$counter}";
+                while (Company::where('slug', $slug)->exists() || in_array($slug, Company::RESERVED_SLUGS, true)) {
+                    $counter++;
+                    $slug = "{$baseSlug}-{$counter}";
+                }
             }
 
             $posMode = $data['pos_mode'] ?? 'general';

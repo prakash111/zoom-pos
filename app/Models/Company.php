@@ -870,6 +870,21 @@ class Company extends Model
             return str_starts_with($domain, 'http') ? $domain : "https://{$domain}";
         }
 
+        $baseDomain = config('tenancy.central_domain')
+            ?: config('app.domain')
+            ?: parse_url(config('app.url', 'https://saas.zoomnearby.com'), PHP_URL_HOST)
+            ?: 'saas.zoomnearby.com';
+
+        $domainSetupEnabled = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
+
+        if (! $domainSetupEnabled) {
+            $storePath = ! empty($this->name) && preg_match('/^[a-zA-Z0-9_\-]+$/', $this->name)
+                ? $this->name
+                : (trim((string) ($this->subdomain ?: $this->slug ?: '')) ?: \Illuminate\Support\Str::slug($this->name ?: 'store'));
+
+            return "https://{$baseDomain}/{$storePath}";
+        }
+
         $slug = trim((string) ($this->subdomain ?: $this->slug ?: ''));
         if (empty($slug) && ! empty($this->name)) {
             $slug = \Illuminate\Support\Str::slug($this->name);
@@ -877,11 +892,6 @@ class Company extends Model
         if (empty($slug)) {
             $slug = 'store';
         }
-
-        $baseDomain = config('tenancy.central_domain')
-            ?: config('app.domain')
-            ?: parse_url(config('app.url', 'https://saas.zoomnearby.com'), PHP_URL_HOST)
-            ?: 'saas.zoomnearby.com';
 
         return "https://{$slug}.{$baseDomain}";
     }

@@ -133,12 +133,18 @@ class TenantRegister extends Component
         $domainSetupEnabled = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
 
         if (! $domainSetupEnabled) {
-            $baseSlug = Str::slug($this->storeName ?: 'store');
-            $candidate = $baseSlug.'-'.strtolower(Str::random(4));
-            while (Company::where('slug', $candidate)->exists() || in_array($candidate, Company::RESERVED_SLUGS, true)) {
-                $candidate = $baseSlug.'-'.strtolower(Str::random(6));
+            $baseSlug = Str::slug($this->storeName ?: 'store') ?: 'store';
+            if (! Company::where('slug', $baseSlug)->exists() && ! in_array($baseSlug, Company::RESERVED_SLUGS, true)) {
+                $this->slug = $baseSlug;
+            } else {
+                $counter = 2;
+                $candidate = "{$baseSlug}-{$counter}";
+                while (Company::where('slug', $candidate)->exists() || in_array($candidate, Company::RESERVED_SLUGS, true)) {
+                    $counter++;
+                    $candidate = "{$baseSlug}-{$counter}";
+                }
+                $this->slug = $candidate;
             }
-            $this->slug = $candidate;
             $this->customDomain = '';
             $cleanCustomDomain = null;
         } else {

@@ -63,6 +63,10 @@ class DynamicSetting extends Model
             return $default !== null ? (bool) $default : true;
         }
 
+        if ($key === 'pwa_enabled') {
+            return $default !== null ? (bool) $default : true;
+        }
+
         if ($key === 'show_auth_banner') {
             return $default !== null ? (bool) $default : false;
         }

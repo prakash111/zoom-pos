@@ -709,7 +709,7 @@
             </div>
 
             <!-- Auth & Domain Registration Controls -->
-            <div class="pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
                     <label class="flex items-center justify-between cursor-pointer">
                         <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
@@ -728,6 +728,16 @@
                         <input type="checkbox" wire:model="otpRegistrationEnabled" class="w-5 h-5 rounded text-indigo-600">
                     </label>
                     <p class="text-[11px] text-slate-400">{{ __('Verify registrant identity via 6-digit email OTP before access is granted.') }}</p>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
+                    <label class="flex items-center justify-between cursor-pointer">
+                        <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                            <span>📲</span> {{ __('Progressive Web App (PWA)') }}
+                        </span>
+                        <input type="checkbox" wire:model="pwaEnabled" class="w-5 h-5 rounded text-indigo-600">
+                    </label>
+                    <p class="text-[11px] text-slate-400">{{ __('Enable PWA installation banner, web app manifest, and offline service worker.') }}</p>
                 </div>
             </div>
 

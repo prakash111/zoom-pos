@@ -177,6 +177,8 @@ class Index extends Component
 
     public bool $enableRegistrationDomainSetup = true;
 
+    public bool $pwaEnabled = true;
+
     public string $primaryColor = '#4f46e5';
 
     public string $superadminSidebarColor = '#4338ca';
@@ -350,6 +352,7 @@ class Index extends Component
         $this->showAuthBanner = (bool) \App\Models\DynamicSetting::get('show_auth_banner', false);
         $this->authBannerImageUrl = (string) \App\Models\DynamicSetting::get('auth_banner_image_url', '');
         $this->enableRegistrationDomainSetup = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
+        $this->pwaEnabled = (bool) \App\Models\DynamicSetting::get('pwa_enabled', true);
         $this->primaryColor = $branding->primary_color ?? '#4f46e5';
         $this->superadminSidebarColor = $branding->superadmin_sidebar_color ?? '#4338ca';
         $this->landingPrimaryColor = $branding->landing_primary_color ?? '#10b981';
@@ -1018,12 +1021,11 @@ class Index extends Component
         // Never persist a key that is no longer a real store type — an
         // uninstalled / deactivated package module must not linger in this
         // list even if it was somehow still in the posted payload.
-        $validModeKeys = array_keys(ModuleRegistry::operatingModules());
-        $guard = $this->moduleGovernance();
+        $availableModes = ModuleRegistry::getAvailableModes();
+        $validModeKeys = array_keys(array_filter($availableModes, fn ($m) => empty($m['is_locked'])));
         $this->enabledRegistrationModules = array_values(array_filter(
             array_intersect(array_values($this->enabledRegistrationModules), $validModeKeys),
-            // A premium vertical can only be enabled once its module is licensed.
-            fn ($key) => empty($guard[$key]['premium']) || ! empty($guard[$key]['licensed']),
+            fn ($key) => empty($availableModes[$key]['is_locked'])
         ));
         PlatformSystem::set('allowed_registration_modes', json_encode($this->enabledRegistrationModules));
         PlatformSystem::set('ai_image_enabled', $this->aiImageEnabled ? '1' : '0');
@@ -1669,6 +1671,7 @@ class Index extends Component
         \App\Models\DynamicSetting::put('show_auth_banner', $this->showAuthBanner);
         \App\Models\DynamicSetting::put('auth_banner_image_url', $this->authBannerImageUrl);
         \App\Models\DynamicSetting::put('enable_registration_domain_setup', $this->enableRegistrationDomainSetup);
+        \App\Models\DynamicSetting::put('pwa_enabled', $this->pwaEnabled);
         if (! empty($data['logoUrl'])) {
             \App\Models\DynamicSetting::put('platform_logo_url', $data['logoUrl']);
         }
@@ -1851,6 +1854,7 @@ class Index extends Component
             'countryOptions' => PlatformRegionalService::countryOptions(),
             'dialCodeOptions' => PlatformRegionalService::dialCodeOptions(),
             'moduleGuard' => $this->moduleGovernance(),
+            'availableExtensions' => ModuleRegistry::getAvailableExtensions(),
             'currentMenuItems' => MenuItem::where('location', $this->menuLocation)->orderBy('order_index')->get(),
             'selectedLandingPage' => $this->landingPageId ? Page::find($this->landingPageId) : null,
         ]);
@@ -1872,17 +1876,16 @@ class Index extends Component
             ->all();
 
         $guard = [];
-        foreach (array_keys(ModuleRegistry::operatingModules()) as $key) {
-            $isPremium = array_key_exists($key, $premium);
-            $catalogSlug = $isPremium ? (string) $premium[$key] : $key;
+        foreach (ModuleRegistry::getAvailableModes() as $key => $mode) {
+            $isLocked = ! empty($mode['is_locked']);
+            $isPremium = ! empty($mode['required_module_slug']);
+            $catalogSlug = $mode['required_module_slug'] ?? $key;
 
             $guard[$key] = [
                 'premium' => $isPremium,
-                'licensed' => ! $isPremium
-                    || in_array($key, $free, true)
-                    || in_array($catalogSlug, $licensedSlugs, true),
+                'licensed' => ! $isLocked,
                 'catalog_slug' => $catalogSlug,
-                'store_link' => $isPremium ? ModuleCatalog::storeLink($catalogSlug) : null,
+                'store_link' => $isLocked && $isPremium ? ModuleCatalog::storeLink($catalogSlug) : null,
             ];
         }
 

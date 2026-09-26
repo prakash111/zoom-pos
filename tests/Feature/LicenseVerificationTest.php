@@ -77,7 +77,7 @@ class LicenseVerificationTest extends TestCase
             ->assertJson([
                 'status' => 'unregistered',
                 'code' => 403,
-                'buy_url' => 'https://zoomnearby.com/pricing',
+                'buy_url' => 'https://pos.zoomnearby.com/public/marketing',
             ]);
     }
 

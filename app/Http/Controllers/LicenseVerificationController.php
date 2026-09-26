@@ -53,7 +53,7 @@ class LicenseVerificationController extends Controller
                 'status'  => 'unregistered',
                 'code'    => 403,
                 'message' => 'Your domain is not registered. You are not authorized to access. Buy a valid core script license to continue.',
-                'buy_url' => 'https://zoomnearby.com/pricing'
+                'buy_url' => 'https://pos.zoomnearby.com/public/marketing'
             ], 403);
         }
 

@@ -55,12 +55,31 @@ class StorefrontController extends Controller
             }
         }
 
-        // Fallback: check query parameter, request body, or default active company
-        $storeSlug = $request->input('store') ?: $request->query('store') ?: $request->input('store_slug');
+        // Fallback: check route parameter, query parameter, request body, or default active company
+        $storeSlug = $request->route('storeSlug')
+            ?: $request->route('store_slug')
+            ?: $request->input('store')
+            ?: $request->query('store')
+            ?: $request->input('store_slug');
+
         if ($storeSlug) {
-            $company = Company::withoutGlobalScopes()->where('slug', $storeSlug)->first();
+            $slugLower = strtolower(trim((string) $storeSlug));
+            $company = Company::withoutGlobalScopes()
+                ->where(function ($q) use ($storeSlug, $slugLower) {
+                    $q->where('slug', $slugLower)
+                        ->orWhere('name', $storeSlug)
+                        ->orWhereRaw('LOWER(name) = ?', [$slugLower])
+                        ->orWhere('slug', Str::slug($storeSlug));
+                })
+                ->first();
+
             if ($company) {
                 return $company;
+            }
+
+            // If a route slug was explicitly given in the URL, do not fallback to a random company
+            if ($request->route('storeSlug') || $request->route('store_slug')) {
+                return null;
             }
         }
 

@@ -9,6 +9,10 @@ class PwaManifestController extends Controller
 {
     public function __invoke(): JsonResponse
     {
+        if (! (bool) \App\Models\DynamicSetting::get('pwa_enabled', true)) {
+            abort(404, 'PWA is disabled on this platform.');
+        }
+
         $company = auth('web')->user()?->company;
         $name = trim((string) ($company?->trade_name ?: $company?->name ?: config('app.name', 'Zoom Sales CRM & Inventory')));
         $themeColor = $this->validColor($company?->primary_color) ?: '#2563eb';

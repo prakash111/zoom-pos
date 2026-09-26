@@ -47,16 +47,23 @@ class StoreInquiryController extends Controller
             }
         }
 
-        $storeSlug = $request->input('store')
+        $storeSlug = $request->route('storeSlug')
+            ?: $request->route('store_slug')
+            ?: $request->input('store')
             ?: $request->query('store')
             ?: $request->input('store_slug')
             ?: $request->input('slug')
             ?: $request->query('slug');
 
         if ($storeSlug) {
+            $slugLower = strtolower(trim((string) $storeSlug));
             $company = Company::withoutGlobalScopes()
-                ->where('slug', strtolower(trim((string) $storeSlug)))
-                ->orWhere('subdomain', strtolower(trim((string) $storeSlug)))
+                ->where(function ($q) use ($storeSlug, $slugLower) {
+                    $q->where('slug', $slugLower)
+                        ->orWhere('name', $storeSlug)
+                        ->orWhereRaw('LOWER(name) = ?', [$slugLower])
+                        ->orWhere('slug', \Illuminate\Support\Str::slug($storeSlug));
+                })
                 ->first();
             if ($company) {
                 return $company;

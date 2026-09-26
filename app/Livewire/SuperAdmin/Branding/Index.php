@@ -27,6 +27,7 @@ class Index extends Component
     public string $authBannerImageUrl = '';
     public $authBannerImage = null;
     public bool $enableRegistrationDomainSetup = true;
+    public bool $pwaEnabled = true;
 
     public string $primaryColor = '#4f46e5';
     public string $superadminSidebarColor = '#4338ca';
@@ -133,6 +134,7 @@ class Index extends Component
         $this->showAuthBanner = (bool) DynamicSetting::get('show_auth_banner', false);
         $this->authBannerImageUrl = (string) DynamicSetting::get('auth_banner_image_url', '');
         $this->enableRegistrationDomainSetup = (bool) DynamicSetting::get('enable_registration_domain_setup', true);
+        $this->pwaEnabled = (bool) DynamicSetting::get('pwa_enabled', true);
 
         $this->primaryColor = $branding->primary_color ?? '#4f46e5';
         $this->superadminSidebarColor = $branding->superadmin_sidebar_color ?? '#4338ca';
@@ -761,6 +763,7 @@ class Index extends Component
         DynamicSetting::put('show_auth_banner', $this->showAuthBanner);
         DynamicSetting::put('auth_banner_image_url', $this->authBannerImageUrl);
         DynamicSetting::put('enable_registration_domain_setup', $this->enableRegistrationDomainSetup);
+        DynamicSetting::put('pwa_enabled', $this->pwaEnabled);
         if (! empty($data['logoUrl'])) {
             DynamicSetting::put('platform_logo_url', $data['logoUrl']);
         }

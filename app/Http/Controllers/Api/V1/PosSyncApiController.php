@@ -431,6 +431,8 @@ class PosSyncApiController extends Controller
             'allowed_registration_modes' => $legacyString,
             'enabled_modes' => $enabled,
             'default_mode' => $registrationModes[0]['key'] ?? 'retail',
+            'enable_registration_domain_setup' => (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true),
+            'pwa_enabled' => (bool) \App\Models\DynamicSetting::get('pwa_enabled', true),
         ]);
     }
 
@@ -467,6 +469,8 @@ class PosSyncApiController extends Controller
             'auth_banner_image_url' => $settings['platform']['auth_banner_image_url'],
             'show_auth_banner' => $settings['platform']['show_auth_banner'],
             'landing_page_enabled' => (bool) ($settings['platform']['landing_page_enabled'] ?? true),
+            'enable_registration_domain_setup' => (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true),
+            'pwa_enabled' => (bool) \App\Models\DynamicSetting::get('pwa_enabled', true),
             'platform_tagline' => null,
             'header_inline' => true,
             'show_tagline' => false,
@@ -530,6 +534,8 @@ class PosSyncApiController extends Controller
             // quick-fill chip bar from this list and auto-submits on tap.
             'demo_mode' => $demoMode,
             'demo_accounts' => $demoAccounts,
+            'enable_registration_domain_setup' => (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true),
+            'pwa_enabled' => (bool) \App\Models\DynamicSetting::get('pwa_enabled', true),
         ]);
     }
 

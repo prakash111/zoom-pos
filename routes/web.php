@@ -272,3 +272,27 @@ Route::post('/api/v2/verify-entitlement', [\App\Http\Controllers\LicenseVerifica
 Route::post('/lic/api/v2/verify-entitlement', [\App\Http\Controllers\LicenseVerificationController::class, 'verifyClientApp']);
 Route::post('/lic/api/verify-entitlement', [\App\Http\Controllers\LicenseVerificationController::class, 'verifyClientApp']);
 
+// Sub-directory Storefront routes (e.g. domain.com/Ramu)
+Route::middleware(EnsureAppIsInstalled::class)
+    ->prefix('{storeSlug}')
+    ->where([
+        'storeSlug' => '^(?!login|register|logout|store|admin|superadmin|api|build|assets|public|lic|c|pages?|pricing|features|contact|terms|privacy|refund|demo|install|home|tenant|livewire|settings).*$',
+    ])
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\Tenant\StorefrontController::class, 'index'])->name('tenant.store.slug');
+        Route::post('/order', [\App\Http\Controllers\Tenant\StorefrontController::class, 'placeOrder'])->name('tenant.store.slug.order');
+        Route::get('/account', [\App\Http\Controllers\Tenant\StorefrontController::class, 'account'])->name('tenant.store.slug.account');
+        Route::get('/track/{code}', [\App\Http\Controllers\Tenant\StorefrontController::class, 'trackOrder'])->name('tenant.store.slug.track');
+        Route::get('/payment-methods', [\App\Http\Controllers\Tenant\StorefrontController::class, 'paymentMethods'])->name('tenant.store.slug.payment_methods');
+        Route::post('/coupons/validate', [\App\Http\Controllers\Tenant\StorefrontController::class, 'validateCoupon'])->name('tenant.store.slug.coupon.validate');
+        Route::get('/faqs', [\App\Http\Controllers\Tenant\StorefrontController::class, 'faqsPage'])->name('tenant.store.slug.faqs');
+        Route::get('/api/faqs', [\App\Http\Controllers\Tenant\StorefrontController::class, 'apiFaqs'])->name('tenant.store.slug.api.faqs');
+        Route::post('/auth/send-verification', [\App\Http\Controllers\Tenant\StorefrontController::class, 'sendVerification'])->name('tenant.store.slug.auth.send_verification');
+        Route::post('/auth/verify-code', [\App\Http\Controllers\Tenant\StorefrontController::class, 'verifyCode'])->name('tenant.store.slug.auth.verify_code');
+        Route::post('/payment/initiate', [\App\Http\Controllers\Tenant\StorefrontController::class, 'initiateGatewayPayment'])->name('tenant.store.slug.payment.initiate');
+        Route::post('/payment/verify', [\App\Http\Controllers\Tenant\StorefrontController::class, 'verifyGatewayPayment'])->name('tenant.store.slug.payment.verify');
+        Route::get('/page/{slug}', [\App\Http\Controllers\Tenant\StorefrontController::class, 'showCmsPage'])->name('tenant.store.slug.page');
+        Route::post('/inquiry', [\App\Http\Controllers\Tenant\StoreInquiryController::class, 'submitPublicInquiry'])->name('tenant.store.slug.inquiry');
+    });
+
+
