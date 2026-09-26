@@ -100,6 +100,14 @@ class LicenseSecurityEngine {
 
       final dynamic data = jsonDecode(response.body);
       if (data is Map<String, dynamic>) {
+        if (data['code'] == 200 && data['status'] == 'authorized') {
+          if (clientOverride == null) {
+            final targetValidation = await _validateTargetServer(cleanUrl, headers, body);
+            if (targetValidation != null) {
+              return targetValidation;
+            }
+          }
+        }
         return data;
       }
       return {
@@ -139,4 +147,100 @@ class LicenseSecurityEngine {
       };
     }
   }
+
+  static Future<Map<String, dynamic>?> _validateTargetServer(
+    String cleanUrl,
+    Map<String, String> headers,
+    String body,
+  ) async {
+    final clientUri = Uri.tryParse(cleanUrl);
+    if (clientUri == null || !clientUri.isAbsolute) {
+      return {
+        'code': 400,
+        'status': 'invalid_url',
+        'message': 'Invalid server URL: $cleanUrl',
+      };
+    }
+
+    // 1. Probe target server health / POS endpoint
+    try {
+      final authConfigUri = clientUri.replace(path: '/api/app/auth-config');
+      final probeRes = await http.get(authConfigUri, headers: {
+        'Accept': 'application/json',
+      }).timeout(const Duration(seconds: 8));
+
+      if (probeRes.statusCode == 200) {
+        try {
+          final probeJson = jsonDecode(probeRes.body);
+          if (probeJson is! Map || probeJson['success'] != true) {
+            return {
+              'code': 400,
+              'status': 'invalid_server',
+              'message': 'The server at $cleanUrl did not return a valid Zoom POS configuration.',
+            };
+          }
+        } catch (_) {
+          return {
+            'code': 400,
+            'status': 'invalid_server',
+            'message': 'The server at $cleanUrl did not return a valid Zoom POS JSON response.',
+          };
+        }
+      } else {
+        // Fallback probe to /api/v1/pos/status (Zoom POS returns 401 with JSON for unauthenticated requests)
+        final posStatusUri = clientUri.replace(path: '/api/v1/pos/status');
+        final posRes = await http.get(posStatusUri, headers: {
+          'Accept': 'application/json',
+        }).timeout(const Duration(seconds: 8));
+
+        final isZoomPos = (posRes.statusCode == 401 && posRes.body.contains('Missing Bearer token')) ||
+            (posRes.statusCode == 200 && posRes.body.contains('"success"'));
+
+        if (!isZoomPos) {
+          return {
+            'code': 400,
+            'status': 'invalid_server',
+            'message': 'The server at $cleanUrl is not running a compatible Zoom POS backend (HTTP ${probeRes.statusCode}).',
+          };
+        }
+      }
+    } on SocketException catch (e) {
+      return {
+        'code': 0,
+        'status': 'target_unreachable',
+        'message': 'Could not reach target server ($cleanUrl): ${e.message}',
+      };
+    } on TimeoutException {
+      return {
+        'code': 0,
+        'status': 'target_timeout',
+        'message': 'Connection to target server ($cleanUrl) timed out. Check server connectivity.',
+      };
+    } catch (e) {
+      return {
+        'code': 0,
+        'status': 'target_error',
+        'message': 'Could not connect to target server ($cleanUrl): $e',
+      };
+    }
+
+    // 2. Query target server local entitlement endpoint if available
+    try {
+      final localLicUri = clientUri.replace(path: '/api/v2/verify-entitlement');
+      final localRes = await http.post(localLicUri, headers: headers, body: body)
+          .timeout(const Duration(seconds: 8));
+      if (localRes.statusCode == 403) {
+        final dynamic localData = jsonDecode(localRes.body);
+        if (localData is Map<String, dynamic> &&
+            (localData['status'] == 'unregistered' || localData['code'] == 403)) {
+          return localData;
+        }
+      }
+    } catch (_) {
+      // Non-blocking if endpoint not reachable; central authority is primary
+    }
+
+    return null; // All checks passed
+  }
 }
+
