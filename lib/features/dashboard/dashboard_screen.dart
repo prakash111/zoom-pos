@@ -42,6 +42,9 @@ import '../../core/models/dashboard_summary_model.dart';
 import '../auth/auth_provider.dart';
 import '../navigation/presentation/widgets/app_drawer.dart';
 import '../sales/screens/sales_screen.dart';
+import '../pos/screens/pos_screen.dart';
+import '../restaurant/screens/restaurant_pos_screen.dart';
+import '../../core/models/navigation_config_model.dart';
 import '../stores/store_switcher_sheet.dart';
 import '../settings/screens/change_password_screen.dart';
 import '../settings/settings_repository.dart';
@@ -2110,13 +2113,262 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  IconData _resolveNavIcon(String iconName) {
+    switch (iconName.toLowerCase().trim()) {
+      case 'home':
+      case 'home_rounded':
+      case 'dashboard':
+        return Icons.home_rounded;
+      case 'receipt':
+      case 'receipt_long':
+      case 'sales':
+      case 'sale':
+        return Icons.receipt_long_outlined;
+      case 'shopping_bag':
+      case 'orders':
+      case 'order':
+        return Icons.shopping_bag_outlined;
+      case 'inventory':
+      case 'inventory_2':
+        return Icons.inventory_2_outlined;
+      case 'restaurant':
+      case 'restaurant_menu':
+      case 'dining':
+        return Icons.restaurant_menu_rounded;
+      case 'analytics':
+      case 'bar_chart':
+      case 'reports':
+        return Icons.bar_chart_rounded;
+      case 'grid_view':
+      case 'more':
+      case 'more_horiz':
+      case 'menu':
+        return Icons.grid_view_rounded;
+      case 'add':
+      case 'plus':
+        return Icons.add;
+      case 'point_of_sale':
+      case 'pos':
+        return Icons.point_of_sale_rounded;
+      default:
+        return Icons.widgets_outlined;
+    }
+  }
+
+  void _handleDynamicNavigation(
+    BuildContext context,
+    String route, {
+    Map<String, dynamic>? arguments,
+  }) {
+    final clean = route.trim().toLowerCase();
+    switch (clean) {
+      case '/restaurant-pos-terminal':
+      case 'restaurant_pos_terminal':
+      case 'restaurant_terminal':
+      case 'restaurant_pos':
+      case 'restaurant_order_launcher':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const RestaurantPosScreen(),
+          ),
+        );
+        break;
+
+      case '/pos':
+      case 'pos':
+      case 'pos_grid':
+      case 'standard_pos':
+        final isRestaurant = BootstrapCache.instance.activeMode.toLowerCase().contains('restaurant') ||
+            BootstrapCache.instance.activeMode.toLowerCase().contains('cafe') ||
+            BootstrapCache.instance.config['is_restaurant'] == true ||
+            BootstrapCache.instance.config['operating_mode']?.toString().toLowerCase().contains('restaurant') == true ||
+            BootstrapCache.instance.config['operating_mode']?.toString().toLowerCase().contains('cafe') == true ||
+            (context.read<AuthProvider>().company?.isRestaurantMode ?? false);
+        if (isRestaurant && (clean == 'pos' || clean == '/pos')) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const RestaurantPosScreen(),
+            ),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PosScreen(),
+            ),
+          );
+        }
+        break;
+
+      case '/sales':
+      case 'sales':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const SalesScreen(),
+          ),
+        );
+        break;
+
+      case '/orders':
+      case 'orders':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const SalesScreen(),
+          ),
+        );
+        break;
+
+      case 'drawer':
+      case '/drawer':
+      case 'menu':
+        if (_scaffoldKey.currentState?.hasEndDrawer == true) {
+          _scaffoldKey.currentState?.openEndDrawer();
+        } else {
+          _scaffoldKey.currentState?.openDrawer();
+        }
+        break;
+
+      case '/home':
+      case 'home':
+      case '/dashboard':
+      case 'dashboard':
+        setState(() => _dockIndex = 0);
+        break;
+
+      default:
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SduiComponentRegistry.resolveRoute(route, arguments: arguments),
+          ),
+        );
+        break;
+    }
+  }
+
   Widget _buildRedesignedFloatingBottomNav(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final BottomNavConfig? navConfig = BootstrapCache.instance.bottomNavConfig;
+    final CenterActionConfig? centerAction = navConfig?.centerAction;
 
-    void openRoute(String key) => Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: SduiComponentRegistry.instance.resolve(key)),
+    final isRestaurant = BootstrapCache.instance.activeMode.toLowerCase().contains('restaurant') ||
+        BootstrapCache.instance.activeMode.toLowerCase().contains('cafe') ||
+        BootstrapCache.instance.config['is_restaurant'] == true ||
+        BootstrapCache.instance.config['operating_mode']?.toString().toLowerCase().contains('restaurant') == true ||
+        BootstrapCache.instance.config['operating_mode']?.toString().toLowerCase().contains('cafe') == true ||
+        (context.read<AuthProvider>().company?.isRestaurantMode ?? false);
+
+    // Center Floating Action Button Click Handler
+    void onCenterActionPressed() {
+      if (centerAction != null && centerAction.targetRoute.isNotEmpty) {
+        _handleDynamicNavigation(
+          context,
+          centerAction.targetRoute,
+          arguments: centerAction.arguments,
         );
+      } else if (isRestaurant) {
+        _handleDynamicNavigation(context, '/restaurant-pos-terminal');
+      } else {
+        _handleDynamicNavigation(context, '/pos');
+      }
+    }
+
+    final centerButtonWidget = GestureDetector(
+      onTap: onCenterActionPressed,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            colors: [Color(0xFF10B981), Color(0xFF059669)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF10B981).withValues(alpha: 0.4),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Icon(
+          centerAction != null ? _resolveNavIcon(centerAction.icon) : Icons.add,
+          color: Colors.white,
+          size: 28,
+        ),
+      ),
+    );
+
+    // If server items are configured, dynamically map them around center button
+    final serverItems = navConfig?.items;
+    List<Widget> navChildren;
+
+    if (serverItems != null && serverItems.length >= 2) {
+      final half = (serverItems.length / 2).ceil();
+      final leftItems = serverItems.take(half).toList();
+      final rightItems = serverItems.skip(half).toList();
+
+      navChildren = [
+        ...leftItems.map((item) {
+          final isHome = item.route == '/dashboard' || item.route == 'home' || item.route == '/home';
+          return _buildRedesignedNavItem(
+            icon: _resolveNavIcon(item.icon),
+            label: context.tr(item.label),
+            isSelected: isHome && _dockIndex == 0,
+            onTap: () => _handleDynamicNavigation(context, item.route, arguments: item.arguments),
+            isDark: isDark,
+          );
+        }),
+        centerButtonWidget,
+        ...rightItems.map((item) {
+          return _buildRedesignedNavItem(
+            icon: _resolveNavIcon(item.icon),
+            label: context.tr(item.label),
+            isSelected: false,
+            onTap: () => _handleDynamicNavigation(context, item.route, arguments: item.arguments),
+            isDark: isDark,
+          );
+        }),
+      ];
+    } else {
+      // Fallback default 4 items layout
+      navChildren = [
+        _buildRedesignedNavItem(
+          icon: Icons.home_rounded,
+          label: context.tr('Home'),
+          isSelected: _dockIndex == 0,
+          onTap: () => setState(() => _dockIndex = 0),
+          isDark: isDark,
+        ),
+        _buildRedesignedNavItem(
+          icon: Icons.receipt_long_outlined,
+          label: context.tr('Sales'),
+          isSelected: false,
+          onTap: () => _handleDynamicNavigation(context, 'sales'),
+          isDark: isDark,
+        ),
+        centerButtonWidget,
+        _buildRedesignedNavItem(
+          icon: isRestaurant ? Icons.restaurant_menu_rounded : Icons.shopping_bag_outlined,
+          label: context.tr('Orders'),
+          isSelected: false,
+          onTap: () => _handleDynamicNavigation(context, 'orders'),
+          isDark: isDark,
+        ),
+        _buildRedesignedNavItem(
+          icon: Icons.grid_view_rounded,
+          label: context.tr('More'),
+          isSelected: false,
+          onTap: () => _handleDynamicNavigation(context, 'drawer'),
+          isDark: isDark,
+        ),
+      ];
+    }
 
     return SafeArea(
       child: Padding(
@@ -2142,70 +2394,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildRedesignedNavItem(
-                icon: Icons.home_rounded,
-                label: context.tr('Home'),
-                isSelected: _dockIndex == 0,
-                onTap: () => setState(() => _dockIndex = 0),
-                isDark: isDark,
-              ),
-              _buildRedesignedNavItem(
-                icon: Icons.receipt_long_outlined,
-                label: context.tr('Sales'),
-                isSelected: false,
-                onTap: () => openRoute('sales'),
-                isDark: isDark,
-              ),
-              // Center FAB + Quick Sale
-              GestureDetector(
-                onTap: () => openRoute('pos'),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF10B981), Color(0xFF059669)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.4),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.add,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-              ),
-              _buildRedesignedNavItem(
-                icon: Icons.shopping_bag_outlined,
-                label: context.tr('Orders'),
-                isSelected: false,
-                onTap: () => openRoute('orders'),
-                isDark: isDark,
-              ),
-              _buildRedesignedNavItem(
-                icon: Icons.grid_view_rounded,
-                label: context.tr('More'),
-                isSelected: false,
-                onTap: () {
-                  if (_scaffoldKey.currentState?.hasEndDrawer == true) {
-                    _scaffoldKey.currentState?.openEndDrawer();
-                  } else {
-                    _scaffoldKey.currentState?.openDrawer();
-                  }
-                },
-                isDark: isDark,
-              ),
-            ],
+            children: navChildren,
           ),
         ),
       ),

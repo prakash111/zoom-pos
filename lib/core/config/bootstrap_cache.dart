@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
 import '../models/settings_models.dart';
+import '../models/navigation_config_model.dart';
 import '../navigation/navigation_provider.dart';
 import '../sdui/models/sdui_models.dart';
 import '../utils/color_utils.dart';
@@ -111,6 +112,7 @@ class BootstrapCache extends ChangeNotifier {
   static const _labelsCacheKey = 'zoom_pos.bootstrap.navigation_labels';
   static const _formLabelsCacheKey =
       'zoom_pos.bootstrap.form_field_customizations';
+  static const _bottomNavCacheKey = 'zoom_pos.bootstrap.bottom_nav';
 
   TenantSchema? tenant;
   Map<String, ModuleSchema> modules = {};
@@ -119,6 +121,7 @@ class BootstrapCache extends ChangeNotifier {
   Map<String, dynamic> formFieldCustomizations = {};
   SduiUiSchema uiSchema = const SduiUiSchema();
   NavConfig navConfig = const NavConfig();
+  BottomNavConfig? bottomNavConfig;
   Map<String, dynamic> config = {};
   Map<String, dynamic> localization = {};
   BootstrapTheme theme = const BootstrapTheme();
@@ -405,6 +408,18 @@ class BootstrapCache extends ChangeNotifier {
               'cached form field customizations', error, stackTrace);
         }
       }
+
+      final bottomNavRaw = prefs.getString(_bottomNavCacheKey);
+      if (bottomNavRaw != null) {
+        try {
+          final decoded = jsonDecode(bottomNavRaw);
+          if (decoded is Map) {
+            bottomNavConfig = BottomNavConfig.fromJson(_safeMap(decoded));
+          }
+        } catch (error, stackTrace) {
+          _logParseFailure('cached bottom_nav', error, stackTrace);
+        }
+      }
     } catch (error, stackTrace) {
       _logParseFailure('bootstrap disk cache', error, stackTrace);
     } finally {
@@ -564,6 +579,19 @@ class BootstrapCache extends ChangeNotifier {
         await prefs.setString(
             _formLabelsCacheKey, jsonEncode(formFieldCustomizations));
       }
+
+      final bottomNavPayload = response['bottom_nav_config'] ??
+          response['bottom_nav_schema'] ??
+          response['bottom_navigation'];
+      if (bottomNavPayload is Map) {
+        try {
+          bottomNavConfig = BottomNavConfig.fromJson(_safeMap(bottomNavPayload));
+          await prefs.setString(
+              _bottomNavCacheKey, jsonEncode(bottomNavConfig!.toJson()));
+        } catch (error, stackTrace) {
+          _logParseFailure('server bottom_nav', error, stackTrace);
+        }
+      }
     } catch (error, stackTrace) {
       if (menuStructure.isEmpty) {
         _navigationError =
@@ -574,6 +602,22 @@ class BootstrapCache extends ChangeNotifier {
     } finally {
       _activeRefreshes--;
       notifyListeners();
+    }
+  }
+
+  /// Dynamically updates the server-driven bottom navigation configuration.
+  Future<void> applyBottomNavConfig(
+    Map<String, dynamic> json, {
+    SharedPreferences? preferences,
+  }) async {
+    try {
+      bottomNavConfig = BottomNavConfig.fromJson(_safeMap(json));
+      final prefs = preferences ?? await SharedPreferences.getInstance();
+      await prefs.setString(
+          _bottomNavCacheKey, jsonEncode(bottomNavConfig!.toJson()));
+      notifyListeners();
+    } catch (e, stackTrace) {
+      _logParseFailure('applyBottomNavConfig', e, stackTrace);
     }
   }
 

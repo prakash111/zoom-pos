@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/navigation_config_model.dart';
 
 /// Navigation item model hardened against Flutter Web minified JS cast exceptions.
 class NavItem {
@@ -306,20 +307,32 @@ class NavigationProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   Tenant? _currentTenant;
+  BottomNavConfig? _bottomNavConfig;
 
   List<NavSection> get sections => _sections;
   bool get isLoading => _isLoading;
   String? get error => _error;
   Tenant? get currentTenant => _currentTenant;
+  BottomNavConfig? get bottomNavConfig => _bottomNavConfig;
 
   static const String _cachedTenantProfileKey = 'cached_tenant_profile';
   static const String _bootstrapTenantCacheKey = 'zoom_pos.bootstrap.tenant';
+  static const String _cachedBottomNavKey = 'zoom_pos.bootstrap.bottom_nav';
   static const String _sessionCacheKey = 'zoom_pos.session_cache.v1';
 
-  /// Immediately loads cached tenant profile from SharedPreferences before network sync completes.
+  /// Immediately loads cached tenant profile and bottom navigation from SharedPreferences.
   Future<Tenant?> loadCachedTenant() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final cachedNav = prefs.getString(_cachedBottomNavKey);
+      if (cachedNav != null && cachedNav.trim().isNotEmpty) {
+        try {
+          final decodedNav = jsonDecode(cachedNav);
+          if (decodedNav is Map) {
+            _bottomNavConfig = BottomNavConfig.fromJson(safeMap(decodedNav));
+          }
+        } catch (_) {}
+      }
       final cachedJson = prefs.getString(_cachedTenantProfileKey) ??
           prefs.getString(_bootstrapTenantCacheKey);
       if (cachedJson != null && cachedJson.trim().isNotEmpty) {
@@ -507,6 +520,18 @@ class NavigationProvider extends ChangeNotifier {
             parsedTenant.id.isNotEmpty) {
           _currentTenant = parsedTenant;
         }
+      }
+
+      final dynamic rawBottomNav = safePayload['bottom_nav_config'] ??
+          safePayload['bottom_nav_schema'] ??
+          safePayload['bottom_navigation'];
+      if (rawBottomNav is Map) {
+        try {
+          _bottomNavConfig = BottomNavConfig.fromJson(safeMap(rawBottomNav));
+          SharedPreferences.getInstance().then((prefs) {
+            prefs.setString(_cachedBottomNavKey, jsonEncode(_bottomNavConfig!.toJson()));
+          });
+        } catch (_) {}
       }
 
       final rawSections = safePayload.containsKey('sections')

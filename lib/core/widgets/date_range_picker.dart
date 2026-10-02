@@ -27,7 +27,7 @@ Future<DateTimeRange?> showPosDateRangePicker({
             surface: Color(0xFF0F172A), // Dark slate dialog background
             onSurface: Colors.white,
           ),
-          dialogBackgroundColor: const Color(0xFF0F172A),
+          dialogTheme: const DialogThemeData(backgroundColor: Color(0xFF0F172A)),
         ),
         child: child ?? const SizedBox(),
       );

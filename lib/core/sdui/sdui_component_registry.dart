@@ -67,8 +67,15 @@ class SduiComponentRegistry {
   final Map<String, WidgetBuilder> _registry = {
     // POS & Terminals
     'pos': (_) => const PosScreen(),
+    '/pos': (_) => const PosScreen(),
     'point_of_sale': (_) => const PosScreen(),
     'restaurant_pos': (_) => const RestaurantPosScreen(),
+    'restaurant_terminal': (_) => const RestaurantPosScreen(),
+    '/restaurant-pos-terminal': (_) => const RestaurantPosScreen(),
+    'restaurant_pos_terminal': (_) => const RestaurantPosScreen(),
+    'restaurant_order_launcher': (_) => const RestaurantPosScreen(),
+    'restaurantposterminalscreen': (_) => const RestaurantPosScreen(),
+    'restaurant_terminal_screen': (_) => const RestaurantPosScreen(),
     'floor_plan': (_) => const RestaurantTablesScreen(),
     'kitchen_display': (_) => const RestaurantKdsScreen(),
     // Pharmacy checkouts run through the core native POS now — the old
