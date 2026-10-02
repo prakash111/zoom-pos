@@ -77,9 +77,8 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // Total balance + statistics values off the live model.
-    expect(find.text('Total balance'), findsOneWidget);
-    expect(find.text('\$25,640.00'), findsOneWidget);
+    // Total balance card is permanently removed/hidden.
+    expect(find.text('Total balance'), findsNothing);
     expect(find.text('Statistics'), findsOneWidget);
     expect(find.text('\$12,235.99'), findsOneWidget);
     expect(find.text('318'), findsOneWidget);

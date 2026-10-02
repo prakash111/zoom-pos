@@ -63,14 +63,10 @@ class PoshDashboardHome extends StatelessWidget {
               rangeLabel: analytics.rangeLabel,
             ),
             const SizedBox(height: 16),
-            twoUp(
-              _TotalBalanceCard(analytics: analytics, formatter: formatter),
-              _StatisticsCard(
-                  analytics: analytics,
-                  formatter: formatter,
-                  onFilter: onFilter),
-              flexA: 2,
-              flexB: 3,
+            _StatisticsCard(
+              analytics: analytics,
+              formatter: formatter,
+              onFilter: onFilter,
             ),
             const SizedBox(height: 16),
             twoUp(
@@ -263,92 +259,15 @@ class _DashboardHeader extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _TotalBalanceCard extends StatelessWidget {
-  const _TotalBalanceCard({required this.analytics, required this.formatter});
+  const _TotalBalanceCard({this.analytics, this.formatter});
 
-  final AnalyticsModel analytics;
-  final CurrencyFormatter formatter;
+  final AnalyticsModel? analytics;
+  final CurrencyFormatter? formatter;
 
   @override
   Widget build(BuildContext context) {
-    final now = TimeOfDay.now();
-    final stamp = now.format(context);
-    final spots = <FlSpot>[
-      for (var i = 0; i < analytics.revenueTrend.length; i++)
-        FlSpot(i.toDouble(), analytics.revenueTrend[i].revenue),
-    ];
-    const line = Color(0xFF22D3EE); // cyan, as in the reference
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.darkCard,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Expanded(
-                child: Text('Total balance',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700)),
-              ),
-              Text(
-                formatter.format(analytics.allTimeRevenue),
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text('Last updated $stamp',
-              style: const TextStyle(color: Colors.white54, fontSize: 11)),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 96,
-            child: spots.length < 2
-                ? const Center(
-                    child: Text('No revenue yet',
-                        style: TextStyle(color: Colors.white38, fontSize: 12)))
-                : LineChart(
-                    LineChartData(
-                      gridData: const FlGridData(show: false),
-                      titlesData: const FlTitlesData(show: false),
-                      borderData: FlBorderData(show: false),
-                      lineTouchData: const LineTouchData(enabled: false),
-                      minY: 0,
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: spots,
-                          isCurved: true,
-                          color: line,
-                          barWidth: 2.5,
-                          dotData: const FlDotData(show: false),
-                          belowBarData: BarAreaData(
-                            show: true,
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                line.withValues(alpha: 0.25),
-                                line.withValues(alpha: 0),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
+    // Permanently excluded: Total balance card is removed
+    return const SizedBox.shrink();
   }
 }
 
