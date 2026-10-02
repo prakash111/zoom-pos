@@ -116,8 +116,10 @@
             </div>
             <div>
                 <select wire:model="posMode" class="w-full sm:w-80 rounded-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm font-semibold focus:ring-indigo-500">
-                    @foreach (\App\Services\Modular\ModuleRegistry::operatingModules() as $mKey => $mVal)
-                        <option value="{{ $mKey }}">{{ __($mVal['title']) }} ({{ $mKey }})</option>
+                    @foreach (\App\Services\Modular\ModuleRegistry::getAvailableModes() as $mKey => $mVal)
+                        <option value="{{ $mKey }}" @disabled(!empty($mVal['is_locked']))>
+                            {{ __($mVal['title']) }} ({{ $mKey }}) {{ !empty($mVal['is_locked']) ? '— 🔒 ' . __('Locked') : '' }}
+                        </option>
                     @endforeach
                 </select>
                 @error('posMode') <p class="text-[11px] text-rose-500 font-bold mt-1">{{ $message }}</p> @enderror
@@ -140,19 +142,29 @@
                     {{ __("Select which specific modules are licensed and visible in this tenant's workspace navigation.") }}
                 </p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    @foreach (\App\Services\Modular\ModuleRegistry::operatingModules() as $mKey => $mVal)
-                        @php $isLic = in_array($mKey, $licensedModules, true); @endphp
-                        <label class="flex items-center justify-between p-3 rounded-xl border cursor-pointer {{ $isLic ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30' : 'border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-100' }}">
+                    @foreach (\App\Services\Modular\ModuleRegistry::getAvailableModes() as $mKey => $mVal)
+                        @php
+                            $isLocked = !empty($mVal['is_locked']);
+                            $isLic = !$isLocked && in_array($mKey, $licensedModules, true);
+                        @endphp
+                        <label class="flex items-center justify-between p-3 rounded-xl border {{ $isLocked ? 'border-amber-300/70 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-950/20 cursor-not-allowed opacity-75' : ($isLic ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30 cursor-pointer' : 'border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-100 cursor-pointer') }}">
                             <div class="flex items-center gap-2">
-                                <span class="text-base">
+                                <span class="text-base shrink-0">
                                     @if ($mKey === 'restaurant') 🍽️ @elseif ($mKey === 'pharmacy') 💊 @elseif ($mKey === 'service_booking') ✂️ @elseif ($mKey === 'repair_technician') 🛠️ @elseif ($mKey === 'leadmanagement') 📊 @else 🏪 @endif
                                 </span>
                                 <div>
-                                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200">{{ __($mVal['title']) }}</span>
-                                    <span class="block text-[10px] text-slate-500 dark:text-slate-400">{{ $mVal['layout_type'] }}</span>
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="text-xs font-bold text-slate-800 dark:text-slate-200">{{ __($mVal['title']) }}</span>
+                                        @if ($isLocked)
+                                            <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                                                🔒 {{ __('Module Not Installed - Extended License / Add-on required') }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <span class="block text-[10px] text-slate-500 dark:text-slate-400">{{ $mVal['layout_type'] ?? 'standard_grid' }}</span>
                                 </div>
                             </div>
-                            <input type="checkbox" wire:model="licensedModules" value="{{ $mKey }}" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                            <input type="checkbox" wire:model="licensedModules" value="{{ $mKey }}" @disabled($isLocked) class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 {{ $isLocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer' }}">
                         </label>
                     @endforeach
                 </div>

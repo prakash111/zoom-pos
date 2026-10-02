@@ -45,6 +45,10 @@ class LocalizationService
                 foreach ($this->defaultLanguages as $lang) {
                     Language::create($lang);
                 }
+            } else {
+                foreach ($this->defaultLanguages as $lang) {
+                    Language::firstOrCreate(['code' => $lang['code']], $lang);
+                }
             }
         } catch (\Throwable) {
             // DB not ready or testing before migrate
@@ -251,6 +255,12 @@ class LocalizationService
         if ($translator instanceof TenantAwareTranslator) {
             $translator->flushLoaded();
         }
+
+        try {
+            \Illuminate\Support\Facades\Cache::increment('landing_page_cache_version');
+        } catch (\Throwable) {
+            // cache driver might not support or be available
+        }
     }
 
     /**
@@ -307,9 +317,6 @@ class LocalizationService
         $clean = strtolower(trim($locale));
         if (Schema::hasTable('system_translations')) {
             $this->replaceSystemTranslations($clean, $translations);
-            $this->flushTranslator();
-
-            return true;
         }
 
         $path = $this->getLanguageFilePath($locale);
@@ -590,9 +597,9 @@ class LocalizationService
         $this->flushTranslator();
     }
 
-    private function importLegacyCatalog(string $locale): void
+    public function importLegacyCatalog(string $locale, bool $force = false): void
     {
-        if (SystemTranslation::query()->where('locale', $locale)->exists()) {
+        if (! $force && SystemTranslation::query()->where('locale', $locale)->where('module', 'core')->exists()) {
             return;
         }
 

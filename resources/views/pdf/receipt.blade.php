@@ -459,28 +459,30 @@
     <div class="dashed"></div>
 
     <!-- Centered Footer Block with QR Code -->
+    @php
+        $pdfVerifyUrl = $verificationUrl ?? ($sale->operation_type === 'quotation' ? route('quotes.public', $sale->sale_number) : route('sales.public', $sale->sale_number));
+    @endphp
     <div class="footer-block">
-        @if (!empty($qrCodeDataUri))
-            <div class="qr-wrapper">
-                <img src="{{ $qrCodeDataUri }}" class="qr-image" alt="QR Code">
-                <div class="qr-caption">{!! $L("Scan for digital e-receipt & verify") !!}</div>
-            </div>
-        @elseif (!empty($qrCodeSvg))
-            <div class="qr-wrapper">
-                <div style="width: {{ $qrDimension }}; height: {{ $qrDimension }}; margin: 0 auto;">
-                    {!! $qrCodeSvg !!}
+        <a href="{{ $pdfVerifyUrl }}" target="_blank" style="text-decoration: none; color: inherit;">
+            @if (!empty($qrCodeDataUri))
+                <div class="qr-wrapper">
+                    <img src="{{ $qrCodeDataUri }}" class="qr-image" alt="QR Code">
+                    <div class="qr-caption">{!! $L("Scan for digital e-receipt & verify") !!}</div>
                 </div>
-                <div class="qr-caption">{!! $L("Scan for digital e-receipt & verify") !!}</div>
-            </div>
-        @else
-            @php
-                $pdfVerifyUrl = $verificationUrl ?? ($sale->operation_type === 'quotation' ? route('quotes.public', $sale->sale_number) : route('sales.public', $sale->sale_number));
-            @endphp
-            <div class="qr-wrapper">
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($pdfVerifyUrl) }}" class="qr-image" alt="QR Code">
-                <div class="qr-caption">{!! $L("Scan for digital e-receipt & verify") !!}</div>
-            </div>
-        @endif
+            @elseif (!empty($qrCodeSvg))
+                <div class="qr-wrapper">
+                    <div style="width: {{ $qrDimension }}; height: {{ $qrDimension }}; margin: 0 auto;">
+                        {!! $qrCodeSvg !!}
+                    </div>
+                    <div class="qr-caption">{!! $L("Scan for digital e-receipt & verify") !!}</div>
+                </div>
+            @else
+                <div class="qr-wrapper">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($pdfVerifyUrl) }}" class="qr-image" alt="QR Code">
+                    <div class="qr-caption">{!! $L("Scan for digital e-receipt & verify") !!}</div>
+                </div>
+            @endif
+        </a>
 
         <div class="ref-code">#{{ $sale->sale_number }}</div>
 

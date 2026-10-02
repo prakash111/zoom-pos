@@ -146,6 +146,22 @@ class PasswordResetController extends Controller
      */
     public function changePassword(Request $request): JsonResponse|RedirectResponse
     {
+        if (config('app.demo_mode')) {
+            return $this->fail($request, 'Action disabled: Modifications are restricted in demo mode.', [], 403);
+        }
+
+        if ($request->filled('password') && ! $request->filled('new_password')) {
+            $request->merge([
+                'new_password' => $request->input('password'),
+                'new_password_confirmation' => $request->input('password_confirmation'),
+            ]);
+        } elseif ($request->filled('new_password') && ! $request->filled('password')) {
+            $request->merge([
+                'password' => $request->input('new_password'),
+                'password_confirmation' => $request->input('new_password_confirmation'),
+            ]);
+        }
+
         $validator = Validator::make($request->all(), [
             'current_password' => ['required', 'string'],
             'new_password' => ['required', 'string', 'min:6', 'confirmed'],

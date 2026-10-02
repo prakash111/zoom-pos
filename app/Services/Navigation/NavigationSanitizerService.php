@@ -356,4 +356,146 @@ class NavigationSanitizerService
 
         return $sections;
     }
+
+    /**
+     * Resolve server-driven POS navigation and primary bottom action routes for a store.
+     *
+     * Aligns the primary action route (center floating '+' button) and quick actions
+     * to the exact route used by "Restaurant POS Terminal" when the store operates
+     * in restaurant/cafe mode.
+     *
+     * @param  mixed  $store  Store model, Company model, array, or object
+     * @return array<string, mixed>
+     */
+    public static function getStoreNavigationConfig(mixed $store): array
+    {
+        $operatingMode = '';
+        $isRestaurant = false;
+
+        if ($store instanceof \App\Models\Store) {
+            $company = $store->company ?? ($store->company_id ? \App\Models\Company::withoutGlobalScopes()->find($store->company_id) : null);
+            $operatingMode = strtolower(trim((string) (
+                $store->settings['operating_mode']
+                ?? (isset($store->operating_mode) ? $store->operating_mode : null)
+                ?? $company?->pos_mode
+                ?? $company?->operating_mode
+                ?? ''
+            )));
+            $isRestaurant = in_array($operatingMode, ['restaurant', 'cafe', 'food_dining', 'food_restaurant'], true)
+                || ($store->settings['is_restaurant_module_enabled'] ?? false)
+                || ($store->is_restaurant_module_enabled ?? false)
+                || ($company && $company->isRestaurantMode());
+        } elseif ($store instanceof \App\Models\Company) {
+            $operatingMode = strtolower(trim((string) ($store->pos_mode ?? $store->operating_mode ?? '')));
+            $isRestaurant = in_array($operatingMode, ['restaurant', 'cafe', 'food_dining', 'food_restaurant'], true)
+                || $store->isRestaurantMode();
+        } elseif (is_array($store)) {
+            $operatingMode = strtolower(trim((string) ($store['operating_mode'] ?? $store['pos_mode'] ?? '')));
+            $isRestaurant = in_array($operatingMode, ['restaurant', 'cafe', 'food_dining', 'food_restaurant'], true)
+                || ($store['is_restaurant_module_enabled'] ?? false);
+        } elseif (is_object($store)) {
+            $operatingMode = strtolower(trim((string) ($store->operating_mode ?? $store->pos_mode ?? '')));
+            $isRestaurant = in_array($operatingMode, ['restaurant', 'cafe', 'food_dining', 'food_restaurant'], true)
+                || ($store->is_restaurant_module_enabled ?? false);
+        }
+
+        // Align the primary action route to the exact route used by "Restaurant POS Terminal"
+        $primaryPosRoute = $isRestaurant ? 'restaurant_terminal' : 'standard_pos';
+        $drawerRouteKey = $isRestaurant ? 'restaurant_pos' : 'pos';
+        $targetRoute = $isRestaurant ? '/restaurant-pos-terminal' : '/pos';
+        $defaultPosScreen = $isRestaurant ? 'RestaurantPosTerminalScreen' : 'PosGridScreen';
+        $posLayout = $isRestaurant ? 'restaurant_terminal' : 'grid_catalog';
+        $screenType = $isRestaurant ? 'restaurant_terminal' : 'pos_catalog';
+
+        return [
+            'primary_pos_route'     => $primaryPosRoute,
+            'center_action_route'   => $primaryPosRoute,
+            'primary_action'        => $primaryPosRoute,
+            'center_button_route'   => $primaryPosRoute,
+            'default_pos_route'     => $primaryPosRoute,
+            'drawer_pos_route'      => $drawerRouteKey,
+            'drawer_route'          => $drawerRouteKey,
+            'default_pos_action'    => $drawerRouteKey,
+            'default_pos_screen'    => $defaultPosScreen,
+            'operating_mode'        => $operatingMode ?: ($isRestaurant ? 'restaurant' : 'retail'),
+            'is_restaurant'         => $isRestaurant,
+            'pos_layout'            => $posLayout,
+            'default_terminal_view' => $posLayout,
+            'target_route'          => $targetRoute,
+            'screen_type'           => $screenType,
+            'quick_actions'         => [
+                'add_sale' => [
+                    'target_route' => $targetRoute,
+                    'screen_type'  => $screenType,
+                    'route_key'    => $drawerRouteKey,
+                    'route'        => $drawerRouteKey,
+                ],
+                'new_sale' => [
+                    'target_route' => $targetRoute,
+                    'screen_type'  => $screenType,
+                    'route_key'    => $drawerRouteKey,
+                    'route'        => $drawerRouteKey,
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Build the dynamic Server-Driven Bottom Navigation Schema and Center Action Router.
+     *
+     * Enables Flutter mobile clients to dynamically build bottom navigation items,
+     * icons, target routes, and center action routing from the server without app updates.
+     */
+    public static function getBottomNavigationSchema($store = null): array
+    {
+        $config = self::getStoreNavigationConfig($store);
+        $isRestaurant = !empty($config['is_restaurant']);
+
+        $centerAction = [
+            'id'           => 'primary_action',
+            'icon'         => 'add',
+            'target_route' => $isRestaurant ? '/restaurant-pos-terminal' : '/pos',
+            'route_key'    => $isRestaurant ? 'restaurant_terminal' : 'pos',
+            'label'        => $isRestaurant ? 'New Order' : 'New Sale',
+            'arguments'    => [
+                'mode'   => $isRestaurant ? 'restaurant' : 'retail',
+                'screen' => $isRestaurant ? 'RestaurantPosTerminalScreen' : 'PosGridScreen',
+            ],
+        ];
+
+        $items = [
+            [
+                'id'    => 'nav_home',
+                'label' => 'Home',
+                'icon'  => 'home',
+                'route' => '/dashboard',
+            ],
+            [
+                'id'    => 'nav_sales',
+                'label' => 'Sales',
+                'icon'  => 'receipt_long',
+                'route' => '/sales',
+            ],
+            [
+                'id'    => 'nav_orders',
+                'label' => 'Orders',
+                'icon'  => 'shopping_bag',
+                'route' => '/orders',
+            ],
+            [
+                'id'    => 'nav_more',
+                'label' => 'More',
+                'icon'  => 'grid_view',
+                'route' => 'drawer',
+            ],
+        ];
+
+        return [
+            'items'         => $items,
+            'center_action' => $centerAction,
+            'config'        => $config,
+        ];
+    }
 }
+
+

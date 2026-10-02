@@ -70,16 +70,25 @@ class LanguageApiController extends Controller
      */
     public function appTranslations(Request $request, LocalizationService $localization): JsonResponse
     {
-        $company = $this->resolveCompany($request);
+        $companyId = null;
+        try {
+            $company = $this->resolveCompany($request);
+            $companyId = $company->id;
+        } catch (\Throwable) {
+            // Unauthenticated public/guest client (e.g. landing page web visitor)
+        }
+
         $clean = strtolower(trim((string) $request->query('lang', $request->query('locale', ''))));
         if ($clean === '') {
-            $clean = $company->default_locale ?: ($company->language ?: 'en');
+            $clean = ($companyId && isset($company))
+                ? ($company->default_locale ?: ($company->language ?: 'en'))
+                : 'en';
         }
         if (! $localization->isValidLocale($clean)) {
             return response()->json(['success' => false, 'error' => 'Unsupported locale.'], 404);
         }
 
-        $version = $localization->translationVersion($clean, $company->id);
+        $version = $localization->translationVersion($clean, $companyId);
         $clientVersion = trim((string) $request->query('version', ''));
         $response = [
             'success' => true,
@@ -89,7 +98,7 @@ class LanguageApiController extends Controller
             'not_modified' => $clientVersion !== '' && hash_equals($version, $clientVersion),
         ];
         if (! $response['not_modified']) {
-            $response['translations'] = $localization->getMergedTranslations($clean, $company->id);
+            $response['translations'] = $localization->getMergedTranslations($clean, $companyId);
         }
 
         return response()->json($response)->header('ETag', '"'.$version.'"');

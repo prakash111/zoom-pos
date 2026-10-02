@@ -24,6 +24,8 @@ class LandingPageController extends Controller
      */
     public function index(Request $request)
     {
+        app()->setLocale(app(\App\Services\Localization\LocalizationService::class)->getActiveLocale());
+
         if (Desktop::isRunning()) {
             return auth('web')->check()
                 ? redirect('/tenant')

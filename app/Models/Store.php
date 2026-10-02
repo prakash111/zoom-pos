@@ -103,4 +103,71 @@ class Store extends Model
     {
         return (string) ($this->phone ?: ($this->tenant->phone ?? ''));
     }
+
+    public function getOperatingModeAttribute(): string
+    {
+        return (string) ($this->settings['operating_mode'] ?? $this->company?->pos_mode ?? $this->company?->operating_mode ?? 'retail');
+    }
+
+    public function getIsRestaurantAttribute(): bool
+    {
+        $mode = strtolower($this->operating_mode);
+        $company = $this->company;
+        return in_array($mode, ['restaurant', 'cafe', 'food_dining', 'food_restaurant'], true)
+            || ($this->settings['is_restaurant_module_enabled'] ?? false)
+            || ($company && $company->isRestaurantMode());
+    }
+
+    public function getPosLayoutAttribute(): string
+    {
+        return (string) ($this->settings['pos_layout'] ?? ($this->is_restaurant ? 'restaurant_terminal' : 'grid_catalog'));
+    }
+
+    public function getDefaultTerminalViewAttribute(): string
+    {
+        return (string) ($this->settings['default_terminal_view'] ?? ($this->is_restaurant ? 'restaurant_terminal' : 'grid_catalog'));
+    }
+
+    public function getPrimaryPosRouteAttribute(): string
+    {
+        return $this->is_restaurant ? 'restaurant_terminal' : 'standard_pos';
+    }
+
+    public function getCenterActionRouteAttribute(): string
+    {
+        return $this->is_restaurant ? 'restaurant_terminal' : 'standard_pos';
+    }
+
+    public function getDefaultPosScreenAttribute(): string
+    {
+        return $this->is_restaurant ? 'RestaurantPosTerminalScreen' : 'PosGridScreen';
+    }
+
+    public function getDefaultPosActionAttribute(): string
+    {
+        return $this->is_restaurant ? 'restaurant_pos' : 'pos';
+    }
+
+    public function getQuickActionsAttribute(): array
+    {
+        $isRestaurant = $this->is_restaurant;
+        $targetRoute = $isRestaurant ? '/restaurant-pos-terminal' : '/pos';
+        $screenType = $isRestaurant ? 'restaurant_terminal' : 'pos_catalog';
+        $drawerKey = $isRestaurant ? 'restaurant_pos' : 'pos';
+
+        return [
+            'add_sale' => [
+                'target_route' => $targetRoute,
+                'screen_type'  => $screenType,
+                'route_key'    => $drawerKey,
+                'route'        => $drawerKey,
+            ],
+            'new_sale' => [
+                'target_route' => $targetRoute,
+                'screen_type'  => $screenType,
+                'route_key'    => $drawerKey,
+                'route'        => $drawerKey,
+            ],
+        ];
+    }
 }

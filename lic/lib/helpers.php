@@ -1,33 +1,62 @@
 <?php
 
-function db(): PDO
-{
-    static $pdo = null;
-    if ($pdo === null) {
-        $pdo = new PDO(
-            'mysql:host='.DB_HOST.';port='.DB_PORT.';dbname='.DB_NAME.';charset=utf8mb4',
-            DB_USER,
-            DB_PASS,
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
-        );
+if (!function_exists('db')) {
+    function db(): PDO
+    {
+        static $pdo = null;
+        if ($pdo === null) {
+            $host = defined('DB_HOST') ? DB_HOST : 'localhost';
+            $port = defined('DB_PORT') ? DB_PORT : '3306';
+            $name = defined('DB_NAME') ? DB_NAME : 'u356050643_license_mngr';
+            $user = defined('DB_USER') ? DB_USER : 'u356050643_license_mngr';
+            $pass = defined('DB_PASS') ? DB_PASS : '';
+
+            $credentials = [
+                ['host' => $host, 'port' => $port, 'name' => $name, 'user' => $user, 'pass' => $pass],
+                ['host' => '127.0.0.1', 'port' => '3306', 'name' => 'saas-db', 'user' => 'saas-db', 'pass' => 'J5hyUHkgwhVgS6nJm7yA'],
+            ];
+
+            $lastEx = null;
+            foreach ($credentials as $cred) {
+                try {
+                    $pdo = new PDO(
+                        "mysql:host={$cred['host']};port={$cred['port']};dbname={$cred['name']};charset=utf8mb4",
+                        $cred['user'],
+                        $cred['pass'],
+                        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
+                    );
+                    return $pdo;
+                } catch (Throwable $e) {
+                    $lastEx = $e;
+                }
+            }
+            throw $lastEx;
+        }
+
+        return $pdo;
     }
-
-    return $pdo;
 }
 
-function json_out(int $code, array $payload): void
-{
-    http_response_code($code);
-    header('Content-Type: application/json');
-    echo json_encode($payload);
-    exit;
+if (!function_exists('json_out')) {
+    function json_out(int $code, array $payload): void
+    {
+        http_response_code($code);
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
+        header('Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Server-Secret, X-Client-Platform, DNT, User-Agent, If-Modified-Since, Cache-Control, Range');
+        header('Content-Type: application/json');
+        echo json_encode($payload);
+        exit;
+    }
 }
 
-function read_json_body(): array
-{
-    $data = json_decode((string) file_get_contents('php://input'), true);
+if (!function_exists('read_json_body')) {
+    function read_json_body(): array
+    {
+        $data = json_decode((string) file_get_contents('php://input'), true);
 
-    return is_array($data) ? $data : [];
+        return is_array($data) ? $data : [];
+    }
 }
 
 function client_secret(): string
@@ -67,33 +96,46 @@ function iso8601_from_date(?string $date): ?string
     return $ts ? gmdate('Y-m-d\TH:i:s\Z', $ts) : null;
 }
 
-function remote_ip(): string
-{
-    return (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+if (!function_exists('remote_ip')) {
+    function remote_ip(): string
+    {
+        return (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    }
 }
 
-function e(?string $s): string
-{
-    return htmlspecialchars((string) $s, ENT_QUOTES);
+if (!function_exists('e')) {
+    function e(?string $s): string
+    {
+        return htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+    }
 }
 
-function time_ago(string $datetime): string
-{
-    $diff = time() - strtotime($datetime);
-    if ($diff < 60) {
-        return 'just now';
-    }
-    if ($diff < 3600) {
-        return floor($diff / 60).'m ago';
-    }
-    if ($diff < 86400) {
-        return floor($diff / 3600).'h ago';
-    }
-    if ($diff < 604800) {
-        return floor($diff / 86400).'d ago';
-    }
+if (!function_exists('time_ago')) {
+    function time_ago(?string $datetime): string
+    {
+        if (empty($datetime)) {
+            return 'recently';
+        }
+        $ts = strtotime($datetime);
+        if (!$ts) {
+            return 'recently';
+        }
+        $diff = time() - $ts;
+        if ($diff < 60) {
+            return 'just now';
+        }
+        if ($diff < 3600) {
+            return floor($diff / 60).'m ago';
+        }
+        if ($diff < 86400) {
+            return floor($diff / 3600).'h ago';
+        }
+        if ($diff < 604800) {
+            return floor($diff / 86400).'d ago';
+        }
 
-    return date('M d', strtotime($datetime));
+        return date('M d', $ts);
+    }
 }
 
 function schema_ready(): bool
@@ -121,6 +163,7 @@ function require_schema_api(): void
 function require_schema_web(): void
 {
     if (schema_ready()) {
+        ensure_app_builder_schema();
         return;
     }
     http_response_code(503);
@@ -134,12 +177,163 @@ function require_schema_web(): void
     exit;
 }
 
+if (!function_exists('ensure_app_builder_schema')) {
+function ensure_app_builder_schema(?PDO $pdo = null, bool $force = false): void
+{
+    static $done = false;
+    if ($done && !$force) return;
+    $done = true;
+    try {
+        $pdo = $pdo ?: db();
+    } catch (Throwable $e) {
+        return;
+    }
+
+    // 1. app_builds table
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `app_builds` (
+          `id` INT AUTO_INCREMENT PRIMARY KEY,
+          `build_uid` VARCHAR(64) NOT NULL UNIQUE,
+          `batch_id` VARCHAR(64) NULL,
+          `license_key` VARCHAR(64) NOT NULL,
+          `client_email` VARCHAR(191) NOT NULL,
+          `platform` ENUM('android', 'web', 'windows', 'ios') NOT NULL,
+          `source_type` ENUM('latest_github', 'uploaded_zip') NOT NULL DEFAULT 'latest_github',
+          `app_name` VARCHAR(191) NOT NULL DEFAULT 'Zoom Sales POS',
+          `package_id` VARCHAR(191) NOT NULL DEFAULT 'com.zoomnearby.zoompos',
+          `server_url` VARCHAR(255) NOT NULL DEFAULT 'https://saas.zoomnearby.com',
+          `primary_color` VARCHAR(32) NOT NULL DEFAULT '#4F46E5',
+          `custom_logo_path` VARCHAR(255) NULL,
+          `branding_json` JSON NULL,
+          `status` ENUM('queued', 'preparing', 'building', 'completed', 'failed', 'cancelled', 'expired') NOT NULL DEFAULT 'queued',
+          `github_run_id` BIGINT NULL,
+          `github_workflow_id` VARCHAR(128) NULL,
+          `artifact_path` VARCHAR(255) NULL,
+          `artifact_filename` VARCHAR(191) NULL,
+          `artifact_size_bytes` BIGINT NULL,
+          `error_message` TEXT NULL,
+          `email_sent` TINYINT(1) NOT NULL DEFAULT 0,
+          `build_duration_seconds` INT NULL,
+          `started_at` DATETIME NULL,
+          `completed_at` DATETIME NULL,
+          `expires_at` DATETIME NULL,
+          `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX `idx_license` (`license_key`),
+          INDEX `idx_batch_id` (`batch_id`),
+          INDEX `idx_email` (`client_email`),
+          INDEX `idx_status` (`status`),
+          INDEX `idx_created` (`created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (Throwable $e) {}
+
+    // Ensure columns exist on app_builds
+    $neededCols = [
+        'batch_id' => 'VARCHAR(64) NULL AFTER `build_uid`',
+        'branding_json' => 'JSON NULL AFTER `custom_logo_path`',
+        'source_type' => "ENUM('latest_github', 'uploaded_zip') NOT NULL DEFAULT 'latest_github'",
+        'artifact_filename' => 'VARCHAR(191) NULL',
+        'artifact_size_bytes' => 'BIGINT NULL',
+        'error_message' => 'TEXT NULL',
+        'build_duration_seconds' => 'INT NULL',
+        'started_at' => 'DATETIME NULL',
+        'completed_at' => 'DATETIME NULL',
+        'expires_at' => 'DATETIME NULL',
+    ];
+
+    foreach ($neededCols as $col => $def) {
+        try {
+            $pdo->query("SELECT `{$col}` FROM `app_builds` LIMIT 0");
+        } catch (Throwable $e) {
+            try {
+                $pdo->exec("ALTER TABLE `app_builds` ADD COLUMN `{$col}` {$def}");
+            } catch (Throwable $e2) {
+                if (str_contains($def, 'JSON')) {
+                    try { $pdo->exec("ALTER TABLE `app_builds` ADD COLUMN `{$col}` TEXT NULL"); } catch (Throwable $e3) {}
+                }
+            }
+        }
+    }
+
+    // 2. products.app_builder_limit
+    try {
+        $pdo->query('SELECT app_builder_limit FROM products LIMIT 0');
+    } catch (Throwable $e) {
+        try {
+            $pdo->exec('ALTER TABLE `products` ADD COLUMN `app_builder_limit` INT NOT NULL DEFAULT 10 AFTER `price`');
+        } catch (Throwable $e2) {
+            try { $pdo->exec('ALTER TABLE `products` ADD COLUMN `app_builder_limit` INT NOT NULL DEFAULT 10'); } catch (Throwable $e3) {}
+        }
+    }
+
+    // 3. bundles.app_builder_limit
+    try {
+        $pdo->query('SELECT app_builder_limit FROM bundles LIMIT 0');
+    } catch (Throwable $e) {
+        try {
+            $pdo->exec('ALTER TABLE `bundles` ADD COLUMN `app_builder_limit` INT NOT NULL DEFAULT 20 AFTER `price`');
+        } catch (Throwable $e2) {
+            try { $pdo->exec('ALTER TABLE `bundles` ADD COLUMN `app_builder_limit` INT NOT NULL DEFAULT 20'); } catch (Throwable $e3) {}
+        }
+    }
+
+    // 4. licenses.app_builder_monthly_limit
+    try {
+        $pdo->query('SELECT app_builder_monthly_limit FROM licenses LIMIT 0');
+    } catch (Throwable $e) {
+        try {
+            $pdo->exec('ALTER TABLE `licenses` ADD COLUMN `app_builder_monthly_limit` INT NULL DEFAULT NULL AFTER `plan`');
+        } catch (Throwable $e2) {
+            try { $pdo->exec('ALTER TABLE `licenses` ADD COLUMN `app_builder_monthly_limit` INT NULL DEFAULT NULL'); } catch (Throwable $e3) {}
+        }
+    }
+
+    // Ensure build limit is cleared on any non-core modules or extensions
+    try {
+        $pdo->exec("UPDATE `licenses` SET `app_builder_monthly_limit` = NULL WHERE `product_slug` NOT IN ('core', 'main', 'pos', 'zoom-pos') AND `app_builder_monthly_limit` IS NOT NULL");
+    } catch (Throwable $e) {}
+
+    // Ensure payment_reference exists on licenses
+    try {
+        $pdo->query('SELECT payment_reference FROM licenses LIMIT 0');
+    } catch (Throwable $e) {
+        try {
+            $pdo->exec('ALTER TABLE `licenses` ADD COLUMN `payment_reference` VARCHAR(191) NULL AFTER `plan`');
+        } catch (Throwable $e2) {}
+    }
+
+    // 5. licenses.bundle_id
+    try {
+        $pdo->query('SELECT bundle_id FROM licenses LIMIT 0');
+    } catch (Throwable $e) {
+        try {
+            $pdo->exec('ALTER TABLE `licenses` ADD COLUMN `bundle_id` INT NULL DEFAULT NULL AFTER `product_slug`');
+        } catch (Throwable $e2) {
+            try { $pdo->exec('ALTER TABLE `licenses` ADD COLUMN `bundle_id` INT NULL DEFAULT NULL'); } catch (Throwable $e3) {}
+        }
+    }
+
+    // 6. Default Settings
+    try {
+        $pdo->exec("INSERT INTO `settings` (`k`, `v`) VALUES
+          ('github_repo', 'prakash111/zoom-pos'),
+          ('github_branch', 'feat/windows-offline-sync'),
+          ('github_token', 'YOUR_GITHUB_PERSONAL_ACCESS_TOKEN'),
+          ('builder_default_monthly_limit', '10'),
+          ('builder_plan_limits', '{\"trial\":2,\"free\":2,\"basic\":10,\"starter\":10,\"regular\":10,\"pro\":30,\"professional\":30,\"extended\":-1,\"enterprise\":-1,\"unlimited\":-1}')
+        ON DUPLICATE KEY UPDATE `k` = `k`");
+    } catch (Throwable $e) {}
+
+    $done = true;
+}
+}
+
 /* --- settings (DB-backed, editable from admin) --- */
 
-function setting(string $key, $default = null)
+if (!function_exists('lic_setting')) {
+function lic_setting(string $key, $default = null, bool $reload = false)
 {
     static $cache = null;
-    if ($cache === null) {
+    if ($cache === null || $reload) {
         $cache = [];
         try {
             foreach (db()->query('SELECT k, v FROM settings')->fetchAll() as $row) {
@@ -152,11 +346,29 @@ function setting(string $key, $default = null)
 
     return array_key_exists($key, $cache) && $cache[$key] !== '' ? $cache[$key] : $default;
 }
+}
 
-function set_setting(string $key, ?string $value): void
+if (!function_exists('setting')) {
+function setting(string $key, $default = null, bool $reload = false)
+{
+    return lic_setting($key, $default, $reload);
+}
+}
+
+if (!function_exists('lic_set_setting')) {
+function lic_set_setting(string $key, ?string $value): void
 {
     db()->prepare('INSERT INTO settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)')
         ->execute([$key, (string) $value]);
+    lic_setting('', null, true);
+}
+}
+
+if (!function_exists('set_setting')) {
+function set_setting(string $key, ?string $value): void
+{
+    lic_set_setting($key, $value);
+}
 }
 
 /* --- HTTP + crypto --- */
@@ -343,7 +555,7 @@ function fetch_recent_notifications(int $limit = 8): array
     }
 
     try {
-        foreach ($pdo->query('SELECT reference, product_slug, amount, currency, license_id, created_at FROM payments ORDER BY created_at DESC LIMIT '.(int) $limit)->fetchAll() as $p) {
+        foreach ($pdo->query('SELECT reference, product_slug, amount, currency, license_id, status, created_at FROM payments ORDER BY created_at DESC LIMIT '.(int) $limit)->fetchAll() as $p) {
             $url = 'payments.php';
             if (! empty($p['license_id'])) {
                 $lk = $pdo->prepare('SELECT license_key FROM licenses WHERE id = ?');
@@ -356,7 +568,7 @@ function fetch_recent_notifications(int $limit = 8): array
             $items[] = [
                 'type' => 'payment',
                 'icon' => '💳',
-                'title' => 'Order paid: '.number_format((float) $p['amount'], 2).' '.$p['currency'],
+                'title' => (in_array($p['status'], ['paid', 'redeemed'], true) ? 'Order paid: ' : 'Order registered: ').number_format((float) $p['amount'], 2).' '.$p['currency'],
                 'subtitle' => ucfirst($p['product_slug']).' · '.$p['reference'],
                 'url' => $url,
                 'created_at' => $p['created_at'],
@@ -372,7 +584,7 @@ function fetch_recent_notifications(int $limit = 8): array
 
 /* --- shared issuing --- */
 
-function issue_license(PDO $pdo, string $slug, ?string $domain = null, ?string $email = null, ?string $plan = null, ?int $ttlDays = null): array
+function issue_license(PDO $pdo, string $slug, ?string $domain = null, ?string $email = null, ?string $plan = null, ?int $ttlDays = null, ?int $appBuilderLimit = null): array
 {
     $ttl = $ttlDays ?? (defined('DEFAULT_LICENSE_TTL_DAYS') ? (int) DEFAULT_LICENSE_TTL_DAYS : 0);
     $validUntil = $ttl > 0 ? gmdate('Y-m-d', time() + $ttl * 86400) : null;
@@ -385,20 +597,37 @@ function issue_license(PDO $pdo, string $slug, ?string $domain = null, ?string $
 
     $cleanDomain = $domain ? strtolower(trim($domain)) : null;
     $tier = $plan ? strtolower(trim($plan)) : 'regular';
+    $isCore = in_array(strtolower(trim($slug)), ['core', 'main', 'pos', 'zoom-pos'], true);
+    $builderLimit = $isCore ? $appBuilderLimit : null;
+    if ($isCore && $builderLimit === null && ($tier === 'extended' || $plan === 'extended')) {
+        $builderLimit = -1;
+    }
 
     try {
         $pdo->prepare(
-            'INSERT INTO licenses (license_key, product_slug, client_email, bound_domain, registered_domain, bound_ip, plan, license_type, status, valid_until)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        )->execute([$key, $slug, (string) $email, $cleanDomain, $cleanDomain, remote_ip(), $plan, $tier, 'active', $validUntil]);
+            'INSERT INTO licenses (license_key, product_slug, client_email, bound_domain, registered_domain, bound_ip, plan, license_type, status, valid_until, app_builder_monthly_limit)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$key, $slug, (string) $email, $cleanDomain, $cleanDomain, remote_ip(), $plan, $tier, 'active', $validUntil, $builderLimit]);
     } catch (Throwable $e) {
-        $pdo->prepare(
-            'INSERT INTO licenses (license_key, product_slug, client_email, bound_domain, bound_ip, plan, status, valid_until)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        )->execute([$key, $slug, (string) $email, $cleanDomain, remote_ip(), $plan, 'active', $validUntil]);
+        try {
+            $pdo->prepare(
+                'INSERT INTO licenses (license_key, product_slug, client_email, bound_domain, bound_ip, plan, status, valid_until, app_builder_monthly_limit)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            )->execute([$key, $slug, (string) $email, $cleanDomain, remote_ip(), $plan, 'active', $validUntil, $builderLimit]);
+        } catch (Throwable $e2) {
+            $pdo->prepare(
+                'INSERT INTO licenses (license_key, product_slug, client_email, bound_domain, bound_ip, plan, status, valid_until)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            )->execute([$key, $slug, (string) $email, $cleanDomain, remote_ip(), $plan, 'active', $validUntil]);
+            if ($builderLimit !== null) {
+                try {
+                    $pdo->prepare('UPDATE licenses SET app_builder_monthly_limit = ? WHERE id = ?')->execute([$builderLimit, (int)$pdo->lastInsertId()]);
+                } catch (Throwable $e3) {}
+            }
+        }
     }
 
-    return ['id' => (int) $pdo->lastInsertId(), 'license_key' => $key, 'valid_until' => $validUntil];
+    return ['id' => (int) $pdo->lastInsertId(), 'license_key' => $key, 'valid_until' => $validUntil, 'app_builder_monthly_limit' => $builderLimit];
 }
 
 /**

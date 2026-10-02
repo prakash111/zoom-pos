@@ -11,6 +11,7 @@ use App\Models\ProductReview;
 use App\Models\Sale;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class StorefrontReviewController extends Controller
 {
@@ -18,6 +19,13 @@ class StorefrontReviewController extends Controller
     {
         if (app()->bound('tenant.company_id')) {
             $company = Company::withoutGlobalScopes()->find(app('tenant.company_id'));
+            if ($company) {
+                return $company;
+            }
+        }
+
+        if ($request->attributes->get('company_id')) {
+            $company = Company::withoutGlobalScopes()->find($request->attributes->get('company_id'));
             if ($company) {
                 return $company;
             }
@@ -310,14 +318,14 @@ class StorefrontReviewController extends Controller
         abort_if(! $company, 404, 'Store not found');
 
         // Automatically seed sample reviews if company has products but no reviews yet
-        ProductReview::seedSampleReviewsForCompany($company->id);
+        ProductReview::seedSampleReviewsForCompany((string) $company->id);
 
         $query = ProductReview::withoutGlobalScopes()
             ->where('company_id', $company->id)
             ->with('product:id,name');
 
         if ($request->filled('status')) {
-            $status = strtolower(trim((string) $request->query('status', 'all')));
+            $status = strtolower(trim((string) $request->input('status', 'all')));
             if ($status === 'approved') {
                 $query->where('is_approved', true);
             } elseif ($status === 'pending') {
@@ -326,18 +334,19 @@ class StorefrontReviewController extends Controller
         }
 
         if ($request->filled('rating')) {
-            $rating = (int) $request->query('rating');
+            $rating = (int) $request->input('rating');
             if ($rating >= 1 && $rating <= 5) {
                 $query->where('rating', $rating);
             }
         }
 
         if ($request->filled('product_id')) {
-            $query->where('product_id', $request->query('product_id'));
+            $query->where('product_id', $request->input('product_id'));
         }
 
-        if ($request->filled('search')) {
-            $term = '%' . trim((string) $request->query('search')) . '%';
+        $search = $request->input('search') ?: $request->input('q') ?: $request->query('search') ?: $request->query('q');
+        if (! empty($search)) {
+            $term = '%' . trim((string) $search) . '%';
             $query->where(function ($q) use ($term) {
                 $q->where('customer_name', 'like', $term)
                     ->orWhere('customer_email', 'like', $term)
@@ -366,7 +375,7 @@ class StorefrontReviewController extends Controller
             1 => $allReviews->where('rating', 1)->count(),
         ];
 
-        $perPage = min(100, max(5, (int) $request->query('per_page', 50)));
+        $perPage = min(100, max(5, (int) $request->input('per_page', 50)));
         $reviews = $query->latest()->paginate($perPage);
 
         $formatted = collect($reviews->items())->map(function ($r) {
@@ -381,27 +390,41 @@ class StorefrontReviewController extends Controller
                 'title' => $r->title,
                 'comment' => $r->comment,
                 'is_approved' => (bool) $r->is_approved,
+                'status' => $r->is_approved ? 'approved' : 'pending',
                 'is_verified_purchase' => (bool) $r->is_verified_purchase,
                 'created_at' => $r->created_at?->toISOString(),
                 'created_at_human' => $r->created_at?->diffForHumans() ?? '',
             ];
         });
 
+        $enableReviews = (bool) ($company->enable_product_reviews ?? true);
+        $requireApproval = (bool) ($company->require_review_approval ?? false);
+
+        $settings = [
+            'enable_product_reviews' => $enableReviews,
+            'require_admin_approval' => $requireApproval,
+            'require_review_approval' => $requireApproval,
+        ];
+
+        $summary = [
+            'total' => $totalCount,
+            'approved' => $approvedCount,
+            'pending' => $pendingCount,
+            'average_rating' => $avgRating,
+            'total_count' => $totalCount,
+            'approved_count' => $approvedCount,
+            'pending_count' => $pendingCount,
+            'rating_distribution' => $ratingDistribution,
+        ];
+
         return response()->json([
             'success' => true,
             'data' => [
                 'reviews' => $formatted,
-                'stats' => [
-                    'total_count' => $totalCount,
-                    'approved_count' => $approvedCount,
-                    'pending_count' => $pendingCount,
-                    'average_rating' => $avgRating,
-                    'rating_distribution' => $ratingDistribution,
-                ],
-                'settings' => [
-                    'enable_product_reviews' => (bool) ($company->enable_product_reviews ?? true),
-                    'require_review_approval' => (bool) ($company->require_review_approval ?? false),
-                ],
+                'counters' => $summary,
+                'summary' => $summary,
+                'stats' => $summary,
+                'settings' => $settings,
                 'pagination' => [
                     'current_page' => $reviews->currentPage(),
                     'last_page' => $reviews->lastPage(),
@@ -409,6 +432,22 @@ class StorefrontReviewController extends Controller
                     'total' => $reviews->total(),
                 ],
             ],
+            // Top-level aliases for flexible mobile client consumption
+            'reviews' => $formatted,
+            'counters' => $summary,
+            'summary' => $summary,
+            'stats' => $summary,
+            'settings' => $settings,
+            'pagination' => [
+                'current_page' => $reviews->currentPage(),
+                'last_page' => $reviews->lastPage(),
+                'per_page' => $reviews->perPage(),
+                'total' => $reviews->total(),
+            ],
+            'total' => $reviews->total(),
+            'current_page' => $reviews->currentPage(),
+            'last_page' => $reviews->lastPage(),
+            'per_page' => $reviews->perPage(),
         ]);
     }
 
@@ -493,21 +532,73 @@ class StorefrontReviewController extends Controller
     }
 
     /**
+     * Get review moderation settings.
+     * GET /tenant/storefront/reviews/settings
+     * GET /api/v1/tenant/storefront/reviews/settings
+     * GET /api/v1/pos/tenant/storefront/reviews/settings
+     * GET /api/v1/pos/storefront/reviews/settings
+     */
+    public function getSettings(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        abort_if(! $company, 404, 'Store not found');
+
+        $enableReviews = (bool) ($company->enable_product_reviews ?? true);
+        $requireApproval = (bool) ($company->require_review_approval ?? false);
+
+        $settings = [
+            'enable_product_reviews' => $enableReviews,
+            'require_admin_approval' => $requireApproval,
+            'require_review_approval' => $requireApproval,
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $settings,
+            'settings' => $settings,
+            'enable_product_reviews' => $enableReviews,
+            'require_admin_approval' => $requireApproval,
+            'require_review_approval' => $requireApproval,
+        ]);
+    }
+
+    /**
      * Update review moderation settings.
      * POST /tenant/storefront/reviews/settings
      * PUT /tenant/storefront/reviews/settings
      * POST /api/v1/tenant/storefront/reviews/settings
+     * PUT /api/v1/tenant/storefront/reviews/settings
+     * POST /api/v1/pos/tenant/storefront/reviews/settings
+     * PUT /api/v1/pos/tenant/storefront/reviews/settings
+     * POST /api/v1/pos/storefront/reviews/settings
+     * PUT /api/v1/pos/storefront/reviews/settings
      */
     public function updateSettings(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
         abort_if(! $company, 404, 'Store not found');
 
+        $validator = Validator::make($request->all(), [
+            'enable_product_reviews' => ['nullable', 'boolean'],
+            'require_admin_approval' => ['nullable', 'boolean'],
+            'require_review_approval' => ['nullable', 'boolean'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
         $updates = [];
         if ($request->has('enable_product_reviews')) {
             $updates['enable_product_reviews'] = $request->boolean('enable_product_reviews');
         }
-        if ($request->has('require_review_approval')) {
+        if ($request->has('require_admin_approval')) {
+            $updates['require_review_approval'] = $request->boolean('require_admin_approval');
+        } elseif ($request->has('require_review_approval')) {
             $updates['require_review_approval'] = $request->boolean('require_review_approval');
         }
 
@@ -516,13 +607,24 @@ class StorefrontReviewController extends Controller
             AuditLog::record('storefront.review_settings_updated', $company->id, $request->user()?->id, $updates);
         }
 
+        $fresh = $company->fresh();
+        $enableReviews = (bool) ($fresh->enable_product_reviews ?? true);
+        $requireApproval = (bool) ($fresh->require_review_approval ?? false);
+
+        $settings = [
+            'enable_product_reviews' => $enableReviews,
+            'require_admin_approval' => $requireApproval,
+            'require_review_approval' => $requireApproval,
+        ];
+
         return response()->json([
             'success' => true,
             'message' => 'Review settings updated successfully.',
-            'data' => [
-                'enable_product_reviews' => (bool) ($company->fresh()->enable_product_reviews ?? true),
-                'require_review_approval' => (bool) ($company->fresh()->require_review_approval ?? false),
-            ],
+            'data' => $settings,
+            'settings' => $settings,
+            'enable_product_reviews' => $enableReviews,
+            'require_admin_approval' => $requireApproval,
+            'require_review_approval' => $requireApproval,
         ]);
     }
 

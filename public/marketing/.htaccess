@@ -1,0 +1,31 @@
+# Marketing Landing Page Standalone Apache / LiteSpeed Configuration
+# Ensures assets and pages load properly without parent Laravel rewrite interference
+
+Options -Indexes +FollowSymLinks
+
+# Disable rewrite engine in this folder so LiteSpeed/Apache serves files directly
+<IfModule mod_rewrite.c>
+    RewriteEngine Off
+</IfModule>
+
+# Correct MIME types for all marketing assets
+<IfModule mod_mime.c>
+    AddType text/css .css
+    AddType application/javascript .js
+    AddType image/png .png
+    AddType image/jpeg .jpg .jpeg
+    AddType image/svg+xml .svg
+    AddType image/webp .webp
+    AddType image/x-icon .ico
+    AddType font/woff2 .woff2
+    AddType font/woff .woff
+    AddType font/ttf .ttf
+</IfModule>
+
+# CORS & Caching headers
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    <FilesMatch "\.(css|js|png|jpg|jpeg|svg|webp|woff2|woff|ttf|ico)$">
+        Header set Cache-Control "max-age=2592000, public"
+    </FilesMatch>
+</IfModule>

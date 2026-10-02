@@ -530,7 +530,15 @@
 
         <!-- Footer -->
         @if ($template->show_qr_code && !empty($qrCodeData['data_uri']))
-            <div style="text-align: center; margin: 8px 0;"><img src="{{ $qrCodeData['data_uri'] }}" width="80" height="80" alt="Invoice verification QR"><br><small>View invoice online</small></div>
+            @php
+                $verifyInvoiceUrl = !empty($qrCodeData['url']) ? $qrCodeData['url'] : route('sales.public', $sale->sale_number);
+            @endphp
+            <div style="text-align: center; margin: 8px 0;">
+                <a href="{{ $verifyInvoiceUrl }}" target="_blank" style="text-decoration: none; color: inherit;">
+                    <img src="{{ $qrCodeData['data_uri'] }}" width="80" height="80" alt="Invoice verification QR"><br>
+                    <small style="color: #64748b; text-decoration: underline;">View invoice online</small>
+                </a>
+            </div>
         @endif
         <div class="footer-bar">
             {{ $sale->store?->receipt_footer ?: ($template->footer_notes ?: 'Thank you for your business with '.($sale->store?->name ?: $company->name).'!') }}

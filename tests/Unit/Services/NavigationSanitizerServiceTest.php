@@ -73,4 +73,47 @@ class NavigationSanitizerServiceTest extends TestCase
         $this->assertIsList($items[1]['children']);
         $this->assertSame('staff', $items[1]['children'][0]['key']);
     }
+
+    public function test_it_resolves_restaurant_store_navigation_config_to_restaurant_terminal(): void
+    {
+        $store = [
+            'operating_mode' => 'restaurant',
+            'is_restaurant_module_enabled' => true,
+        ];
+
+        $config = NavigationSanitizerService::getStoreNavigationConfig($store);
+
+        $this->assertTrue($config['is_restaurant']);
+        $this->assertSame('restaurant_terminal', $config['primary_pos_route']);
+        $this->assertSame('restaurant_terminal', $config['center_action_route']);
+        $this->assertSame('restaurant_pos', $config['drawer_pos_route']);
+        $this->assertSame('restaurant_pos', $config['default_pos_action']);
+        $this->assertSame('RestaurantPosTerminalScreen', $config['default_pos_screen']);
+        $this->assertSame('restaurant_terminal', $config['pos_layout']);
+        $this->assertSame('restaurant_terminal', $config['default_terminal_view']);
+        $this->assertSame('/restaurant-pos-terminal', $config['quick_actions']['add_sale']['target_route']);
+        $this->assertSame('restaurant_terminal', $config['quick_actions']['add_sale']['screen_type']);
+        $this->assertSame('restaurant_pos', $config['quick_actions']['add_sale']['route_key']);
+    }
+
+    public function test_it_resolves_standard_store_navigation_config_to_standard_pos(): void
+    {
+        $store = [
+            'operating_mode' => 'retail',
+            'is_restaurant_module_enabled' => false,
+        ];
+
+        $config = NavigationSanitizerService::getStoreNavigationConfig($store);
+
+        $this->assertFalse($config['is_restaurant']);
+        $this->assertSame('standard_pos', $config['primary_pos_route']);
+        $this->assertSame('standard_pos', $config['center_action_route']);
+        $this->assertSame('pos', $config['drawer_pos_route']);
+        $this->assertSame('pos', $config['default_pos_action']);
+        $this->assertSame('PosGridScreen', $config['default_pos_screen']);
+        $this->assertSame('grid_catalog', $config['pos_layout']);
+        $this->assertSame('/pos', $config['quick_actions']['add_sale']['target_route']);
+        $this->assertSame('pos_catalog', $config['quick_actions']['add_sale']['screen_type']);
+        $this->assertSame('pos', $config['quick_actions']['add_sale']['route_key']);
+    }
 }

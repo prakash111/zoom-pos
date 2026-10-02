@@ -30,18 +30,39 @@ class TenantTranslationLoader implements Loader
         // 1. Load base translations from file system (system files, /lang/{locale}.json, etc.)
         $lines = $this->fileLoader->load($locale, $group, $namespace);
 
-        // 2. If this is a specific vendor namespace other than default, return base lines
+        // 2. Overlay system database translations for root JSON catalog
+        if ($group === '*' && ($namespace === null || $namespace === '*')) {
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('system_translations')) {
+                    $systemOverrides = \Illuminate\Support\Facades\Cache::remember(
+                        "system_translations:{$locale}",
+                        3600,
+                        fn () => \App\Models\SystemTranslation::query()
+                            ->where('locale', $locale)
+                            ->pluck('value', 'key')
+                            ->toArray()
+                    );
+                    if (! empty($systemOverrides)) {
+                        $lines = array_replace($lines, $systemOverrides);
+                    }
+                }
+            } catch (\Throwable) {
+                // Ignore DB lookup issues and fall back to disk translations
+            }
+        }
+
+        // 3. If this is a specific vendor namespace other than default, return base lines
         if ($namespace !== null && $namespace !== '*') {
             return $lines;
         }
 
-        // 3. Resolve active tenant ID
+        // 4. Resolve active tenant ID
         $tenantId = $this->resolveActiveTenantId();
         if (! $tenantId) {
             return $lines;
         }
 
-        // 4. Retrieve tenant overrides for this tenant, locale, and group
+        // 5. Retrieve tenant overrides for this tenant, locale, and group
         $overrides = $this->getTenantOverrides($tenantId, (string) $locale, (string) $group);
 
         if (! empty($overrides)) {
@@ -140,6 +161,13 @@ class TenantTranslationLoader implements Loader
     {
         if ($tenantId === null) {
             self::$tenantCache = [];
+            try {
+                foreach (['en', 'es', 'fr', 'de', 'ar', 'hi', 'pt', 'it', 'zh', 'ja', 'ru', 'id', 'tr', 'nl'] as $loc) {
+                    \Illuminate\Support\Facades\Cache::forget("system_translations:{$loc}");
+                }
+            } catch (\Throwable) {
+                // cache not reachable
+            }
         } else {
             foreach (array_keys(self::$tenantCache) as $key) {
                 if (str_starts_with($key, "{$tenantId}:")) {

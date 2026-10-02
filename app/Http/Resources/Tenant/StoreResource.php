@@ -4,6 +4,7 @@ namespace App\Http\Resources\Tenant;
 
 use App\Models\Company;
 use App\Models\Store;
+use App\Services\Navigation\NavigationSanitizerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Str;
@@ -70,15 +71,12 @@ class StoreResource extends JsonResource
 
     /**
      * Format a store name based on client device type.
+     * Truncates to 4 characters for compact mobile header display.
      */
     public static function formatStoreName(?string $name, ?Request $request = null): string
     {
         $name = (string) ($name ?? '');
-        if (static::isMobileClient($request)) {
-            return Str::limit($name, 3, '');
-        }
-
-        return $name;
+        return mb_substr($name, 0, 4);
     }
 
     /**
@@ -94,9 +92,8 @@ class StoreResource extends JsonResource
             return [];
         }
 
-        $isMobile = static::isMobileClient($request);
         $fullName = (string) ($store->name ?? '');
-        $displayName = $isMobile ? Str::limit($fullName, 3, '') : $fullName;
+        $shortName = mb_substr($fullName, 0, 4);
 
         $company = $this->company
             ?? $store->company
@@ -113,15 +110,35 @@ class StoreResource extends JsonResource
             'is_primary', 'is_active',
         ]);
 
+        $navConfig = NavigationSanitizerService::getStoreNavigationConfig($store);
+
         return array_merge($base, [
-            'name' => $displayName,
+            'name' => $fullName,
+            'short_name' => $shortName,
             'full_name' => $fullName,
+            'logo' => $store->logo_url ?? $company?->logo_url,
             'effective_address' => $store->effective_address,
             'effective_phone' => $store->effective_phone,
             'effective_tax_id' => $store->effective_tax_id,
             'subdomain' => $company?->slug,
             'is_current' => $store->is_active && (int) $store->id === $currentId,
             'receipt_prefix' => $store->invoice_prefix ?: ($store->settings['invoice_prefix'] ?? $company?->invoice_prefix),
+            'operating_mode' => $navConfig['operating_mode'],
+            'is_restaurant' => (bool) $navConfig['is_restaurant'],
+            'pos_layout' => $store->settings['pos_layout'] ?? $navConfig['pos_layout'],
+            'default_terminal_view' => $store->settings['default_terminal_view'] ?? $navConfig['default_terminal_view'],
+            'primary_pos_route' => $navConfig['primary_pos_route'],
+            'center_action_route' => $navConfig['center_action_route'],
+            'center_button_route' => $navConfig['center_button_route'],
+            'primary_action' => $navConfig['primary_action'],
+            'default_pos_screen' => $navConfig['default_pos_screen'],
+            'default_pos_action' => $navConfig['default_pos_action'],
+            'drawer_pos_route' => $navConfig['drawer_pos_route'],
+            'quick_actions' => $navConfig['quick_actions'],
+            'navigation_config' => $navConfig,
+            'bottom_nav_schema' => NavigationSanitizerService::getBottomNavigationSchema($store),
+            'bottom_nav_config' => NavigationSanitizerService::getBottomNavigationSchema($store),
+            'bottom_navigation' => NavigationSanitizerService::getBottomNavigationSchema($store),
         ]);
     }
 }

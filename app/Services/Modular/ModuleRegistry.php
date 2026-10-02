@@ -270,6 +270,204 @@ class ModuleRegistry
         return array_filter(self::allModules(), fn ($module) => ($module['type'] ?? SduiModule::TYPE_CORE) !== SduiModule::TYPE_EXTENSION);
     }
 
+    /**
+     * Check if a module slug is physically installed, activated in the database,
+     * and holds a valid active license.
+     */
+    public static function isModuleInstalledAndActive(string $slug): bool
+    {
+        if (! Schema::hasTable('sdui_modules')) {
+            return false;
+        }
+
+        try {
+            $slugs = [strtolower(trim($slug))];
+            if ($slug === 'repairtechnician' || $slug === 'repair_technician') {
+                $slugs = ['repairtechnician', 'repair_technician'];
+            } elseif ($slug === 'salon' || $slug === 'service_booking') {
+                $slugs = ['salon', 'service_booking'];
+            }
+
+            $module = SduiModule::query()
+                ->whereIn('slug', $slugs)
+                ->where('is_active', true)
+                ->first();
+
+            if (! $module) {
+                return false;
+            }
+
+            return $module->isLicensed() && ! $module->licenseIsExpired();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Comprehensive business operating modes synchronized with installed license modules.
+     * Core defaults (always unlocked): Retail, Cafe & Restaurant.
+     * Gated verticals:
+     * - PHARMACY requires module slug 'pharmacy' installed and active.
+     * - REPAIR_TECHNICIAN requires module slug 'repairtechnician' installed and active.
+     * - SERVICE_BOOKING (Salon) requires module slug 'salon' installed and active.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function getAvailableModes(): array
+    {
+        $all = self::allModules();
+        $extended = self::extendedSchemas();
+
+        $pharmacyActive = self::isModuleInstalledAndActive('pharmacy');
+        $repairActive = self::isModuleInstalledAndActive('repairtechnician');
+        $salonActive = self::isModuleInstalledAndActive('salon');
+
+        return [
+            'retail' => array_replace($all['retail'] ?? [
+                'id' => 'retail',
+                'title' => 'Retail',
+                'subtitle' => 'Shops, electronics, general stores',
+                'description' => 'Barcode scanning, cash register, quotations, invoices, and standard stock management for retail shops.',
+                'layout_type' => 'standard_grid',
+                'icon' => 'storefront',
+            ], [
+                'id' => 'retail',
+                'title' => 'Retail',
+                'is_core' => true,
+                'is_locked' => false,
+                'lock_reason' => null,
+                'required_module_slug' => null,
+                'store_link' => null,
+            ]),
+
+            'restaurant' => array_replace($all['restaurant'] ?? [
+                'id' => 'restaurant',
+                'title' => 'Cafe & Restaurant',
+                'subtitle' => 'Tables, KOT, kitchen display',
+                'description' => 'Floor plans & live tables, KOT tickets, Kitchen Display (KDS), Dine-In/Takeaway routing, and QR table ordering.',
+                'layout_type' => 'table_floor_plan',
+                'icon' => 'restaurant',
+            ], [
+                'id' => 'restaurant',
+                'title' => 'Cafe & Restaurant',
+                'is_core' => true,
+                'is_locked' => false,
+                'lock_reason' => null,
+                'required_module_slug' => null,
+                'store_link' => null,
+            ]),
+
+            'pharmacy' => array_replace($all['pharmacy'] ?? $extended['pharmacy'] ?? [
+                'id' => 'pharmacy',
+                'title' => 'Pharmacy',
+                'subtitle' => 'Batches, expiry dates, medicines',
+                'description' => 'Drug batch & expiry tracking, prescription intake, FEFO stock and dispensing.',
+                'layout_type' => 'standard_grid',
+                'icon' => 'medication',
+            ], [
+                'id' => 'pharmacy',
+                'title' => 'Pharmacy',
+                'is_core' => false,
+                'is_locked' => ! $pharmacyActive,
+                'lock_reason' => ! $pharmacyActive ? 'Module Not Installed - Extended License / Add-on required' : null,
+                'required_module_slug' => 'pharmacy',
+                'store_link' => ModuleCatalog::storeLink('pharmacy'),
+            ]),
+
+            'repair_technician' => array_replace($all['repair_technician'] ?? $extended['repair_technician'] ?? [
+                'id' => 'repair_technician',
+                'title' => 'Repair Technician',
+                'subtitle' => 'Tickets, technician workbench, spare parts billing',
+                'description' => 'Device intake tickets, diagnostic checklist, parts & labor, technician workbench and pickup.',
+                'layout_type' => 'repair_kanban',
+                'icon' => 'handyman',
+            ], [
+                'id' => 'repair_technician',
+                'title' => 'Repair Technician',
+                'is_core' => false,
+                'is_locked' => ! $repairActive,
+                'lock_reason' => ! $repairActive ? 'Module Not Installed - Extended License / Add-on required' : null,
+                'required_module_slug' => 'repairtechnician',
+                'store_link' => ModuleCatalog::storeLink('repairtechnician'),
+            ]),
+
+            'service_booking' => array_replace($all['service_booking'] ?? $extended['service_booking'] ?? [
+                'id' => 'service_booking',
+                'title' => 'Salon & Bookings',
+                'subtitle' => 'Appointments, stylist bookings',
+                'description' => 'Service catalogue, stylists / specialists, appointment booking and lifecycle.',
+                'layout_type' => 'service_booking_list',
+                'icon' => 'content_cut',
+            ], [
+                'id' => 'service_booking',
+                'title' => 'Salon & Bookings',
+                'is_core' => false,
+                'is_locked' => ! $salonActive,
+                'lock_reason' => ! $salonActive ? 'Module Not Installed - Extended License / Add-on required' : null,
+                'required_module_slug' => 'salon',
+                'store_link' => ModuleCatalog::storeLink('salon'),
+            ]),
+        ];
+    }
+
+    /**
+     * Modular add-ons and extensions (e.g. Lead Management / CRM).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function getAvailableExtensions(): array
+    {
+        $catalog = collect(ModuleCatalog::available())->keyBy('slug');
+        $extended = self::extendedSchemas();
+
+        $extensions = [];
+        $extensionSlugs = array_values(array_unique(array_merge(
+            (array) config('modules.extensions', []),
+            ['leadmanagement']
+        )));
+
+        if (Schema::hasTable('sdui_modules') && Schema::hasColumn('sdui_modules', 'type')) {
+            $dbExts = SduiModule::query()->where('type', SduiModule::TYPE_EXTENSION)->pluck('slug')->all();
+            $extensionSlugs = array_values(array_unique(array_merge($extensionSlugs, $dbExts)));
+        }
+
+        // Exclude features that are built into core
+        $extensionSlugs = array_values(array_diff($extensionSlugs, ['whatsapp_api', 'custom_domain']));
+
+        foreach ($extensionSlugs as $slug) {
+            $catItem = $catalog->get($slug);
+            $extSchema = $extended[$slug] ?? null;
+
+            $module = null;
+            if (Schema::hasTable('sdui_modules')) {
+                $module = SduiModule::query()->where('slug', $slug)->first();
+            }
+
+            $isInstalled = $module !== null;
+            $isActive = $module && $module->is_active && $module->isLicensed() && ! $module->licenseIsExpired();
+            $isLocked = ! $isActive;
+
+            $title = $extSchema['title'] ?? $catItem['name'] ?? ucwords(str_replace(['_', '-'], ' ', $slug));
+            $description = $extSchema['description'] ?? $catItem['description'] ?? 'Optional platform extension managed by SuperAdmin.';
+            $icon = $extSchema['icon'] ?? 'leaderboard';
+
+            $extensions[$slug] = [
+                'id' => $slug,
+                'slug' => $slug,
+                'title' => $title,
+                'description' => $description,
+                'icon' => $icon,
+                'is_installed' => $isInstalled,
+                'is_active' => (bool) $isActive,
+                'is_locked' => $isLocked,
+                'lock_reason' => $isLocked ? 'Extension Not Purchased or Not Activated - License Required' : null,
+                'store_link' => ModuleCatalog::storeLink($slug),
+            ];
+        }
+
+        return $extensions;
+    }
+
     /** Includes inactive extensions so disabling a package cannot change its type. */
     public static function extensionKeys(): array
     {
@@ -277,6 +475,9 @@ class ModuleRegistry
         if (Schema::hasTable('sdui_modules') && Schema::hasColumn('sdui_modules', 'type')) {
             $keys = [...$keys, ...SduiModule::query()->where('type', SduiModule::TYPE_EXTENSION)->pluck('slug')->all()];
         }
+
+        // Exclude features that are built into core
+        $keys = array_diff($keys, ['whatsapp_api', 'custom_domain']);
 
         return array_values(array_unique(array_map([self::class, 'canonicalKey'], $keys)));
     }

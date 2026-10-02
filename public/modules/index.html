@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zoom POS &amp; Sales CRM — Modular Add-Ons Hub</title>
+  <link rel="icon" type="image/png" href="../assets/images/favicon.png" onerror="this.onerror=null;">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --card-border: #1f293d;
+      --card-hover: #172033;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --accent: #10b981;
+      --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 18px 24px;
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo-badge {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-main);
+      font-weight: 800;
+      font-size: 20px;
+    }
+    .logo-badge span {
+      background: linear-gradient(135deg, #3b82f6, #60a5fa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 48px 24px;
+      width: 100%;
+    }
+    .hero {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .hero-tag {
+      display: inline-block;
+      padding: 6px 16px;
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 999px;
+      color: #60a5fa;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .hero h1 {
+      font-size: 40px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 14px;
+      line-height: 1.2;
+    }
+    .hero p {
+      font-size: 17px;
+      color: var(--text-muted);
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .bundle-banner {
+      background: linear-gradient(135deg, rgba(30, 58, 138, 0.4), rgba(15, 23, 42, 0.8));
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 16px;
+      padding: 28px 32px;
+      margin-bottom: 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .bundle-info h3 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .bundle-info p {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-bottom: 60px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.25s ease;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(59, 130, 246, 0.4);
+      box-shadow: 0 16px 32px -10px rgba(0, 0, 0, 0.4);
+    }
+    .card-top {
+      margin-bottom: 20px;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+    .card-icon {
+      font-size: 32px;
+      width: 52px;
+      height: 52px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-extension {
+      background: rgba(234, 179, 8, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(234, 179, 8, 0.3);
+    }
+    .badge-core {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    .card-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+    .card-desc {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+    .features-list {
+      list-style: none;
+      margin-bottom: 24px;
+    }
+    .features-list li {
+      font-size: 13px;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .features-list li::before {
+      content: "✔";
+      color: var(--accent);
+      font-weight: bold;
+      font-size: 12px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      font-weight: 600;
+      font-size: 14px;
+      border-radius: 10px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+      border: none;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #ffffff;
+      width: 100%;
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+    }
+    .btn-success {
+      background: #10b981;
+      color: #ffffff;
+      padding: 14px 28px;
+      font-size: 15px;
+    }
+    .btn-success:hover {
+      background: #059669;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+    }
+    .guide-section {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 36px;
+    }
+    .guide-section h2 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      margin-top: 24px;
+    }
+    .step-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .step-number {
+      width: 28px;
+      height: 28px;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .step-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .step-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    code {
+      font-family: var(--mono);
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #38bdf8;
+    }
+    .footer {
+      margin-top: auto;
+      border-top: 1px solid var(--card-border);
+      padding: 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo-badge">
+        <span>Zoom POS</span> Modules
+      </a>
+      <a href="../Zoom-Sales-CRM-POS-v1.0.5-Codecanyon-Package.zip" class="btn btn-primary" style="width: auto; padding: 8px 16px; font-size: 13px;">
+        ← Back to Main Package
+      </a>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="hero">
+      <div class="hero-tag">Standalone Plugin Packages</div>
+      <h1>Add-On Vertical &amp; Extension Modules</h1>
+      <p>Download individual module packages for Zoom Sales CRM &amp; Inventory. Each module can be uploaded and activated instantly via your SuperAdmin panel.</p>
+    </div>
+
+    <!-- All-In-One Bundle Banner -->
+    <div class="bundle-banner">
+      <div class="bundle-info">
+        <h3>📦 All-In-One Add-On Modules Bundle</h3>
+        <p>Get all 4 specialized vertical &amp; CRM modules in a single comprehensive zip package.</p>
+      </div>
+      <a href="zoom-all-addon-modules-bundle.zip" class="btn btn-success" download>
+        Download All 4 Modules (.ZIP) ⬇
+      </a>
+    </div>
+
+    <!-- Modules Grid -->
+    <div class="grid">
+
+      <!-- Lead Management System -->
+      <div class="card">
+        <div class="card-top">
+          <div class="card-header">
+            <div class="card-icon">🎯</div>
+            <span class="badge badge-extension">CRM Extension</span>
+          </div>
+          <h2 class="card-title">Lead Management CRM</h2>
+          <p class="card-desc">Visual Kanban sales pipeline, prospective customer tracking, activity logs, quotation pre-fill, and 1-tap customer conversion.</p>
+          <ul class="features-list">
+            <li>Kanban Lead Pipeline (New → Won)</li>
+            <li>Automatic Customer Master Sync</li>
+            <li>Instant Quotation &amp; Invoice Link</li>
+            <li>Follow-Up Push &amp; SMS Reminders</li>
+          </ul>
+        </div>
+        <a href="leadmanagement.zip" class="btn btn-primary" download>
+          Download leadmanagement.zip ⬇
+        </a>
+      </div>
+
+      <!-- Pharmacy POS Module -->
+      <div class="card">
+        <div class="card-top">
+          <div class="card-header">
+            <div class="card-icon">💊</div>
+            <span class="badge badge-core">Vertical Core</span>
+          </div>
+          <h2 class="card-title">Pharmacy POS</h2>
+          <p class="card-desc">Specialized pharmacy vertical: drug batch tracking, expiration monitoring, doctor prescription intake, dispensing workflows, and medicine batches.</p>
+          <ul class="features-list">
+            <li>Drug Batch Numbers &amp; Expiry</li>
+            <li>Prescription Intake &amp; Dispensing</li>
+            <li>Dedicated Pharmacy Dashboard</li>
+            <li>Low Stock &amp; Expired Drug Alerts</li>
+          </ul>
+        </div>
+        <a href="pharmacy.zip" class="btn btn-primary" download>
+          Download pharmacy.zip ⬇
+        </a>
+      </div>
+
+      <!-- Repair Service Provider -->
+      <div class="card">
+        <div class="card-top">
+          <div class="card-header">
+            <div class="card-icon">🔧</div>
+            <span class="badge badge-core">Vertical Core</span>
+          </div>
+          <h2 class="card-title">Repair Technician</h2>
+          <p class="card-desc">Device repair workbench: customer intake service tickets, diagnostic checklist, replacement parts ledger, technician labor, and claim receipts.</p>
+          <ul class="features-list">
+            <li>Device Intake Tickets &amp; Claim Slips</li>
+            <li>Hardware Diagnosis Checklist</li>
+            <li>Parts Cost + Labor Fee Accounting</li>
+            <li>Lifecycle Status Tracker (Queue → Ready)</li>
+          </ul>
+        </div>
+        <a href="repairtechnician.zip" class="btn btn-primary" download>
+          Download repairtechnician.zip ⬇
+        </a>
+      </div>
+
+      <!-- Salon & Spa Bookings -->
+      <div class="card">
+        <div class="card-top">
+          <div class="card-header">
+            <div class="card-icon">✂️</div>
+            <span class="badge badge-core">Vertical Core</span>
+          </div>
+          <h2 class="card-title">Salon &amp; Spa Bookings</h2>
+          <p class="card-desc">Service scheduling system: hair, beauty, and spa service catalog, specialist stylist profiles, appointment calendar, chair allocation, and checkout.</p>
+          <ul class="features-list">
+            <li>Service Menu &amp; Duration Timers</li>
+            <li>Stylist &amp; Specialist Scheduling</li>
+            <li>Interactive Appointment Calendar</li>
+            <li>Integrated POS Billing &amp; Gratuity</li>
+          </ul>
+        </div>
+        <a href="salon.zip" class="btn btn-primary" download>
+          Download salon.zip ⬇
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Step-by-Step Installation Guide -->
+    <div class="guide-section">
+      <h2>🚀 How to Install Any Module (1-Minute Setup)</h2>
+      <div class="steps">
+        <div class="step-item">
+          <div class="step-number">1</div>
+          <div class="step-title">Open SuperAdmin</div>
+          <div class="step-desc">Sign in to your SuperAdmin portal at <code>https://yourdomain.com/login</code> and navigate to <strong>Modules</strong>.</div>
+        </div>
+        <div class="step-item">
+          <div class="step-number">2</div>
+          <div class="step-title">Upload Module ZIP</div>
+          <div class="step-desc">Click <strong>Upload Module</strong> and select the downloaded <code>.zip</code> file (e.g. <code>leadmanagement.zip</code>).</div>
+        </div>
+        <div class="step-item">
+          <div class="step-number">3</div>
+          <div class="step-title">Activate &amp; Assign</div>
+          <div class="step-desc">Click <strong>Activate</strong>. For extensions, enable it under <strong>Tenants → Tenant Detail → Optional Extensions</strong>.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    &copy; 2026 Zoom POS &amp; Sales CRM Platform. All modules are 100% unencrypted and customizable.
+  </footer>
+
+</body>
+</html>

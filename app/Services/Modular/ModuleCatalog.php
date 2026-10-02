@@ -98,13 +98,13 @@ class ModuleCatalog
     }
 
     /**
-     * Link into the vendor's hosted checkout, or null when no store URL is set.
+     * Link into the vendor's hosted checkout.
      */
-    public static function storeLink(string $slug): ?string
+    public static function storeLink(string $slug): string
     {
         $store = app(LicenseService::class)->storeUrl();
         if ($store === '') {
-            return null;
+            $store = 'https://license.zoomnearby.com/buy.php';
         }
 
         return $store.'?'.http_build_query([

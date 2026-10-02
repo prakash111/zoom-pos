@@ -182,7 +182,7 @@
                                        id="business_name"
                                        name="storeName"
                                        autocomplete="organization"
-                                       wire:model="storeName"
+                                       wire:model.live.debounce.300ms="storeName"
                                        required
                                        placeholder="e.g. Zenith Coffee Bar"
                                        class="w-full h-11 pl-10 pr-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs sm:text-sm focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all shadow-2xs">
@@ -364,6 +364,42 @@
                                     </div>
                                 </div>
                             @endif
+                        </div>
+                    @else
+                        <!-- Store Directory Link Preview when Subdomain & Custom Domain on Registration is disabled -->
+                        @php $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?? 'domain.com'; @endphp
+                        <div class="pt-1">
+                            <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2.5">
+                                <div class="flex items-center justify-between">
+                                    <label for="store_directory_slug" class="block text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                        <span>🏪</span>
+                                        <span>{{ __('Store Directory Link') }}</span>
+                                    </label>
+                                    <span class="text-[10px] text-slate-400 font-mono">{{ __('Directory Path') }}</span>
+                                </div>
+
+                                <div class="relative flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden focus-within:ring-2 focus-within:ring-blue-600 transition shadow-2xs">
+                                    <span class="pl-3 pr-1 text-slate-400 text-xs">🔗</span>
+                                    <span class="text-xs font-mono font-medium text-slate-500 dark:text-slate-400 select-none pl-1 pr-0.5">{{ $appHost }}/</span>
+                                    <input type="text"
+                                           id="store_directory_slug"
+                                           name="slug"
+                                           wire:model.live.debounce.300ms="slug"
+                                           placeholder="store-name"
+                                           class="w-full border-none bg-transparent text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:ring-0 py-2.5 pr-2 font-mono">
+                                </div>
+                                @error('slug') <p class="text-rose-500 text-[11px] mt-0.5">{{ $message }}</p> @enderror
+
+                                <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
+                                    <span>
+                                        {{ __('Your store link:') }}
+                                        <span class="font-mono font-bold text-blue-600 dark:text-blue-400">{{ $appHost }}/{{ $slug ?: ($this->storeName ? \Illuminate\Support\Str::slug($this->storeName) : 'store-name') }}</span>
+                                    </span>
+                                </div>
+                                <p class="text-[10px] text-slate-400">
+                                    {{ __('Example:') }} <span class="font-mono text-slate-500 dark:text-slate-400">{{ $appHost }}/store-name</span>
+                                </p>
+                            </div>
                         </div>
                     @endif
 

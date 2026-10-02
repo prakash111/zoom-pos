@@ -85,6 +85,47 @@ class TenantNavigationComposer
         }
         $activeStoreId = app()->bound('tenant.store_id') ? app('tenant.store_id') : $user?->current_store_id;
 
+        $entitlementService = app(\App\Services\Subscription\SubscriptionEntitlementService::class);
+        $hasStorefrontModule = ! $company->exists
+            || $company->hasModule('ecommerce_storefront')
+            || $entitlementService->tenantCanUseExtension($company, 'ecommerce_storefront');
+
+        $canStorefront = $hasStorefrontModule && ($allows('storefront') || $allows('settings'));
+        $canStorefrontMenus = $canStorefront && ($allows('storefront', 'menus.manage') || $allows('storefront') || $allows('settings'));
+        $canStorefrontInquiries = $canStorefront && ($allows('storefront', 'inquiries.view') || $allows('storefront') || $allows('settings'));
+        $canStorefrontBanner = $canStorefront && ($allows('storefront', 'manage') || $allows('storefront') || $allows('settings'));
+        $canCoupons = $allows('coupons') || $allows('settings');
+        $canFaqs = $allows('faqs') || $allows('settings');
+        $canReviews = $allows('reviews') || $allows('settings');
+        $canGateways = $allows('gateways') || $allows('settings');
+
+        $unreadInquiriesCount = 0;
+        if ($company->exists) {
+            try {
+                $unreadInquiriesCount = \App\Models\TenantInquiry::withoutGlobalScopes()
+                    ->where('company_id', $company->id)
+                    ->where('status', 'unread')
+                    ->count();
+            } catch (\Throwable) {
+                $unreadInquiriesCount = 0;
+            }
+        }
+        $liveStoreUrl = $company->exists ? $company->getStorefrontUrl() : url('/');
+
+        $isStorefront = $this->request->routeIs('tenant.settings.storefront*')
+            || $this->request->routeIs('tenant.storefront.*')
+            || $this->request->routeIs('tenant.coupons.*')
+            || $this->request->routeIs('tenant.faqs.*')
+            || $this->request->routeIs('tenant.reviews.*');
+        $isStorefrontMenus = $this->request->routeIs('tenant.storefront.menus') || $this->request->routeIs('tenant.settings.storefront.menus');
+        $isStorefrontInquiries = $this->request->routeIs('tenant.storefront.inquiries*');
+        $isStorefrontBanner = $this->request->routeIs('tenant.settings.storefront.banner') || ($this->request->routeIs('tenant.settings.storefront') && ! $isStorefrontMenus);
+        $isStorefrontDomain = $this->request->routeIs('tenant.settings.storefront.domain');
+        $isStorefrontGateways = $this->request->routeIs('tenant.settings.storefront.payments') || ($this->request->routeIs('tenant.settings.payments') && $this->request->query('section') === 'payments');
+        $isCoupons = $this->request->routeIs('tenant.coupons.*') || $this->request->routeIs('tenant.settings.coupons') || $this->request->routeIs('tenant.settings.storefront.coupons');
+        $isFaqs = $this->request->routeIs('tenant.faqs.*') || $this->request->routeIs('tenant.settings.faqs') || $this->request->routeIs('tenant.settings.storefront.faqs');
+        $isReviews = $this->request->routeIs('tenant.reviews.*') || $this->request->routeIs('tenant.settings.reviews') || $this->request->routeIs('tenant.settings.storefront.reviews');
+
         $view->with([
             'tenantCompany' => $company,
             'canStores' => $canStores,
@@ -129,6 +170,18 @@ class TenantNavigationComposer
             'canSettings' => $allows('settings'),
             'canUsers' => $allows('users'),
 
+            'hasStorefront' => $hasStorefrontModule,
+            'canStorefront' => $canStorefront,
+            'canStorefrontMenus' => $canStorefrontMenus,
+            'canStorefrontInquiries' => $canStorefrontInquiries,
+            'canStorefrontBanner' => $canStorefrontBanner,
+            'canCoupons' => $canCoupons,
+            'canFaqs' => $canFaqs,
+            'canReviews' => $canReviews,
+            'canGateways' => $canGateways,
+            'unreadInquiriesCount' => $unreadInquiriesCount,
+            'liveStoreUrl' => $liveStoreUrl,
+
             'isHome' => $this->request->routeIs('tenant.dashboard'),
             'isQuotes' => $isQuotes,
             'isLeads' => $this->request->routeIs('tenant.leads.*'),
@@ -147,6 +200,15 @@ class TenantNavigationComposer
             'isSuppliers' => $this->request->routeIs('tenant.suppliers.*'),
             'isCustomers' => $this->request->routeIs('tenant.customers.*'),
             'isCatalog' => $this->request->routeIs('tenant.catalog.*'),
+            'isStorefront' => $isStorefront,
+            'isStorefrontMenus' => $isStorefrontMenus,
+            'isStorefrontInquiries' => $isStorefrontInquiries,
+            'isStorefrontBanner' => $isStorefrontBanner,
+            'isStorefrontDomain' => $isStorefrontDomain,
+            'isStorefrontGateways' => $isStorefrontGateways,
+            'isCoupons' => $isCoupons,
+            'isFaqs' => $isFaqs,
+            'isReviews' => $isReviews,
             'isCashRegister' => $isCashRegister,
             'isReceivables' => $isReceivables,
             'isPayables' => $isPayables,

@@ -1,0 +1,31 @@
+# ==============================================================================
+# Zoom POS App Builder - Apache Configuration & Security Protection
+# ==============================================================================
+
+# Disable directory listing
+Options -Indexes
+
+# Protect sensitive environment and source files
+<FilesMatch "^\.env|^\.git|\.(sql|yml|yaml|md|log|lock|json)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Disallow access to the lib directory directly
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^lib(/.*)?$ - [F,L]
+</IfModule>
+
+# Ensure PHP UTF-8 encoding
+<IfModule mod_php7.c>
+    php_value default_charset UTF-8
+</IfModule>
+<IfModule mod_php.c>
+    php_value default_charset UTF-8
+</IfModule>

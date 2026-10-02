@@ -77,6 +77,19 @@ class DocumentTemplateController extends Controller
      */
     public function update(Request $request, string $type)
     {
+        if (config('app.demo_mode')) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'error',
+                    'error' => 'Action disabled: Modifications are restricted in demo mode.',
+                    'message' => 'Action disabled: Modifications are restricted in demo mode.',
+                ], 403);
+            }
+
+            return redirect()->back()->with('error', 'Action disabled: Modifications are restricted in demo mode.');
+        }
+
         $user = auth('web')->user() ?? auth('sanctum')->user() ?? $request->user();
         $this->authorizeTemplateAccess($user, $type, true);
 

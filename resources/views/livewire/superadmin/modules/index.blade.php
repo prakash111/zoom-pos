@@ -62,7 +62,7 @@
 
                         @if (! empty($p['store_link']))
                             <a href="{{ $p['store_link'] }}" target="_blank" rel="noopener noreferrer"
-                               class="mt-2 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white text-center">{{ __("Buy module") }} ↗</a>
+                               class="mt-2 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white text-center">🛒 {{ __("Buy First to Activate") }} ↗</a>
                         @endif
 
                         <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
@@ -107,10 +107,15 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
                     @forelse ($modules as $module)
+                        @php
+                            $isBuiltin = $module->source_type === 'builtin' || in_array($module->slug, ['retail', 'restaurant'], true);
+                        @endphp
                         <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
                             <td class="px-6 py-4 font-bold text-slate-900 dark:text-white">
                                 {{ $module->name }}
-                                @if ($module->isExtension())
+                                @if ($isBuiltin)
+                                    <span class="block mt-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">{{ __('Core Platform System · Built-in Native Vertical') }}</span>
+                                @elseif ($module->isExtension())
                                     <span class="block mt-1 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">{{ __('Extension') }} · {{ __('Super Admin activation only') }}</span>
                                 @endif
                             </td>
@@ -144,16 +149,26 @@
                                                 {{ $module->license_expires_at ? $module->license_expires_at->format('Y-m-d') : __('no expiry') }}
                                             </span>
                                         @endif
+                                    @elseif ($isBuiltin)
+                                        <span class="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">
+                                            {{ __("License") }}: {{ __("Core Included") }}
+                                        </span>
                                     @endif
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-slate-400 text-xs font-mono">
-                                {{ $module->installed_at?->format('Y-m-d H:i:s') ?? '—' }}
+                                {{ $module->installed_at?->format('Y-m-d H:i:s') ?? ($isBuiltin ? __('Bundled Core') : '—') }}
                             </td>
                             <td class="px-6 py-4 text-right whitespace-nowrap align-top">
                                 @php $needsKey = $module->requires_license && $module->license_status !== 'active'; @endphp
 
-                                @if ($module->is_active)
+                                @if ($isBuiltin)
+                                    <div class="space-y-1">
+                                        <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                            <span>🛡️</span> {{ __("Core System (Protected)") }}
+                                        </span>
+                                    </div>
+                                @elseif ($module->is_active)
                                     <div class="space-x-3">
                                         <button wire:click="deactivate({{ $module->id }})" wire:confirm="{{ __("Deactivate this module? Its navigation and routes stop working (and it is removed from selectable store types), but its data is kept.") }}" type="button" class="text-amber-600 hover:underline font-bold">{{ __("Deactivate") }}</button>
                                         @if ($module->requires_license)
@@ -170,8 +185,8 @@
                                         @enderror
                                         <div class="flex items-center gap-3">
                                             @if (! empty($catalog[$module->id]['store_link']))
-                                                <a href="{{ $catalog[$module->id]['store_link'] }}" target="_blank" rel="noopener noreferrer" class="text-emerald-600 dark:text-emerald-400 hover:underline font-bold text-xs">
-                                                    {{ __("Buy") }}@if (($catalog[$module->id]['price'] ?? 0) > 0) {{ $catalog[$module->id]['currency'] }} {{ number_format($catalog[$module->id]['price'], 2) }}@endif ↗
+                                                <a href="{{ $catalog[$module->id]['store_link'] }}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white">
+                                                    🛒 {{ __("Buy First to Activate") }}@if (($catalog[$module->id]['price'] ?? 0) > 0) · {{ $catalog[$module->id]['currency'] }} {{ number_format($catalog[$module->id]['price'], 2) }}@endif ↗
                                                 </a>
                                             @endif
                                             <button wire:click="activate({{ $module->id }})" type="button" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white">{{ __("Verify & Activate") }}</button>
@@ -186,10 +201,12 @@
                                     </div>
                                 @endif
 
-                                <div class="space-x-3 mt-2">
-                                    <button wire:click="uninstall({{ $module->id }}, false)" wire:confirm="{{ __("Uninstall this module? Its files will be removed but its data tables are kept.") }}" type="button" class="text-rose-600 hover:underline font-bold">{{ __("Uninstall") }}</button>
-                                    <button wire:click="uninstall({{ $module->id }}, true)" wire:confirm="{{ __("Uninstall this module AND drop its data tables? This cannot be undone.") }}" type="button" class="text-rose-800 hover:underline font-bold">{{ __("Uninstall + Drop Data") }}</button>
-                                </div>
+                                @if (! $isBuiltin)
+                                    <div class="space-x-3 mt-2">
+                                        <button wire:click="uninstall({{ $module->id }}, false)" wire:confirm="{{ __("Uninstall this module? Its files will be removed but its data tables are kept.") }}" type="button" class="text-rose-600 hover:underline font-bold">{{ __("Uninstall") }}</button>
+                                        <button wire:click="uninstall({{ $module->id }}, true)" wire:confirm="{{ __("Uninstall this module AND drop its data tables? This cannot be undone.") }}" type="button" class="text-rose-800 hover:underline font-bold">{{ __("Uninstall + Drop Data") }}</button>
+                                    </div>
+                                @endif
                             </td>
                         </tr>
                     @empty

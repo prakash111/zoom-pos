@@ -34,13 +34,15 @@ export const ALL_DOCK_ITEMS = [
 export const ADMIN_DOCK_ITEMS = [
     { key: 'dashboard', label: 'Dashboard Overview', icon: '📊', route: 'superadmin.dashboard' },
     { key: 'tenants', label: 'Tenant Stores', icon: '🏢', route: 'superadmin.tenants.index' },
+    { key: 'modules', label: 'Modules & Add-ons', icon: '🧩', route: 'superadmin.modules.index' },
     { key: 'plans', label: 'SaaS Plans & Pricing', icon: '👑', route: 'superadmin.plans.index' },
     { key: 'taxes', label: 'Global Tax Engine', icon: '⚖️', route: 'superadmin.tax.index' },
     { key: 'menus', label: 'Menu Builder', icon: '🧭', route: 'superadmin.menus.index' },
     { key: 'inquiries', label: 'Web Inquiries', icon: '📬', route: 'superadmin.inquiries.index' },
     { key: 'pages', label: 'CMS Custom Pages', icon: '📄', route: 'superadmin.pages.index' },
     { key: 'settings', label: 'Platform Settings', icon: '⚙️', route: 'superadmin.settings.index' },
-    { key: 'smtp', label: 'SMTP & Mail Config', icon: '✉️', route: 'superadmin.smtp.index' }
+    { key: 'smtp', label: 'SMTP & Mail Config', icon: '✉️', route: 'superadmin.smtp.index' },
+    { key: 'codes', label: 'Activation Codes', icon: '🔑', route: 'superadmin.activation-codes.index' }
 ];
 
 export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 'left', operatingMode = 'general', persistUrl = '') {
@@ -65,9 +67,9 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
         visibleAdminItems: (function() {
             try {
                 const raw = localStorage.getItem('nav_visible_items');
-                return raw ? JSON.parse(raw) : ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp'];
+                return raw ? JSON.parse(raw) : ['dashboard', 'tenants', 'modules', 'plans', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp'];
             } catch(e) {
-                return ['dashboard', 'tenants', 'plans', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp'];
+                return ['dashboard', 'tenants', 'modules', 'plans', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp'];
             }
         })(),
         x: 24,
@@ -92,7 +94,7 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
 
         getDefaultKeys() {
             if (this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin') {
-                return ['dashboard', 'tenants', 'plans', 'taxes', 'settings', 'smtp'];
+                return ['dashboard', 'tenants', 'modules', 'plans', 'taxes', 'settings', 'smtp'];
             }
             const isRest = this.operatingMode === 'restaurant' || this.operatingMode === 'food_restaurant';
             return isRest
@@ -106,7 +108,7 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
         },
 
         resetAdminDefaultItems() {
-            this.visibleAdminItems = ['dashboard', 'tenants', 'plans', 'taxes', 'settings', 'smtp'];
+            this.visibleAdminItems = ['dashboard', 'tenants', 'modules', 'plans', 'taxes', 'settings', 'smtp'];
             this.persistAdminDock();
         },
 

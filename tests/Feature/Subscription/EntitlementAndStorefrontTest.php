@@ -91,7 +91,7 @@ class EntitlementAndStorefrontTest extends TestCase
             'invoice_limit' => 500,
             'device_limit' => 5,
             'staff_limit' => 10,
-            'extensions' => ['leadmanagement', 'whatsapp_api'],
+            'extensions' => ['leadmanagement'],
             'features' => ['cloud_backup' => true],
         ]);
 

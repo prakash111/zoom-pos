@@ -250,6 +250,7 @@ class Index extends Component
 
     public bool $landingWindowsEnabled = false;
 
+
     /**
      * Per-section title / subtitle overrides, keyed by section slug.
      *

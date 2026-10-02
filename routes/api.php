@@ -86,6 +86,10 @@ Route::post('/verify-entitlement', [\App\Http\Controllers\LicenseVerificationCon
 Route::get('/public/landing', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
 Route::get('/public/landing-config', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
 Route::get('/v1/public/landing-config', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'show']);
+Route::get('/app/translations', [\App\Http\Controllers\Api\V1\LanguageApiController::class, 'appTranslations']);
+Route::get('/v1/app/translations', [\App\Http\Controllers\Api\V1\LanguageApiController::class, 'appTranslations']);
+Route::get('/public/translations', [\App\Http\Controllers\Api\V1\LanguageApiController::class, 'appTranslations']);
+Route::get('/v1/public/translations', [\App\Http\Controllers\Api\V1\LanguageApiController::class, 'appTranslations']);
 Route::get('/public/check-subdomain', [AuthApiController::class, 'checkSubdomain']);
 Route::get('/v1/public/check-subdomain', [AuthApiController::class, 'checkSubdomain']);
 Route::get('/auth/check-subdomain', [AuthApiController::class, 'checkSubdomain']);
@@ -236,6 +240,7 @@ foreach (SubscriptionWebhookController::GATEWAYS as $gw) {
 // Server-Driven UI Bootstrap, View Schemas, and Form Action Routes
 Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, PreventDemoModifications::class])->group(function () {
     Route::get('/v1/tenant/stores', [StoreController::class, 'index']);
+    Route::get('/v1/tenant/stores/current', [StoreController::class, 'current']);
     Route::post('/v1/tenant/stores', [StoreController::class, 'store']);
     Route::post('/v1/tenant/stores/switch', [StoreController::class, 'switch']);
     Route::post('/v1/tenant/stores/{id}/switch', [StoreController::class, 'switch'])->whereNumber('id');
@@ -247,7 +252,6 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
     Route::get('/v1/tenant/bootstrap', [AppBootstrapController::class, 'bootstrap']);
     Route::get('/v1/bootstrap', [AppBootstrapController::class, 'bootstrap']);
     Route::get('/bootstrap', [AppBootstrapController::class, 'bootstrap']);
-    Route::get('/app/translations', [LanguageApiController::class, 'appTranslations']);
     Route::post('/app/mode', [AppBootstrapController::class, 'switchMode'])->middleware('tenant.api.permission:settings,edit');
 
     // Dashboard chrome and its notification feed are server-driven so badge
@@ -715,17 +719,19 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
     // Tenant Storefront Reviews & Moderation
     Route::get('/tenant/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantIndex']);
     Route::post('/tenant/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantStore']);
+    Route::get('/tenant/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'getSettings']);
+    Route::match(['post', 'put'], '/tenant/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'updateSettings']);
     Route::match(['post', 'put'], '/tenant/storefront/reviews/{id}/toggle-approval', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'toggleApproval']);
     Route::delete('/tenant/storefront/reviews/{id}', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy']);
     Route::post('/tenant/storefront/reviews/{id}/delete', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy']);
-    Route::match(['post', 'put'], '/tenant/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'updateSettings']);
 
     Route::get('/v1/tenant/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantIndex']);
     Route::post('/v1/tenant/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantStore']);
+    Route::get('/v1/tenant/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'getSettings']);
+    Route::match(['post', 'put'], '/v1/tenant/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'updateSettings']);
     Route::match(['post', 'put'], '/v1/tenant/storefront/reviews/{id}/toggle-approval', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'toggleApproval']);
     Route::delete('/v1/tenant/storefront/reviews/{id}', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy']);
     Route::post('/v1/tenant/storefront/reviews/{id}/delete', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy']);
-    Route::match(['post', 'put'], '/v1/tenant/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'updateSettings']);
 
     // Tenant Storefront CMS Pages & Navigation Menus
     Route::get('/tenant/storefront/pages', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesIndex']);
@@ -875,6 +881,11 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
     Route::get('/tenant/ui/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
     Route::get('/v1/tenant/ui/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
     Route::get('/v1/tenant/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+    Route::get('/tenant/navigation/bottom-bar', [SettingsApiController::class, 'getBottomNavigation']);
+    Route::get('/app/navigation/bottom-bar', [SettingsApiController::class, 'getBottomNavigation']);
+    Route::get('/v1/tenant/navigation/bottom-bar', [SettingsApiController::class, 'getBottomNavigation']);
+    Route::get('/v1/navigation/bottom-bar', [SettingsApiController::class, 'getBottomNavigation']);
+    Route::get('/navigation/bottom-bar', [SettingsApiController::class, 'getBottomNavigation']);
     Route::get('/navigation/menu', [NavigationController::class, 'getDrawerMenu']);
     Route::get('/drawer/menu', [NavigationController::class, 'getDrawerMenu']);
     Route::get('/drawer-menu', [NavigationController::class, 'getDrawerMenu']);
@@ -979,6 +990,11 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
     Route::post('/tenant/settings/sms-gateway/test', [TenantSettingsController::class, 'sendTestSms'])->middleware('tenant.api.permission:settings,edit');
     Route::post('/app/settings/sms-gateway/test', [TenantSettingsController::class, 'sendTestSms'])->middleware('tenant.api.permission:settings,edit');
     Route::post('/v1/tenant/settings/sms-gateway/test', [TenantSettingsController::class, 'sendTestSms'])->middleware('tenant.api.permission:settings,edit');
+
+    // Tenant Settings REST Endpoints
+    Route::get('/tenant/settings', [SettingsApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/app/settings', [SettingsApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
+    Route::get('/v1/tenant/settings', [SettingsApiController::class, 'index'])->middleware('tenant.api.permission:settings,view');
 
     // Server-Driven UI Declarative Form Submissions
     Route::match(['post', 'put'], '/tenant/settings/{section}', [SduiViewController::class, 'submitSettings'])->middleware('tenant.api.permission:settings,edit');
@@ -1165,6 +1181,7 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/navigation/drawer', [SettingsApiController::class, 'getDrawerNavigation']);
         Route::get('/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
         Route::get('/ui/navigation', [SettingsApiController::class, 'getDrawerNavigation']);
+        Route::get('/navigation/bottom-bar', [SettingsApiController::class, 'getBottomNavigation']);
         Route::get('/navigation/menu', [NavigationController::class, 'getDrawerMenu']);
         Route::get('/drawer/menu', [NavigationController::class, 'getDrawerMenu']);
         Route::get('/drawer-menu', [NavigationController::class, 'getDrawerMenu']);
@@ -1288,26 +1305,48 @@ Route::prefix('v1/pos')->group(function () {
         Route::match(['put', 'post'], '/faqs/{id}', [FaqApiController::class, 'update'])->middleware('tenant.api.permission:settings,edit');
         Route::delete('/faqs/{id}', [FaqApiController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
         Route::post('/faqs/{id}/delete', [FaqApiController::class, 'destroy'])->middleware('tenant.api.permission:settings,edit');
+        // Storefront Ratings & Reviews Moderation
+        Route::get('/tenant/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantIndex'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,view']);
         Route::get('/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantIndex'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,view']);
+        Route::post('/tenant/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantStore'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,create']);
         Route::post('/storefront/reviews', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantStore'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,create']);
+        Route::get('/tenant/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'getSettings'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:settings,view']);
+        Route::get('/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'getSettings'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:settings,view']);
+        Route::match(['post', 'put'], '/tenant/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'updateSettings'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:settings,edit']);
+        Route::match(['post', 'put'], '/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'updateSettings'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:settings,edit']);
+        Route::match(['post', 'put'], '/tenant/storefront/reviews/{id}/toggle-approval', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'toggleApproval'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,edit']);
         Route::match(['post', 'put'], '/storefront/reviews/{id}/toggle-approval', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'toggleApproval'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,edit']);
+        Route::delete('/tenant/storefront/reviews/{id}', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,delete']);
+        Route::post('/tenant/storefront/reviews/{id}/delete', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,delete']);
         Route::delete('/storefront/reviews/{id}', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,delete']);
         Route::post('/storefront/reviews/{id}/delete', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'tenantDestroy'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:reviews,delete']);
-        Route::match(['post', 'put'], '/storefront/reviews/settings', [\App\Http\Controllers\Tenant\StorefrontReviewController::class, 'updateSettings'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:settings,edit']);
 
         // Storefront CMS Pages & Menus
+        Route::get('/tenant/storefront/pages', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesIndex'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::get('/storefront/pages', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesIndex'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
+        Route::post('/tenant/storefront/pages', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesStore'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::post('/storefront/pages', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesStore'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
+        Route::get('/tenant/storefront/pages/{id}', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesShow'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::get('/storefront/pages/{id}', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesShow'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
+        Route::match(['put', 'post'], '/tenant/storefront/pages/{id}', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesUpdate'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::match(['put', 'post'], '/storefront/pages/{id}', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesUpdate'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
+        Route::delete('/tenant/storefront/pages/{id}', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesDestroy'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
+        Route::post('/tenant/storefront/pages/{id}/delete', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesDestroy'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::delete('/storefront/pages/{id}', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesDestroy'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::post('/storefront/pages/{id}/delete', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'pagesDestroy'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
 
+        Route::get('/tenant/storefront/menus', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'menusIndex'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::get('/storefront/menus', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'menusIndex'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
+        Route::post('/tenant/storefront/menus', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'menusStore'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::post('/storefront/menus', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'menusStore'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
+        Route::post('/tenant/storefront/menus/reorder', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'reorder'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::post('/storefront/menus/reorder', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'reorder'])->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
+        Route::match(['put', 'post'], '/tenant/storefront/menus/{id}', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'menusUpdate'])->whereNumber('id')->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::match(['put', 'post'], '/storefront/menus/{id}', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'menusUpdate'])->whereNumber('id')->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
+        Route::match(['put', 'post'], '/tenant/storefront/menus/{id}/toggle-visibility', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'toggleVisibility'])->whereNumber('id')->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::match(['put', 'post'], '/storefront/menus/{id}/toggle-visibility', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'toggleVisibility'])->whereNumber('id')->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
+        Route::delete('/tenant/storefront/menus/{id}', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'menusDestroy'])->whereNumber('id')->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
+        Route::post('/tenant/storefront/menus/{id}/delete', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'menusDestroy'])->whereNumber('id')->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::delete('/storefront/menus/{id}', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'menusDestroy'])->whereNumber('id')->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
         Route::post('/storefront/menus/{id}/delete', [\App\Http\Controllers\Tenant\StorefrontMenuController::class, 'menusDestroy'])->whereNumber('id')->middleware(['entitled:ecommerce_storefront', 'tenant.api.permission:storefront,menus.manage']);
 

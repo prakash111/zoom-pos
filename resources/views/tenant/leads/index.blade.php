@@ -88,8 +88,8 @@
                         ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400 font-bold'
                         : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-medium'"
                     class="whitespace-nowrap py-3 px-3.5 border-b-2 text-xs sm:text-sm flex items-center gap-2 cursor-pointer transition-colors">
-                <span>📋</span>
-                <span>{{ __('All Leads') }}</span>
+                <span>🗂️</span>
+                <span>{{ __('Leads Pipeline') }}</span>
                 <span class="ml-1 text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">
                     {{ $leads->total() }}
                 </span>
@@ -112,12 +112,25 @@
                         : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-medium'"
                     class="whitespace-nowrap py-3 px-3.5 border-b-2 text-xs sm:text-sm flex items-center gap-2 cursor-pointer transition-colors">
                 <span>🔔</span>
-                <span>{{ __('Follow-ups & Reminders') }}</span>
+                <span>{{ __('Follow-ups & Activities') }}</span>
                 @if (count($pendingActivities) > 0)
                     <span class="ml-1 text-[11px] px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-bold">
                         {{ count($pendingActivities) }}
                     </span>
                 @endif
+            </button>
+
+            <button type="button"
+                    @click="activeTab = 'sources'"
+                    :class="activeTab === 'sources'
+                        ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400 font-bold'
+                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-medium'"
+                    class="whitespace-nowrap py-3 px-3.5 border-b-2 text-xs sm:text-sm flex items-center gap-2 cursor-pointer transition-colors">
+                <span>🏷️</span>
+                <span>{{ __('Lead Sources') }}</span>
+                <span class="ml-1 text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">
+                    {{ count($sources) }}
+                </span>
             </button>
         </nav>
     </div>
@@ -645,6 +658,108 @@
                     @endforeach
                 </div>
             @endif
+        </div>
+    </div>
+
+    <!-- TAB 5: LEAD SOURCES -->
+    <div x-show="activeTab === 'sources'" class="space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Form: Add New Source -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-[0_4px_25px_rgb(0,0,0,0.03)] h-fit">
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-9 h-9 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-base shrink-0">
+                        🏷️
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-black text-slate-900 dark:text-white">
+                            {{ __('Add Lead Source') }}
+                        </h3>
+                        <p class="text-[11px] text-slate-400">
+                            {{ __('Define marketing origins, campaign channels or referral sources.') }}
+                        </p>
+                    </div>
+                </div>
+
+                <form action="{{ route('tenant.leads.sources.store') }}" method="POST" class="space-y-4">
+                    @csrf
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            {{ __('Source Name') }} <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="text" name="name" required placeholder="{{ __('e.g. Website Form, Google Ads, Walk-in') }}" class="w-full rounded-2xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            {{ __('Description / Campaign Notes') }}
+                        </label>
+                        <textarea name="description" rows="3" placeholder="{{ __('Optional notes regarding channel tracking or attribution rules...') }}" class="w-full rounded-2xl border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs sm:text-sm"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full py-2.5 rounded-2xl text-xs sm:text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                        <span>{{ __('Create Lead Source') }}</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Right Column: Lead Sources List -->
+            <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-[0_4px_25px_rgb(0,0,0,0.03)]">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <span>🏷️</span>
+                        <span>{{ __('Configured Lead Sources') }}</span>
+                    </h3>
+                    <span class="text-xs text-slate-400 font-medium">
+                        {{ count($sources) }} {{ __('Active Sources') }}
+                    </span>
+                </div>
+
+                @if (count($sources) === 0)
+                    <div class="py-12 text-center text-slate-400 dark:text-slate-500 text-xs">
+                        <div class="text-3xl mb-2">🏷️</div>
+                        <p class="font-bold text-slate-700 dark:text-slate-300">{{ __('No lead sources defined yet') }}</p>
+                        <p class="text-[11px] mt-1">{{ __('Add standard acquisition channels such as Website, Social Media, or Inbound Calls.') }}</p>
+                    </div>
+                @else
+                    <div class="divide-y divide-slate-100 dark:divide-slate-800">
+                        @foreach ($sources as $sourceItem)
+                            <div class="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-9 h-9 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm font-bold shrink-0 mt-0.5">
+                                        #
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <h4 class="text-xs sm:text-sm font-black text-slate-900 dark:text-white">{{ $sourceItem->name }}</h4>
+                                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                                                {{ __('Active') }}
+                                            </span>
+                                        </div>
+                                        @if ($sourceItem->description)
+                                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ $sourceItem->description }}</p>
+                                        @endif
+                                        <div class="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
+                                            <span>📊 {{ $sourceItem->leads_count ?? 0 }} {{ __('associated leads') }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2 sm:self-center self-end">
+                                    <form action="{{ route('tenant.leads.sources.destroy', $sourceItem->id) }}" method="POST" onsubmit="return confirm('{{ __('Are you sure you want to remove this lead source?') }}');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors flex items-center gap-1 cursor-pointer">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            <span>{{ __('Delete') }}</span>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
         </div>
     </div>
 

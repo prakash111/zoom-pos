@@ -132,12 +132,21 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         Route::get('/settings/integrations', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.integrations');
         Route::get('/settings/navigation', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.navigation');
         Route::get('/settings/storefront', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.storefront');
+        Route::get('/settings/storefront/banner', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.storefront.banner');
+        Route::get('/settings/storefront/domain', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.storefront.domain');
+        Route::get('/settings/storefront/payments', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.storefront.payments');
+        Route::get('/settings/storefront/coupons', Coupons\Index::class)->middleware('tenant.permission:settings,view')->name('settings.storefront.coupons');
+        Route::get('/settings/storefront/faqs', Faqs\Index::class)->middleware('tenant.permission:settings,view')->name('settings.storefront.faqs');
+        Route::get('/settings/storefront/reviews', Reviews\Index::class)->middleware('tenant.permission:settings,view')->name('settings.storefront.reviews');
         Route::get('/settings/storefront/menus', \App\Livewire\Tenant\Storefront\MenuBuilderComponent::class)
             ->middleware(['entitled:ecommerce_storefront', 'tenant.permission:storefront,menus.manage'])
             ->name('settings.storefront.menus');
         Route::get('/storefront/menus', \App\Livewire\Tenant\Storefront\MenuBuilderComponent::class)
             ->middleware(['entitled:ecommerce_storefront', 'tenant.permission:storefront,menus.manage'])
             ->name('storefront.menus');
+        Route::get('/storefront/inquiries', \App\Livewire\Tenant\Storefront\Inquiries::class)
+            ->middleware(['entitled:ecommerce_storefront', 'tenant.permission:storefront,view'])
+            ->name('storefront.inquiries');
         Route::get('/settings/payments', Settings\Index::class)->middleware('tenant.permission:settings,view')->name('settings.payments');
         Route::get('/settings/coupons', Coupons\Index::class)->middleware('tenant.permission:settings,view')->name('settings.coupons');
         Route::get('/coupons', Coupons\Index::class)->middleware('tenant.permission:settings,view')->name('coupons.index');
@@ -148,7 +157,10 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         Route::post('/settings/navigation-menu', [NavigationMenuController::class, 'store'])
             ->middleware('tenant.permission:settings,edit')
             ->name('settings.navigation-menu.store');
-        Route::post('/settings/change-password', [PasswordResetController::class, 'changePassword'])->name('settings.change-password');
+        Route::match(['post', 'put'], '/password/update', [\App\Http\Controllers\Tenant\ProfileController::class, 'updatePassword'])->name('password.update');
+        Route::match(['post', 'put'], '/settings/change-password', [\App\Http\Controllers\Tenant\ProfileController::class, 'updatePassword'])->name('settings.change-password');
+        Route::match(['post', 'put'], '/profile/update-password', [\App\Http\Controllers\Tenant\ProfileController::class, 'updatePassword'])->name('profile.update-password');
+        Route::match(['post', 'put'], '/profile/password', [\App\Http\Controllers\Tenant\ProfileController::class, 'updatePassword'])->name('profile.password');
 
         // Per-user workspace preference — the dockable nav position. Any
         // signed-in user may move their own dock; no settings permission.
@@ -246,7 +258,13 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
 
             // Lead Management System
             Route::get('/leads', [\App\Http\Controllers\Tenant\LeadWebController::class, 'index'])->middleware('tenant.permission:leads,view')->name('leads.index');
+            Route::get('/leads/dashboard', [\App\Http\Controllers\Tenant\LeadWebController::class, 'dashboard'])->middleware('tenant.permission:leads,view')->name('leads.dashboard');
             Route::get('/leads/create', [\App\Http\Controllers\Tenant\LeadWebController::class, 'create'])->middleware('tenant.permission:leads,create')->name('leads.create');
+            Route::get('/leads/pipeline', [\App\Http\Controllers\Tenant\LeadWebController::class, 'pipeline'])->middleware('tenant.permission:leads,view')->name('leads.pipeline');
+            Route::get('/leads/activities', [\App\Http\Controllers\Tenant\LeadWebController::class, 'activities'])->middleware('tenant.permission:leads,view')->name('leads.activities');
+            Route::get('/leads/sources', [\App\Http\Controllers\Tenant\LeadWebController::class, 'sources'])->middleware('tenant.permission:leads,view')->name('leads.sources');
+            Route::post('/leads/sources', [\App\Http\Controllers\Tenant\LeadWebController::class, 'storeSource'])->middleware('tenant.permission:leads,create')->name('leads.sources.store');
+            Route::delete('/leads/sources/{id}', [\App\Http\Controllers\Tenant\LeadWebController::class, 'destroySource'])->middleware('tenant.permission:leads,edit')->name('leads.sources.destroy');
             Route::get('/leads/{id}', [\App\Http\Controllers\Tenant\LeadWebController::class, 'show'])->middleware('tenant.permission:leads,view')->name('leads.show');
             Route::post('/leads', [\App\Http\Controllers\Tenant\LeadWebController::class, 'store'])->middleware('tenant.permission:leads,create')->name('leads.store');
             Route::match(['put', 'patch'], '/leads/{id}', [\App\Http\Controllers\Tenant\LeadWebController::class, 'update'])->middleware('tenant.permission:leads,edit')->name('leads.update');

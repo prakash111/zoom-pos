@@ -153,11 +153,39 @@
                                 @endif
                             </div>
 
-                            {{-- Schedule-H Drug Warning Badge --}}
+                            {{-- Prescribed Medicines & Schedule-H Drug Warning Badge --}}
                             @php
-                                $medText = is_array($rx->medicines) ? implode(' ', $rx->medicines) : (string) $rx->medicines;
+                                $medList = [];
+                                if (is_array($rx->medicines)) {
+                                    foreach ($rx->medicines as $m) {
+                                        if (is_array($m)) {
+                                            $itemStr = ($m['name'] ?? $m['medicine_name'] ?? 'Medicine');
+                                            if (!empty($m['dosage'])) $itemStr .= ' — ' . $m['dosage'];
+                                            if (!empty($m['quantity']) || !empty($m['qty'])) $itemStr .= ' (Qty: ' . ($m['quantity'] ?? $m['qty']) . ')';
+                                            $medList[] = $itemStr;
+                                        } elseif (is_string($m)) {
+                                            $medList[] = $m;
+                                        }
+                                    }
+                                    $medText = implode(' ', $medList);
+                                } else {
+                                    $medText = (string) $rx->medicines;
+                                }
                                 $isScheduleH = str_contains(strtolower($medText), 'schedule h') || str_contains(strtolower($medText), 'amoxicillin') || str_contains(strtolower($medText), 'antibiotic');
                             @endphp
+                            @if (!empty($medList))
+                                <div class="mt-2 flex flex-wrap gap-1.5">
+                                    @foreach ($medList as $medItem)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-[#1E293B] text-slate-700 dark:text-[#F8FAFC]">
+                                            💊 {{ $medItem }}
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @elseif ($medText)
+                                <div class="mt-2 text-xs text-slate-600 dark:text-[#94A3B8]">
+                                    💊 {{ $medText }}
+                                </div>
+                            @endif
                             @if ($isScheduleH)
                                 <div class="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-300 text-[10px] font-black uppercase tracking-wide">
                                     <span>⚠️</span> {{ __('Schedule H Prescription Drug — Valid Doctor Rx Mandatory') }}

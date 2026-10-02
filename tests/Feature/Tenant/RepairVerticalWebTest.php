@@ -115,4 +115,27 @@ class RepairVerticalWebTest extends TestCase
 
         $this->assertDatabaseHas('categories', ['name' => 'Laptops', 'type' => 'device']);
     }
+
+    public function test_repair_dashboard_loads_with_tickets_and_computes_receivables(): void
+    {
+        [$company] = $this->repairTenant();
+
+        RepairTicket::create([
+            'company_id' => $company->id,
+            'ticket_number' => 'REP-TEST-100',
+            'customer_name' => 'Alice Smartphone',
+            'brand' => 'Apple',
+            'model' => 'iPhone 14',
+            'status' => RepairTicket::STATUS_IN_PROGRESS,
+            'estimated_cost' => 150.00,
+            'total_amount' => 150.00,
+            'advance_deposit' => 50.00,
+        ]);
+
+        $response = $this->get(route('tenant.repair.dashboard'));
+        $response->assertOk();
+        $response->assertSee('Repair Workbench');
+        $response->assertSee('REP-TEST-100');
+        $response->assertSee('100.00'); // 150 - 50 = 100 pending receivables
+    }
 }

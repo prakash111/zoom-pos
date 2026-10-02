@@ -91,8 +91,7 @@ class TenantRegister extends Component
 
     public function updatedStoreName(string $value): void
     {
-        $domainSetupEnabled = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
-        if ($domainSetupEnabled && (empty($this->slug) || Str::slug($this->slug) === Str::slug(substr($value, 0, -1)))) {
+        if (empty($this->slug) || Str::slug($this->slug) === Str::slug(substr($value, 0, -1))) {
             $this->slug = Str::slug($value);
         }
     }
@@ -133,7 +132,7 @@ class TenantRegister extends Component
         $domainSetupEnabled = (bool) \App\Models\DynamicSetting::get('enable_registration_domain_setup', true);
 
         if (! $domainSetupEnabled) {
-            $baseSlug = Str::slug($this->storeName ?: 'store') ?: 'store';
+            $baseSlug = Str::slug($this->slug ?: $this->storeName ?: 'store') ?: 'store';
             if (! Company::where('slug', $baseSlug)->exists() && ! in_array($baseSlug, Company::RESERVED_SLUGS, true)) {
                 $this->slug = $baseSlug;
             } else {

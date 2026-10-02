@@ -5,8 +5,11 @@ function lm_header(string $active, string $title = 'License Manager'): void
     $tabs = [
         'index' => ['label' => 'Licenses', 'icon' => '🔑'],
         'products' => ['label' => 'Products', 'icon' => '📦'],
+        'bundles' => ['label' => 'Bundles', 'icon' => '🎁'],
+        'landing' => ['label' => 'Landing Page', 'icon' => '🎨'],
         'payments' => ['label' => 'Orders', 'icon' => '💳'],
         'redeem' => ['label' => 'Redeem', 'icon' => '🎟️'],
+        'build-stats' => ['label' => 'Build Stats', 'icon' => '📊'],
         'settings' => ['label' => 'Settings', 'icon' => '⚙️'],
     ];
 
@@ -45,6 +48,13 @@ function lm_header(string $active, string $title = 'License Manager'): void
         echo '<span>'.e($meta['label']).'</span>';
         echo '</a>';
     }
+    echo '<div style="margin:14px 8px 6px;padding-top:12px;border-top:1px solid #334155;">';
+    echo '<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#94a3b8;letter-spacing:0.5px;margin-bottom:8px;padding:0 8px;">Tenant Portal</div>';
+    echo '<a href="../app-builder/" target="_blank" class="sidebar-link" title="Open Tenant App Builder">';
+    echo '<span class="icon">🔨</span>';
+    echo '<span>Tenant App Builder ↗</span>';
+    echo '</a>';
+    echo '</div>';
     echo '</nav>';
     echo '</div>';
 

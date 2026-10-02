@@ -39,7 +39,7 @@
     re-rendered by the server on every page — only a reactive Alpine binding
     stays correct as the URL changes underneath a persisted DOM node.
 --}}
-<a @if($itemKey) x-show="isItemVisible('{{ $itemKey }}')" @endif wire:navigate.hover href="{{ $route }}"
+<a @if($itemKey) x-show="isItemVisible('{{ $itemKey }}')" data-item-key="{{ $itemKey }}" @endif wire:navigate.hover href="{{ $route }}"
    class="dockable-nav-item"
    :aria-selected="isCurrentRoute('{{ $route }}') ? 'true' : 'false'"
    :class="{

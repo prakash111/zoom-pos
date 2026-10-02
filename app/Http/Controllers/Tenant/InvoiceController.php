@@ -253,7 +253,11 @@ class InvoiceController extends Controller
     {
         $sale = Sale::withoutGlobalScope('company')
             ->with(['payments' => fn ($q) => $q->withoutGlobalScope('company')])
-            ->where('sale_number', $saleNumber)
+            ->where(function ($q) use ($saleNumber) {
+                $q->where('sale_number', $saleNumber)
+                    ->orWhere('id', $saleNumber)
+                    ->orWhere('external_id', $saleNumber);
+            })
             ->firstOrFail();
         $company = $sale->company ?? Company::find($sale->company_id);
         $deliveryService = app(InvoiceDeliveryService::class);

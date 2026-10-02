@@ -22,6 +22,71 @@ class Dashboard extends Component
 
     public string $selectedPosLayout = 'standard';
 
+    public string $salesOverviewPeriod = 'weekly'; // weekly | monthly | custom
+
+    public ?string $salesOverviewStartDate = null;
+
+    public ?string $salesOverviewEndDate = null;
+
+    public function mount(): void
+    {
+        $this->salesOverviewStartDate = now()->subDays(6)->toDateString();
+        $this->salesOverviewEndDate = now()->toDateString();
+    }
+
+    public function setSalesOverviewPeriod(string $period): void
+    {
+        if (! in_array($period, ['weekly', 'monthly', 'custom'])) {
+            return;
+        }
+
+        $this->salesOverviewPeriod = $period;
+
+        if ($period === 'weekly') {
+            $this->salesOverviewStartDate = now()->subDays(6)->toDateString();
+            $this->salesOverviewEndDate = now()->toDateString();
+        } elseif ($period === 'monthly') {
+            $this->salesOverviewStartDate = now()->subDays(29)->toDateString();
+            $this->salesOverviewEndDate = now()->toDateString();
+        } elseif ($period === 'custom') {
+            if (! $this->salesOverviewStartDate) {
+                $this->salesOverviewStartDate = now()->subDays(6)->toDateString();
+            }
+            if (! $this->salesOverviewEndDate) {
+                $this->salesOverviewEndDate = now()->toDateString();
+            }
+        }
+    }
+
+    public function updatedSalesOverviewStartDate(): void
+    {
+        $this->salesOverviewPeriod = 'custom';
+        $this->normalizeCustomOverviewDates();
+    }
+
+    public function updatedSalesOverviewEndDate(): void
+    {
+        $this->salesOverviewPeriod = 'custom';
+        $this->normalizeCustomOverviewDates();
+    }
+
+    public function applyCustomSalesOverviewDateRange(): void
+    {
+        $this->salesOverviewPeriod = 'custom';
+        $this->normalizeCustomOverviewDates();
+    }
+
+    protected function normalizeCustomOverviewDates(): void
+    {
+        if ($this->salesOverviewStartDate && $this->salesOverviewEndDate) {
+            if ($this->salesOverviewStartDate > $this->salesOverviewEndDate) {
+                $tmp = $this->salesOverviewStartDate;
+                $this->salesOverviewStartDate = $this->salesOverviewEndDate;
+                $this->salesOverviewEndDate = $tmp;
+            }
+        }
+    }
+
     public function openPosLayoutModal(): void
     {
         $company = auth('web')->user()?->company;
@@ -106,19 +171,53 @@ class Dashboard extends Component
         $totalCustomersCount = Customer::count();
         $salesOnly = fn ($query) => $query->whereNull('operation_type')->orWhere('operation_type', '!=', 'quotation');
         $recentSales = Sale::where($salesOnly)->orderByDesc('created_at')->limit(5)->get();
-        $start = now()->subDays(6)->startOfDay();
+        $tz = $company?->timezone ?: config('app.timezone');
+        $localNow = now($tz);
+
+        if ($this->salesOverviewPeriod === 'monthly') {
+            $start = $localNow->copy()->subDays(29)->startOfDay();
+            $end = $localNow->copy()->endOfDay();
+            $daysCount = 30;
+            $periodLabel = __('Last 30 Days');
+        } elseif ($this->salesOverviewPeriod === 'custom' && $this->salesOverviewStartDate && $this->salesOverviewEndDate) {
+            try {
+                $start = \Illuminate\Support\Carbon::parse($this->salesOverviewStartDate, $tz)->startOfDay();
+                $end = \Illuminate\Support\Carbon::parse($this->salesOverviewEndDate, $tz)->endOfDay();
+                if ($start->gt($end)) {
+                    [$start, $end] = [$end->copy()->startOfDay(), $start->copy()->endOfDay()];
+                }
+                if ($start->diffInDays($end) > 90) {
+                    $start = $end->copy()->subDays(90)->startOfDay();
+                }
+                $daysCount = (int) $start->diffInDays($end) + 1;
+            } catch (\Throwable $e) {
+                $start = $localNow->copy()->subDays(6)->startOfDay();
+                $end = $localNow->copy()->endOfDay();
+                $daysCount = 7;
+            }
+            $periodLabel = $start->format('d M') . ' - ' . $end->format('d M');
+        } else {
+            $this->salesOverviewPeriod = 'weekly';
+            $start = $localNow->copy()->subDays(6)->startOfDay();
+            $end = $localNow->copy()->endOfDay();
+            $daysCount = 7;
+            $periodLabel = __('Last 7 Days');
+        }
+
         $dailyRows = Sale::where($salesOnly)
             ->where('status', 'completed')
-            ->where('created_at', '>=', $start)
+            ->whereBetween('created_at', [$start, $end])
             ->selectRaw('DATE(created_at) as day, SUM(total) as total, COUNT(*) as orders')
             ->groupByRaw('DATE(created_at)')
             ->get()
             ->keyBy('day');
-        $weeklySales = collect(range(0, 6))->map(function ($offset) use ($dailyRows, $start) {
+
+        $weeklySales = collect(range(0, max(0, $daysCount - 1)))->map(function ($offset) use ($dailyRows, $start) {
             $day = $start->copy()->addDays($offset);
             $row = $dailyRows->get($day->toDateString());
 
             return [
+                'date' => $day->toDateString(),
                 'label' => $day->format('d M'),
                 'total' => (float) ($row?->total ?? 0),
                 'orders' => (int) ($row?->orders ?? 0),
@@ -148,6 +247,10 @@ class Dashboard extends Component
             'totalCustomersCount' => $totalCustomersCount,
             'recentSales' => $recentSales,
             'weeklySales' => $weeklySales,
+            'salesOverviewPeriod' => $this->salesOverviewPeriod,
+            'salesOverviewPeriodLabel' => $periodLabel,
+            'salesOverviewStartDate' => $this->salesOverviewStartDate,
+            'salesOverviewEndDate' => $this->salesOverviewEndDate,
             'receivableAmount' => $receivableAmount,
             'outstandingInvoices' => $outstandingInvoices,
             'overdueAmount' => $overdueAmount,

@@ -14,7 +14,7 @@ class Plan extends Model
 
     protected $fillable = [
         'name', 'display_name', 'billing_cycle', 'duration_days',
-        'price', 'currency', 'features', 'limits', 'active',
+        'price', 'currency', 'features', 'limits', 'active', 'is_active',
         'invoice_limit', 'products_limit', 'device_limit', 'staff_limit', 'store_limit', 'extensions',
     ];
 
@@ -30,6 +30,7 @@ class Plan extends Model
             'staff_limit' => 'integer',
             'store_limit' => 'integer',
             'active' => 'boolean',
+            'is_active' => 'boolean',
             'price' => 'decimal:2',
         ];
     }
@@ -73,12 +74,19 @@ class Plan extends Model
             ? $this->features
             : (is_string($this->features) ? (json_decode($this->features, true) ?: []) : []);
 
+        $featureLabels = [
+            'app_builder_access' => 'Cloud App Builder Included',
+            'white_label_custom_branding' => '100% White-Label App Branding',
+            'android_web_and_windows_builds' => 'Android, Web & Windows App Builds',
+            'cloud_build_history_and_alerts' => 'Build History & Email Notifications',
+        ];
+
         $featureList = [];
         foreach ($rawFeatures as $k => $v) {
             if (is_numeric($k) && is_string($v)) {
                 $featureList[] = $v;
             } elseif ($v === true || $v === 1 || $v === '1') {
-                $featureList[] = is_string($k) ? str_replace('_', ' ', ucfirst($k)) : (string) $v;
+                $featureList[] = $featureLabels[$k] ?? (is_string($k) ? str_replace('_', ' ', ucfirst($k)) : (string) $v);
             } elseif (is_string($v) && ! empty($v)) {
                 $featureList[] = "$k: $v";
             }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Api\V1\Concerns\ResolvesTenantSyncContext;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Services\Navigation\NavigationSanitizerService;
 use App\Services\Navigation\TenantNavigationConfigService;
 use App\Services\Navigation\TenantNavRegistry;
 use Illuminate\Http\JsonResponse;
@@ -61,6 +62,7 @@ class NavigationController extends Controller
         ];
 
         if ($company !== null) {
+            $navConfig = NavigationSanitizerService::getStoreNavigationConfig($company);
             $payload['header'] = $drawerHeader;
             $payload['drawer_header'] = $drawerHeader;
             $payload['store_name'] = $company->display_name;
@@ -69,6 +71,20 @@ class NavigationController extends Controller
             $payload['display_name'] = $company->display_name;
             $payload['title'] = $company->display_name;
             $payload['store_type'] = $company->store_type;
+            $payload['operating_mode'] = $navConfig['operating_mode'];
+            $payload['is_restaurant'] = (bool) $navConfig['is_restaurant'];
+            $payload['pos_layout'] = $navConfig['pos_layout'];
+            $payload['default_terminal_view'] = $navConfig['default_terminal_view'];
+            $payload['primary_pos_route'] = $navConfig['primary_pos_route'];
+            $payload['center_action_route'] = $navConfig['center_action_route'];
+            $payload['center_button_route'] = $navConfig['center_button_route'];
+            $payload['primary_action'] = $navConfig['primary_action'];
+            $payload['default_pos_screen'] = $navConfig['default_pos_screen'];
+            $payload['default_pos_action'] = $navConfig['default_pos_action'];
+            $payload['drawer_pos_route'] = $navConfig['drawer_pos_route'];
+            $payload['quick_actions'] = $navConfig['quick_actions'];
+            $payload['navigation_config'] = $navConfig;
+            $payload['store_navigation_config'] = $navConfig;
         }
 
         return response()->json($payload);

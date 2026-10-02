@@ -148,16 +148,22 @@
             if (empty($qrDataUri)) {
                 $qrDataUri = 'https://api.qrserver.com/v1/create-qr-code/?size=' . $qrSize . 'x' . $qrSize . '&data=' . urlencode($qrPayload);
             }
+            $verifyUrl = ($type === 'quotation')
+                ? route('quotes.public', $reference)
+                : route('sales.public', $reference);
+            $linkUrl = filter_var($qrPayload, FILTER_VALIDATE_URL) ? $qrPayload : $verifyUrl;
         @endphp
         <div style="margin-top: 14px; text-align: center;">
-            <div style="display: inline-block; padding: 6px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 10px; color: #64748b; background: #fff;">
-                <img src="{{ $qrDataUri }}"
-                     width="{{ $qrSize }}"
-                     height="{{ $qrSize }}"
-                     alt="Scan to Verify QR Code"
-                     style="display: block; margin: 0 auto; width: {{ $qrSize }}px; height: {{ $qrSize }}px; object-fit: contain;" />
-                <span style="display: block; margin-top: 4px; font-weight: 600; font-size: 9px; letter-spacing: 0.02em;">{{ __('Scan to Verify') }}</span>
-            </div>
+            <a href="{{ $linkUrl }}" target="_blank" rel="noopener noreferrer" style="text-decoration: none; color: inherit; display: inline-block;">
+                <div style="display: inline-block; padding: 6px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 10px; color: #64748b; background: #fff; cursor: pointer;">
+                    <img src="{{ $qrDataUri }}"
+                         width="{{ $qrSize }}"
+                         height="{{ $qrSize }}"
+                         alt="Scan to Verify QR Code"
+                         style="display: block; margin: 0 auto; width: {{ $qrSize }}px; height: {{ $qrSize }}px; object-fit: contain;" />
+                    <span style="display: block; margin-top: 4px; font-weight: 600; font-size: 9px; letter-spacing: 0.02em;">{{ __('Scan to Verify') }}</span>
+                </div>
+            </a>
         </div>
     @endif
 

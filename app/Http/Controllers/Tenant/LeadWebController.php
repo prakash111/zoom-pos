@@ -125,8 +125,9 @@ class LeadWebController extends Controller implements HasMiddleware
             ->take(15)
             ->get();
 
-        // Dropdown Data
+        // Dropdown & Sources Data
         $sources = LeadSource::where('company_id', $company->id)
+            ->withCount('leads')
             ->where('is_active', true)
             ->get();
 
@@ -152,6 +153,65 @@ class LeadWebController extends Controller implements HasMiddleware
             'sourceId',
             'tab'
         ));
+    }
+
+    public function dashboard(Request $request): View
+    {
+        $request->merge(['tab' => 'pipeline']);
+        return $this->index($request);
+    }
+
+    public function pipeline(Request $request): View
+    {
+        $request->merge(['tab' => 'all']);
+        return $this->index($request);
+    }
+
+    public function activities(Request $request): View
+    {
+        $request->merge(['tab' => 'activities']);
+        return $this->index($request);
+    }
+
+    public function sources(Request $request): View
+    {
+        $request->merge(['tab' => 'sources']);
+        return $this->index($request);
+    }
+
+    public function storeSource(Request $request): RedirectResponse
+    {
+        $user = auth()->user();
+        $company = $user?->company;
+        abort_if(! $company, 403, 'Company not associated with user');
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'description' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        LeadSource::create([
+            'company_id' => $company->id,
+            'name' => trim($validated['name']),
+            'description' => $validated['description'] ?? null,
+            'is_active' => true,
+        ]);
+
+        return redirect()->route('tenant.leads.sources')
+            ->with('status', __('Lead source added successfully.'));
+    }
+
+    public function destroySource(int $id): RedirectResponse
+    {
+        $user = auth()->user();
+        $company = $user?->company;
+        abort_if(! $company, 403, 'Company not associated with user');
+
+        $source = LeadSource::where('company_id', $company->id)->findOrFail($id);
+        $source->delete();
+
+        return redirect()->route('tenant.leads.sources')
+            ->with('status', __('Lead source removed.'));
     }
 
     public function create(Request $request): RedirectResponse

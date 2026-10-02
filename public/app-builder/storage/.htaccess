@@ -1,0 +1,3 @@
+# Deny direct web access to storage
+Order Deny,Allow
+Deny from all

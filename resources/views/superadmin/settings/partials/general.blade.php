@@ -224,72 +224,173 @@
         </div>
 
         <!-- Allowed Registration Modes & Module Governance -->
-        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/80 dark:border-slate-800 space-y-5">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/80 dark:border-slate-800 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
                 <div>
                     <h3 class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                         <span>🧩</span> {{ __('SuperAdmin Module Governance & Registration Modes') }}
                     </h3>
                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        {{ __('Globally enable or disable modules available across the platform. Only active modules configured here will appear as selectable store types during new tenant signups on web and mobile.') }}
+                        {{ __('Globally manage operating modes and platform extensions. Only active business verticals configured here will appear as selectable store types during new tenant signups on web and mobile.') }}
                     </p>
                 </div>
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 w-fit">
-                    {{ count($enabledRegistrationModules) }} {{ __('Active') }}
-                </span>
+                <div class="flex items-center gap-2">
+                    <a href="{{ route('superadmin.modules.index') }}"
+                       class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                        <span>📦</span> {{ __('Modules Manager') }} &rarr;
+                    </a>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                        {{ count($enabledRegistrationModules) }} {{ __('Active Modes') }}
+                    </span>
+                </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                @foreach (\App\Services\Modular\ModuleRegistry::operatingModules() as $modKey => $mod)
-                    @php
-                        $g = $moduleGuard[$modKey] ?? ['premium' => false, 'licensed' => true, 'store_link' => null];
-                        $locked = $g['premium'] && ! $g['licensed'];
-                        $isEnabled = ! $locked && in_array($modKey, $enabledRegistrationModules, true);
-                    @endphp
-                    <label class="flex items-start justify-between p-4 rounded-2xl border transition-all {{ $locked ? 'border-amber-300/70 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-950/20 cursor-default' : 'cursor-pointer' }} {{ $isEnabled ? 'border-indigo-500/80 bg-indigo-50/60 dark:bg-indigo-950/30 ring-1 ring-indigo-500/40' : (! $locked ? 'border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 opacity-75 hover:opacity-100' : '') }}">
-                        <div class="flex items-start gap-3.5 pr-3">
-                            <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 {{ $isEnabled ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400' }}">
-                                @if ($modKey === 'restaurant')
-                                    <span class="text-lg">🍽️</span>
-                                @elseif ($modKey === 'pharmacy')
-                                    <span class="text-lg">💊</span>
-                                @elseif ($modKey === 'service_booking')
-                                    <span class="text-lg">✂️</span>
-                                @else
-                                    <span class="text-lg">🏪</span>
-                                @endif
-                            </div>
-                            <div class="space-y-1">
-                                <div class="flex items-center gap-2 flex-wrap">
-                                    <span class="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">{{ __($mod['title']) }}</span>
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide {{ $isEnabled ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' }}">
-                                        {{ $modKey }}
-                                    </span>
-                                    @if ($locked)
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">{{ __('Not purchased') }}</span>
+            <!-- Subsection 1: Business Operating Modes (Signup Store Types) -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        {{ __('Business Operating Modes (Signup Store Types)') }}
+                    </h4>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    @foreach (\App\Services\Modular\ModuleRegistry::getAvailableModes() as $modKey => $mod)
+                        @php
+                            $isLocked = !empty($mod['is_locked']);
+                            $isEnabled = !$isLocked && in_array($modKey, $enabledRegistrationModules, true);
+                            $storeLink = $mod['store_link'] ?? ($moduleGuard[$modKey]['store_link'] ?? null) ?? \App\Services\Modular\ModuleCatalog::storeLink($mod['required_module_slug'] ?? $modKey);
+                        @endphp
+                        <label class="flex items-start justify-between p-4 rounded-2xl border transition-all {{ $isLocked ? 'border-amber-300/70 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-950/20 cursor-not-allowed opacity-90' : 'cursor-pointer' }} {{ $isEnabled ? 'border-indigo-500/80 bg-indigo-50/60 dark:bg-indigo-950/30 ring-1 ring-indigo-500/40' : (! $isLocked ? 'border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 opacity-75 hover:opacity-100' : '') }}">
+                            <div class="flex items-start gap-3.5 pr-3">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 {{ $isEnabled ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : ($isLocked ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400') }}">
+                                    @if ($modKey === 'restaurant')
+                                        <span class="text-lg">🍽️</span>
+                                    @elseif ($modKey === 'pharmacy')
+                                        <span class="text-lg">💊</span>
+                                    @elseif ($modKey === 'service_booking')
+                                        <span class="text-lg">✂️</span>
+                                    @elseif ($modKey === 'repair_technician')
+                                        <span class="text-lg">🛠️</span>
+                                    @else
+                                        <span class="text-lg">🏪</span>
                                     @endif
                                 </div>
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                                    {{ __($mod['description']) }}
-                                </p>
-                                @if ($locked && ! empty($g['store_link']))
-                                    <a href="{{ $g['store_link'] }}" target="_blank" rel="noopener noreferrer"
-                                       class="inline-flex mt-1.5 items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-extrabold bg-amber-600 hover:bg-amber-700 text-white">
-                                        {{ __('Purchase to activate') }} ↗
-                                    </a>
-                                @endif
+                                <div class="space-y-1">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">{{ __($mod['title']) }}</span>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide {{ $isEnabled ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' }}">
+                                            {{ $modKey }}
+                                        </span>
+                                        @if (!empty($mod['is_core']))
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300">
+                                                {{ __('Core Platform Vertical · Built-in') }}
+                                            </span>
+                                        @endif
+                                        @if ($isLocked)
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
+                                                🔒 {{ __('Not Purchased / License Required') }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                        {{ __($mod['description']) }}
+                                    </p>
+                                    @if ($isLocked)
+                                        <div class="pt-2 flex items-center gap-2 flex-wrap">
+                                            @if ($storeLink)
+                                                <a href="{{ $storeLink }}" target="_blank" rel="noopener noreferrer"
+                                                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm">
+                                                    <span>🛒</span> {{ __('Buy First to Activate') }} ↗
+                                                </a>
+                                            @endif
+                                            <a href="{{ route('superadmin.modules.index') }}"
+                                               class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white transition shadow-xs">
+                                                <span>🧩</span> {{ __('Install & Activate in Modules') }} &rarr;
+                                            </a>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="pt-0.5 shrink-0">
+                                <input type="checkbox"
+                                       wire:model.live="enabledRegistrationModules"
+                                       value="{{ $modKey }}"
+                                       @disabled($isLocked)
+                                       class="w-5 h-5 rounded-lg border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 {{ $isLocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer' }}">
+                            </div>
+                        </label>
+                    @endforeach
+                </div>
+            </div>
+
+            <!-- Subsection 2: Modular Extensions & Add-ons -->
+            <div class="space-y-3 pt-5 border-t border-slate-100 dark:border-slate-800">
+                <div>
+                    <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        {{ __('Modular Extensions & Platform Add-ons') }}
+                    </h4>
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">
+                        {{ __('System extensions provide CRM, communications, and specialized add-ons. SuperAdmin can assign active extensions to individual tenant companies.') }}
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    @foreach (\App\Services\Modular\ModuleRegistry::getAvailableExtensions() as $extKey => $ext)
+                        @php
+                            $isExtLocked = !empty($ext['is_locked']);
+                            $isExtActive = !empty($ext['is_active']);
+                            $extStoreLink = $ext['store_link'] ?? \App\Services\Modular\ModuleCatalog::storeLink($extKey);
+                        @endphp
+                        <div class="flex items-start justify-between p-4 rounded-2xl border transition-all {{ $isExtLocked ? 'border-amber-300/70 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-950/20' : 'border-indigo-500/40 bg-indigo-50/40 dark:bg-indigo-950/20' }}">
+                            <div class="flex items-start gap-3.5 pr-3">
+                                <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 {{ $isExtActive ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : ($isExtLocked ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400') }}">
+                                    @if ($extKey === 'leadmanagement')
+                                        <span class="text-lg">📈</span>
+                                    @else
+                                        <span class="text-lg">🔌</span>
+                                    @endif
+                                </div>
+                                <div class="space-y-1">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">{{ __($ext['title']) }}</span>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300">
+                                            {{ $extKey }}
+                                        </span>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                            {{ __('Extension') }}
+                                        </span>
+                                        @if ($isExtActive)
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                                                ✓ {{ __('Active & Licensed') }}
+                                            </span>
+                                        @elseif ($isExtLocked)
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
+                                                🔒 {{ __('Not Purchased / License Required') }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                        {{ __($ext['description']) }}
+                                    </p>
+                                    <div class="pt-2 flex items-center gap-2 flex-wrap">
+                                        @if ($isExtLocked && $extStoreLink)
+                                            <a href="{{ $extStoreLink }}" target="_blank" rel="noopener noreferrer"
+                                               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm">
+                                                <span>🛒</span> {{ __('Buy First to Activate') }} ↗
+                                            </a>
+                                        @endif
+                                        <a href="{{ route('superadmin.modules.index') }}"
+                                           class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold {{ $isExtActive ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-800 hover:bg-slate-700 text-white' }} transition shadow-xs">
+                                            <span>🧩</span> {{ $isExtActive ? __('Manage in Modules') : __('Install & Activate in Modules') }} &rarr;
+                                        </a>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="pt-0.5 shrink-0">
-                            <input type="checkbox"
-                                   wire:model.live="enabledRegistrationModules"
-                                   value="{{ $modKey }}"
-                                   @disabled($locked)
-                                   class="w-5 h-5 rounded-lg border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 {{ $locked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer' }}">
-                        </div>
-                    </label>
-                @endforeach
+                    @endforeach
+                </div>
             </div>
+
             @error('enabledRegistrationModules') <p class="text-[11px] text-rose-500 font-bold">{{ $message }}</p> @enderror
         </div>
 

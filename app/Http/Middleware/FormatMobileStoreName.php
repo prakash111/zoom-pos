@@ -10,15 +10,16 @@ use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Formats store and tenant display name to 3 characters exclusively for mobile devices.
+ * Formats store and tenant display name to 4 characters (`short_name`) for mobile header,
+ * while retaining the complete business name in `name` and `full_name`.
  *
  * Checks:
  * - User-Agent: contains 'dart', 'mobile', 'android', 'iphone', or 'okhttp'
  * - X-Client-Platform: 'android', 'ios', or 'mobile'
  *
  * Guarantees:
- * - Mobile requests receive 3-character store name (e.g. "Zoo", "ZNE") without trailing dots.
- * - Always preserves `full_name` holding the complete unmodified business name in the JSON payload.
+ * - Mobile requests receive 4-character `short_name` (e.g. "Zoom") without trailing dots.
+ * - Always preserves `name` and `full_name` holding the complete unmodified business name in the JSON payload.
  * - Desktop, web browser, invoice generation, and receipt endpoints receive full unmodified store name.
  */
 class FormatMobileStoreName
@@ -112,7 +113,7 @@ class FormatMobileStoreName
     }
 
     /**
-     * Sanitize a single store record: truncate `name` to 3 characters and preserve `full_name`.
+     * Sanitize a single store record: provide 4-character `short_name` and retain `name`/`full_name`.
      */
     protected function sanitizeStoreRecord(array &$store): void
     {
@@ -120,7 +121,8 @@ class FormatMobileStoreName
             if (! isset($store['full_name'])) {
                 $store['full_name'] = $store['name'];
             }
-            $store['name'] = Str::limit($store['full_name'], 3, '');
+            $store['short_name'] = mb_substr($store['full_name'], 0, 4);
+            $store['name'] = $store['full_name'];
         }
     }
 }

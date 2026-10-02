@@ -254,6 +254,7 @@ class Index extends Component
         $this->ctaSecondaryText = $branding->landingText('cta.secondary_text', '');
         $this->ctaSecondaryUrl = $branding->landingText('cta.secondary_url', '');
 
+
         // HTML & JSON overrides
         $this->landingCustomHtml = (string) data_get($branding->landing_content ?? [], 'html', '');
         $this->landingContentJson = json_encode($branding->landing_content ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '';
@@ -941,6 +942,7 @@ class Index extends Component
         if (filled($this->pricingNote)) {
             $landingContent['pricing']['note'] = $this->pricingNote;
         }
+
         if (filled($this->ctaPrimaryText)) {
             $landingContent['cta']['primary_text'] = $this->ctaPrimaryText;
         }
@@ -1023,6 +1025,7 @@ class Index extends Component
 
         AuditLog::record('branding.updated', null, auth('platform_web')->id());
         session()->flash('status', 'Landing page & branding configurations saved successfully.');
+        $this->dispatch('notify', 'Landing page & branding configurations saved successfully.');
     }
 
     public function render()

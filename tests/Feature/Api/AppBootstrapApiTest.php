@@ -329,15 +329,17 @@ class AppBootstrapApiTest extends TestCase
 
     public function test_empty_or_corrupted_database_navigation_falls_back_to_core_sections(): void
     {
-        DB::table('sdui_modules')->insert([
-            'name' => 'Retail Override',
-            'slug' => 'retail',
-            'layout_type' => 'standard_grid',
-            'navigation' => json_encode([]),
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::table('sdui_modules')->updateOrInsert(
+            ['slug' => 'retail'],
+            [
+                'name' => 'Retail Override',
+                'layout_type' => 'standard_grid',
+                'navigation' => json_encode([]),
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
 
         $assertCoreMenu = function (array $menu): void {
             $sections = collect($menu)->keyBy('key');

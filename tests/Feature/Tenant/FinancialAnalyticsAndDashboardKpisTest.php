@@ -218,4 +218,64 @@ class FinancialAnalyticsAndDashboardKpisTest extends TestCase
             ->get(route('tenant.customers.index'));
         $customersResponse->assertStatus(200);
     }
+
+    public function test_sales_overview_filter_options_toggle_weekly_monthly_and_custom_range(): void
+    {
+        $today = now();
+        $fifteenDaysAgo = now()->subDays(15);
+
+        Sale::create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->user->id,
+            'sale_number' => 'POS-TODAY-099',
+            'status' => 'completed',
+            'total' => 200.00,
+            'payment_method' => 'cash',
+            'items' => [],
+            'created_at' => $today,
+        ]);
+
+        Sale::create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->user->id,
+            'sale_number' => 'POS-15D-099',
+            'status' => 'completed',
+            'total' => 150.00,
+            'payment_method' => 'card',
+            'items' => [],
+            'created_at' => $fifteenDaysAgo,
+        ]);
+
+        $test = Livewire::actingAs($this->user)->test(Dashboard::class);
+
+        // 1. Weekly (Default)
+        $test->assertSee('Sales Overview')
+            ->assertSee('Last 7 Days')
+            ->assertSee('Weekly')
+            ->assertSee('Monthly')
+            ->assertSee('Custom Range')
+            ->assertSee($today->format('d M'))
+            ->assertSee($today->copy()->subDays(6)->format('d M'))
+            ->assertDontSee('Date Range:');
+
+        // 2. Switch to Monthly
+        $test->call('setSalesOverviewPeriod', 'monthly')
+            ->assertSee('Last 30 Days')
+            ->assertSet('salesOverviewPeriod', 'monthly')
+            ->assertSee($today->format('d M'));
+
+        // 3. Switch to Custom Range
+        $startStr = now()->subDays(20)->toDateString();
+        $endStr = now()->toDateString();
+        $expectedLabel = now()->subDays(20)->format('d M') . ' - ' . now()->format('d M');
+
+        $test->call('setSalesOverviewPeriod', 'custom')
+            ->assertSet('salesOverviewPeriod', 'custom')
+            ->assertSee('Date Range:')
+            ->set('salesOverviewStartDate', $startStr)
+            ->set('salesOverviewEndDate', $endStr)
+            ->call('applyCustomSalesOverviewDateRange')
+            ->assertSee($expectedLabel);
+    }
 }
+

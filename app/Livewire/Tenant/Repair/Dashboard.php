@@ -15,7 +15,7 @@ class Dashboard extends Component
 {
     public function render()
     {
-        $tickets = RepairTicket::query()->get(['status', 'total_amount', 'balance_due']);
+        $tickets = RepairTicket::query()->get();
 
         $counts = [];
         foreach (array_keys(RepairTicket::STATUSES) as $status) {

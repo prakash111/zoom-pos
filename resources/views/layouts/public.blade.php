@@ -439,7 +439,7 @@
                 </button>
 
                 @if (config('app.demo_mode'))
-                    <a href="https://web.zoomnearby.com/demo" target="_blank" rel="noopener noreferrer" class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white text-xs font-black shadow-md shadow-sky-500/20 transition active:scale-95">
+                    <a href="https://saas.zoomnearby.com/pos-web/" target="_blank" rel="noopener noreferrer" class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white text-xs font-black shadow-md shadow-sky-500/20 transition active:scale-95">
                         <span>🚀</span>
                         <span>{{ __('Try Flutter Web Demo') }}</span>
                     </a>
@@ -492,7 +492,7 @@
                 </button>
             </div>
             @if (config('app.demo_mode'))
-                <a href="https://web.zoomnearby.com/demo" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold text-xs shadow transition my-1">
+                <a href="https://saas.zoomnearby.com/pos-web/" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold text-xs shadow transition my-1">
                     <span>🚀</span>
                     <span>{{ __('Try Flutter Web Version (Live POS Demo)') }}</span>
                 </a>
@@ -671,13 +671,13 @@
                                 @endphp
                                 <li>
                                     <a href="{{ $itemUrl }}" target="{{ $itemTarget }}" class="text-slate-500 dark:text-slate-400 hover:text-brand-lime transition">
-                                        {{ $itemTitle }}
+                                        {{ __($itemTitle) }}
                                     </a>
                                 </li>
                             @endforeach
                         @else
                             @forelse ($publicFooterPages as $fp)
-                                <li><a href="{{ route('pages.show', $fp->slug) }}" class="text-slate-500 dark:text-slate-400 hover:text-brand-lime transition">{{ $fp->title }}</a></li>
+                                <li><a href="{{ route('pages.show', $fp->slug) }}" class="text-slate-500 dark:text-slate-400 hover:text-brand-lime transition">{{ __($fp->title) }}</a></li>
                             @empty
                                 <li class="text-slate-500">{{ __('Terms & Privacy Policy') }}</li>
                             @endforelse

@@ -1,0 +1,1941 @@
+/* ==========================================================================
+   Real-Time White Label Preview System for App Builder
+   Enhanced Multi-Platform Mockups: Android, iOS, Windows, Web
+   Device Profiles, Orientation, Aspect Ratio Preservation & Scaling
+   ========================================================================== */
+
+/* Split Layout */
+.builder-split-wrapper {
+    max-width: 1680px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+.builder-split-grid {
+    display: grid;
+    grid-template-columns: minmax(460px, 1fr) minmax(560px, 1.4fr);
+    gap: 28px;
+    align-items: start;
+}
+
+@media (max-width: 1200px) {
+    .builder-split-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Mobile View Switcher (Tabs between Edit Form and Live Preview on small screens) */
+.mobile-view-switcher {
+    display: none;
+    position: sticky;
+    top: 60px;
+    z-index: 100;
+    background: #ffffff;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    margin-bottom: 20px;
+    gap: 8px;
+}
+
+@media (max-width: 1180px) {
+    .mobile-view-switcher {
+        display: flex;
+    }
+}
+
+.mobile-view-btn {
+    flex: 1;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #475569;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.mobile-view-btn.active {
+    background: #4f46e5;
+    color: #ffffff;
+    border-color: #4f46e5;
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+/* Sticky Preview Column on Desktop */
+.preview-sticky-container {
+    position: sticky;
+    top: 10px;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
+/* Preview Card Shell */
+.preview-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px -2px rgba(0,0,0,0.06);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    width: 100%;
+}
+
+.preview-header {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.preview-header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+}
+
+.preview-live-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.preview-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+    animation: livePulse 1.8s infinite;
+}
+
+@keyframes livePulse {
+    0% { transform: scale(0.9); opacity: 0.8; }
+    50% { transform: scale(1.3); opacity: 1; }
+    100% { transform: scale(0.9); opacity: 0.8; }
+}
+
+/* ==========================================================================
+   COMPACT PLATFORM-ADAPTIVE TOOLBAR
+   ========================================================================== */
+.preview-toolbar {
+    background: #1e293b;
+    padding: 12px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-bottom: 1px solid #334155;
+}
+
+.preview-nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Platform Switcher Buttons */
+.platform-pill-group {
+    display: inline-flex;
+    background: #0f172a;
+    padding: 3px;
+    border-radius: 10px;
+    border: 1px solid #334155;
+    gap: 3px;
+}
+
+.platform-pill-btn-item {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.platform-pill-btn-item:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.platform-pill-btn-item.active {
+    background: #4f46e5;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(79, 70, 229, 0.4);
+}
+
+/* Device Selector Dropdown */
+.device-select-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.device-select-label {
+    font-size: 11.5px;
+    color: #94a3b8;
+    font-weight: 700;
+}
+
+.device-dropdown {
+    background: #0f172a;
+    color: #ffffff;
+    border: 1px solid #334155;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.15s ease;
+}
+
+.device-dropdown:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+/* Orientation Switcher */
+.orientation-pill-group {
+    display: inline-flex;
+    background: #0f172a;
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    gap: 2px;
+}
+
+.orientation-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 5px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.orientation-btn:hover {
+    color: #ffffff;
+}
+
+.orientation-btn.active {
+    background: #334155;
+    color: #38bdf8;
+    font-weight: 700;
+}
+
+/* Custom Dimension Inputs */
+.custom-dim-panel {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #0f172a;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+}
+
+.custom-dim-input {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #ffffff;
+    padding: 4px 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    width: 52px;
+    font-family: monospace;
+    text-align: center;
+    outline: none;
+}
+.custom-dim-input:focus {
+    border-color: #6366f1;
+}
+
+/* Screen Mode & Viewport Switchers */
+.screen-mode-group, .viewport-size-group {
+    display: inline-flex;
+    background: #0f172a;
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    gap: 2px;
+}
+
+.screen-mode-btn, .viewport-size-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 5px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.screen-mode-btn:hover, .viewport-size-btn:hover {
+    color: #ffffff;
+}
+
+.screen-mode-btn.active, .viewport-size-btn.active {
+    background: #334155;
+    color: #38bdf8;
+    font-weight: 700;
+}
+
+/* Tool Buttons (Zoom, Dark/Light, Reset, Fullscreen) */
+.tool-btn {
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #cbd5e1;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s ease;
+}
+
+.tool-btn:hover {
+    background: #334155;
+    color: #ffffff;
+}
+
+/* ==========================================================================
+   EXTRA-LARGE VERTICAL PREVIEW CANVAS
+   Substantially increased height: min-height 880px, up to 1150px / available viewport
+   ========================================================================== */
+.preview-canvas {
+    background: #0b1120;
+    background-image: 
+        radial-gradient(circle at 50% 50%, rgba(79, 70, 229, 0.12) 0%, transparent 70%),
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 100% 100%, 20px 20px, 20px 20px;
+    padding: 24px 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 760px;
+    height: calc(100vh - 180px);
+    max-height: 1050px;
+    overflow: hidden;
+    position: relative;
+    box-sizing: border-box;
+}
+
+.preview-viewport-wrapper {
+    position: relative;
+    margin: auto;
+    display: block;
+    flex-shrink: 0;
+    transition: width 0.2s ease, height 0.2s ease;
+}
+
+/* ==========================================================================
+   DEVICE CHASSIS: Generic Adaptive Frame for Android, iOS, Windows, Web
+   ========================================================================== */
+.device-chassis {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 
+        0 25px 60px -15px rgba(0,0,0,0.7),
+        0 0 0 1px rgba(255,255,255,0.18);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.2s ease;
+    user-select: none;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+/* --- iOS iPhone Chassis --- */
+.device-chassis.type-ios {
+    background: #1c1917;
+    border: 4px solid #44403c;
+    color: #0f172a;
+}
+
+/* Dynamic Island */
+.ios-status-bar {
+    background: #000000;
+    color: #ffffff;
+    height: 44px;
+    padding: 0 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 700;
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+.ios-dynamic-island {
+    width: 104px;
+    height: 28px;
+    background: #000000;
+    border-radius: 20px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 9px;
+    box-shadow: inset 0 0 0 1px #262626;
+}
+
+.ios-island-camera {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #09090b;
+    border: 1px solid #18181b;
+}
+
+.ios-island-sensor {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #18181b;
+}
+
+/* iPhone SE Classic Bezel */
+.ios-se-topbar {
+    height: 48px;
+    background: #000000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.ios-se-speaker {
+    width: 46px;
+    height: 4px;
+    background: #27272a;
+    border-radius: 2px;
+}
+
+.ios-se-bottombar {
+    height: 56px;
+    background: #000000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ios-touch-id {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 2px solid #52525b;
+    box-shadow: inset 0 0 6px rgba(255,255,255,0.15);
+}
+
+.ios-home-indicator {
+    background: #000000;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+.ios-home-bar {
+    width: 130px;
+    height: 4.5px;
+    background: #a8a29e;
+    border-radius: 4px;
+}
+
+/* --- Android Chassis --- */
+.device-chassis.type-android {
+    background: #0f172a;
+    border: 4px solid #334155;
+    color: #0f172a;
+}
+
+.android-status-bar {
+    background: #000000;
+    color: #ffffff;
+    height: 34px;
+    padding: 0 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: -apple-system, Roboto, sans-serif;
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+.android-punch-hole {
+    width: 12px;
+    height: 12px;
+    background: #0b0f19;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 50%;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.android-status-icons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+}
+
+.android-nav-bar {
+    background: #000000;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+.android-gesture-pill {
+    width: 110px;
+    height: 4px;
+    background: #64748b;
+    border-radius: 4px;
+}
+
+/* --- Windows 11 Desktop Chassis --- */
+.device-chassis.type-windows {
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #94a3b8;
+    color: #0f172a;
+}
+
+.windows-titlebar {
+    background: #f1f5f9;
+    border-bottom: 1px solid #cbd5e1;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    flex-shrink: 0;
+}
+
+.windows-titlebar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 75%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.windows-titlebar-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    object-fit: cover;
+}
+
+.windows-controls {
+    display: flex;
+    height: 100%;
+}
+
+.win-btn {
+    width: 42px;
+    height: 100%;
+    border: none;
+    background: transparent;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.win-btn:hover {
+    background: #e2e8f0;
+}
+
+.win-btn.close:hover {
+    background: #e81123;
+    color: #ffffff;
+}
+
+.windows-menubar {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 4px 14px;
+    display: flex;
+    gap: 18px;
+    font-size: 11.5px;
+    color: #475569;
+    flex-shrink: 0;
+}
+
+.windows-statusbar {
+    background: #f1f5f9;
+    border-top: 1px solid #cbd5e1;
+    padding: 5px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10.5px;
+    color: #64748b;
+    flex-shrink: 0;
+}
+
+/* --- Web Browser Chassis --- */
+.device-chassis.type-web {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #94a3b8;
+    color: #0f172a;
+}
+
+.web-tabstrip {
+    background: #e2e8f0;
+    height: 38px;
+    display: flex;
+    align-items: flex-end;
+    padding: 0 10px;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.web-tab {
+    background: #ffffff;
+    border-radius: 8px 8px 0 0;
+    padding: 7px 14px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 240px;
+    border: 1px solid #cbd5e1;
+    border-bottom: none;
+}
+
+.web-tab-favicon {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    object-fit: cover;
+}
+
+.web-tab-close {
+    font-size: 10px;
+    color: #94a3b8;
+    margin-left: auto;
+}
+
+.web-omnibox {
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 6px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.web-nav-icons {
+    display: flex;
+    gap: 8px;
+    color: #64748b;
+    font-size: 12px;
+}
+
+.web-address-bar {
+    flex: 1;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 16px;
+    padding: 4px 14px;
+    font-size: 11.5px;
+    font-family: monospace;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ==========================================================================
+   SCREENS: Dashboard, Login, Splash
+   Using flex: 1 with generous vertical scroll area
+   ========================================================================== */
+.device-screen-body {
+    flex: 1;
+    min-height: 600px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: #0b1329;
+    color: #f1f5f9;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.device-screen-body::-webkit-scrollbar {
+    width: 4px;
+}
+.device-screen-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+
+/* ==========================================================================
+   REAL SCREEN 1: METRO DASHBOARD (Screenshots 1 & 2 in /read)
+   ========================================================================== */
+.real-dashboard-layout {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 100%;
+    background: #0b1329;
+    position: relative;
+    padding-bottom: 68px; /* space for bottom dock */
+}
+
+/* Top App Header */
+.real-dash-topbar {
+    background: #0d1733;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+.real-menu-btn {
+    font-size: 18px;
+    color: #f1f5f9;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.real-brand-badge-box {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 13px;
+    color: #ffffff;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.real-brand-logo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.real-store-dropdown {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+
+.real-store-name {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #f8fafc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
+.real-dash-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.real-notif-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 6px;
+    height: 6px;
+    background: #ef4444;
+    border-radius: 50%;
+}
+
+.real-user-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10.5px;
+    font-weight: 800;
+}
+
+/* Dashboard Body Container */
+.real-dash-body-wrap {
+    display: flex;
+    flex: 1;
+}
+
+.real-dash-body-wrap.with-sidebar {
+    display: grid;
+    grid-template-columns: 190px 1fr;
+}
+
+/* Left Sidebar for Desktop/Landscape */
+.real-sidebar {
+    background: #0a1024;
+    border-right: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+}
+
+.real-sidebar-section {
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #475569;
+    padding: 8px 8px 3px;
+}
+
+.real-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    color: #94a3b8;
+    cursor: pointer;
+}
+
+.real-sidebar-item.active {
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    font-weight: 700;
+}
+
+.real-sidebar-footer {
+    margin-top: auto;
+    padding: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.real-dash-content {
+    flex: 1;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Greeting Banner */
+.real-greeting-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.real-greeting-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 800;
+    color: #f8fafc;
+}
+
+.real-greeting-sub {
+    margin: 2px 0 0;
+    font-size: 10.5px;
+    color: #64748b;
+}
+
+.real-greeting-pills {
+    display: flex;
+    gap: 6px;
+}
+
+.real-info-pill {
+    background: #14203d;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+/* 4 KPI Cards Grid */
+.real-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.orientation-landscape .real-kpi-grid,
+.type-windows .real-kpi-grid,
+.type-web .real-kpi-grid {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.real-kpi-card {
+    background: #131f3a;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+    padding: 12px 10px 6px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.real-kpi-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.real-kpi-icon-box {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+}
+.real-kpi-icon-box.sales { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.real-kpi-icon-box.orders { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
+.real-kpi-icon-box.customers { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
+.real-kpi-icon-box.stock { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+
+.real-kpi-badge {
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-size: 9.5px;
+    font-weight: 800;
+}
+.real-kpi-badge.green { background: rgba(16, 185, 129, 0.16); color: #10b981; }
+.real-kpi-badge.teal { background: rgba(14, 165, 233, 0.16); color: #38bdf8; }
+.real-kpi-badge.purple { background: rgba(139, 92, 246, 0.16); color: #a78bfa; }
+.real-kpi-badge.amber { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
+.real-kpi-badge.red { background: rgba(239, 68, 68, 0.16); color: #ef4444; }
+
+.real-kpi-value {
+    font-size: 16px;
+    font-weight: 900;
+    color: #f8fafc;
+    line-height: 1.2;
+}
+
+.real-kpi-label {
+    font-size: 10px;
+    color: #64748b;
+    margin-bottom: 4px;
+}
+
+.real-kpi-sparkline {
+    width: 100%;
+    height: 24px;
+    margin-top: 2px;
+}
+
+/* Sales Overview & Mid Section */
+.real-mid-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.orientation-landscape .real-mid-grid,
+.type-windows .real-mid-grid,
+.type-web .real-mid-grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+}
+
+.real-sales-chart-card {
+    background: #131f3a;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.real-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.real-chart-title {
+    font-size: 12.5px;
+    font-weight: 800;
+    color: #f8fafc;
+}
+
+.real-chart-sub {
+    font-size: 9.5px;
+    color: #64748b;
+}
+
+.real-chart-pills {
+    display: flex;
+    gap: 4px;
+    background: #0a1122;
+    padding: 2px;
+    border-radius: 8px;
+}
+
+.real-chart-pill {
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 9.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.real-chart-area {
+    position: relative;
+    width: 100%;
+}
+
+.real-main-chart-svg {
+    width: 100%;
+    height: 110px;
+}
+
+.real-chart-x-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 8px;
+    color: #64748b;
+    padding: 2px 20px 0;
+}
+
+/* Amount Receivable Card */
+.real-receivable-card {
+    background: #131f3a;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.real-rec-amount {
+    font-size: 19px;
+    font-weight: 900;
+    color: #f8fafc;
+    margin: 4px 0 2px;
+}
+
+.real-rec-item {
+    background: rgba(10, 17, 34, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    margin-bottom: 6px;
+}
+
+.real-reminder-btn {
+    margin-top: auto;
+    background: transparent;
+    border: 1px solid #10b981;
+    color: #10b981;
+    padding: 7px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+/* Quick Actions (Desktop/Landscape) */
+.real-quick-actions-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.real-qa-card {
+    background: #131f3a;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.real-qa-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #ffffff;
+}
+
+.real-qa-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+/* Real Floating Bottom Dock Bar (Mobile) */
+.real-dock-navbar {
+    position: absolute;
+    bottom: 8px;
+    left: 12px;
+    right: 12px;
+    background: #101c38;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 5px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    z-index: 30;
+}
+
+.real-dock-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 9px;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.real-dock-item.active {
+    font-weight: 800;
+}
+
+.real-dock-icon {
+    font-size: 15px;
+}
+
+.real-dock-fab {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 900;
+    margin-top: -16px;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+    cursor: pointer;
+}
+
+/* ==========================================================================
+   REAL SCREEN 2: RETAIL POS REGISTER (Screenshot 3 in /read)
+   ========================================================================== */
+.real-retail-screen {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 100%;
+    background: #0b1329;
+    padding-bottom: 60px;
+    position: relative;
+}
+
+.real-retail-topbar {
+    background: #0d1733;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.real-back-btn {
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0;
+}
+
+.real-retail-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.real-search-wrap {
+    padding: 10px 14px 6px;
+}
+
+.real-search-input-box {
+    background: #14203d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 7px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.real-search-inp {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #ffffff;
+    font-size: 11.5px;
+}
+.real-search-inp::placeholder {
+    color: #64748b;
+}
+
+.real-cats-scroll {
+    display: flex;
+    gap: 6px;
+    padding: 6px 14px 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.real-cats-scroll::-webkit-scrollbar { display: none; }
+
+.real-cat-pill {
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #14203d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.real-cat-pill.active {
+    font-weight: 800;
+}
+
+.real-product-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 0 14px 14px;
+}
+
+.orientation-landscape .real-product-grid,
+.type-windows .real-product-grid,
+.type-web .real-product-grid {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.real-prod-card {
+    background: #131f3a;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.real-prod-img-box {
+    height: 105px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.med-blister-graphic,
+.med-bottle-graphic {
+    font-size: 26px;
+    display: flex;
+    gap: 4px;
+}
+
+.real-prod-body {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    justify-content: space-between;
+}
+
+.real-prod-name {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #f1f5f9;
+    line-height: 1.3;
+    margin-bottom: 6px;
+}
+
+.real-prod-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+}
+
+.real-prod-price {
+    font-size: 12.5px;
+    font-weight: 900;
+}
+
+.real-prod-badge {
+    font-size: 9.5px;
+    font-weight: 700;
+}
+.real-prod-badge.out { color: #ef4444; }
+.real-prod-badge.in { font-weight: 800; }
+
+.real-retail-cart-bar-wrap {
+    position: absolute;
+    bottom: 10px;
+    left: 12px;
+    right: 12px;
+    z-index: 30;
+}
+
+.real-retail-cart-bar {
+    width: 100%;
+    border: none;
+    color: #ffffff;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35);
+}
+
+/* ==========================================================================
+   REAL SCREEN 3: ORDER CART & CHECKOUT (Screenshot 4 in /read)
+   ========================================================================== */
+.real-cart-screen {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 100%;
+    background: #0d1733;
+    padding: 10px 14px 14px;
+}
+
+.real-sheet-handle {
+    width: 36px;
+    height: 4px;
+    background: #334155;
+    border-radius: 2px;
+    margin: 0 auto 10px;
+}
+
+.real-cart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.real-cart-title {
+    font-size: 17px;
+    font-weight: 900;
+    color: #ffffff;
+}
+
+.real-cart-count-pill {
+    background: #134e4a;
+    color: #2dd4bf;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.real-cart-clear-btn {
+    background: transparent;
+    border: none;
+    color: #ef4444;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.real-chips-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.real-chips-row {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+}
+
+.real-action-chip {
+    background: #14203d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: #cbd5e1;
+    padding: 6px 10px;
+    font-size: 10.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.real-pay-section {
+    margin-bottom: 10px;
+}
+
+.real-pay-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #94a3b8;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.real-pay-methods-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.real-pay-btn {
+    background: #14203d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 11.5px;
+    font-weight: 800;
+    color: #94a3b8;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.real-tender-section {
+    margin-bottom: 10px;
+}
+
+.real-tender-input-box {
+    background: #0a1122;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13.5px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.real-change-banner {
+    padding: 8px 12px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.real-denom-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+}
+
+.real-denom-btn {
+    flex: 1;
+    background: #14203d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 6px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #cbd5e1;
+    text-align: center;
+    cursor: pointer;
+}
+
+.real-summary-box {
+    background: #14203d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    font-size: 11px;
+}
+
+.real-sum-row {
+    display: flex;
+    justify-content: space-between;
+    color: #cbd5e1;
+    margin-bottom: 4px;
+}
+.real-sum-row.sub {
+    color: #64748b;
+    font-size: 10px;
+}
+.real-sum-row.total {
+    margin-bottom: 0;
+    align-items: center;
+}
+
+.real-complete-sale-btn {
+    width: 100%;
+    border: none;
+    color: #ffffff;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+}
+
+/* ==========================================================================
+   REAL SCREEN 4: SIGN IN / AUTH (Screenshot 5 in /read)
+   ========================================================================== */
+.real-login-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.real-login-wrapper.is-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    padding: 30px 40px;
+    align-items: center;
+}
+
+.real-login-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 360px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+    margin: 0 auto;
+}
+
+.real-login-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+
+.real-login-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 12px;
+    color: #334155;
+}
+
+.real-signin-btn {
+    width: 100%;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+
+.real-or-divider {
+    text-align: center;
+    position: relative;
+    margin: 14px 0;
+}
+.real-or-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #e2e8f0;
+}
+.real-or-divider span {
+    position: relative;
+    background: #ffffff;
+    padding: 0 8px;
+    font-size: 10.5px;
+    color: #94a3b8;
+}
+
+.real-social-btn {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.real-store-id-banner {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.real-login-showcase {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Splash Screen */
+.splash-screen-layout {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 50px 24px 30px;
+    background: radial-gradient(circle at 50% 40%, var(--brand-primary, #4f46e5) 0%, #1e1b4b 100%);
+    color: #ffffff;
+    text-align: center;
+}
+
+.splash-logo-squircle {
+    width: 84px;
+    height: 84px;
+    border-radius: 22px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 18px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+    overflow: hidden;
+    animation: splashGlow 2.5s infinite alternate;
+}
+
+@keyframes splashGlow {
+    0% { transform: scale(0.97); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+    100% { transform: scale(1.03); box-shadow: 0 14px 32px rgba(255,255,255,0.25); }
+}
+
+.splash-logo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.splash-logo-letter {
+    font-size: 40px;
+    font-weight: 900;
+    color: var(--brand-primary, #4f46e5);
+}
+
+.splash-title {
+    font-size: 21px;
+    font-weight: 900;
+    margin: 0 0 6px;
+    letter-spacing: -0.3px;
+}
+
+.splash-tagline {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0 0 24px;
+}
+
+.splash-loader-bar {
+    width: 160px;
+    height: 4.5px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 auto;
+}
+
+.splash-loader-progress {
+    width: 60%;
+    height: 100%;
+    background: var(--brand-accent, #10b981);
+    border-radius: 4px;
+    animation: splashProgress 1.6s infinite ease-in-out;
+}
+
+@keyframes splashProgress {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(250%); }
+}
+
+.splash-footer-info {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+/* ==========================================================================
+   COMPLETENESS VALIDATION CHECKLIST
+   ========================================================================== */
+.completeness-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+}
+
+.completeness-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.completeness-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.completeness-meter-wrap {
+    width: 100%;
+    height: 8px;
+    background: #f1f5f9;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+
+.completeness-meter-fill {
+    height: 100%;
+    background: #10b981;
+    border-radius: 999px;
+    transition: width 0.3s ease, background 0.3s ease;
+}
+
+.checklist-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+@media (max-width: 640px) {
+    .checklist-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.check-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    transition: all 0.15s ease;
+}
+
+.check-item.ready {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.check-item.warning {
+    border-color: #fed7aa;
+    background: #fff7ed;
+    color: #9a3412;
+    cursor: pointer;
+}
+
+.check-icon {
+    font-weight: 800;
+    font-size: 12px;
+}
+
+/* ==========================================================================
+   FULLSCREEN THEATER MODAL OVERLAY
+   ========================================================================== */
+.preview-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.9);
+    backdrop-filter: blur(10px);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.preview-modal-overlay.active {
+    display: flex;
+}
+
+.preview-modal-content {
+    background: #0b1120;
+    border-radius: 20px;
+    border: 1px solid #334155;
+    box-shadow: 0 35px 70px rgba(0,0,0,0.8);
+    width: 100%;
+    max-width: 1200px;
+    height: 94vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+@media (min-width: 1181px) {
+    #col_form_view, #col_preview_view {
+        display: block !important;
+    }
+}

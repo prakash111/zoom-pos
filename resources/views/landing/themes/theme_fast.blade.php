@@ -69,21 +69,21 @@
                     <div class="reference-container reference-hero-grid">
                         <div class="reference-hero-copy">
                             @if ($heroBadge)
-                                <span class="reference-badge reference-hero-badge"><x-landing.icon name="bolt" width="18" height="18" /> {{ $heroBadge }}</span>
+                                <span class="reference-badge reference-hero-badge"><x-landing.icon name="bolt" width="18" height="18" /> {{ __($heroBadge) }}</span>
                             @endif
                             <h1>
-                                @if (count($heroTitleParts) === 2)
-                                    {{ $heroTitleParts[0] }}<br>{{ __('to') }} <span class="reference-gradient-text">{{ $heroTitleParts[1] }}</span>
+                                @if (count($heroTitleParts) === 2 && App::getLocale() === 'en')
+                                    {{ __($heroTitleParts[0]) }}<br>{{ __('to') }} <span class="reference-gradient-text">{{ __($heroTitleParts[1]) }}</span>
                                 @else
-                                    {{ $heroTitle }}
+                                    {{ __($heroTitle) }}
                                 @endif
                             </h1>
-                            <p class="reference-hero-description">{{ $heroSubtitle }}</p>
+                            <p class="reference-hero-description">{{ __($heroSubtitle) }}</p>
                             <div class="reference-hero-actions">
-                                <a href="{{ $ctaPrimaryUrl }}" class="reference-button reference-button--primary"><x-landing.icon name="user-plus" width="20" height="20" /> {{ $ctaPrimaryText }} <x-landing.icon name="arrow" width="20" height="20" /></a>
-                                <a href="{{ $ctaSecondaryUrl }}" @if($ctaSecondaryUrl === '#demo') x-on:click.prevent="$refs.demo.showModal()" @endif class="reference-button reference-button--outline"><x-landing.icon name="play" width="22" height="22" /> {{ $ctaSecondaryText }}</a>
+                                <a href="{{ $ctaPrimaryUrl }}" class="reference-button reference-button--primary"><x-landing.icon name="user-plus" width="20" height="20" /> {{ __($ctaPrimaryText) }} <x-landing.icon name="arrow" width="20" height="20" /></a>
+                                <a href="{{ $ctaSecondaryUrl }}" @if($ctaSecondaryUrl === '#demo') x-on:click.prevent="$refs.demo.showModal()" @endif class="reference-button reference-button--outline"><x-landing.icon name="play" width="22" height="22" /> {{ __($ctaSecondaryText) }}</a>
                                 @if (config('app.demo_mode'))
-                                    <a href="https://web.zoomnearby.com/demo" target="_blank" rel="noopener noreferrer" class="reference-button reference-button--flutter-demo" style="background: linear-gradient(135deg, #0284c7, #2563eb); color: #fff; border: 1px solid rgba(255,255,255,0.25); box-shadow: 0 4px 14px rgba(37,99,235,0.3);">
+                                    <a href="https://saas.zoomnearby.com/pos-web/" target="_blank" rel="noopener noreferrer" class="reference-button reference-button--flutter-demo" style="background: linear-gradient(135deg, #0284c7, #2563eb); color: #fff; border: 1px solid rgba(255,255,255,0.25); box-shadow: 0 4px 14px rgba(37,99,235,0.3);">
                                         <span>🚀 {{ __('Try Flutter Web Version') }}</span>
                                     </a>
                                 @endif
@@ -95,15 +95,15 @@
                                 @foreach ($heroModules as $module)
                                     <div class="reference-hero-module">
                                         <span class="reference-icon reference-icon--{{ $module['color'] ?? 'blue' }}"><x-landing.icon :name="$module['icon'] ?? 'shield'" /></span>
-                                        <h2>{{ $module['title'] ?? '' }}</h2>
-                                        <p>{{ $module['body'] ?? '' }}</p>
+                                        <h2>{{ __($module['title'] ?? '') }}</h2>
+                                        <p>{{ __($module['body'] ?? '') }}</p>
                                     </div>
                                 @endforeach
                             </div>
                             @if (!$referencePreset)
                                 <div class="reference-extra-highlights">
                                     @foreach ($highlights as $highlight)
-                                        <span>✓ {{ is_array($highlight) ? ($highlight['label'] ?? ($highlight[0] ?? '')) : $highlight }}</span>
+                                        <span>✓ {{ __(is_array($highlight) ? ($highlight['label'] ?? ($highlight[0] ?? '')) : $highlight) }}</span>
                                     @endforeach
                                 </div>
                             @endif
@@ -126,7 +126,7 @@
                             </div>
                             <p>{{ __('Explore a preview of sales, inventory and customers across your laptop, checkout terminal and phone.') }}</p>
                             <img src="{{ asset('assets/images/landing-device-showcase.png') }}" alt="{{ __('Preview of the POS dashboard and mobile app') }}" width="1536" height="1024" decoding="async">
-                            <a href="{{ $ctaPrimaryUrl }}" class="reference-button reference-button--primary">{{ $ctaPrimaryText }} <x-landing.icon name="arrow" width="20" height="20" /></a>
+                            <a href="{{ $ctaPrimaryUrl }}" class="reference-button reference-button--primary">{{ __($ctaPrimaryText) }} <x-landing.icon name="arrow" width="20" height="20" /></a>
                         </dialog>
                     @endif
                 </section>
@@ -137,7 +137,7 @@
                 <section id="trust_bar" class="landing-sec-trust border-b {{ $rule }} transition-colors duration-300">
                     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                         <p class="text-center text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-5">
-                            {{ $branding->getSectionTitle('trust_bar', __('Works out of the box with your existing retail & dining hardware')) }}
+                            {{ __($branding->getSectionTitle('trust_bar', __('Works out of the box with your existing retail & dining hardware'))) }}
                         </p>
                         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-center">
                             @foreach ($hardware as $item)
@@ -162,15 +162,15 @@
                     <div class="reference-container">
                         <div class="reference-features-grid">
                             <div class="reference-features-intro">
-                                <span class="reference-badge">{{ $branding->getSectionBadge('features', __('Powerful Features')) }}</span>
+                                <span class="reference-badge">{{ __($branding->getSectionBadge('features', __('Powerful Features'))) }}</span>
                                 <h2>
-                                    @if (count($featureTitleParts) === 2)
-                                        {{ $featureTitleParts[0] }}<br>{{ __('in') }} <span class="reference-text-blue">{{ $featureTitleParts[1] }}</span>
+                                    @if (count($featureTitleParts) === 2 && App::getLocale() === 'en')
+                                        {{ __($featureTitleParts[0]) }}<br>{{ __('in') }} <span class="reference-text-blue">{{ __($featureTitleParts[1]) }}</span>
                                     @else
-                                        {{ $featureTitleParts[0] }}
+                                        {{ __($branding->getSectionTitle('features', __('Everything You Need in One Platform'))) }}
                                     @endif
                                 </h2>
-                                <p>{{ $branding->getSectionSubtitle('features', __('From point of sale to advanced reporting, our platform gives you the tools to work smarter, serve better and grow faster.')) }}</p>
+                                <p>{{ __($branding->getSectionSubtitle('features', __('From point of sale to advanced reporting, our platform gives you the tools to work smarter, serve better and grow faster.'))) }}</p>
                                 <button type="button" class="reference-button reference-button--outline" x-on:click="allFeatures = !allFeatures" :aria-expanded="allFeatures.toString()" aria-controls="all-features">
                                     {{ __('Explore All Features') }} <x-landing.icon name="arrow" width="20" height="20" />
                                 </button>
@@ -179,7 +179,7 @@
                                 @foreach ($overviewFeatures as $feature)
                                     <article class="reference-feature-card">
                                         <span class="reference-icon reference-icon--{{ $feature['color'] ?? 'blue' }}"><x-landing.icon :name="$feature['icon'] ?? 'shield'" /></span>
-                                        <div><h3>{{ $feature['title'] ?? '' }}</h3><p>{{ $feature['body'] ?? '' }}</p></div>
+                                        <div><h3>{{ __($feature['title'] ?? '') }}</h3><p>{{ __($feature['body'] ?? '') }}</p></div>
                                     </article>
                                 @endforeach
                             </div>
@@ -189,17 +189,17 @@
                                 @foreach ($features as $f)
                                     <article class="reference-full-feature p-6 {{ $card }}">
                                         <span class="reference-icon reference-icon--{{ ['green', 'purple', 'cyan', 'orange', 'pink', 'blue'][$loop->index % 6] }}"><x-landing.icon :name="['cart', 'box', 'cloud', 'chart', 'users', 'settings'][$loop->index % 6]" /></span>
-                                        <h3 class="text-base font-bold mt-4">{{ $f['title'] }}</h3>
-                                        <p class="text-sm mt-2 leading-relaxed whitespace-pre-line">{{ $f['body'] }}</p>
+                                        <h3 class="text-base font-bold mt-4">{{ __($f['title']) }}</h3>
+                                        <p class="text-sm mt-2 leading-relaxed whitespace-pre-line">{{ __($f['body']) }}</p>
                                     </article>
                                 @endforeach
                             </div>
                             @if (!$referencePreset)
                                 <div class="reference-dashboard-preview">
-                                    <h3>{{ $branding->landingText('hero.dashboard_title', __('Smart POS & Inventory')) }}</h3>
-                                    <span>{{ $branding->landingText('hero.dashboard_status', __('Live')) }}</span>
+                                    <h3>{{ __($branding->landingText('hero.dashboard_title', __('Smart POS & Inventory'))) }}</h3>
+                                    <span>{{ __($branding->landingText('hero.dashboard_status', __('Live'))) }}</span>
                                     @foreach ($heroProducts as $product)
-                                        <p>{{ is_array($product) ? ($product['name'] ?? ($product[0] ?? '')) : $product }}</p>
+                                        <p>{{ __(is_array($product) ? ($product['name'] ?? ($product[0] ?? '')) : $product) }}</p>
                                     @endforeach
                                 </div>
                             @endif
@@ -213,12 +213,12 @@
                 @if ($hasDownloads)
                     <section id="download" class="landing-sec-downloads scroll-mt-20 border-y {{ $rule }} {{ $altBg }} transition-colors duration-300">
                         <div class="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-20 text-center">
-                            <span class="{{ $badge }}">{{ $branding->getSectionBadge('downloads', __('Native Apps')) }}</span>
+                            <span class="{{ $badge }}">{{ __($branding->getSectionBadge('downloads', __('Native Apps'))) }}</span>
                             <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
-                                {{ $branding->getSectionTitle('downloads', __('Take the counter anywhere')) }}
+                                {{ __($branding->getSectionTitle('downloads', __('Take the counter anywhere'))) }}
                             </h2>
                             <p class="mt-3 text-sm {{ $muted }} max-w-xl mx-auto">
-                                {{ $branding->getSectionSubtitle('downloads', __('Install the native Android or Windows app for offline-first speed, hardware integration and a full-screen terminal experience.')) }}
+                                {{ __($branding->getSectionSubtitle('downloads', __('Install the native Android or Windows app for offline-first speed, hardware integration and a full-screen terminal experience.'))) }}
                             </p>
                             <x-landing.download-buttons :branding="$branding" size="lg" class="mt-8 justify-center" />
                         </div>
@@ -231,9 +231,9 @@
                 <section id="solutions" class="landing-sec-solutions scroll-mt-20 border-y {{ $rule }} {{ $altBg }} transition-colors duration-300">
                     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
                         <div class="max-w-2xl">
-                            <span class="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-3 bg-lime-100 text-lime-800 border border-lime-200 dark:bg-brand-lime/10 dark:text-brand-lime dark:border-brand-lime/20">{{ $branding->getSectionBadge('solutions', __('Engineered For Maximum Conversion')) }}</span>
-                            <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">{{ $branding->getSectionTitle('solutions', __('Why Modern Online Stores & Retailers Choose Our Platform')) }}</h2>
-                            <p class="mt-2 text-sm {{ $muted }}">{{ $branding->getSectionSubtitle('solutions', __('Designed from the ground up to boost online revenue, eliminate inventory discrepancies, and keep counter checkouts flying during peak rushes.')) }}</p>
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-3 bg-lime-100 text-lime-800 border border-lime-200 dark:bg-brand-lime/10 dark:text-brand-lime dark:border-brand-lime/20">{{ __($branding->getSectionBadge('solutions', __('Engineered For Maximum Conversion'))) }}</span>
+                            <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">{{ __($branding->getSectionTitle('solutions', __('Why Modern Online Stores & Retailers Choose Our Platform'))) }}</h2>
+                            <p class="mt-2 text-sm {{ $muted }}">{{ __($branding->getSectionSubtitle('solutions', __('Designed from the ground up to boost online revenue, eliminate inventory discrepancies, and keep counter checkouts flying during peak rushes.'))) }}</p>
                         </div>
                         <div class="mt-10 grid sm:grid-cols-2 gap-6">
                             @foreach ($solutions as $item)
@@ -244,8 +244,8 @@
                                 @endphp
                                 <div class="p-6 {{ $card }}">
                                     <div class="text-xl mb-3">{{ $icon }}</div>
-                                    <h3 class="text-base font-black text-slate-900 dark:text-white">{{ $title }}</h3>
-                                    <p class="mt-2 text-sm {{ $muted }} leading-relaxed">{{ $body }}</p>
+                                    <h3 class="text-base font-black text-slate-900 dark:text-white">{{ __($title) }}</h3>
+                                    <p class="mt-2 text-sm {{ $muted }} leading-relaxed">{{ __($body) }}</p>
                                 </div>
                             @endforeach
                         </div>
@@ -258,15 +258,15 @@
                     <div class="reference-container">
                         @if (!$referencePreset)
                             <div class="reference-stats-heading">
-                                <h2>{{ $branding->getSectionTitle('stats', __('Trusted by growing businesses')) }}</h2>
-                                <p>{{ $branding->getSectionSubtitle('stats') }}</p>
+                                <h2>{{ __($branding->getSectionTitle('stats', __('Trusted by growing businesses'))) }}</h2>
+                                <p>{{ __($branding->getSectionSubtitle('stats')) }}</p>
                             </div>
                         @endif
                         <div class="reference-stats-strip">
                             @foreach ($stats as $stat)
                                 <div class="reference-stat">
                                     <x-landing.icon :name="['users', 'star', 'shield', 'headphones'][$loop->index % 4]" width="36" height="36" />
-                                    <span><strong>{{ $stat['value'] }}</strong><small>{{ $stat['label'] }}</small></span>
+                                    <span><strong>{{ $stat['value'] }}</strong><small>{{ __($stat['label']) }}</small></span>
                                 </div>
                             @endforeach
                             <div class="reference-stat-trust"><span>{{ __('Trusted by businesses') }}<br>{{ __('across the world') }}</span><x-landing.icon name="globe" width="38" height="38" /></div>
@@ -279,10 +279,10 @@
                 {{-- 7. About --}}
                 <section id="about" class="landing-sec-mission landing-sec-about landing-dark-section scroll-mt-20 py-20 transition-colors duration-300">
                     <div class="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
-                        <span class="{{ $badge }}">{{ $branding->getSectionBadge('about', __('Our Mission')) }}</span>
-                        <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">{{ $branding->getSectionTitle('about', __('Built to Turn Every Online Store & Counter into a High-Revenue Machine')) }}</h2>
+                        <span class="{{ $badge }}">{{ __($branding->getSectionBadge('about', __('Our Mission'))) }}</span>
+                        <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">{{ __($branding->getSectionTitle('about', __('Built to Turn Every Online Store & Counter into a High-Revenue Machine'))) }}</h2>
                         <p class="mt-5 text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed">
-                            {{ $branding->getSectionBody('about', $branding->getSectionSubtitle('about', __('We exist to empower online merchants, retailers, and food businesses with enterprise-grade commerce infrastructure without enterprise complexity or exorbitant fees. By uniting your online storefront, front-counter barcode checkout, multi-warehouse inventory, and automated tax invoicing into one synchronized engine, we remove software friction so you can focus on what matters: acquiring customers, expanding your catalog, and scaling your profit.'))) }}
+                            {{ __($branding->getSectionBody('about', $branding->getSectionSubtitle('about', __('We exist to empower online merchants, retailers, and food businesses with enterprise-grade commerce infrastructure without enterprise complexity or exorbitant fees. By uniting your online storefront, front-counter barcode checkout, multi-warehouse inventory, and automated tax invoicing into one synchronized engine, we remove software friction so you can focus on what matters: acquiring customers, expanding your catalog, and scaling your profit.')))) }}
                         </p>
                     </div>
                 </section>
@@ -293,18 +293,18 @@
                 <section id="testimonials" class="landing-sec-testimonials border-y {{ $rule }} {{ $altBg }} transition-colors duration-300">
                     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
                         <div class="text-center mb-12">
-                            <span class="{{ $badge }}">{{ $branding->getSectionBadge('testimonials', __('Proven Results')) }}</span>
-                            <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">{{ $branding->getSectionTitle('testimonials', __('Trusted by Leading Online Brands & Retailers Worldwide')) }}</h2>
-                            <p class="mt-2 text-sm {{ $muted }}">{{ $branding->getSectionSubtitle('testimonials', __('See how omnichannel businesses use our cloud commerce engine to drive revenue and save hours every single day.')) }}</p>
+                            <span class="{{ $badge }}">{{ __($branding->getSectionBadge('testimonials', __('Proven Results'))) }}</span>
+                            <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">{{ __($branding->getSectionTitle('testimonials', __('Trusted by Leading Online Brands & Retailers Worldwide'))) }}</h2>
+                            <p class="mt-2 text-sm {{ $muted }}">{{ __($branding->getSectionSubtitle('testimonials', __('See how omnichannel businesses use our cloud commerce engine to drive revenue and save hours every single day.'))) }}</p>
                         </div>
                         <div class="grid md:grid-cols-3 gap-6">
                             @foreach ($branding->landingTestimonials() as $t)
                                 <figure class="p-6 {{ $card }} flex flex-col">
                                     <div class="text-amber-500 dark:text-brand-lime text-sm mb-3">★★★★★</div>
-                                    <blockquote class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed flex-1">&ldquo;{{ $t['quote'] }}&rdquo;</blockquote>
+                                    <blockquote class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed flex-1">&ldquo;{{ __($t['quote']) }}&rdquo;</blockquote>
                                     <figcaption class="mt-6 pt-4 border-t {{ $rule }}">
-                                        <div class="text-sm font-black text-slate-900 dark:text-white">{{ $t['name'] }}</div>
-                                        <div class="text-xs {{ $muted }}">{{ $t['role'] }}</div>
+                                        <div class="text-sm font-black text-slate-900 dark:text-white">{{ __($t['name']) }}</div>
+                                        <div class="text-xs {{ $muted }}">{{ __($t['role']) }}</div>
                                     </figcaption>
                                 </figure>
                             @endforeach
@@ -326,22 +326,22 @@
                     <section id="faq" class="landing-sec-faq scroll-mt-20 border-y {{ $rule }} transition-colors duration-300">
                         <div class="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
                             <div class="text-center mb-10">
-                                <span class="{{ $badge }}">{{ $branding->getSectionBadge('faq', __('Answers')) }}</span>
+                                <span class="{{ $badge }}">{{ __($branding->getSectionBadge('faq', __('Answers'))) }}</span>
                                 <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
-                                    {{ $branding->getSectionTitle('faq', __('Frequently asked questions')) }}
+                                    {{ __($branding->getSectionTitle('faq', __('Frequently asked questions'))) }}
                                 </h2>
                                 <p class="mt-3 text-sm {{ $muted }}">
-                                    {{ $branding->getSectionSubtitle('faq', __('Everything you need to know before getting started.')) }}
+                                    {{ __($branding->getSectionSubtitle('faq', __('Everything you need to know before getting started.'))) }}
                                 </p>
                             </div>
                             <div class="space-y-3">
                                 @foreach ($faqs as $faq)
                                     <details class="group p-5 {{ $card }}">
                                         <summary class="flex items-center justify-between gap-4 cursor-pointer list-none text-sm font-black text-slate-900 dark:text-white">
-                                            {{ $faq['q'] ?? ($faq['question'] ?? '') }}
+                                            {{ __($faq['q'] ?? ($faq['question'] ?? '')) }}
                                             <span class="shrink-0 text-slate-400 transition-transform group-open:rotate-45 text-lg leading-none">+</span>
                                         </summary>
-                                        <p class="mt-3 text-sm {{ $muted }} leading-relaxed">{{ $faq['a'] ?? ($faq['answer'] ?? '') }}</p>
+                                        <p class="mt-3 text-sm {{ $muted }} leading-relaxed">{{ __($faq['a'] ?? ($faq['answer'] ?? '')) }}</p>
                                     </details>
                                 @endforeach
                             </div>
@@ -360,10 +360,10 @@
                     <div class="reference-container reference-cta-inner">
                         <x-landing.icon name="rocket" width="38" height="38" />
                         <div>
-                            <h2>{{ $branding->getSectionTitle('cta', __('Ready to take your business to the next level?')) }}</h2>
-                            <p>{{ $branding->getSectionSubtitle('cta', __('Join successful businesses using our POS & Inventory platform.')) }}</p>
+                            <h2>{{ __($branding->getSectionTitle('cta', __('Ready to take your business to the next level?'))) }}</h2>
+                            <p>{{ __($branding->getSectionSubtitle('cta', __('Join successful businesses using our POS & Inventory platform.'))) }}</p>
                         </div>
-                        <a href="{{ $branding->landingText('cta.primary_url', $ctaPrimaryUrl) }}" class="reference-button reference-button--white">{{ $branding->landingText('cta.primary_text', __('Start Free Trial')) }} <x-landing.icon name="arrow" width="20" height="20" /></a>
+                        <a href="{{ $branding->landingText('cta.primary_url', $ctaPrimaryUrl) }}" class="reference-button reference-button--white">{{ __($branding->landingText('cta.primary_text', __('Start Free Trial'))) }} <x-landing.icon name="arrow" width="20" height="20" /></a>
                     </div>
                 </section>
                 @break

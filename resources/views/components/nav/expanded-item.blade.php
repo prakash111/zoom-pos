@@ -16,6 +16,8 @@
     'subtitle',
     'navTitle' => null,
     'variant' => 'blue', // 'blue' (default) | 'lime' (restaurant POS)
+    'badge' => null,
+    'isExternal' => false,
 ])
 @php
     $title = html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -33,13 +35,15 @@
     re-rendered by the server on every page — only a reactive Alpine binding
     stays correct as the URL changes underneath a persisted DOM node.
 --}}
-<a @if($itemKey) x-show="isItemVisible('{{ $itemKey }}')" @endif wire:navigate.hover href="{{ $route }}"
+<a @if($itemKey) x-show="isItemVisible('{{ $itemKey }}')" data-item-key="{{ $itemKey }}" @endif
+   @if(!$isExternal) wire:navigate.hover @else target="_blank" rel="noopener noreferrer" @endif
+   href="{{ $route }}"
    :class="{
        'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
        'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
        'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating',
-       '{{ $activeClasses }}': isCurrentRoute('{{ $route }}'),
-       'text-white/80 hover:text-white hover:bg-white/15': !isCurrentRoute('{{ $route }}')
+       '{{ $activeClasses }}': !{{ $isExternal ? 'true' : 'false' }} && isCurrentRoute('{{ $route }}'),
+       'text-white/80 hover:text-white hover:bg-white/15': {{ $isExternal ? 'true' : 'false' }} || !isCurrentRoute('{{ $route }}')
    }"
    title="{{ $navTitle ?? $title }}">
     {{ $slot }}
@@ -47,4 +51,10 @@
         <div class="text-xs truncate">{{ $title }}</div>
         <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ $subtitle }}</div>
     </div>
+    @if ($badge)
+        <span class="ml-auto inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white shrink-0 animate-pulse">{{ $badge }}</span>
+    @endif
+    @if ($isExternal)
+        <span class="ml-auto text-xs opacity-60 shrink-0">↗</span>
+    @endif
 </a>

@@ -17,6 +17,15 @@ class NavigationMenuController extends Controller
      */
     public function store(Request $request, TenantNavigationConfigService $navigation): JsonResponse
     {
+        if (config('app.demo_mode')) {
+            return response()->json([
+                'success' => false,
+                'status' => 'error',
+                'error' => 'Action disabled: Modifications are restricted in demo mode.',
+                'message' => 'Action disabled: Modifications are restricted in demo mode.',
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), TenantNavigationConfigService::validationRules());
         if ($validator->fails()) {
             return response()->json([

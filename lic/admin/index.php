@@ -16,13 +16,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'issue') {
         $slug = strtolower(trim($_POST['product_slug'] ?? ''));
+        $planVal = trim($_POST['plan'] ?? '') ?: null;
+        $rawLimit = trim((string)($_POST['app_builder_monthly_limit'] ?? ''));
+        $isCore = in_array($slug, ['core', 'main', 'pos', 'zoom-pos'], true);
+        $appBuilderLimit = $isCore
+            ? ($rawLimit !== '' ? (int)$rawLimit : ($planVal === 'extended' ? -1 : 10))
+            : null;
+
         $lic = issue_license(
             $pdo,
             $slug,
             strtolower(trim($_POST['bound_domain'] ?? '')) ?: null,
             trim($_POST['client_email'] ?? ''),
-            trim($_POST['plan'] ?? '') ?: null,
-            trim($_POST['valid_until'] ?? '') !== '' ? null : null
+            $planVal,
+            trim($_POST['valid_until'] ?? '') !== '' ? null : null,
+            $appBuilderLimit
         );
         if (trim($_POST['valid_until'] ?? '') !== '') {
             $pdo->prepare('UPDATE licenses SET valid_until = ? WHERE id = ?')->execute([$_POST['valid_until'], $lic['id']]);
@@ -31,8 +39,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare('UPDATE licenses SET license_key = ? WHERE id = ?')->execute([trim($_POST['license_key']), $lic['id']]);
             $lic['license_key'] = trim($_POST['license_key']);
         }
-        $flash = 'Issued '.$lic['license_key'];
+        try {
+            $pdo->prepare('UPDATE licenses SET app_builder_monthly_limit = ? WHERE id = ?')->execute([$appBuilderLimit, $lic['id']]);
+        } catch (Throwable $e) {}
+
+        $limitMsg = $isCore 
+            ? ' (App Builder limit: '.($appBuilderLimit === -1 ? 'Unlimited' : $appBuilderLimit.' builds/mo').')'
+            : ' (Module / Extension — No App Builder limit)';
+        $flash = 'Issued '.$lic['license_key'].$limitMsg;
         $redirectKey = $lic['license_key'];
+    } elseif ($action === 'update_license_limit' && $id) {
+        $stChk = $pdo->prepare('SELECT product_slug FROM licenses WHERE id = ? LIMIT 1');
+        $stChk->execute([$id]);
+        $prodSlug = (string)$stChk->fetchColumn();
+        if (!in_array($prodSlug, ['core', 'main', 'pos', 'zoom-pos'], true)) {
+            $pdo->prepare('UPDATE licenses SET app_builder_monthly_limit = NULL WHERE id = ?')->execute([$id]);
+            $flash = 'App Builder limits are applicable for the Core script only (not for modules or extensions). Limit removed.';
+        } else {
+            $limVal = trim((string)($_POST['app_builder_monthly_limit'] ?? ''));
+            $lim = $limVal !== '' ? (int)$limVal : 10;
+            try {
+                $pdo->prepare('UPDATE licenses SET app_builder_monthly_limit = ? WHERE id = ?')->execute([$lim, $id]);
+                $flash = 'App Builder limit for license updated to ' . ($lim === -1 ? 'Unlimited' : $lim . ' builds/month') . '.';
+            } catch (Throwable $e) {
+                $flash = 'Could not update limit: ' . $e->getMessage();
+            }
+        }
+        $curr = $pdo->prepare('SELECT license_key FROM licenses WHERE id = ?');
+        $curr->execute([$id]);
+        $redirectKey = (string) $curr->fetchColumn();
     } elseif ($action === 'regenerate' && $id) {
         $newKey = generate_license_key();
         $pdo->prepare('UPDATE licenses SET license_key = ? WHERE id = ?')->execute([$newKey, $id]);
@@ -158,7 +193,7 @@ lm_header('index', 'Licenses');
     </form>
     <div class="table-wrap">
     <table>
-        <thead><tr><th>License Key</th><th>Product</th><th>Client</th><th>Domain</th><th>Status</th><th>Valid until</th><th>Last seen</th><th>Actions</th></tr></thead>
+        <thead><tr><th>License Key</th><th>Product</th><th>Client</th><th>Domain</th><th>Status</th><th>Valid until</th><th>Build Limit</th><th>Last seen</th><th>Actions</th></tr></thead>
         <tbody>
         <?php foreach ($licenses as $l): ?>
             <?php
@@ -183,6 +218,19 @@ lm_header('index', 'Licenses');
                     <span class="status-pill <?= $statusClass ?>">● <?= ucfirst(e($l['status'])) ?></span>
                 </td>
                 <td><?= $l['valid_until'] ? e($l['valid_until']) : '<span class="muted">Perpetual</span>' ?></td>
+                <td>
+                    <?php if (!in_array($l['product_slug'], ['core', 'main', 'pos', 'zoom-pos'], true)): ?>
+                        <span class="muted" style="font-size:11.5px;" title="App Builder applies only to Core SaaS script">N/A (Module)</span>
+                    <?php elseif ($l['plan'] === 'extended' || (isset($l['app_builder_monthly_limit']) && (int)$l['app_builder_monthly_limit'] === -1)): ?>
+                        <span class="tag green" title="Unlimited App Builds">Unlimited</span>
+                    <?php elseif (isset($l['app_builder_monthly_limit']) && $l['app_builder_monthly_limit'] !== null && $l['app_builder_monthly_limit'] !== ''): ?>
+                        <span class="tag blue" title="User Build Limit"><?= (int)$l['app_builder_monthly_limit'] ?> / mo</span>
+                    <?php elseif (!empty($l['bundle_id'])): ?>
+                        <span class="tag purple" title="Bundle Limit">Bundle</span>
+                    <?php else: ?>
+                        <span class="muted" title="Default Build Limit">10 / mo</span>
+                    <?php endif; ?>
+                </td>
                 <td class="muted"><?= e($l['last_verified_at'] ?: 'Never') ?></td>
                 <td class="acts">
                     <a href="index.php?key=<?= urlencode($l['license_key']) ?>" class="btn" style="background:#f3f4f6;color:#111827;border:1px solid #d1d5db;padding:4px 8px;font-size:11px">Inspect</a>
@@ -203,7 +251,7 @@ lm_header('index', 'Licenses');
                 </td>
             </tr>
         <?php endforeach; ?>
-        <?php if (! $licenses): ?><tr><td colspan="8" class="muted" style="text-align:center;padding:24px">No licenses found matching your filters.</td></tr><?php endif; ?>
+        <?php if (! $licenses): ?><tr><td colspan="9" class="muted" style="text-align:center;padding:24px">No licenses found matching your filters.</td></tr><?php endif; ?>
         </tbody>
     </table>
     </div>
@@ -310,6 +358,41 @@ lm_header('index', 'Licenses');
                         <span class="kv-label">License tier / plan</span>
                         <span class="kv-val"><?= e($selected['plan'] ?: 'Standard Production') ?></span>
                     </div>
+                    <?php $isCoreSel = in_array($selected['product_slug'], ['core', 'main', 'pos', 'zoom-pos'], true); ?>
+                    <div class="kv-item">
+                        <span class="kv-label">App Builder Monthly Limit</span>
+                        <span class="kv-val">
+                            <?php if ($isCoreSel): ?>
+                                <form method="post" action="index.php" style="display:inline-flex;align-items:center;gap:8px;margin:0;">
+                                    <input type="hidden" name="csrf" value="<?= e($token) ?>">
+                                    <input type="hidden" name="action" value="update_license_limit">
+                                    <input type="hidden" name="id" value="<?= (int) $selected['id'] ?>">
+                                    <input type="number" name="app_builder_monthly_limit" 
+                                           value="<?= isset($selected['app_builder_monthly_limit']) && $selected['app_builder_monthly_limit'] !== null && $selected['app_builder_monthly_limit'] !== '' ? (int)$selected['app_builder_monthly_limit'] : ($selected['plan'] === 'extended' ? -1 : 10) ?>" 
+                                           min="-1" step="1" 
+                                           style="width:80px;padding:4px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700;">
+                                    <button type="submit" class="btn" style="padding:4px 10px;font-size:11.5px;background:#4f46e5;color:#fff;border-radius:6px;border:none;font-weight:700;cursor:pointer;">
+                                        Save Limit
+                                    </button>
+                                    <span class="muted" style="font-size:11px;margin-left:6px;">(-1 = Unlimited)</span>
+                                </form>
+                            <?php else: ?>
+                                <span class="muted" style="font-size:12px;">N/A (Core script only &mdash; not applicable for modules/extensions)</span>
+                            <?php endif; ?>
+                        </span>
+                    </div>
+                    <div class="kv-item">
+                        <span class="kv-label">App Builder Access</span>
+                        <span class="kv-val">
+                            <?php if ($isCoreSel): ?>
+                                <a href="../app-builder/?key=<?= urlencode($selected['license_key']) ?>" target="_blank" class="btn" style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:4px 10px;font-size:12px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:6px;">
+                                    🔨 Open App Builder as Licensee &rarr;
+                                </a>
+                            <?php else: ?>
+                                <span class="muted" style="font-size:12px;">Core script only</span>
+                            <?php endif; ?>
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -332,7 +415,7 @@ lm_header('index', 'Licenses');
                                     <td><code>#<?= e(substr($ord['reference'], 0, 10)) ?></code></td>
                                     <td><?= date('M d Y H:i', strtotime($ord['created_at'])) ?></td>
                                     <td><strong><?= e(number_format((float) $ord['amount'], 2).' '.$ord['currency']) ?></strong></td>
-                                    <td><span class="status-pill active">● <?= ucfirst(e($ord['status'])) ?></span></td>
+                                    <td><span class="tag <?= lm_order_status($ord) === 'completed' ? 'green' : 'amber' ?>">● <?= e(ucfirst(lm_order_status($ord))) ?></span><div class="muted">Payment: <?= e($ord['status']) ?></div><a href="payments.php?email=<?= e(urlencode($selected['client_email'])) ?>">Manage order</a></td>
                                 </tr>
                             <?php endforeach; ?>
                             <?php if (! $relatedOrders): ?>
@@ -419,9 +502,9 @@ lm_header('index', 'Licenses');
         <input type="hidden" name="csrf" value="<?= e($token) ?>">
         <input type="hidden" name="action" value="issue">
         <label>Product
-            <select name="product_slug" required>
+            <select name="product_slug" id="field_issue_product" required onchange="toggleBuilderLimitField(this.value)">
                 <?php foreach ($products as $p): ?>
-                    <option value="<?= e($p['slug']) ?>"><?= e($p['name']) ?> (<?= e($p['slug']) ?>)</option>
+                    <option value="<?= e($p['slug']) ?>" <?= $p['slug'] === 'core' ? 'selected' : '' ?>><?= e($p['name']) ?> (<?= e($p['slug']) ?>)</option>
                 <?php endforeach; ?>
             </select>
         </label>
@@ -429,13 +512,62 @@ lm_header('index', 'Licenses');
         <label>Bind domain (optional)<input name="bound_domain" placeholder="crm.example.com"></label>
         <label>Valid until (optional)<input type="date" name="valid_until"></label>
         <label>License Tier / Plan
-            <select name="plan">
+            <select name="plan" id="field_issue_plan" onchange="updatePlanDefaultLimit(this.value)">
                 <option value="regular" selected>regular (Standard Self-Service Domain)</option>
                 <option value="extended">extended (Full White-label Branding & Custom APK/EXE)</option>
             </select>
         </label>
+        <div id="container_builder_limit" style="grid-column: 1 / -1;">
+            <label>App Builder Monthly Limit
+                <input type="number" name="app_builder_monthly_limit" id="field_issue_limit" value="10" min="-1" step="1" placeholder="10 (-1 for unlimited)">
+            </label>
+            <span class="muted" style="display:block; font-size: 11.5px; color: #64748b; margin-top: 4px; margin-bottom: 6px;">
+                🔨 <strong>Core Script Build Limit:</strong> Enter monthly compilation quota (Android, Web, Windows, iOS). Use <strong>-1</strong> for Unlimited builds, <strong>0</strong> to disable builder, or a specific count (e.g. 5, 10, 25).
+            </span>
+        </div>
+        <div id="container_module_notice" style="display:none; grid-column: 1 / -1; padding: 12px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12.5px; color: #475569; line-height: 1.5;">
+            📦 <strong>Module / Extension License:</strong> Build limits are applicable for the <strong>Core SaaS Script only</strong>. Modules and extensions do not have build limits.
+        </div>
         <label>Key (optional)<input name="license_key" placeholder="auto-generated"></label>
         <button type="submit">✨ Issue license</button>
     </form>
 </section>
+
+<script>
+function toggleBuilderLimitField(slug) {
+    const isCore = ['core', 'main', 'pos', 'zoom-pos'].includes((slug || '').toLowerCase().trim());
+    const limitContainer = document.getElementById('container_builder_limit');
+    const noticeContainer = document.getElementById('container_module_notice');
+    const input = document.getElementById('field_issue_limit');
+    if (limitContainer) limitContainer.style.display = isCore ? 'block' : 'none';
+    if (noticeContainer) noticeContainer.style.display = isCore ? 'none' : 'block';
+    if (input) {
+        if (!isCore) {
+            input.value = '';
+        } else if (input.value === '') {
+            const plan = document.getElementById('field_issue_plan')?.value || 'regular';
+            input.value = (plan === 'extended') ? '-1' : '10';
+        }
+    }
+}
+
+function updatePlanDefaultLimit(plan) {
+    const input = document.getElementById('field_issue_limit');
+    const product = document.getElementById('field_issue_product')?.value || 'core';
+    const isCore = ['core', 'main', 'pos', 'zoom-pos'].includes(product.toLowerCase().trim());
+    if (!input || !isCore) return;
+    if (plan === 'extended') {
+        input.value = '-1';
+    } else if (input.value === '-1') {
+        input.value = '10';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const prodSelect = document.getElementById('field_issue_product');
+    if (prodSelect) {
+        toggleBuilderLimitField(prodSelect.value);
+    }
+});
+</script>
 <?php lm_footer();

@@ -1,9 +1,37 @@
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE"
+    Header set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Server-Secret, X-Client-Platform, DNT, User-Agent, If-Modified-Since, Cache-Control, Range"
+</IfModule>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteRule ^api/v1/license/verify/?$   api/verify.php   [L]
-    RewriteRule ^api/v1/license/issue/?$    api/issue.php    [L]
-    RewriteRule ^api/v1/catalog/?$          api/catalog.php  [L]
-    RewriteRule ^api/v1/module/download/?$  api/download.php [L]
+
+    # Prevent mod_dir from issuing 301 redirects for trailing slashes on API endpoints
+    DirectorySlash Off
+
+    # License API endpoints
+    RewriteRule ^api/v1/license/verify/?$     api/verify.php   [L]
+    RewriteRule ^api/v1/license/issue/?$      api/issue.php    [L]
+    RewriteRule ^api/v1/catalog/?$            api/catalog.php  [L]
+    RewriteRule ^api/v1/module/download/?$    api/download.php [L]
     RewriteRule ^api/v2/verify-entitlement/?$ api/verify-entitlement.php [L]
     RewriteRule ^api/verify-entitlement/?$    api/verify-entitlement.php [L]
+
+    # App Builder direct aliases
+    RewriteRule ^builder/?$                  /app-builder/    [R=302,L]
 </IfModule>
+
+# Protect sensitive environment and database files
+<FilesMatch "^\.env|^\.git|\.(sql|log|lock)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Disable directory listing
+Options -Indexes

@@ -60,8 +60,9 @@ class Show extends Component
 
     public function selectAllModules(): void
     {
+        $unlockedModes = array_keys(array_filter(ModuleRegistry::getAvailableModes(), fn ($m) => empty($m['is_locked'])));
         $this->licensedModules = array_values(array_unique([
-            ...array_keys(ModuleRegistry::operatingModules()),
+            ...$unlockedModes,
             ...array_intersect($this->licensedModules, ModuleRegistry::extensionKeys()),
         ]));
     }
@@ -76,10 +77,13 @@ class Show extends Component
 
     protected function rules(): array
     {
-        $validModes = implode(',', array_keys(ModuleRegistry::operatingModules()));
+        $availableModes = ModuleRegistry::getAvailableModes();
+        $unlockedModes = array_keys(array_filter($availableModes, fn ($m) => empty($m['is_locked'])));
+        $validModes = implode(',', array_unique([...$unlockedModes, ModuleRegistry::canonicalKey((string) $this->company->pos_mode)]));
         $validModules = implode(',', array_unique([
-            ...array_keys(ModuleRegistry::allModules()),
-            ...array_intersect(array_map([ModuleRegistry::class, 'canonicalKey'], (array) $this->company->licensed_modules), ModuleRegistry::extensionKeys()),
+            ...array_keys($availableModes),
+            ...ModuleRegistry::extensionKeys(),
+            ...array_map([ModuleRegistry::class, 'canonicalKey'], (array) $this->company->licensed_modules),
         ]));
 
         return [
@@ -101,6 +105,18 @@ class Show extends Component
     {
         $this->posMode = ModuleRegistry::canonicalKey($this->posMode);
         $this->licensedModules = array_values(array_unique(array_map([ModuleRegistry::class, 'canonicalKey'], (array) $this->licensedModules)));
+
+        $availableModes = ModuleRegistry::getAvailableModes();
+        if (! empty($availableModes[$this->posMode]['is_locked']) && $this->posMode !== ModuleRegistry::canonicalKey((string) $this->company->pos_mode)) {
+            $this->addError('posMode', __('The selected operating mode is locked because its module is not installed or active.'));
+
+            return;
+        }
+
+        // Prevent activating locked modules
+        $unlockedModes = array_keys(array_filter($availableModes, fn ($m) => empty($m['is_locked'])));
+        $allowedModules = array_unique([...$unlockedModes, ...ModuleRegistry::extensionKeys(), $this->posMode]);
+        $this->licensedModules = array_values(array_intersect($this->licensedModules, $allowedModules));
 
         app(ModulePackageService::class)->authorizeExtensionAssignment($this->company, $this->licensedModules, 'licensedModules');
 

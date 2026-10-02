@@ -73,3 +73,26 @@
         </x-nav.expanded-item>
     </div>
 @endif
+
+@if ($canLeads)
+    <div :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
+        <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
+            {{ __('Lead Management') }}
+        </div>
+        <x-nav.expanded-item :route="route('tenant.leads.dashboard')" :active="request()->routeIs('tenant.leads.dashboard') || (request()->routeIs('tenant.leads.index') && request('tab') === 'pipeline')" item-key="lead_dashboard" title="{{ __('Leads Dashboard') }}" subtitle="{{ __('Overview, metrics & conversion KPIs') }}">
+            <span class="text-base shrink-0">📊</span>
+        </x-nav.expanded-item>
+        <x-nav.expanded-item :route="route('tenant.leads.create')" :active="request()->routeIs('tenant.leads.create') || (request()->routeIs('tenant.leads.index') && request('tab') === 'capture')" item-key="lead_create" title="{{ __('Capture Lead') }}" subtitle="{{ __('Intake prospect & contact details') }}">
+            <span class="text-base shrink-0">➕</span>
+        </x-nav.expanded-item>
+        <x-nav.expanded-item :route="route('tenant.leads.pipeline')" :active="request()->routeIs('tenant.leads.pipeline') || (request()->routeIs('tenant.leads.index') && (request('tab') === 'all' || !request('tab')))" item-key="lead_pipeline" title="{{ __('Leads Pipeline') }}" subtitle="{{ __('Stage tracker & Kanban board') }}">
+            <span class="text-base shrink-0">🗂️</span>
+        </x-nav.expanded-item>
+        <x-nav.expanded-item :route="route('tenant.leads.activities')" :active="request()->routeIs('tenant.leads.activities') || (request()->routeIs('tenant.leads.index') && request('tab') === 'activities')" item-key="lead_activities" title="{{ __('Follow-ups & Activities') }}" subtitle="{{ __('Scheduled tasks, calls & reminders') }}">
+            <span class="text-base shrink-0">🔔</span>
+        </x-nav.expanded-item>
+        <x-nav.expanded-item :route="route('tenant.leads.sources')" :active="request()->routeIs('tenant.leads.sources') || (request()->routeIs('tenant.leads.index') && request('tab') === 'sources')" item-key="lead_sources" title="{{ __('Lead Sources') }}" subtitle="{{ __('Inbound channels & marketing origins') }}">
+            <span class="text-base shrink-0">🏷️</span>
+        </x-nav.expanded-item>
+    </div>
+@endif

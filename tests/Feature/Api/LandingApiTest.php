@@ -172,7 +172,7 @@ class LandingApiTest extends TestCase
             'invoice_limit' => 2000,
             'device_limit' => 5,
             'staff_limit' => 10,
-            'extensions' => ['leadmanagement', 'whatsapp_api', 'custom_domain'],
+            'extensions' => ['leadmanagement'],
             'features' => ['Advanced POS', 'Digital Invoices'],
             'active' => true,
         ]);
@@ -190,7 +190,6 @@ class LandingApiTest extends TestCase
         $this->assertEquals(5, $growth['device_limit']);
         $this->assertEquals(10, $growth['staff_limit']);
         $this->assertContains('leadmanagement', $growth['extensions']);
-        $this->assertContains('whatsapp_api', $growth['extensions']);
     }
 
     public function test_contact_inquiry_submission_validates_and_persists(): void

@@ -1,5 +1,40 @@
 # Central License Manager (standalone)
 
+## Checkout order tracking upgrade
+
+Run `php bin/install.php` in this directory after uploading the updated files.
+It adds the order tracking columns without deleting existing purchases. The
+standalone SQL is also available in `database/upgrade_orders.sql` (apply once).
+Existing paid/redeemed purchases display as Completed.
+
+The marketing site's email/domain checkout registration now creates a Pending
+order before payment. Opening the gateway moves it to Processing, and verified
+payment plus successful license issuance moves it to Completed. Abandoned or
+failed attempts remain visible. There is no separate customer login in this
+standalone marketing script; the buyer sees status on checkout and the receipt.
+
+In **Orders**, filter by status or customer email and use the status selector to
+update any order. Workflow labels do not change payment verification or activate
+licenses. **Check Stripe Payment** verifies a stuck Stripe purchase and issues
+its saved products if paid. **Resend Email** is available after keys are issued.
+
+Stripe Checkout now includes the package name, every included product and its
+description, license validity, installation domain and delivery email. The
+configured bundle total remains the amount charged.
+
+For automatic completion when the buyer closes the browser, create a Stripe
+webhook pointing to `https://YOUR-LICENSE-HOST/api/stripe-webhook.php` (include
+the installation path if hosted in a subdirectory). Subscribe to
+`checkout.session.completed` and `checkout.session.async_payment_succeeded`,
+then save the endpoint's `whsec_...` secret in **Settings → Stripe Webhook
+Signing Secret**. Use the same Stripe account and test/live mode as checkout.
+The return page and admin verification also complete orders without a webhook.
+Sessions started before this upgrade have no saved order snapshot; handle those
+through support using their gateway payment reference.
+
+Run the isolated regression checks with `php tests/orders.php`. They use an
+in-memory SQLite database and do not charge cards, send email or alter live data.
+
 The vendor's control centre for selling and validating the SaaS script + its
 add-on modules. Dependency-free PHP 8+. Runs on its own domain
 (`https://license.example.com`), separate from any SaaS install.

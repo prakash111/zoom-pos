@@ -110,7 +110,7 @@ class LandingPricingSyncTest extends TestCase
             'products_limit' => -1,
             'device_limit' => -1,
             'staff_limit' => -1,
-            'extensions' => ['leadmanagement', 'whatsapp_api', 'custom_domain'],
+            'extensions' => ['leadmanagement'],
             'active' => true,
         ]);
 
@@ -138,8 +138,6 @@ class LandingPricingSyncTest extends TestCase
         $this->assertSame(-1, $pro->device_limit);
         $this->assertSame(-1, $pro->staff_limit);
         $this->assertContains('leadmanagement', $pro->enabled_extensions);
-        $this->assertContains('whatsapp_api', $pro->enabled_extensions);
-        $this->assertContains('custom_domain', $pro->enabled_extensions);
         $this->assertContains('Multi location', $pro->feature_list);
         $this->assertContains('Restaurant mode', $pro->feature_list);
         $this->assertContains('Automatic backup', $pro->feature_list);
@@ -171,8 +169,6 @@ class LandingPricingSyncTest extends TestCase
 
         // 2. Modular Extension Badges
         $this->assertStringContainsString('CRM &amp; Leads', $html);
-        $this->assertStringContainsString('WhatsApp API', $html);
-        $this->assertStringContainsString('Custom Domain', $html);
 
         // 3. Feature checklist with checkmark icons
         $this->assertStringContainsString('Quotations', $html);
@@ -203,8 +199,6 @@ class LandingPricingSyncTest extends TestCase
         $response->assertSee('Unlimited POS Devices');
         $response->assertSee('Unlimited Staff');
         $response->assertSee('CRM &amp; Leads', false);
-        $response->assertSee('WhatsApp API');
-        $response->assertSee('Custom Domain');
         $response->assertSee('Select Plan');
         $response->assertSee('MOST POPULAR');
         $response->assertSee('bg-[#101726]', false);

@@ -272,11 +272,19 @@ Route::post('/api/v2/verify-entitlement', [\App\Http\Controllers\LicenseVerifica
 Route::post('/lic/api/v2/verify-entitlement', [\App\Http\Controllers\LicenseVerificationController::class, 'verifyClientApp']);
 Route::post('/lic/api/verify-entitlement', [\App\Http\Controllers\LicenseVerificationController::class, 'verifyClientApp']);
 
+// Public shareable document links (for customers clicking from WhatsApp or Email or scanning QR codes)
+Route::middleware(EnsureAppIsInstalled::class)->get('/i/{sale_number}', [\App\Http\Controllers\Tenant\InvoiceController::class, 'publicShow'])->name('sales.public');
+Route::middleware(EnsureAppIsInstalled::class)->get('/q/{quote_number}', [\App\Http\Controllers\Tenant\QuotationController::class, 'publicShow'])->name('quotes.public');
+Route::middleware(EnsureAppIsInstalled::class)->get('/t/{token}', [\App\Http\Controllers\Tenant\Restaurant\TableOrderController::class, 'show'])->name('restaurant.table.short');
+Route::middleware(EnsureAppIsInstalled::class)->get('/order/table/{token}', [\App\Http\Controllers\Tenant\Restaurant\TableOrderController::class, 'show'])->name('restaurant.table.order');
+Route::middleware(EnsureAppIsInstalled::class)->post('/order/table/{token}', [\App\Http\Controllers\Tenant\Restaurant\TableOrderController::class, 'placeOrder'])->name('restaurant.table.order.place');
+Route::middleware(EnsureAppIsInstalled::class)->get('/portal/repair/{ticket_number}', [\App\Http\Controllers\Tenant\RepairPortalController::class, 'track'])->name('repair.portal.track');
+
 // Sub-directory Storefront routes (e.g. domain.com/Ramu)
 Route::middleware(EnsureAppIsInstalled::class)
     ->prefix('{storeSlug}')
     ->where([
-        'storeSlug' => '^(?!login|register|logout|store|admin|superadmin|api|build|assets|public|lic|c|pages?|pricing|features|contact|terms|privacy|refund|demo|install|home|tenant|livewire|settings).*$',
+        'storeSlug' => '^(?!login|register|logout|store|admin|superadmin|api|build|assets|public|lic|c|i|q|t|order|portal|accept-invite|pages?|pricing|features|contact|terms|privacy|refund|demo|install|home|tenant|livewire|settings)[^/]+$',
     ])
     ->group(function () {
         Route::get('/', [\App\Http\Controllers\Tenant\StorefrontController::class, 'index'])->name('tenant.store.slug');

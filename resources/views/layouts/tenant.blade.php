@@ -392,6 +392,12 @@
                     </x-nav.rail-item>
                 @endif
 
+                @if ($canStorefront)
+                    <x-nav.rail-item :route="route('tenant.settings.storefront')" :active="$isStorefront" item-key="nav_storefront_group" title="{{ __('Storefront & Online Sales') }}" label="{{ __('Storefront') }}">
+                        <span class="text-xl group-hover:scale-110 transition-transform shrink-0">🏪</span>
+                    </x-nav.rail-item>
+                @endif
+
                 @if ($canStores)
                     <x-nav.rail-item :route="route('tenant.settings.stores')" :active="request()->routeIs('tenant.settings.stores')" item-key="nav_stores" title="{{ __('Stores & Branches') }}" label="{{ __('Stores & Branches') }}">
                         <span class="text-xl shrink-0" aria-hidden="true">🏬</span>
@@ -469,11 +475,6 @@
                                 <span class="text-base shrink-0">📑</span>
                             </x-nav.expanded-item>
                         @endif
-                        @if ($canLeads)
-                            <x-nav.expanded-item :route="route('tenant.leads.index')" :active="$isLeads" item-key="lead_management" title="{{ __('Lead Management') }}" subtitle="{{ __('Pipeline, follow-ups & auto-sync CRM') }}">
-                                <span class="text-base shrink-0">🎯</span>
-                            </x-nav.expanded-item>
-                        @endif
                         @if ($canCustomers)
                             <x-nav.expanded-item :route="route('tenant.customers.index')" :active="$isCustomers" item-key="customers" title="{{ __('Customers & CRM') }}" subtitle="{{ __('Profiles, history & loyalty') }}">
                                 <span class="text-base shrink-0">👥</span>
@@ -522,11 +523,61 @@
                         </x-nav.expanded-item>
                     @endif
                     @if ($canCatalog)
-                        <x-nav.expanded-item :route="route('tenant.catalog.index')" :active="$isCatalog" item-key="products" title="{{ __('eCommerce Storefront & Website') }}" subtitle="{{ __('Online business store & WhatsApp sales') }}">
+                        <x-nav.expanded-item :route="route('tenant.catalog.index')" :active="$isCatalog" item-key="catalog" title="{{ __('Digital Catalog') }}" subtitle="{{ __('Digital QR catalog & WhatsApp store') }}">
                             <span class="text-base shrink-0">🌐</span>
                         </x-nav.expanded-item>
                     @endif
                 </div>
+
+                <!-- Category: Storefront & Online Sales -->
+                @if ($canStorefront)
+                    <div :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
+                        <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
+                            {{ __('Storefront & Online Sales') }}
+                        </div>
+                        <x-nav.expanded-item :route="$liveStoreUrl" is-external item-key="nav_view_live_store" title="{{ __('View Live Store') }}" subtitle="{{ __('Open public web shop') }}">
+                            <span class="text-base shrink-0">🏪</span>
+                        </x-nav.expanded-item>
+                        <x-nav.expanded-item :route="route('tenant.settings.storefront.domain')" :active="$isStorefrontDomain" item-key="nav_storefront_domain" title="{{ __('Store Web Address & Domain') }}" subtitle="{{ __('Domain, subdomain & links') }}">
+                            <span class="text-base shrink-0">🌐</span>
+                        </x-nav.expanded-item>
+                        @if ($canStorefrontMenus)
+                            <x-nav.expanded-item :route="route('tenant.storefront.menus')" :active="$isStorefrontMenus" item-key="nav_storefront_menus" title="{{ __('Store Menus & CMS Pages') }}" subtitle="{{ __('Header menus, footer & custom pages') }}">
+                                <span class="text-base shrink-0">📖</span>
+                            </x-nav.expanded-item>
+                        @endif
+                        @if ($canStorefrontInquiries)
+                            <x-nav.expanded-item :route="route('tenant.storefront.inquiries')" :active="$isStorefrontInquiries" item-key="nav_storefront_inquiries" :badge="$unreadInquiriesCount > 0 ? (string)$unreadInquiriesCount : null" title="{{ __('Online Store Inquiries') }}" subtitle="{{ __('Customer contact messages') }}">
+                                <span class="text-base shrink-0">📬</span>
+                            </x-nav.expanded-item>
+                        @endif
+                        @if ($canStorefrontBanner)
+                            <x-nav.expanded-item :route="route('tenant.settings.storefront.banner')" :active="$isStorefrontBanner" item-key="nav_storefront_banner_auth" title="{{ __('Storefront Banner & Auth') }}" subtitle="{{ __('Hero banner & customer auth') }}">
+                                <span class="text-base shrink-0">🖼️</span>
+                            </x-nav.expanded-item>
+                        @endif
+                        @if ($canGateways)
+                            <x-nav.expanded-item :route="route('tenant.settings.storefront.payments')" :active="$isStorefrontGateways" item-key="nav_storefront_gateways" title="{{ __('Storefront Payment Gateways') }}" subtitle="{{ __('Stripe, PayPal, Razorpay & COD') }}">
+                                <span class="text-base shrink-0">💳</span>
+                            </x-nav.expanded-item>
+                        @endif
+                        @if ($canCoupons)
+                            <x-nav.expanded-item :route="route('tenant.coupons.index')" :active="$isCoupons" item-key="nav_coupons_discounts" title="{{ __('Coupons & Discounts') }}" subtitle="{{ __('Promos, vouchers & discounts') }}">
+                                <span class="text-base shrink-0">🏷️</span>
+                            </x-nav.expanded-item>
+                        @endif
+                        @if ($canFaqs)
+                            <x-nav.expanded-item :route="route('tenant.faqs.index')" :active="$isFaqs" item-key="nav_store_faqs" title="{{ __('Store FAQs & Help Center') }}" subtitle="{{ __('Frequently asked questions') }}">
+                                <span class="text-base shrink-0">❓</span>
+                            </x-nav.expanded-item>
+                        @endif
+                        @if ($canReviews)
+                            <x-nav.expanded-item :route="route('tenant.reviews.index')" :active="$isReviews" item-key="nav_store_reviews" title="{{ __('Product Ratings & Reviews') }}" subtitle="{{ __('Customer ratings & feedback') }}">
+                                <span class="text-base shrink-0">⭐</span>
+                            </x-nav.expanded-item>
+                        @endif
+                    </div>
+                @endif
 
                 @include('layouts.partials.vertical-nav-expanded')
 
@@ -932,7 +983,39 @@
                                 @endif
 
                                 @if ($canCatalog)
-                                    <x-nav.drawer-item item-key="catalog" :route="route('tenant.catalog.index')" title="{{ __('eCommerce Storefront & Website') }}" subtitle="{{ __('Online business store & WhatsApp sales') }}">🌐</x-nav.drawer-item>
+                                    <x-nav.drawer-item item-key="catalog" :route="route('tenant.catalog.index')" title="{{ __('Digital Catalog') }}" subtitle="{{ __('Digital QR catalog & WhatsApp store') }}">🌐</x-nav.drawer-item>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+
+                    <!-- Storefront & Online Sales Dedicated Drawer Section -->
+                    @if ($canStorefront)
+                        <div data-section-key="sec_storefront">
+                            <div class="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-2 px-3">{{ __('Storefront & Online Sales') }}</div>
+                            <div class="space-y-1">
+                                <x-nav.drawer-item item-key="nav_view_live_store" :route="$liveStoreUrl" is-external title="{{ __('View Live Store') }}" subtitle="{{ __('Open public web shop') }}">🏪</x-nav.drawer-item>
+                                <x-nav.drawer-item item-key="nav_storefront_domain" :route="route('tenant.settings.storefront.domain')" title="{{ __('Store Web Address & Domain') }}" subtitle="{{ __('Domain, subdomain & links') }}">🌐</x-nav.drawer-item>
+                                @if ($canStorefrontMenus)
+                                    <x-nav.drawer-item item-key="nav_storefront_menus" :route="route('tenant.storefront.menus')" title="{{ __('Store Menus & CMS Pages') }}" subtitle="{{ __('Header menus, footer & custom pages') }}">📖</x-nav.drawer-item>
+                                @endif
+                                @if ($canStorefrontInquiries)
+                                    <x-nav.drawer-item item-key="nav_storefront_inquiries" :route="route('tenant.storefront.inquiries')" :badge="$unreadInquiriesCount > 0 ? (string)$unreadInquiriesCount : null" title="{{ __('Online Store Inquiries') }}" subtitle="{{ __('Storefront messages & leads') }}">📬</x-nav.drawer-item>
+                                @endif
+                                @if ($canStorefrontBanner)
+                                    <x-nav.drawer-item item-key="nav_storefront_banner_auth" :route="route('tenant.settings.storefront.banner')" title="{{ __('Storefront Banner & Auth') }}" subtitle="{{ __('Hero banners & user authentication') }}">🖼️</x-nav.drawer-item>
+                                @endif
+                                @if ($canGateways)
+                                    <x-nav.drawer-item item-key="nav_storefront_gateways" :route="route('tenant.settings.storefront.payments')" title="{{ __('Storefront Payment Gateways') }}" subtitle="{{ __('Online checkout & payment methods') }}">💳</x-nav.drawer-item>
+                                @endif
+                                @if ($canCoupons)
+                                    <x-nav.drawer-item item-key="nav_coupons_discounts" :route="route('tenant.coupons.index')" title="{{ __('Coupons & Discounts') }}" subtitle="{{ __('Promo codes & order discounts') }}">🏷️</x-nav.drawer-item>
+                                @endif
+                                @if ($canFaqs)
+                                    <x-nav.drawer-item item-key="nav_store_faqs" :route="route('tenant.faqs.index')" title="{{ __('Store FAQs & Help Center') }}" subtitle="{{ __('Frequently asked questions') }}">❓</x-nav.drawer-item>
+                                @endif
+                                @if ($canReviews)
+                                    <x-nav.drawer-item item-key="nav_store_reviews" :route="route('tenant.reviews.index')" title="{{ __('Product Ratings & Reviews') }}" subtitle="{{ __('Customer ratings & feedback') }}">⭐</x-nav.drawer-item>
                                 @endif
                             </div>
                         </div>
@@ -943,9 +1026,13 @@
                          for the all-modules enterprise workspace. --}}
                     @if ($canLeads)
                         <div data-section-key="lead_ops">
-                            <div class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 px-3">{{ __('Lead Operations') }}</div>
+                            <div class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 px-3">{{ __('Lead Management') }}</div>
                             <div class="space-y-1">
-                                <x-nav.drawer-item item-key="lead_management" :route="route('tenant.leads.index')" title="{{ __('Lead Management') }}" subtitle="{{ __('Pipeline, follow-ups & auto-sync CRM') }}">🎯</x-nav.drawer-item>
+                                <x-nav.drawer-item item-key="lead_dashboard" :route="route('tenant.leads.dashboard')" title="{{ __('Leads Dashboard') }}" subtitle="{{ __('Overview, metrics & conversion KPIs') }}">📊</x-nav.drawer-item>
+                                <x-nav.drawer-item item-key="lead_create" :route="route('tenant.leads.create')" title="{{ __('Capture Lead') }}" subtitle="{{ __('Intake prospect & contact details') }}">➕</x-nav.drawer-item>
+                                <x-nav.drawer-item item-key="lead_pipeline" :route="route('tenant.leads.pipeline')" title="{{ __('Leads Pipeline') }}" subtitle="{{ __('Stage tracker & Kanban board') }}">🗂️</x-nav.drawer-item>
+                                <x-nav.drawer-item item-key="lead_activities" :route="route('tenant.leads.activities')" title="{{ __('Follow-ups & Activities') }}" subtitle="{{ __('Scheduled tasks, calls & reminders') }}">🔔</x-nav.drawer-item>
+                                <x-nav.drawer-item item-key="lead_sources" :route="route('tenant.leads.sources')" title="{{ __('Lead Sources') }}" subtitle="{{ __('Inbound channels & marketing origins') }}">🏷️</x-nav.drawer-item>
                             </div>
                         </div>
                     @endif
@@ -972,12 +1059,16 @@
                                     <x-nav.drawer-link item-key="settings_taxes" :route="route('tenant.settings.taxes')" :title="__('Taxes & Compliance')" />
                                     <x-nav.drawer-link item-key="settings_api" :route="route('tenant.settings.integrations')" :title="__('API & Integrations')" />
                                     <x-nav.drawer-link item-key="settings_navigation" :route="route('tenant.settings.navigation')" :title="__('Navigation Menu')" />
+                                    @if (! $canStorefront)
                                     <x-nav.drawer-link item-key="settings_coupons" :route="route('tenant.settings.coupons')" :title="__('Coupons & Discounts')" />
                                     <x-nav.drawer-link item-key="settings_faqs" :route="route('tenant.settings.faqs')" :title="__('Store FAQs')" />
                                     <x-nav.drawer-link item-key="settings_reviews" :route="route('tenant.settings.reviews')" :title="__('Product Reviews')" />
                                     @endif
+                                    @endif
                                 </div>
                             @endif
+
+                            <x-nav.drawer-link item-key="languages" :route="route('tenant.languages.index')" dot="emerald" :title="__('Languages & Translations')" :badge="__('Multi-Lang')" badge-color="emerald" />
 
                             @if ($canUsers)
                                 <x-nav.drawer-link item-key="staff" :route="route('tenant.users.index')" :title="__('Users & Permissions')" />

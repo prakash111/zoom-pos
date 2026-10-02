@@ -1,0 +1,489 @@
+#!/usr/bin/env python3
+"""
+Generate comprehensive, human-written marketplace listing content
+and save to /public/marketing.txt.
+"""
+
+import os
+
+OUTPUT_FILE = "/home/zoomnearby-saas/htdocs/saas.zoomnearby.com/public/marketing.txt"
+
+CONTENT = """================================================================================
+ZOOM POS & CRM — MULTI-TENANT SAAS PLATFORM & WHITE-LABEL CLOUD APP BUILDER
+Marketplace Listing Description, Promotional Copy & Complete Feature Architecture
+================================================================================
+
+Item Name: Zoom POS & CRM — Multi-Tenant SaaS Point of Sale, ERP & White-Label Cloud App Builder
+Category: PHP Scripts / Project Management Tools / Miscellaneous / POS Systems
+Compatibility: Laravel 11.x, Livewire 3.x, Flutter 3.x, MySQL 8.x / MariaDB 10.4+, PHP 8.2 - 8.3+
+Included Assets: Web Dashboard Source, Flutter Mobile/Desktop Source, Automated GitHub Actions CI/CD Pipeline, Standalone Marketing Landing Page Script, 5 Vertical Modules, Documentation & Graphic Banners
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1.  The Big Picture: Turnkey Multi-Tenant SaaS Business in a Box
+2.  Live Interactive Demos & Real Test Environments
+3.  The Game Changer: White-Label Cloud App Builder (Zero-Code Mobile Compilation)
+4.  Pricing Study & Business Strategy ($49 Core vs $119 Enterprise Bundle)
+5.  Why SaaS Entrepreneurs Choose Zoom POS (The Unfair Advantage)
+6.  Sequential Feature Tour — Part 1: Core POS & Counter Workflow
+7.  Sequential Feature Tour — Part 2: True Offline-First SQLite Resilience
+8.  Sequential Feature Tour — Part 3: Dual Hardware & Direct Thermal Printing Engine
+9.  Sequential Feature Tour — Part 4: Multi-Store & Centralized Warehousing
+10. Sequential Feature Tour — Part 5: The 5 High-Demand Industry Vertical Modules
+    • 10.1 Retail & Supermarkets
+    • 10.2 Restaurant, Café, Bar & QSR (Dine-in, KDS, KOT, QR Ordering)
+    • 10.3 Pharmacy & Healthcare (Drug Batches, Expiry, Prescriptions)
+    • 10.4 Salon, Spa & Wellness (Stylist Booking, Calendar, Commissions)
+    • 10.5 Repair Service Workshop (Device Intake, Diagnosis, Parts, Tracking Portal)
+    • 10.6 Lead Management & Sales CRM (Kanban Pipeline, Deal Scoring)
+11. Sequential Feature Tour — Part 6: Customer-Facing Web Storefront & eCommerce
+12. Sequential Feature Tour — Part 7: Omnichannel Communications (WhatsApp Cloud API & SMS)
+13. Sequential Feature Tour — Part 8: Accounting, Ledgers, Cash Floats & Dual-Tax Engines
+14. Sequential Feature Tour — Part 9: SuperAdmin SaaS Control Center & Automated Billing
+15. Sequential Feature Tour — Part 10: Server-Driven UI (SDUI) & Dynamic Extensibility
+16. Technical Stack, Architecture & Server Requirements
+17. Included Package Inventory & File Manifest
+18. Frequently Asked Questions (FAQ) for Buyers
+
+
+================================================================================
+1. THE BIG PICTURE: TURNKEY MULTI-TENANT SAAS BUSINESS IN A BOX
+================================================================================
+
+If you have ever wanted to launch your own recurring-revenue software business—competing directly with platforms like Toast, Square, Lightspeed, or Clover—Zoom POS & CRM was engineered specifically for you.
+
+Most POS scripts sold online are single-tenant tools meant for one mom-and-pop shop. Zoom POS is radically different: it is an enterprise-grade Multi-Tenant Software-as-a-Service (SaaS) engine.
+
+With a single installation on your server:
+• You can host hundreds or thousands of separate merchant businesses.
+• Each merchant gets their own private workspace, either on your subdomain (e.g. bakery.yourpos.com) or mapped to their own custom apex domain (e.g. pos.thebakery.com).
+• Each merchant can operate unlimited branches, cash registers, and warehouses.
+• You charge merchants automated monthly or annual subscription fees ($29/mo, $59/mo, $149/mo) collected automatically via Stripe, PayPal, Razorpay, or wire transfer.
+• You keep 100% of the profits. No per-transaction cuts, no royalties, no monthly platform fees owed to us.
+
+Best of all, you receive 100% unencrypted open source code for Laravel, Livewire, Flutter, and the Cloud App Builder. You own your platform, your customer relationships, and your brand forever.
+
+
+================================================================================
+2. LIVE INTERACTIVE DEMOS & REAL TEST ENVIRONMENTS
+================================================================================
+
+Do not take our word for it—test drive the complete live software stack right now. Experience the speed of the SuperAdmin panel, walk through a retail checkout, test the restaurant floor plan, and download the actual compiled native apps.
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ SURFACE                     URL / ACCESS LINK          LOGIN CREDENTIALS     │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ 👑 SuperAdmin SaaS Panel    https://saas.zoomnearby.com/login                │
+│                             Email: admin@zoomnearby.com   Pass: password     │
+│                                                                              │
+│ 🏪 Merchant Store & POS     https://saas.zoomnearby.com/store/login          │
+│                             Email: store@zoomnearby.com   Pass: password     │
+│                                                                              │
+│ 📱 Native Android App (APK) Direct Download:                                 │
+│                             https://saas.zoomnearby.com/zoom-pos-v1.0.2.apk  │
+│                             Server URL to test: https://saas.zoomnearby.com  │
+│                                                                              │
+│ 💻 Windows Desktop App      Direct Download:                                 │
+│                             https://saas.zoomnearby.com/zoom-sales-crm-software-1.0.2.exe │
+│                                                                              │
+│ 🚀 Standalone Marketing     https://pos.zoomnearby.com/marketing/            │
+│    Landing Page             (Self-contained PHP landing page with checkout)  │
+│                                                                              │
+│ 📖 Documentation Portal     https://saas.zoomnearby.com/documentation        │
+│                             Full feature guides, API specs, hardware setup   │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+3. THE GAME CHANGER: WHITE-LABEL CLOUD APP BUILDER
+   (Zero-Code Cross-Platform Mobile & Desktop Compilation)
+================================================================================
+
+3.1 The Traditional Mobile App Problem
+--------------------------------------
+Every software entrepreneur knows that offering native mobile and desktop apps is the #1 way to close high-ticket merchant contracts. But in the real world, compiling Flutter apps is a technical nightmare:
+• You have to install 30GB of tools: Android Studio, Java JDK 17, Android SDK command-line tools, Flutter SDK, Gradle, and CocoaPods.
+• Gradle build errors, Java version mismatches, and outdated dependency locks fail 90% of non-developer buyers.
+• Every time a client wants their own logo or brand color on an app, you waste 4 to 8 hours fighting compilation errors on your laptop.
+
+3.2 The Zoom POS Solution: Cloud CI/CD Builder
+----------------------------------------------
+We eliminated this friction completely. Zoom POS comes with an integrated, web-based White-Label Cloud App Builder hosted directly in your admin portal.
+
+It delegates compilation to automated, cloud-based GitHub Actions runners:
+1. Open your browser and navigate to the App Builder wizard.
+2. Enter your client's details:
+   • Application Name (e.g. "Apex Retail POS")
+   • Android Package ID (e.g. "com.apexretail.pos")
+   • Primary Brand Color (HEX color picker)
+   • Version Number (e.g. 1.0.0)
+   • Server API Endpoint (pre-filled with your domain)
+3. Upload Brand Assets:
+   • High-resolution App Icon (.png)
+   • Branded Splash Screen (.png)
+4. Click "Generate App Build".
+
+3.3 What Happens in the Cloud:
+------------------------------
+In the background, the runner automatically:
+• Clones the production Flutter codebase in a clean, sandboxed Linux container.
+• Injects your custom app name, package identifier, brand hex colors, and server URLs.
+• Auto-generates Android launcher icons (hdpi, xhdpi, xxhdpi, xxxhdpi) and splash screens.
+• Compiles a production-ready Android APK (`.apk`) for instant sideloading.
+• Compiles a Google Play Store release Android App Bundle (`.aab`).
+• Compiles a Windows Desktop executable runtime package (`.zip`).
+• Compiles a Progressive Web App (PWA) distribution.
+• Ingests the compiled artifacts back to your server and sends you an email alert with direct download links.
+
+3.4 The Agency Goldmine:
+------------------------
+You can charge your clients a $199 – $499 one-time "Branded Mobile App Setup" fee, plus a $20/month maintenance fee. You deliver a custom-branded APK with their company logo on their POS counter tablet in under 10 minutes, without writing a single line of code!
+
+
+================================================================================
+4. PRICING STUDY & BUSINESS STRATEGY ($49 CORE VS $119 ENTERPRISE BUNDLE)
+================================================================================
+
+When studying the market and evaluating our two license options on the marketing landing page, here is exactly how they compare and why the $119 All-In-One Enterprise Bundle provides an unbeatable Return on Investment (ROI).
+
+4.1 The Two Available Plans:
+----------------------------
+
+┌───────────────────────────────────────────────┬──────────────────────────────┐
+│ PLAN 1: CORE POS PLAN ($49)                   │ PLAN 2: ENTERPRISE BUNDLE    │
+│ Best for Single Shops or Budget Starters      │ ($119) — RECOMMENDED         │
+├───────────────────────────────────────────────┼──────────────────────────────┤
+│ • Full Multi-Tenant Core POS Engine           │ • EVERYTHING IN CORE, PLUS:  │
+│ • Retail Supermarket POS Module               │ • 10 Cloud App Builds/Month  │
+│ • Restaurant & Café Mode (Tables, KOT, KDS)   │   (10x Mobile Quota!)        │
+│ • Offline-First SQLite Architecture           │ • Google Play Ready AAB      │
+│ • ESC/POS Direct Thermal Printing             │ • Release APK for Sideload   │
+│ • Cash Register Float & Z-Reports             │ • Windows Desktop POS App    │
+│ • Multi-Store & Central Warehousing           │ • Full White-Label Branding  │
+│ • Customer-Facing Online Web Storefront       │ • Build History & Alerts     │
+│ • Dual-Tax Engines (GST, VAT, Split)          │ • ALL 4 VERTICAL MODULES:    │
+│ • Multi-Channel Messaging (WhatsApp/SMS)      │   + Lead Management CRM      │
+│ • SuperAdmin SaaS Control Panel               │   + Pharmacy POS with Batches│
+│ • Lifetime Perpetual License                  │   + Salon & Spa Booking      │
+│ • 1 Cloud App Build / Month Quota             │   + Repair Service Workbench │
+│ • Standard Setup Documentation                │ • VIP Deployment Support     │
+│                                               │ • Server Setup Assistance    │
+│                                               │   (SSL, Database, Cron)      │
+│                                               │ • Priority WhatsApp/Email    │
+│                                               │   Developer Assistance       │
+└───────────────────────────────────────────────┴──────────────────────────────┘
+
+4.2 The Real-World ROI Math (Why $119 is a No-Brainer):
+-------------------------------------------------------
+Let's look at the actual economics of launching your SaaS platform with the $119 Enterprise Bundle:
+
+• Acquisition Cost: $119 one-time payment.
+• Month 1: You onboard 5 local retail shops at $39/month each = $195/month.
+• Month 2: You sign up 2 pharmacies and 3 hair salons on the Enterprise tier at $79/month each = $395/month.
+• Custom App Upsell: You generate custom-branded Android APKs for 3 clients using your 10 builds/month quota at $199 setup each = $597 one-time.
+• Total Month 2 Gross Revenue: $1,187.
+• Your Net Profit: $1,187 - $119 = $1,068 in pure profit within 60 days.
+• Ongoing Recurring Revenue: $590 every single month thereafter, growing with every new merchant you sign.
+
+By including Pharmacy, Salon, Repair, and CRM modules out of the box, the $119 Enterprise Bundle expands your addressable market by 500%. You can pitch to doctors, pharmacies, beauty parlors, and phone repair shops—not just grocery stores.
+
+
+================================================================================
+5. WHY SAAS ENTREPRENEURS CHOOSE ZOOM POS (THE UNFAIR ADVANTAGE)
+================================================================================
+
+1. 100% Unencrypted Source Code:
+   No ionCube loaders, no domain callback traps, no phone-home license locks. You have 100% inspectable, editable code that you can customize or extend at will.
+
+2. Unlimited Multi-Tenancy:
+   Create unlimited tenant businesses. Each business has isolated database records, isolated user permissions, and independent branch configurations.
+
+3. Automated Recurring Billing:
+   Set up monthly, quarterly, or yearly subscription plans. Connect your Stripe, PayPal, or Razorpay account. The system invoices tenants automatically and suspends delinquent accounts upon non-payment.
+
+4. True Custom Domain Support:
+   Tenants can map their own apex domains (e.g. `pos.clientbrand.com`) using CNAME records, with automated SSL detection.
+
+5. Cross-Platform Supremacy:
+   Your merchants can use any hardware they already own: iPads, Android tablets, touchscreen all-in-one POS terminals, Windows PCs, MacBooks, or Android smartphones.
+
+
+================================================================================
+6. SEQUENTIAL FEATURE TOUR — PART 1: CORE POS & COUNTER WORKFLOW
+================================================================================
+
+The point-of-sale interface was engineered with input from retail cashiers to ensure lightning-fast transaction throughput during peak rush hours.
+
+• Ultra-Fast Barcode Scanning: Compatible with standard USB and Bluetooth HID laser/CCD barcode scanners. Scanned barcodes instantly add items to the cart without requiring mouse clicks.
+• Weighing-Scale Barcode Decoding: Built-in parser for weigh-scale barcodes (e.g. price-embedded or weight-embedded EAN/UPC labels). Scans pre-packaged produce, meats, or bulk cheeses and automatically extracts weight and calculates price.
+• Multi-Variant Product Engine: Sell items with complex variant matrixes (e.g. T-Shirt -> Small/Medium/Large x Red/Blue/Black), each with independent SKU, barcode, stock count, and price.
+• Modifier & Add-On System: Configure optional or mandatory modifiers (e.g. Extra Cheese, Less Ice, Oat Milk), with positive or negative price adjustments.
+• Hold & Resume Cart: Cashiers can suspend an active cart when a customer forgets their wallet, serve the next customer in line, and resume the held cart with one tap.
+• Split Tender Payments: Accept mixed payments on a single ticket (e.g. $20 Cash + $35 Credit Card + $10 Store Credit).
+• Customer Credit / Ledger Sales (Pay Later): Ring up sales on store credit. The transaction updates the customer's ledger balance automatically, tracking due dates and aging.
+• Loyalty Points System: Customers earn customizable loyalty reward points per dollar spent, redeemable as instant discounts on future visits.
+• Custom Open-Keypad Items: Quickly ring up uncataloged items or custom labor charges directly from the numeric keypad with role-governed price override permissions.
+• Dual-Unit Pricing: Sell by piece, box, kilogram, liter, or dozen with automated unit price conversions.
+
+
+================================================================================
+7. SEQUENTIAL FEATURE TOUR — PART 2: TRUE OFFLINE-FIRST SQLITE RESILIENCE
+================================================================================
+
+In the real world, internet connections fail—modems overheat, ISP lines get cut, or Wi-Fi drops during storms. Traditional web-based POS systems freeze completely, grinding the merchant's business to a halt.
+
+Zoom POS is built with an offline-first architecture:
+• Local SQLite Cache: When the mobile or desktop app connects, it caches the merchant's active product catalog, pricing rules, tax tables, customer directory, and active shift state directly in an encrypted local SQLite database.
+• Uninterrupted Selling: When the internet connection drops, the cashier continues scanning items, applying discounts, accepting cash payments, and printing thermal receipts without delay.
+• Local Queue Engine: All offline sales are assigned a cryptographically unique UUID and placed into a secure local synchronization queue on the device.
+• Intelligent Bi-Directional Sync: The second the device reconnects to Wi-Fi or cellular data, the sync queue automatically pushes all offline sales to the cloud server, updates central inventory levels, reconciles customer ledgers, and pulls down any price updates made elsewhere.
+• Visual Sync Indicator: Cashiers always see their live connection status (Online, Offline, Syncing) and a counter of pending queued transactions.
+
+
+================================================================================
+8. SEQUENTIAL FEATURE TOUR — PART 3: DUAL HARDWARE & DIRECT THERMAL PRINTING
+================================================================================
+
+Zoom POS talks directly to physical point-of-sale hardware using native protocols:
+
+• Universal ESC/POS Raw Command Engine: Sends raw bytecode directly to thermal receipt printers. Bypasses the clunky browser print dialog window for instant, silent printing.
+• Multi-Interface Support:
+  - USB Direct (OTG on Android, native USB COM/RAW on Windows)
+  - Bluetooth (SPP & BLE pairing for mobile handheld thermal printers)
+  - Ethernet LAN & Wi-Fi (Direct TCP/IP socket printing to remote kitchen/counter printers)
+• Paper Width Flexibility: Flawless layout rendering for both 58mm (2-inch) and 80mm (3-inch) paper rolls.
+• Automatic Cash Drawer Kick: Sends electronic pulse signals (Pin 2 / Pin 5) to pop open standard 12V and 24V RJ11/RJ12 cash drawers automatically upon cash transaction finalization.
+• Kitchen Order Ticket (KOT) Routing: Automatically routes food and beverage items to designated kitchen and bar printers with large, legible ticket formatting.
+• Barcode & Shelf Label Designer: Integrated label printing engine for Code128, EAN-13, and QR codes. Print custom product labels and supermarket shelf talkers directly onto thermal sticker rolls.
+• Fiscal & E-Invoicing Compliance: Generates regional QR codes (ZATCA, GST, VAT compliant) containing cryptographic digital signatures, seller tax IDs, and timestamps.
+
+
+================================================================================
+9. SEQUENTIAL FEATURE TOUR — PART 4: MULTI-STORE & CENTRALIZED WAREHOUSING
+================================================================================
+
+Zoom POS scales effortlessly from a single corner shop to a nationwide franchise chain:
+
+• Unlimited Outlets & Branches: Add unlimited retail locations, pop-up stores, kiosks, and regional fulfillment warehouses under a single merchant account.
+• Centralized Master Catalog: Maintain one master catalog of products, categories, and brands, while controlling which stores carry which items.
+• Store-Specific Pricing: Set unique retail prices per store or geographic territory.
+• Inter-Branch Stock Transfers: Complete three-step stock transfer workflow:
+  1. Store A requests stock from Central Warehouse.
+  2. Warehouse dispatches inventory (marked "In Transit").
+  3. Store A receives and reconciles shipment, automatically updating on-hand stock counts.
+• Reorder Points & Low Stock Warnings: Set minimum stock thresholds per branch. Automated system alerts notify managers when stock dips below safe levels.
+• Physical Stock Auditing & Adjustments: Record shrinkage, breakage, expired items, or stock count corrections with an unalterable audit log and reason tracking.
+• Supplier Purchase Orders (PO) & GRN: Issue formal POs to vendors, track delivery receipts, record vendor bills, and settle payables.
+
+
+================================================================================
+10. SEQUENTIAL FEATURE TOUR — PART 5: THE 5 HIGH-DEMAND INDUSTRY VERTICALS
+================================================================================
+
+Unlike generic POS systems that force every business into a square peg, Zoom POS includes 5 specialized, deeply integrated industry vertical modules:
+
+--------------------------------------------------------------------------------
+10.1 Retail & Supermarkets
+--------------------------------------------------------------------------------
+• High-speed barcode scanning grid designed for rapid item checkout.
+• Weighing-scale barcode recognition for fruits, vegetables, cheeses, and meats.
+• Multi-barcode support per item (case barcode vs individual unit barcode).
+• Fast customer search by name, phone number, or loyalty card scan.
+• Multi-pack discounts, buy-one-get-one (BOGO), and promotional pricing rules.
+• Thermal shelf label generation with price, barcode, and product attributes.
+
+--------------------------------------------------------------------------------
+10.2 Restaurant, Café, Bar & QSR
+--------------------------------------------------------------------------------
+• Visual Interactive Floor Plan: Design your dining rooms, patios, bars, and VIP lounges. Live color-coded table states: Green (Vacant), Blue (Occupied), Orange (Billed), Gray (Needs Cleaning).
+• Table Transfers & Merging: Move parties between tables or combine tables for large banquets with one tap.
+• Kitchen Display System (KDS): Interactive touchscreen view for line cooks and chefs. Track active orders, preparation times, elapsed alerts, and mark items as "Cooking", "Ready", or "Served".
+• Kitchen Order Tickets (KOT): Automatic printing of food tickets to kitchen stations and beverage tickets to the bar.
+• Contactless QR Table Ordering: Print stylish table stand QR cards. Dine-in guests scan with their phones to browse digital menus and submit orders directly.
+• Split Bill by Seat / Items: Split dining checks evenly or itemize by guest seat at checkout.
+
+--------------------------------------------------------------------------------
+10.3 Pharmacy & Healthcare POS
+--------------------------------------------------------------------------------
+• Drug Batch & Lot Number Tracking: Record batch numbers on purchase receipt and track them through dispensing.
+• Expiry Date Monitoring: Real-time warnings for near-expiry and expired drugs. System prevents dispensing expired medications at checkout.
+• Prescription Intake & Digital Archiving: Attach prescription photos or PDF documents directly to the patient's record.
+• Prescription Dispensing Flow: Dispense items against active doctor prescriptions, recording dosage instructions and doctor details.
+• Generic Drug Substitute Directory: Search medicines by generic salt formulation to offer affordable alternatives to customers.
+
+--------------------------------------------------------------------------------
+10.4 Salon, Spa & Wellness Management
+--------------------------------------------------------------------------------
+• Visual Appointment Calendar: Book services by day, week, or stylist with color-coded appointment cards.
+• Service Menu & Duration Blocks: Configure services (e.g. Haircut, Color, Massage) with specific duration buffers.
+• Stylist & Specialist Scheduling: Manage individual stylist rosters, working shifts, and chair availability.
+• Automatic Commission Tracking: Calculate stylist sales commissions automatically based on services rendered and products sold.
+• Hybrid Invoicing: Ring up salon services and retail beauty products on a single customer invoice.
+
+--------------------------------------------------------------------------------
+10.5 Repair Service Workshop & Gadget Center
+--------------------------------------------------------------------------------
+• Device Intake Ticket Creation: Capture device brand, model, serial number/IMEI, cosmetic condition, customer complaint, and intake photos.
+• Diagnostic Checklists: Standardized intake checklists (e.g. Screen, Battery, Camera, Wi-Fi, Water Damage) per device category.
+• Technician Workbench: Assign tickets to technicians, log diagnostic findings, record internal notes, and track labor hours.
+• Spare Parts Usage: Consume spare parts (screens, batteries, charging ports) directly from inventory, linking parts cost to the repair ticket.
+• Public Customer Tracking Portal: Customers check real-time repair status online using their ticket number without calling the shop.
+• Automated Status SMS / WhatsApp: Triggers automated notifications when device status changes (e.g. "Device Inspected", "Ready for Pickup").
+
+--------------------------------------------------------------------------------
+10.6 Lead Management & Sales CRM
+--------------------------------------------------------------------------------
+• Visual Kanban Deal Pipeline: Drag-and-drop deals through customizable sales stages (New, Qualified, Proposal Sent, Negotiating, Won, Lost).
+• Activity & Interaction History: Log phone calls, meeting notes, emails, and follow-up tasks against each prospect.
+• Lead Scoring & Source Attribution: Track ROI from Facebook ads, Google search, referrals, and walk-ins.
+• 1-Click Quotation & Invoice Conversion: Convert winning deals into formal sales quotations or completed POS invoices with one click.
+
+
+================================================================================
+11. SEQUENTIAL FEATURE TOUR — PART 6: CUSTOMER-FACING WEB STOREFRONT
+================================================================================
+
+Every merchant can launch their own fully branded eCommerce storefront with zero setup time:
+
+• Instant Online Store: Activated with a single click inside the merchant dashboard.
+• Mobile-Responsive eCommerce Catalog: Customers can browse categories, filter products, view high-res photos, and read product descriptions on any phone or browser.
+• Customer Account Portal: Buyers can sign up, save delivery addresses, view past order history, and re-order favorite items.
+• Flexible Fulfillment Options: Supports in-store pickup (BOPIS - Buy Online, Pick Up In Store) and local home delivery.
+• Digital Coupons & Promotions: Create percentage or fixed-amount discount codes with usage limits, expiry dates, and minimum order values.
+• Live Order Tracking Link: Customers receive a private tracking link showing order status: "Received" -> "Preparing" -> "Out for Delivery" -> "Completed".
+• Customer Reviews & Social Proof: Verified customers can leave star ratings and text reviews, with moderation controls for the store owner.
+• Storefront SEO & Social Sharing: OpenGraph tags, automated XML sitemaps, and search-engine-friendly URLs.
+
+
+================================================================================
+12. SEQUENTIAL FEATURE TOUR — PART 7: OMNICHANNEL NOTIFICATIONS ENGINE
+================================================================================
+
+Keep customers informed and automate business reminders across multiple channels:
+
+• WhatsApp Cloud API & Twilio Integration: Connect official Meta WhatsApp Cloud API credentials or Twilio WhatsApp numbers.
+• Generic HTTP SMS Gateway: Integrate any global SMS provider (e.g. Infobip, Clickatell, Textlocal, MSG91, or custom telco gateways) using dynamic HTTP webhook endpoints.
+• Automated Instant Triggers:
+  - Instant digital receipt delivery via WhatsApp or SMS.
+  - Order status updates for online store purchases.
+  - Appointment confirmations and reminders for salons.
+  - Repair completion alerts for repair shops.
+• Scheduled Cron Automated Follow-Ups:
+  - Overdue balance and payment reminder notices.
+  - Low-stock inventory alerts sent to store managers every morning.
+  - Daily sales summary digests sent to business owners upon shift close.
+
+
+================================================================================
+13. SEQUENTIAL FEATURE TOUR — PART 8: ACCOUNTING, LEDGERS & TAX ENGINES
+================================================================================
+
+Zoom POS provides a comprehensive financial backbone to keep merchants profitable and audit-ready:
+
+• Cash Register Float Management:
+  - Record opening cash float denominations at shift start.
+  - Log petty cash payouts and cash injections with mandatory reasons.
+  - Blind cash count at shift close.
+  - Automated Z-Report generation highlighting cash overages or shortages.
+• Accounts Receivable (A/R) & Debtor Ledger: Track customer credit sales, overdue aging (30/60/90 days), and record partial balance settlements.
+• Accounts Payable (A/P) & Vendor Bills: Monitor vendor invoices, payment terms, and outstanding payables.
+• Flexible Dual-Tax Engine: Configure single or multiple tax rates (GST, VAT, State Tax, Municipal Surcharge, Compound Tax). Support inclusive or exclusive tax pricing.
+• Financial Statements & Reports: Real-time Profit & Loss (P&L) statements, Net Profit margins, sales breakdown by payment method, and product margin analysis.
+
+
+================================================================================
+14. SEQUENTIAL FEATURE TOUR — PART 9: SUPERADMIN SAAS CONTROL CENTER
+================================================================================
+
+As the platform owner, you have complete command over your SaaS empire:
+
+• Subscription Plans & Pricing Tiers: Create customized tiers (e.g. Starter $29/mo, Professional $59/mo, Enterprise $119/mo). Configure limits for stores, registers, staff, products, and available modules.
+• Integrated Payment Gateways: Connect Stripe, PayPal, and Razorpay for automatic recurring card billing, plus manual bank wire transfer verification.
+• 1-Click Tenant Impersonation: Log in directly to any merchant account with one click to troubleshoot issues instantly without asking for passwords.
+• Custom Domain Manager: Approve and manage custom apex domains configured by your merchants.
+• Platform Revenue Analytics: Monitor Monthly Recurring Revenue (MRR), Annual Recurring Revenue (ARR), churn rate, and active subscriber counts.
+• Broadcast Announcements: Publish platform-wide banner notices to all active tenants regarding maintenance, feature updates, or promotions.
+
+
+================================================================================
+15. SEQUENTIAL FEATURE TOUR — PART 10: SERVER-DRIVEN UI (SDUI)
+================================================================================
+
+Zoom POS uses an advanced Server-Driven UI (SDUI) architecture in its Flutter clients:
+
+• Dynamic Navigation & Menus: The mobile app requests its navigation tree, menu items, and screen permissions from the backend on startup.
+• Zero-Update Feature Delivery: When you enable a new module (such as Pharmacy or Salon) for a merchant in the web dashboard, the new menus and screens appear on their tablets instantly—without requiring them to update their mobile app from the Play Store!
+• Role-Based UI Masking: Cashiers only see screens their role permits. Unauthorized buttons and menus are completely hidden at the engine level.
+
+
+================================================================================
+16. TECHNICAL STACK, ARCHITECTURE & SERVER REQUIREMENTS
+================================================================================
+
+Backend Framework: Laravel 11.x (PHP 8.2 / 8.3+)
+Frontend Technology: Blade, Livewire 3.x, Alpine.js, TailwindCSS
+Mobile / Desktop Engine: Flutter 3.x, Dart 3.x
+Local Database (App): SQLite (Encrypted, Offline-First)
+Server Database: MySQL 8.0+ or MariaDB 10.4+
+Web Server: Nginx or Apache (with mod_rewrite)
+Process Management: Linux Cron (for scheduled jobs) and Queue Worker (Redis or Database)
+
+Minimum Server Requirements:
+• 2 CPU Cores
+• 4 GB RAM (8 GB recommended for large SaaS deployments)
+• 20 GB SSD Disk Space
+• Standard PHP extensions: BCMath, Ctype, cURL, DOM, Fileinfo, GD, JSON, Mbstring, OpenSSL, PCRE, PDO, Tokenizer, XML, Zip
+
+
+================================================================================
+17. INCLUDED PACKAGE INVENTORY & FILE MANIFEST
+================================================================================
+
+When you download your package, you receive an organized, production-ready release:
+
+1. `zoom-sales-pos-saas.zip`: Complete Laravel 11 multi-tenant backend source code with 1-click web installer (`/install`).
+2. `zoom-sales-crm-flutter-pos-source.zip`: Full Flutter 3.x cross-platform mobile and desktop source code.
+3. `marketing-landing-page.zip`: High-converting standalone PHP marketing landing page with live interactive demo selector, color theme presets, and direct checkout integration.
+4. `license-server-files.zip`: Complete license manager and digital delivery system.
+5. All 5 Specialized Vertical Modules: Retail, Restaurant, Pharmacy, Salon, Repair, and Lead CRM.
+6. Documentation & Guides: Step-by-step guides for server setup, GitHub Actions cloud app builder configuration, and WhatsApp integration.
+7. Marketing Assets & Banners: High-resolution product banners (`marketplace-banner.jpg`, `promotional-banner-2000x10000.jpg`, `codecanyon_promo_banner.jpg`).
+
+
+================================================================================
+18. FREQUENTLY ASKED QUESTIONS (FAQ)
+================================================================================
+
+Q: Can I host this on cPanel or shared hosting?
+A: While a VPS or Cloud Server (DigitalOcean, Hetzner, AWS, Linode) is recommended for SaaS deployments, the backend runs smoothly on any cPanel hosting account supporting PHP 8.2+ and MySQL.
+
+Q: Do I need Android Studio or Flutter installed on my computer?
+A: No! With the included White-Label Cloud App Builder, all Android APKs, Google Play AABs, and Windows apps are compiled automatically in the cloud via GitHub Actions.
+
+Q: Can my tenants use their own custom domain names?
+A: Yes! The system natively supports custom domain mapping (e.g. `pos.clientstore.com`) with automated SSL detection.
+
+Q: Does the POS work when the internet is completely offline?
+A: Yes! The Flutter app uses a local SQLite database to record sales offline, automatically synchronizing to the cloud server once internet connectivity is restored.
+
+Q: Are there any monthly recurring fees or royalties owed to you?
+A: None whatsoever. You pay once for the license and keep 100% of the subscription revenue you collect from your merchants.
+
+Q: Can I customize the source code?
+A: Absolutely. You receive 100% unencrypted source code for both the Laravel backend and the Flutter mobile apps.
+
+================================================================================
+"""
+
+def main():
+    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        f.write(CONTENT.strip() + "\n")
+    
+    os.chmod(OUTPUT_FILE, 0o644)
+    file_size = os.path.getsize(OUTPUT_FILE)
+    print(f"Successfully generated {OUTPUT_FILE} ({file_size} bytes)")
+
+if __name__ == "__main__":
+    main()

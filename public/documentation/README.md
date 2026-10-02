@@ -1,33 +1,26 @@
-# Zoom Sales CRM & Inventory — Documentation
+# Zoom Sales CRM & Inventory — Complete Feature Guide
 
-## Help & Support
+Open **index.html** in any browser to view the full illustrated, searchable documentation portal.
 
-For help with Zoom Sales CRM & Inventory, contact:
+The same content is also included as plain Markdown in **Zoom_Sales_CRM_Feature_Guide.md** for easy editing, printing, or converting to another format.
 
-- **WhatsApp:** [+91 85350 75196](https://wa.me/918535075196)
-- **Telegram:** [@cloudonext](https://t.me/cloudonext)
-- **Email:** [support@zoomnearby.com](mailto:support@zoomnearby.com)
+## Contents
 
-Include the app version, affected screen and a brief description of the problem.
+- `index.html` — the browsable documentation portal (search, dark/light theme, print-to-PDF)
+- `Zoom_Sales_CRM_Feature_Guide.md` — the same guide in Markdown
+- `images/` — illustrative diagrams referenced by the portal
 
+## What's covered
 
-Open the [complete illustrated portal](index.html) at `/documentation/`. This manual covers Laravel administration, tenant workflows, Flutter screens, industry modules, online commerce, deployment and operations. The existing `/documwnation/` location remains a compatibility copy.
+How the platform works, business & platform administration, user & branch management, product catalog & inventory, point of sale, invoicing & quotations, customer & financial management, the online storefront, automation & notifications, every industry module (restaurant, pharmacy, salon, repair, service orders, lead management), the mobile & desktop app, offline mode, hardware & printing support, **installation & deployment (including the automatic browser-based installer at `/install`)**, a **complete Flutter app build guide for Android and Windows**, and **support & help**.
 
-Each business feature includes capabilities, instructions, benefits and a source reference. Graphics illustrate architecture, installation, module loading, synchronization and hardware. Technical inventories include every registered route and public method/UI field collected from the reviewed source, plus every Flutter Dart file.
+## Quick facts
 
-## Chapters
+- **Install the backend:** visit `https://your.domain.com/install` in a browser and follow the guided wizard.
+- **Build the app:** see the Flutter App section in the guide for Android (`flutter build apk` / `appbundle`) and Windows (`flutter build windows`) build steps.
 
-- [Zoom Sales CRM & Inventory — Complete Feature Guide and Architecture](00_OVERVIEW_AND_ARCHITECTURE.md)
-- [Server and Client Requirements](01_SERVER_REQUIREMENTS.md)
-- [Backend Installation and Commercial Rollout](02_BACKEND_INSTALLATION.md)
-- [Web Server, Domains and HTTPS](03_WEBSERVER_CONFIG_AND_SSL.md)
-- [Scheduler, Queues, Notifications and Background Operations](04_CRON_QUEUES_AND_SUPERVISOR.md)
-- [Industry Modules, SDUI and Business Workflows](05_SDUI_AND_MODULE_PACKAGES.md)
-- [Flutter App — Features, Instructions and Release Builds](06_FLUTTER_APP_SETUP_AND_BUILD.md)
-- [Offline Sync, Printing and POS Hardware](07_OFFLINE_SYNC_AND_HARDWARE.md)
-- [Licensing, Entitlements and Access Controls](08_LICENSING_SERVER_AND_SECURITY.md)
-- [Troubleshooting, API Reference and Complete Coverage Inventory](09_TROUBLESHOOTING_AND_FAQ.md)
+## Support
 
-## Review scope
-
-Reviewed on 23 September 2026: 56 general feature workflows, 8 industry workflows, 1,355 registered route entries, 598 route actions, 2,705 public PHP methods and 273 Flutter Dart files. Includes compatibility and helper code; coverage counts are not claims that every source entry is a distinct customer feature. No live transactions or app releases were produced for this documentation update.
+- WhatsApp: +91 85350 75196
+- Telegram: @cloudonext
+- Email: support@zoomnearby.com

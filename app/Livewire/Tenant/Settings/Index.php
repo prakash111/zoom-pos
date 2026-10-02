@@ -381,7 +381,7 @@ class Index extends Component
         $routeName = request()->route()?->getName() ?? '';
         if (str_ends_with($routeName, '.mode') || request()->query('section') === 'mode') {
             $this->activeSection = 'mode';
-        } elseif (str_ends_with($routeName, '.profile') || request()->query('section') === 'profile') {
+        } elseif (str_ends_with($routeName, '.profile') || str_ends_with($routeName, '.domain') || request()->query('section') === 'profile' || request()->query('section') === 'domain') {
             $this->activeSection = 'profile';
         } elseif (str_ends_with($routeName, '.receipts') || request()->query('section') === 'receipts') {
             $this->activeSection = 'receipts';
@@ -393,9 +393,9 @@ class Index extends Component
             $this->activeSection = 'integrations';
         } elseif (str_ends_with($routeName, '.navigation') || request()->query('section') === 'navigation') {
             $this->activeSection = 'navigation';
-        } elseif (str_ends_with($routeName, '.storefront') || request()->query('section') === 'storefront') {
+        } elseif (str_ends_with($routeName, '.storefront') || str_ends_with($routeName, '.storefront.banner') || request()->query('section') === 'storefront') {
             $this->activeSection = 'storefront';
-        } elseif (str_ends_with($routeName, '.payments') || request()->query('section') === 'payments') {
+        } elseif (str_ends_with($routeName, '.payments') || str_ends_with($routeName, '.storefront.payments') || request()->query('section') === 'payments') {
             $this->activeSection = 'payments';
         } else {
             $this->activeSection = request()->query('section', 'overview');
@@ -786,8 +786,25 @@ class Index extends Component
         }
     }
 
+    private function guardAgainstDemoMode(): bool
+    {
+        if (config('app.demo_mode')) {
+            session()->flash('error', 'Action disabled: Modifications are restricted in demo mode.');
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Action disabled: Modifications are restricted in demo mode.']);
+            $this->dispatch('toast', ['type' => 'error', 'message' => 'Action disabled: Modifications are restricted in demo mode.']);
+
+            return true;
+        }
+
+        return false;
+    }
+
     public function removeLogo(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         if ($this->company->logo && ! filter_var($this->company->logo, FILTER_VALIDATE_URL)) {
             $cleanPath = preg_replace('#^/?storage/#', '', $this->company->logo);
             Storage::disk('public')->delete($cleanPath);
@@ -802,6 +819,10 @@ class Index extends Component
 
     public function removeFavicon(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         if ($this->company->favicon && ! filter_var($this->company->favicon, FILTER_VALIDATE_URL)) {
             $cleanPath = preg_replace('#^/?storage/#', '', $this->company->favicon);
             Storage::disk('public')->delete($cleanPath);
@@ -815,6 +836,10 @@ class Index extends Component
 
     public function removeStoreBannerImage(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         if ($this->company->store_banner_image_url && ! filter_var($this->company->store_banner_image_url, FILTER_VALIDATE_URL)) {
             $cleanPath = preg_replace('#^/?storage/#', '', $this->company->store_banner_image_url);
             Storage::disk('public')->delete($cleanPath);
@@ -828,6 +853,10 @@ class Index extends Component
 
     public function resetStoreBannerToDefault(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $this->storeBannerTag = 'SPECIAL STORE DEALS';
         $this->storeBannerTitle = 'Grab Up To 50% Off On Selected Products';
         $this->storeBannerSubtitle = 'Order authentic items online with direct-to-door verified dispatch and real-time inventory.';
@@ -851,6 +880,10 @@ class Index extends Component
 
     public function save(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $user = auth('web')->user();
         if ($user && ! PermissionChecker::can($user, 'settings')) {
             abort(403, 'Unauthorized.');
@@ -1047,6 +1080,10 @@ class Index extends Component
 
     public function saveAiConfiguration(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $user = auth('web')->user();
         if ($user && ! PermissionChecker::can($user, 'settings')) {
             abort(403, 'Unauthorized.');
@@ -1090,6 +1127,10 @@ class Index extends Component
 
     public function saveWhatsAppGateway(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $existing = TenantNotificationGateway::withoutGlobalScope('company')
             ->where('company_id', $this->company->id)
             ->where('channel', TenantNotificationGateway::CHANNEL_WHATSAPP)
@@ -1140,6 +1181,10 @@ class Index extends Component
 
     public function saveSmsGateway(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $existing = TenantNotificationGateway::withoutGlobalScope('company')
             ->where('company_id', $this->company->id)
             ->where('channel', TenantNotificationGateway::CHANNEL_SMS)
@@ -1179,6 +1224,10 @@ class Index extends Component
 
     public function saveSmtpGateway(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $credentials = [
             'host' => trim($this->smtpHost),
             'port' => (int) $this->smtpPort,
@@ -1223,6 +1272,10 @@ class Index extends Component
 
     public function saveWebhookGateway(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $credentials = [
             'url' => trim($this->webhookUrl),
             'method' => $this->webhookMethod,
@@ -1252,6 +1305,10 @@ class Index extends Component
 
     public function saveNotificationPreferences(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $this->company->update([
             'require_customer_verification' => $this->requireCustomerVerification,
             'verification_channels' => array_values(array_filter($this->verificationChannels)),
@@ -1274,6 +1331,10 @@ class Index extends Component
 
     public function toggleGateway(string $channel): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $channel = match ($channel) {
             'email', 'smtp' => TenantNotificationGateway::CHANNEL_EMAIL,
             'webhook', 'custom_webhook' => TenantNotificationGateway::CHANNEL_WEBHOOK,
@@ -1450,6 +1511,10 @@ class Index extends Component
 
     public function saveChannel(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $this->validate([
             'channelName' => ['required', 'string', 'max:100'],
             'channelIcon' => ['nullable', 'string', 'max:255'],
@@ -1503,6 +1568,10 @@ class Index extends Component
 
     public function deleteChannel(int $id): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $channel = \App\Models\CustomNotificationChannel::where('company_id', $this->company->id)->findOrFail($id);
         $name = $channel->name;
         $channel->delete();
@@ -1537,6 +1606,10 @@ class Index extends Component
 
     public function savePaymentMethod(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $this->validate([
             'pmName' => ['required', 'string', 'max:100'],
             'pmCode' => ['nullable', 'string', 'max:50'],
@@ -1588,6 +1661,10 @@ class Index extends Component
 
     public function togglePaymentMethodStatus(string $id): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $pm = PaymentMethod::where('company_id', $this->company->id)->findOrFail($id);
         $pm->update(['is_active' => ! $pm->is_active]);
 
@@ -1596,6 +1673,10 @@ class Index extends Component
 
     public function deletePaymentMethod(string $id): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $pm = PaymentMethod::where('company_id', $this->company->id)->findOrFail($id);
         $name = $pm->name;
         $pm->delete();
@@ -1669,6 +1750,10 @@ class Index extends Component
 
     public function saveTaxRule(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $this->validate([
             'taxRuleName' => ['required', 'string', 'max:255'],
             'taxRuleRate' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -1720,6 +1805,10 @@ class Index extends Component
 
     public function setDefaultTaxRule(string $id): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         TaxRule::where('company_id', $this->company->id)->update(['is_default' => false]);
         $rule = TaxRule::where('company_id', $this->company->id)->findOrFail($id);
         $rule->update(['is_default' => true]);
@@ -1729,6 +1818,10 @@ class Index extends Component
 
     public function deleteTaxRule(string $id): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $rule = TaxRule::where('company_id', $this->company->id)->findOrFail($id);
         $name = $rule->tax_name;
         $rule->delete();
@@ -1738,11 +1831,19 @@ class Index extends Component
 
     public function seedJurisdictionTaxRules(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $this->preSeedTaxRules($this->company->country ?: 'US');
     }
 
     public function preSeedTaxRules(string $countryCode): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $service = app(TaxCalculationService::class);
         $service->seedTenantDefaultTaxRules($this->company, $countryCode);
 
@@ -1755,6 +1856,10 @@ class Index extends Component
     // Developer API Key Actions
     public function createApiKey(): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $this->validate([
             'newApiKeyName' => ['required', 'string', 'max:255'],
         ]);
@@ -1776,6 +1881,10 @@ class Index extends Component
 
     public function revokeApiKey(string $id): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $key = TenantApiKey::where('company_id', $this->company->id)->findOrFail($id);
         $key->delete();
         session()->flash('status', "API key {$key->name} revoked.");
@@ -1783,6 +1892,10 @@ class Index extends Component
 
     public function toggleApiKey(string $id): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $key = TenantApiKey::where('company_id', $this->company->id)->findOrFail($id);
         $key->update(['active' => ! $key->active]);
         session()->flash('status', "API key {$key->name} is now ".($key->active ? 'Active' : 'Disabled').'.');
@@ -1992,6 +2105,10 @@ class Index extends Component
      */
     public function saveNavConfig(array $sections): void
     {
+        if ($this->guardAgainstDemoMode()) {
+            return;
+        }
+
         $user = auth('web')->user();
         if ($user && ! PermissionChecker::can($user, 'settings')) {
             abort(403, 'Unauthorized.');

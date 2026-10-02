@@ -61,7 +61,7 @@ class MobileDeviceStoreNameFormattingTest extends TestCase
         $this->token = $res->json('token');
     }
 
-    public function test_mobile_user_agent_returns_truncated_three_character_store_name_and_preserves_full_name(): void
+    public function test_mobile_user_agent_returns_truncated_four_character_short_name_and_preserves_full_name(): void
     {
         $mobileAgents = [
             'Dart/3.1 (dart:io)',
@@ -79,14 +79,16 @@ class MobileDeviceStoreNameFormattingTest extends TestCase
             ])->getJson('/api/v1/tenant/stores');
 
             $response->assertOk()
-                ->assertJsonPath('data.0.name', 'Zoo')
+                ->assertJsonPath('data.0.short_name', 'Zoom')
+                ->assertJsonPath('data.0.name', 'ZoomNearby Enterprise Demo')
                 ->assertJsonPath('data.0.full_name', 'ZoomNearby Enterprise Demo')
-                ->assertJsonPath('stores.0.name', 'Zoo')
+                ->assertJsonPath('stores.0.short_name', 'Zoom')
+                ->assertJsonPath('stores.0.name', 'ZoomNearby Enterprise Demo')
                 ->assertJsonPath('stores.0.full_name', 'ZoomNearby Enterprise Demo');
         }
     }
 
-    public function test_mobile_client_platform_header_returns_three_character_store_name(): void
+    public function test_mobile_client_platform_header_returns_four_character_short_name(): void
     {
         foreach (['android', 'ios', 'mobile'] as $platform) {
             $response = $this->withHeaders([
@@ -96,7 +98,8 @@ class MobileDeviceStoreNameFormattingTest extends TestCase
             ])->getJson('/api/v1/tenant/stores');
 
             $response->assertOk()
-                ->assertJsonPath('data.0.name', 'Zoo')
+                ->assertJsonPath('data.0.short_name', 'Zoom')
+                ->assertJsonPath('data.0.name', 'ZoomNearby Enterprise Demo')
                 ->assertJsonPath('data.0.full_name', 'ZoomNearby Enterprise Demo');
         }
     }
@@ -117,6 +120,7 @@ class MobileDeviceStoreNameFormattingTest extends TestCase
             ])->getJson('/api/v1/tenant/stores');
 
             $response->assertOk()
+                ->assertJsonPath('data.0.short_name', 'Zoom')
                 ->assertJsonPath('data.0.name', 'ZoomNearby Enterprise Demo')
                 ->assertJsonPath('data.0.full_name', 'ZoomNearby Enterprise Demo');
         }
@@ -132,6 +136,7 @@ class MobileDeviceStoreNameFormattingTest extends TestCase
         ])->getJson('/api/v1/tenant/stores');
 
         $response->assertOk()
+            ->assertJsonPath('data.0.short_name', 'Zoom')
             ->assertJsonPath('data.0.name', 'ZoomNearby Enterprise Demo')
             ->assertJsonPath('data.0.full_name', 'ZoomNearby Enterprise Demo');
     }
@@ -148,9 +153,11 @@ class MobileDeviceStoreNameFormattingTest extends TestCase
         ]);
 
         $mobileSwitch->assertOk()
-            ->assertJsonPath('current_store.name', 'Zoo')
+            ->assertJsonPath('current_store.short_name', 'Zoom')
+            ->assertJsonPath('current_store.name', 'ZoomNearby Enterprise Demo')
             ->assertJsonPath('current_store.full_name', 'ZoomNearby Enterprise Demo')
-            ->assertJsonPath('store.name', 'Zoo')
+            ->assertJsonPath('store.short_name', 'Zoom')
+            ->assertJsonPath('store.name', 'ZoomNearby Enterprise Demo')
             ->assertJsonPath('store.full_name', 'ZoomNearby Enterprise Demo');
 
         // Desktop switch request
@@ -163,6 +170,7 @@ class MobileDeviceStoreNameFormattingTest extends TestCase
         ]);
 
         $desktopSwitch->assertOk()
+            ->assertJsonPath('current_store.short_name', 'Zoom')
             ->assertJsonPath('current_store.name', 'ZoomNearby Enterprise Demo')
             ->assertJsonPath('current_store.full_name', 'ZoomNearby Enterprise Demo');
     }
@@ -177,10 +185,12 @@ class MobileDeviceStoreNameFormattingTest extends TestCase
         ])->getJson('/api/v1/tenant/store-profile');
 
         $mobileRes->assertOk()
-            ->assertJsonPath('name', 'Zoo')
+            ->assertJsonPath('short_name', 'Zoom')
+            ->assertJsonPath('name', 'ZoomNearby Enterprise Demo')
             ->assertJsonPath('full_name', 'ZoomNearby Enterprise Demo')
-            ->assertJsonPath('store_name', 'Zoo')
-            ->assertJsonPath('tenant.name', 'Zoo')
+            ->assertJsonPath('store_name', 'ZoomNearby Enterprise Demo')
+            ->assertJsonPath('tenant.short_name', 'Zoom')
+            ->assertJsonPath('tenant.name', 'ZoomNearby Enterprise Demo')
             ->assertJsonPath('tenant.full_name', 'ZoomNearby Enterprise Demo');
 
         // Desktop request
@@ -191,9 +201,11 @@ class MobileDeviceStoreNameFormattingTest extends TestCase
         ])->getJson('/api/v1/tenant/store-profile');
 
         $desktopRes->assertOk()
+            ->assertJsonPath('short_name', 'Zoom')
             ->assertJsonPath('name', 'ZoomNearby Enterprise Demo')
             ->assertJsonPath('full_name', 'ZoomNearby Enterprise Demo')
             ->assertJsonPath('store_name', 'ZoomNearby Enterprise Demo')
+            ->assertJsonPath('tenant.short_name', 'Zoom')
             ->assertJsonPath('tenant.name', 'ZoomNearby Enterprise Demo')
             ->assertJsonPath('tenant.full_name', 'ZoomNearby Enterprise Demo');
     }
@@ -209,6 +221,7 @@ class MobileDeviceStoreNameFormattingTest extends TestCase
         ])->getJson('/api/v1/tenant/stores');
 
         $response->assertOk()
+            ->assertJsonPath('data.0.short_name', 'AB')
             ->assertJsonPath('data.0.name', 'AB')
             ->assertJsonPath('data.0.full_name', 'AB');
 
@@ -221,6 +234,7 @@ class MobileDeviceStoreNameFormattingTest extends TestCase
         ])->getJson('/api/v1/tenant/stores');
 
         $response2->assertOk()
+            ->assertJsonPath('data.0.short_name', 'ZNE')
             ->assertJsonPath('data.0.name', 'ZNE')
             ->assertJsonPath('data.0.full_name', 'ZNE');
     }

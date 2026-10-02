@@ -62,6 +62,11 @@ class Index extends Component
         $this->loadTranslations($localization);
     }
 
+    public function updatedSelectedLocale(string $locale, LocalizationService $localization): void
+    {
+        $this->loadTranslations($localization);
+    }
+
     public function loadTranslations(LocalizationService $localization): void
     {
         $this->reset(['successMessage', 'errorMessage', 'modifiedKeys']);
@@ -192,10 +197,10 @@ class Index extends Component
 
         // Filter translations by search query
         $filteredTranslations = [];
-        $query = strtolower(trim($this->searchQuery));
+        $query = mb_strtolower(trim($this->searchQuery), 'UTF-8');
 
         foreach ($this->translations as $k => $v) {
-            if ($query === '' || str_contains(strtolower($k), $query) || str_contains(strtolower($v), $query)) {
+            if ($query === '' || str_contains(mb_strtolower((string) $k, 'UTF-8'), $query) || str_contains(mb_strtolower((string) $v, 'UTF-8'), $query)) {
                 $filteredTranslations[$k] = $v;
             }
         }

@@ -26,6 +26,19 @@ foreach (array_filter(array_map('trim', explode(';', file_get_contents(__DIR__.'
     }
 }
 
+$builderSql = __DIR__.'/../database/add_app_builder.sql';
+if (file_exists($builderSql)) {
+    foreach (array_filter(array_map('trim', explode(';', file_get_contents($builderSql)))) as $stmt) {
+        try {
+            $pdo->exec($stmt);
+        } catch (Throwable $e) {
+            if (! preg_match('/duplicate|exists/i', $e->getMessage())) {
+                throw $e;
+            }
+        }
+    }
+}
+
 @mkdir(__DIR__.'/../storage/packages', 0770, true);
 
 echo "Schema imported into '".DB_NAME."'. Tables: ".implode(', ', $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN))."\n";

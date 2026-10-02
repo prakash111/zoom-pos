@@ -96,7 +96,7 @@ class LivewireLoginTest extends TestCase
         $tenantResponse = $this->get(route('tenant.login'));
         $tenantResponse->assertOk();
         $tenantResponse->assertSee('Demo Mode Active');
-        $tenantResponse->assertSee('https://web.zoomnearby.com');
+        $tenantResponse->assertSee('https://saas.zoomnearby.com/pos-web/');
         $tenantResponse->assertSee('Try Flutter Web Version Tenant Demo');
         // Consolidated demo module switcher — the 5 store-type chips.
         $tenantResponse->assertSee('Cafe &amp; Restaurant', false);
@@ -127,7 +127,7 @@ class LivewireLoginTest extends TestCase
         $tenantResponse->assertOk();
         $tenantResponse->assertDontSee('Demo Mode Active');
         $tenantResponse->assertDontSee('Quick Demo Credentials');
-        $tenantResponse->assertSee('https://web.zoomnearby.com');
+        $tenantResponse->assertDontSee('https://saas.zoomnearby.com/pos-web/');
 
         Livewire::test(PlatformLogin::class)
             ->assertSet('email', '')

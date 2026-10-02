@@ -70,6 +70,13 @@ class Index extends Component
     {
         $module = SduiModule::findOrFail($moduleId);
 
+        if ($module->source_type === 'builtin' || in_array($module->slug, ['retail', 'restaurant'], true)) {
+            $module->update(['is_active' => true]);
+            session()->flash('status', "Module \"{$module->name}\" activated.");
+
+            return;
+        }
+
         // Licensed package modules need a valid key before the first activation.
         if ($module->requires_license && $module->license_status !== 'active') {
             $this->validate(
@@ -110,7 +117,7 @@ class Index extends Component
     {
         $module = SduiModule::findOrFail($moduleId);
 
-        if (! $module->requires_license) {
+        if ($module->source_type === 'builtin' || in_array($module->slug, ['retail', 'restaurant'], true) || ! $module->requires_license) {
             session()->flash('status', "Module \"{$module->name}\" does not require a license.");
 
             return;
@@ -154,6 +161,13 @@ class Index extends Component
     {
         $module = SduiModule::findOrFail($moduleId);
 
+        if ($module->source_type === 'builtin' || in_array($module->slug, ['retail', 'restaurant'], true)) {
+            $module->update(['is_active' => false]);
+            session()->flash('status', "Module \"{$module->name}\" deactivated.");
+
+            return;
+        }
+
         try {
             $service->deactivate($module, auth('platform_web')->id());
             session()->flash('status', "Module \"{$module->name}\" deactivated.");
@@ -166,6 +180,12 @@ class Index extends Component
     {
         $module = SduiModule::findOrFail($moduleId);
         $name = $module->name;
+
+        if ($module->source_type === 'builtin' || in_array($module->slug, ['retail', 'restaurant'], true)) {
+            session()->flash('error', "Core built-in module \"{$name}\" cannot be uninstalled.");
+
+            return;
+        }
 
         try {
             $service->uninstall($module, $dropData, auth('platform_web')->id());
@@ -213,7 +233,8 @@ class Index extends Component
 
     private function packageModules(): Collection
     {
-        return SduiModule::where('source_type', 'package')
+        return SduiModule::whereIn('source_type', ['package', 'builtin'])
+            ->orderByRaw("CASE WHEN slug = 'retail' THEN 1 WHEN slug = 'restaurant' THEN 2 ELSE 3 END")
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();

@@ -16,7 +16,7 @@
         <nav class="reference-nav" aria-label="{{ __('Main navigation') }}">
             @foreach ($referenceNavigation as $item)
                 <a href="{{ $item['url'] }}" target="{{ $item['target'] ?? '_self' }}" @if(($item['target'] ?? '_self') === '_blank') rel="noopener noreferrer" @endif
-                   @class(['reference-nav-link', 'is-active' => in_array($item['url'], ['#', '#showcase', url('/')], true)])>{{ $item['title'] }}</a>
+                   @class(['reference-nav-link', 'is-active' => in_array($item['url'], ['#', '#showcase', url('/')], true)])>{{ __($item['title']) }}</a>
             @endforeach
         </nav>
         <div class="reference-header-actions">
@@ -56,13 +56,31 @@
     </div>
     <nav id="reference-mobile-nav" class="reference-mobile-nav" aria-label="{{ __('Mobile navigation') }}" x-show="mobileOpen" x-cloak x-on:click.outside="mobileOpen = false">
         @foreach ($referenceNavigation as $item)
-            <a href="{{ $item['url'] }}" target="{{ $item['target'] ?? '_self' }}" x-on:click="mobileOpen = false">{{ $item['title'] }}</a>
+            <a href="{{ $item['url'] }}" target="{{ $item['target'] ?? '_self' }}" x-on:click="mobileOpen = false">{{ __($item['title']) }}</a>
         @endforeach
+        @if ($publicLanguages->isNotEmpty())
+            <div class="pt-3 pb-2 border-t border-slate-200 dark:border-white/10">
+                <div class="text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 px-1 flex items-center gap-1.5">
+                    <x-landing.icon name="globe" width="16" height="16" />
+                    <span>{{ __('Select Language') }}</span>
+                </div>
+                <div class="grid grid-cols-2 gap-1.5">
+                    @foreach ($publicLanguages as $language)
+                        <a href="{{ route('locale.switch', $language->code) }}" data-no-spa="true"
+                           class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs {{ ($publicActiveLang?->code ?? 'en') === $language->code ? 'bg-blue-50 text-blue-600 font-bold dark:bg-blue-500/10 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800' }}">
+                            <span class="uppercase font-mono text-[10px]">{{ $language->code }}</span>
+                            <span>{{ $language->native_name ?: $language->name }}</span>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        @endif
         @if (auth('platform_web')->check())
             <a href="{{ url('/superadmin') }}" class="reference-button reference-button--primary">{{ __('SuperAdmin') }}</a>
         @elseif (auth('web')->check())
             <a href="{{ url('/tenant') }}" class="reference-button reference-button--primary">{{ __('Go to Dashboard') }}</a>
         @else
+            <a href="{{ route('tenant.login') }}" class="reference-button reference-button--outline">{{ __('Sign in') }}</a>
             <a href="{{ route('tenant.register') }}" class="reference-button reference-button--primary">{{ __('Start Free Trial') }}</a>
         @endif
     </nav>

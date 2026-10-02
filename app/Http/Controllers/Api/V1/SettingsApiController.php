@@ -13,6 +13,7 @@ use App\Models\PaymentMethod;
 use App\Services\Invoice\InvoiceDeliveryService;
 use App\Services\Localization\PlatformRegionalService;
 use App\Services\Navigation\MenuService;
+use App\Services\Navigation\NavigationSanitizerService;
 use App\Services\Navigation\TenantNavRegistry;
 use App\Services\Notifications\CustomChannelDispatcherService;
 use App\Services\Sdui\SchemaResponse;
@@ -34,10 +35,24 @@ class SettingsApiController extends Controller
     public function index(Request $request): JsonResponse
     {
         $company = $this->resolveCompany($request);
+        $navConfig = NavigationSanitizerService::getStoreNavigationConfig($company);
 
         return response()->json([
             'success' => true,
             'pos_mode' => $company->isRestaurantMode() ? 'restaurant' : 'general',
+            'operating_mode' => $navConfig['operating_mode'],
+            'is_restaurant' => (bool) $navConfig['is_restaurant'],
+            'pos_layout' => $navConfig['pos_layout'],
+            'default_terminal_view' => $navConfig['default_terminal_view'],
+            'primary_pos_route' => $navConfig['primary_pos_route'],
+            'center_action_route' => $navConfig['center_action_route'],
+            'center_button_route' => $navConfig['center_button_route'],
+            'primary_action' => $navConfig['primary_action'],
+            'default_pos_screen' => $navConfig['default_pos_screen'],
+            'default_pos_action' => $navConfig['default_pos_action'],
+            'drawer_pos_route' => $navConfig['drawer_pos_route'],
+            'quick_actions' => $navConfig['quick_actions'],
+            'navigation_config' => $navConfig,
             'restaurant_mode_locked' => (bool) $company->restaurant_mode_locked,
             'profile' => $this->presentProfile($company),
             'branding' => $company->getThemeTokens(),
@@ -1373,6 +1388,7 @@ class SettingsApiController extends Controller
         $sections = TenantNavRegistry::getEffectiveNavForTenant($company, $selectedColor);
         $drawerHeader = $company->getDrawerHeaderPayload();
         $menuComponents = app(\App\Http\Controllers\Api\NavigationController::class)->getDrawerMenuComponents($request, $company, $selectedColor);
+        $navConfig = NavigationSanitizerService::getStoreNavigationConfig($company);
 
         return response()->json([
             'success'         => true,
@@ -1384,6 +1400,23 @@ class SettingsApiController extends Controller
             'store_type'      => $company->store_type,
             'header'          => $drawerHeader,
             'drawer_header'   => $drawerHeader,
+            'operating_mode'  => $navConfig['operating_mode'],
+            'is_restaurant'   => (bool) $navConfig['is_restaurant'],
+            'pos_layout'      => $navConfig['pos_layout'],
+            'default_terminal_view' => $navConfig['default_terminal_view'],
+            'primary_pos_route' => $navConfig['primary_pos_route'],
+            'center_action_route' => $navConfig['center_action_route'],
+            'center_button_route' => $navConfig['center_button_route'],
+            'primary_action'  => $navConfig['primary_action'],
+            'default_pos_screen' => $navConfig['default_pos_screen'],
+            'default_pos_action' => $navConfig['default_pos_action'],
+            'drawer_pos_route' => $navConfig['drawer_pos_route'],
+            'quick_actions'   => $navConfig['quick_actions'],
+            'navigation_config' => $navConfig,
+            'store_navigation_config' => $navConfig,
+            'bottom_nav_schema' => NavigationSanitizerService::getBottomNavigationSchema($company),
+            'bottom_nav_config' => NavigationSanitizerService::getBottomNavigationSchema($company),
+            'bottom_navigation' => NavigationSanitizerService::getBottomNavigationSchema($company),
             'sections'        => $sections,
             'navigation'      => $sections,
             'components'      => $menuComponents,
@@ -1392,7 +1425,38 @@ class SettingsApiController extends Controller
         ]);
     }
 
+    public function getBottomNavigation(Request $request): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $user = $this->resolveUser($request, $company);
+
+        $currentStoreId = (int) ($request->attributes->get('store_id') ?? $user?->current_store_id);
+        $store = null;
+        if ($currentStoreId && $company) {
+            $store = \App\Models\Store::where('company_id', $company->id)->where('id', $currentStoreId)->first();
+        }
+        if (! $store && $company) {
+            $store = \App\Models\Store::where('company_id', $company->id)->where('is_primary', true)->first()
+                ?? \App\Models\Store::where('company_id', $company->id)->first();
+        }
+        $target = $store ?: $company;
+
+        $bottomSchema = NavigationSanitizerService::getBottomNavigationSchema($target);
+
+        return response()->json([
+            'success'                 => true,
+            'items'                   => $bottomSchema['items'],
+            'center_action'           => $bottomSchema['center_action'],
+            'config'                  => $bottomSchema['config'],
+            'bottom_nav_schema'       => $bottomSchema,
+            'bottom_nav_config'       => $bottomSchema,
+            'bottom_navigation'       => $bottomSchema,
+            'store_navigation_config' => $bottomSchema['config'],
+        ]);
+    }
+
     public function getDrawerMenu(Request $request): JsonResponse
+
     {
         return app(\App\Http\Controllers\Api\NavigationController::class)->getDrawerMenu($request);
     }

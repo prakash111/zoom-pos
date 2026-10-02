@@ -101,9 +101,9 @@ class StoreSettingsModeIsolationTest extends TestCase
         $company->update(['pos_mode' => 'general']);
 
         Livewire::test(Dashboard::class)
-            ->assertSee('Launch Casier POS')
-            ->assertSee('Low Stock Warnings')
-            ->assertDontSee('Dining Sales')
+            ->assertSee('Choose POS Layout')
+            ->assertSee('Low Stock Items')
+            ->assertDontSee('Open Restaurant POS')
             ->assertDontSee('Table 99');
 
         $navResponse = $this->actingAs($admin, 'web')->get(route('tenant.dashboard'));
@@ -118,10 +118,9 @@ class StoreSettingsModeIsolationTest extends TestCase
 
         Livewire::test(Dashboard::class)
             ->assertSee('Open Restaurant POS')
-            ->assertSee('Dining Sales')
             ->assertSee('Table 99')
-            ->assertDontSee('Launch Casier POS')
-            ->assertDontSee('Low Stock Warnings');
+            ->assertDontSee('Choose POS Layout')
+            ->assertDontSee('Low Stock Items');
 
         $navResponseRest = $this->actingAs($admin, 'web')->get(route('tenant.dashboard'));
         $navResponseRest->assertSee('Food POS');

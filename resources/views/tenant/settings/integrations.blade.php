@@ -383,32 +383,39 @@
             <!-- Generic HTTP REST SMS Form -->
             @if($smsProvider === 'generic_http')
                 <div class="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/60 space-y-4">
-                    <div class="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <span>🛡️</span>
-                        <span>{{ __('Generic HTTP REST SMS Gateway') }}</span>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                        <div class="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <span>🛡️</span>
+                            <span>{{ __('ZoomNearby SMS Gateway / Generic HTTP REST API') }}</span>
+                        </div>
+                        <a href="https://sms.zoomnearby.com/docs/api#authenticating-requests" target="_blank" rel="noopener" class="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+                            <span>📖</span>
+                            <span>{{ __('SMS Gateway API Guide') }} &rarr;</span>
+                        </a>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div class="md:col-span-2">
                             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('Gateway Endpoint URL') }} <span class="text-rose-500">*</span></label>
-                            <input type="text" wire:model="genericSmsUrl" placeholder="https://api.sms.com/send?to={phone}&msg={message}"
+                            <input type="text" wire:model="genericSmsUrl" placeholder="https://sms.zoomnearby.com/api/v1/messages/send"
                                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white">
-                            <p class="text-[10px] text-slate-400 mt-1">{{ __('Use {phone} and {message} placeholders in URL or payload.') }}</p>
+                            <p class="text-[10px] text-slate-400 mt-1">{{ __('Official: https://sms.zoomnearby.com/api/v1/messages/send (or custom endpoint with {phone} and {message} placeholders).') }}</p>
                         </div>
 
                         <div>
                             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('HTTP Method') }}</label>
                             <select wire:model="genericSmsMethod" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-900 dark:text-white">
-                                <option value="POST">POST</option>
+                                <option value="POST">POST (JSON - Recommended)</option>
                                 <option value="GET">GET</option>
                             </select>
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('API Key / Bearer Token (Optional)') }}</label>
-                        <input type="password" wire:model="genericSmsApiKey" placeholder="API Key / Token" autocomplete="new-password"
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">{{ __('API Auth Key (Bearer Token)') }} <span class="text-rose-500">*</span></label>
+                        <input type="password" wire:model="genericSmsApiKey" placeholder="Your API Token from sms.zoomnearby.com dashboard" autocomplete="new-password"
                                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white">
+                        <p class="text-[10px] text-slate-400 mt-1">{{ __('Generate from sms.zoomnearby.com dashboard > "Generate API token". Sent automatically as Authorization: Bearer {token}.') }}</p>
                     </div>
                 </div>
             @endif

@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Log;
 class SmsGatewayService
 {
     /**
-     * Dispatch SMS using the tenant's configured generic gateway.
+     * Dispatch SMS using the tenant's configured generic gateway (ZoomNearby SMS API Compatible).
+     * Reference: https://sms.zoomnearby.com/docs/api#authenticating-requests
      */
     public static function send(string $phone, string $message, mixed $tenantId = null): array
     {
@@ -34,86 +35,115 @@ class SmsGatewayService
             if ($gw && is_array($gw->credentials)) {
                 $settings = [
                     'gateway_url' => $gw->credentials['url'] ?? '',
-                    'method'      => $gw->credentials['method'] ?? 'GET',
+                    'method'      => $gw->credentials['method'] ?? 'POST',
                     'api_token'   => $gw->credentials['api_key'] ?? ($gw->credentials['api_token'] ?? ''),
                 ];
             }
         }
 
-        // Fallback default credentials if not stored in DB
+        // Endpoint defaults to official ZoomNearby SMS API
         $endpoint = ! empty($settings['gateway_url'])
-            ? $settings['gateway_url']
-            : 'https://sms.zoomnearby.com/api/v1/messages/send?phone={phone}&message={message}';
-        $method   = strtoupper($settings['method'] ?? 'GET');
-        $apiToken = $settings['api_token'] ?? ($settings['api_key'] ?? '4HIXpW0OPsnPpzzebeA5KI7rI4fnAi7utMu5jwYl8dada339');
+            ? trim($settings['gateway_url'])
+            : 'https://sms.zoomnearby.com/api/v1/messages/send';
+        $method   = strtoupper($settings['method'] ?? 'POST');
+        $apiToken = trim($settings['api_token'] ?? ($settings['api_key'] ?? ''));
 
-        // Format phone: ensure standard international digits (e.g., +919876543210 or 9876543210)
-        $cleanPhone = preg_replace('/[^0-9+]/', '', $phone);
-        $encodedMessage = urlencode($message);
+        // Format phone: ensure standard international digits with leading +
+        $digitsOnly = preg_replace('/[^0-9]/', '', $phone);
+        $cleanPhone = str_starts_with(trim($phone), '+') ? '+'.$digitsOnly : (strlen($digitsOnly) >= 10 ? '+'.$digitsOnly : $digitsOnly);
 
-        // Replace dynamic template variables
+        $isZoomSms = str_contains($endpoint, 'sms.zoomnearby.com');
+
+        // Replace dynamic template variables for custom endpoints
         $resolvedUrl = str_replace(
             ['{phone}', '{message}', '{to}'],
-            [$cleanPhone, $encodedMessage, $cleanPhone],
+            [$cleanPhone, urlencode($message), $cleanPhone],
             $endpoint
         );
 
-        // Ensure token is present in query if template lacks it and token exists
-        if ($apiToken && ! str_contains($resolvedUrl, 'token=') && ! str_contains($resolvedUrl, 'key=')) {
-            $separator = str_contains($resolvedUrl, '?') ? '&' : '?';
-            $resolvedUrl .= "{$separator}token=" . urlencode($apiToken);
-        }
-
-        // Android Gateway (sms.zoomnearby.com) payload compatibility:
-        // sms.zoomnearby.com requires mobile_numbers[] and sims[] parameters
-        if (str_contains($resolvedUrl, 'sms.zoomnearby.com')) {
-            if (! str_contains($resolvedUrl, 'sims') && ! str_contains($resolvedUrl, 'sender_ids')) {
-                $separator = str_contains($resolvedUrl, '?') ? '&' : '?';
-                $resolvedUrl .= "{$separator}sims[]=3";
-            }
-            if (! str_contains($resolvedUrl, 'mobile_numbers')) {
-                $resolvedUrl .= '&mobile_numbers[]=' . urlencode($cleanPhone);
-            }
-        }
-
         try {
-            $client = Http::timeout(15)->acceptJson();
+            $client = Http::timeout(15)
+                ->acceptJson()
+                ->withHeaders([
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ]);
 
-            if ($apiToken) {
+            if ($apiToken !== '') {
+                // Official Authentication per https://sms.zoomnearby.com/docs/api#authenticating-requests
                 $client = $client->withToken($apiToken);
             }
 
             if ($method === 'POST') {
-                $postData = [
-                    'phone'   => $cleanPhone,
-                    'message' => $message,
-                    'token'   => $apiToken,
-                ];
-                if (str_contains($resolvedUrl, 'sms.zoomnearby.com')) {
-                    $postData['mobile_numbers'] = [$cleanPhone];
-                    $postData['sims'] = [3];
+                if ($isZoomSms) {
+                    // ZoomNearby SMS Gateway API payload
+                    $postData = [
+                        'mobile_numbers' => [$cleanPhone],
+                        'type'           => 'SMS',
+                        'message'        => $message,
+                        'sims'           => ['*'], // Default to all available SIMs
+                    ];
+                } else {
+                    $postData = [
+                        'phone'          => $cleanPhone,
+                        'to'             => $cleanPhone,
+                        'mobile_numbers' => [$cleanPhone],
+                        'message'        => $message,
+                    ];
+                    if ($apiToken !== '') {
+                        $postData['token'] = $apiToken;
+                    }
                 }
+
                 $response = $client->post($resolvedUrl, $postData);
             } else {
                 $params = [];
-                if (! str_contains($endpoint, '{phone}') && ! str_contains($endpoint, '{to}')) {
-                    $params['phone'] = $cleanPhone;
+                if ($isZoomSms) {
+                    if (! str_contains($resolvedUrl, 'mobile_numbers')) {
+                        $params['mobile_numbers'] = [$cleanPhone];
+                    }
+                    if (! str_contains($resolvedUrl, 'message')) {
+                        $params['message'] = $message;
+                    }
+                    if (! str_contains($resolvedUrl, 'type')) {
+                        $params['type'] = 'SMS';
+                    }
+                    if (! str_contains($resolvedUrl, 'sims') && ! str_contains($resolvedUrl, 'sender_ids')) {
+                        $params['sims'] = ['*'];
+                    }
+                } else {
+                    if (! str_contains($endpoint, '{phone}') && ! str_contains($endpoint, '{to}')) {
+                        $params['phone'] = $cleanPhone;
+                    }
+                    if (! str_contains($endpoint, '{message}')) {
+                        $params['message'] = $message;
+                    }
                 }
-                if (! str_contains($endpoint, '{message}')) {
-                    $params['message'] = $message;
-                }
+
                 if ($params) {
-                    $resolvedUrl .= (str_contains($resolvedUrl, '?') ? '&' : '?').http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+                    $resolvedUrl .= (str_contains($resolvedUrl, '?') ? '&' : '?') . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
                 }
+
                 $response = $client->get($resolvedUrl);
             }
 
-            Log::info("SMS Gateway Dispatch Result: [{$response->status()}] {$response->body()}");
+            $body = $response->json() ?? $response->body();
+            $success = $response->successful();
+
+            Log::info("SMS Gateway Dispatch Result: [{$response->status()}] " . (is_array($body) ? json_encode($body) : $body));
+
+            $errorMsg = null;
+            if (! $success) {
+                $errorMsg = is_array($body)
+                    ? ($body['message'] ?? ($body['error'] ?? json_encode($body)))
+                    : (string) $body;
+            }
 
             return [
-                'success' => $response->successful(),
+                'success' => $success,
                 'status'  => $response->status(),
-                'body'    => $response->json() ?? $response->body(),
+                'body'    => $body,
+                'error'   => $errorMsg,
             ];
         } catch (\Throwable $e) {
             Log::error("SMS Gateway Exception: " . $e->getMessage());

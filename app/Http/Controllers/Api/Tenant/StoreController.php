@@ -18,6 +18,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use App\Http\Resources\Tenant\StoreResource;
+use App\Services\Navigation\NavigationSanitizerService;
 
 class StoreController extends Controller
 {
@@ -96,6 +97,54 @@ class StoreController extends Controller
         ]);
     }
 
+    public function current(Request $request): JsonResponse
+    {
+        $this->authorizeAction($request, 'view');
+        $user = $request->user();
+        $company = $this->company($request);
+        $currentId = (int) ($request->attributes->get('store_id') ?? $user->current_store_id);
+
+        $store = Store::where('company_id', $company->id)
+            ->where('id', $currentId)
+            ->first()
+            ?? Store::where('company_id', $company->id)
+                ->where('is_primary', true)
+                ->first()
+            ?? Store::where('company_id', $company->id)
+                ->first();
+
+        if (! $store) {
+            return response()->json(['success' => false, 'error' => 'No store found.'], 404);
+        }
+
+        $resource = $this->resource($store, $company, (int) $store->id, $request);
+        $navConfig = NavigationSanitizerService::getStoreNavigationConfig($store);
+
+        return response()->json([
+            'success' => true,
+            'data' => $resource,
+            'store' => $resource,
+            'current_store' => $resource,
+            'current_store_id' => $store->id,
+            'operating_mode' => $navConfig['operating_mode'],
+            'is_restaurant' => (bool) $navConfig['is_restaurant'],
+            'pos_layout' => $store->settings['pos_layout'] ?? $navConfig['pos_layout'],
+            'default_terminal_view' => $store->settings['default_terminal_view'] ?? $navConfig['default_terminal_view'],
+            'primary_pos_route' => $navConfig['primary_pos_route'],
+            'center_action_route' => $navConfig['center_action_route'],
+            'center_button_route' => $navConfig['center_button_route'],
+            'primary_action' => $navConfig['primary_action'],
+            'default_pos_screen' => $navConfig['default_pos_screen'],
+            'default_pos_action' => $navConfig['default_pos_action'],
+            'drawer_pos_route' => $navConfig['drawer_pos_route'],
+            'quick_actions' => $navConfig['quick_actions'],
+            'navigation_config' => $navConfig,
+            'bottom_nav_schema' => NavigationSanitizerService::getBottomNavigationSchema($store),
+            'bottom_nav_config' => NavigationSanitizerService::getBottomNavigationSchema($store),
+            'bottom_navigation' => NavigationSanitizerService::getBottomNavigationSchema($store),
+        ]);
+    }
+
     private function validatedDetails(Request $request, Company $company, ?Store $store = null): array
     {
         if ($request->has('branch_code') && ! $request->has('code')) {
@@ -159,6 +208,7 @@ class StoreController extends Controller
                 }
             }
             $data['is_active'] = true;
+            $isRestaurant = $company->isRestaurantMode() || in_array(strtolower((string) ($company->pos_mode ?? '')), ['restaurant', 'cafe', 'food_dining', 'food_restaurant'], true);
             $store = Store::create($data + [
                 'company_id' => $company->id,
                 'tenant_id' => $company->id,
@@ -167,6 +217,9 @@ class StoreController extends Controller
                 'settings' => [
                     'invoice_prefix' => $data['invoice_prefix'] ?? (strtoupper($data['code']).'-INV-'),
                     'quotation_prefix' => strtoupper($data['code']).'-QUO-',
+                    'operating_mode' => $isRestaurant ? 'restaurant' : 'retail',
+                    'pos_layout' => $isRestaurant ? 'restaurant_terminal' : 'grid_catalog',
+                    'default_terminal_view' => $isRestaurant ? 'restaurant_terminal' : 'grid_catalog',
                     // CashRegister rows are sessions. Provision the drawer now;
                     // the first opening creates a session with this terminal.
                     'cash_register' => ['name' => 'Main Register', 'terminal_id' => substr($data['code'], 0, 58).'-POS-1'],

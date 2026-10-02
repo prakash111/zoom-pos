@@ -495,6 +495,170 @@ class TenantStorefrontSettingsAndCrudTest extends TestCase
         $this->assertTrue((bool) $this->company->require_review_approval);
     }
 
+    public function test_pos_tenant_storefront_reviews_endpoints_and_filters(): void
+    {
+        $this->company->update([
+            'licensed_modules' => ['retail', 'ecommerce_storefront'],
+        ]);
+
+        $product = Product::create([
+            'company_id' => $this->company->id,
+            'name' => 'Artisan Bread',
+            'sku' => 'BREAD-001',
+            'price' => 5.00,
+            'status' => 'active',
+        ]);
+
+        $approvedReview = ProductReview::create([
+            'company_id' => $this->company->id,
+            'product_id' => $product->id,
+            'customer_name' => 'John Doe',
+            'customer_email' => 'john@example.com',
+            'rating' => 5,
+            'title' => 'Fresh and crispy',
+            'comment' => 'The best sourdough bread in town!',
+            'is_approved' => true,
+            'is_verified_purchase' => true,
+        ]);
+
+        $pendingReview = ProductReview::create([
+            'company_id' => $this->company->id,
+            'product_id' => $product->id,
+            'customer_name' => 'Jane Smith',
+            'customer_email' => 'jane@example.com',
+            'rating' => 3,
+            'title' => 'Average bread',
+            'comment' => 'A bit too dense for my taste.',
+            'is_approved' => false,
+            'is_verified_purchase' => false,
+        ]);
+
+        // 1. GET /api/v1/pos/tenant/storefront/reviews without filters
+        $listRes = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/v1/pos/tenant/storefront/reviews');
+
+        $listRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'reviews',
+                    'counters' => ['total', 'approved', 'pending', 'average_rating'],
+                    'summary' => ['total', 'approved', 'pending', 'average_rating'],
+                    'stats',
+                    'settings' => ['enable_product_reviews', 'require_admin_approval'],
+                    'pagination' => ['current_page', 'last_page', 'per_page', 'total'],
+                ],
+            ]);
+
+        $this->assertEquals(2, $listRes->json('data.counters.total'));
+        $this->assertEquals(1, $listRes->json('data.counters.approved'));
+        $this->assertEquals(1, $listRes->json('data.counters.pending'));
+        $this->assertEquals(4.0, (float) $listRes->json('data.counters.average_rating'));
+
+        // 2. Filter by status: pending
+        $pendingRes = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/v1/pos/tenant/storefront/reviews?status=pending');
+        $pendingRes->assertOk();
+        $this->assertCount(1, $pendingRes->json('data.reviews'));
+        $this->assertEquals((string) $pendingReview->id, $pendingRes->json('data.reviews.0.id'));
+
+        // 3. Filter by status: approved
+        $approvedRes = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/v1/pos/tenant/storefront/reviews?status=approved');
+        $approvedRes->assertOk();
+        $this->assertCount(1, $approvedRes->json('data.reviews'));
+        $this->assertEquals((string) $approvedReview->id, $approvedRes->json('data.reviews.0.id'));
+
+        // 4. Filter by rating: 5
+        $ratingRes = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/v1/pos/tenant/storefront/reviews?rating=5');
+        $ratingRes->assertOk();
+        $this->assertCount(1, $ratingRes->json('data.reviews'));
+        $this->assertEquals(5, $ratingRes->json('data.reviews.0.rating'));
+
+        // 5. Search by query: sourdough
+        $searchRes = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/v1/pos/tenant/storefront/reviews?search=sourdough');
+        $searchRes->assertOk();
+        $this->assertCount(1, $searchRes->json('data.reviews'));
+        $this->assertEquals((string) $approvedReview->id, $searchRes->json('data.reviews.0.id'));
+    }
+
+    public function test_pos_tenant_storefront_reviews_settings_endpoints_and_validation(): void
+    {
+        $this->company->update([
+            'licensed_modules' => ['retail', 'ecommerce_storefront'],
+        ]);
+
+        // 1. GET /api/v1/pos/tenant/storefront/reviews/settings
+        $getRes = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/v1/pos/tenant/storefront/reviews/settings');
+
+        $getRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure([
+                'success',
+                'data' => ['enable_product_reviews', 'require_admin_approval'],
+            ]);
+
+        // 2. POST /api/v1/pos/tenant/storefront/reviews/settings
+        $postRes = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/v1/pos/tenant/storefront/reviews/settings', [
+                'enable_product_reviews' => false,
+                'require_admin_approval' => true,
+            ]);
+
+        $postRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.enable_product_reviews', false)
+            ->assertJsonPath('data.require_admin_approval', true);
+
+        $this->company->refresh();
+        $this->assertFalse((bool) $this->company->enable_product_reviews);
+        $this->assertTrue((bool) $this->company->require_review_approval);
+
+        // 3. PUT /api/v1/pos/tenant/storefront/reviews/settings
+        $putRes = $this->withHeaders($this->authHeaders())
+            ->putJson('/api/v1/pos/tenant/storefront/reviews/settings', [
+                'enable_product_reviews' => true,
+                'require_admin_approval' => false,
+            ]);
+
+        $putRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.enable_product_reviews', true)
+            ->assertJsonPath('data.require_admin_approval', false);
+
+        $this->company->refresh();
+        $this->assertTrue((bool) $this->company->enable_product_reviews);
+        $this->assertFalse((bool) $this->company->require_review_approval);
+
+        // 4. Validation error on invalid types
+        $invalidRes = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/v1/pos/tenant/storefront/reviews/settings', [
+                'enable_product_reviews' => 'not-a-boolean',
+            ]);
+
+        $invalidRes->assertStatus(422)
+            ->assertJsonPath('success', false);
+
+        // 5. Test alias routes: /api/v1/pos/storefront/reviews/settings
+        $aliasGetRes = $this->withHeaders($this->authHeaders())
+            ->getJson('/api/v1/pos/storefront/reviews/settings');
+        $aliasGetRes->assertOk()
+            ->assertJsonPath('success', true);
+
+        $aliasPostRes = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/v1/pos/storefront/reviews/settings', [
+                'enable_product_reviews' => true,
+                'require_admin_approval' => true,
+            ]);
+        $aliasPostRes->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.require_admin_approval', true);
+    }
+
     public function test_tenant_custom_pages_crud_and_slug_generation(): void
     {
         // 1. List pages (defaults seeded)

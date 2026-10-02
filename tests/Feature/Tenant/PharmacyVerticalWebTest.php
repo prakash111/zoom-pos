@@ -178,4 +178,38 @@ class PharmacyVerticalWebTest extends TestCase
         $this->assertSame(80, (int) $batch->fresh()->stock_qty);
         $this->assertSame(80.0, (float) $product->fresh()->current_stock);
     }
+
+    public function test_prescription_queue_renders_structured_array_medicines_without_error(): void
+    {
+        [$company] = $this->pharmacyTenant();
+
+        PharmacyPrescription::create([
+            'company_id' => $company->id,
+            'tenant_id' => $company->id,
+            'prescription_number' => 'RX-TEST-999',
+            'patient_name' => 'Jane Patient',
+            'doctor_name' => 'Dr Adams',
+            'prescription_date' => now()->toDateString(),
+            'status' => 'pending',
+            'medicines' => [
+                [
+                    'name' => 'Amoxicillin 500mg Capsules',
+                    'dosage' => '1 cap TID for 7 days',
+                    'quantity' => 21,
+                ],
+                [
+                    'name' => 'Paracetamol 500mg',
+                    'dosage' => '1 tab PRN fever',
+                    'quantity' => 10,
+                ],
+            ],
+        ]);
+
+        $response = $this->get(route('tenant.pharmacy.prescriptions'));
+        $response->assertOk();
+        $response->assertSee('RX-TEST-999');
+        $response->assertSee('Jane Patient');
+        $response->assertSee('Amoxicillin 500mg Capsules');
+        $response->assertSee('Schedule H');
+    }
 }

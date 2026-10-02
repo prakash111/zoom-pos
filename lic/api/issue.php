@@ -45,7 +45,14 @@ if ($row = $seen->fetch()) {
 
 try {
     $pdo->beginTransaction();
-    $lic = issue_license($pdo, $slug, $domain, trim($payment['payer_email'] ?? ''));
+    $isCore = in_array($slug, ['core', 'main', 'pos', 'zoom-pos'], true);
+    $customLimit = $isCore
+        ? (isset($in['app_builder_monthly_limit']) && $in['app_builder_monthly_limit'] !== '' 
+            ? (int)$in['app_builder_monthly_limit'] 
+            : (isset($in['build_limit']) && $in['build_limit'] !== '' ? (int)$in['build_limit'] : null))
+        : null;
+    $planVal = !empty($in['plan']) ? trim((string)$in['plan']) : null;
+    $lic = issue_license($pdo, $slug, $domain, trim($payment['payer_email'] ?? ''), $planVal, null, $customLimit);
     $pdo->prepare(
         'INSERT INTO payments (reference, gateway, amount, currency, product_slug, license_id, email, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
