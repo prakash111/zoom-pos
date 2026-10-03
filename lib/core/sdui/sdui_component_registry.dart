@@ -192,6 +192,12 @@ class SduiComponentRegistry {
     // Legacy native destinations. New and settings destinations arrive with
     // target_endpoint and bypass this compatibility registry entirely.
     'subscription': (_) => const SubscriptionScreen(),
+    '/subscription': (_) => const SubscriptionScreen(),
+    'settings/subscription-pricing': (_) => const SubscriptionScreen(),
+    '/settings/subscription-pricing': (_) => const SubscriptionScreen(),
+    'subscription-pricing': (_) => const SubscriptionScreen(),
+    'billing': (_) => const SubscriptionScreen(),
+    '/billing': (_) => const SubscriptionScreen(),
     'settings': (_) => const TenantSettingsScreen(),
     'store_management': (_) => const StoreManagementScreen(),
     'nav_stores': (_) => const StoreManagementScreen(),
