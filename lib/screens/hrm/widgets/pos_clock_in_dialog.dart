@@ -36,8 +36,9 @@ class _PosClockInDialogState extends State<PosClockInDialog> {
     });
 
     try {
+      final base = widget.apiUrl.replaceAll(RegExp(r'/+$'), '');
       final response = await http.post(
-        Uri.parse('${widget.apiUrl}/api/v1/tenant/hrm/attendance/$actionType'),
+        Uri.parse('$base/api/v1/tenant/hrm/attendance/$actionType'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',

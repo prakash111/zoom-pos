@@ -24,6 +24,9 @@ import 'dynamic_schema_context.dart';
 import 'dynamic_schema_parser.dart';
 import 'sdui_component_registry.dart';
 import 'sdui_tab_advancer.dart';
+import '../stores/store_provider.dart';
+import '../../screens/hrm/widgets/pos_clock_in_dialog.dart';
+import '../../screens/sdui/sdui_generic_list_screen.dart';
 
 /// Endpoints whose effect only exists on the server — queuing them offline
 /// would be a lie. Matched as substrings of the action endpoint.
@@ -429,6 +432,79 @@ class SduiActionDispatcher {
         _filterView(context, action);
         break;
 
+      case 'dialog':
+        final target = action['target']?.toString() ??
+            action['endpoint']?.toString() ??
+            action['dialog']?.toString() ??
+            '';
+        if (target == 'pos_pin_dialog' ||
+            target.contains('pos_pin') ||
+            target.contains('clock')) {
+          final authProvider = context.read<AuthProvider?>();
+          final storeProvider = context.read<StoreProvider?>();
+          final client = resolveApiClient();
+          String baseUrl = AppConfig.defaultBaseUrl;
+          if (client != null) {
+            try {
+              final b = await client.currentBaseUrl();
+              if (b.isNotEmpty) baseUrl = b;
+            } catch (_) {}
+          }
+          if (context.mounted) {
+            await showDialog(
+              context: context,
+              builder: (ctx) => PosClockInDialog(
+                apiUrl: baseUrl.replaceAll(RegExp(r'/+$'), ''),
+                authToken: authProvider?.token ?? '',
+                storeId: storeProvider?.current?.id ?? 1,
+              ),
+            );
+            onReload();
+          }
+        }
+        break;
+
+      case 'action_sheet':
+      case 'modal_form':
+        final target = action['target']?.toString() ??
+            action['endpoint']?.toString() ??
+            action['sheet_endpoint']?.toString() ??
+            action['url']?.toString() ??
+            '';
+        if (target.isNotEmpty && context.mounted) {
+          final result = await showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: const Color(0xFF0F172A),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (ctx) => SduiDynamicFormSheet(formEndpoint: target),
+          );
+          if (result == true) {
+            onReload();
+          }
+        }
+        break;
+
+      case 'item_detail':
+      case 'view_detail':
+        final item = action['item'] is Map
+            ? Map<String, dynamic>.from(action['item'] as Map)
+            : action;
+        if (context.mounted) {
+          await showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: const Color(0xFF0F172A),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (ctx) => SduiItemDetailSheet(item: item),
+          );
+        }
+        break;
+
       default:
         break;
     }
@@ -443,6 +519,10 @@ class SduiActionDispatcher {
       'show_bottom_sheet' => 'open_remote_sheet',
       'show_quotation_sheet' => 'open_quotation_modal',
       'reload_component' => 'refresh_sheet',
+      'action_sheet' => 'action_sheet',
+      'modal_form' => 'modal_form',
+      'dialog' => 'dialog',
+      'item_detail' => 'item_detail',
       _ => type,
     };
   }

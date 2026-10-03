@@ -45,7 +45,11 @@ class AuthProvider extends ChangeNotifier {
   AuthStatus _status = AuthStatus.unknown;
   UserModel? _user;
   CompanyModel? _company;
+  String? _token;
   String? _errorMessage;
+
+  /// Cached auth token
+  String? get token => _token;
 
   /// True while the current signed-in state was restored from [SessionCache]
   /// because the server was unreachable at startup — the token has not been
@@ -88,9 +92,11 @@ class AuthProvider extends ChangeNotifier {
           );
 
       if (token == null || token.isEmpty) {
+        _token = null;
         _status = AuthStatus.unauthenticated;
         return;
       }
+      _token = token;
 
       try {
         final result = await _authRepository.session().timeout(
@@ -370,6 +376,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      _token = token;
       await _secureStorage.saveToken(token);
       if (user != null) _applyUser(user);
       if (company != null) _applyCompany(company);
@@ -401,6 +408,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _handleLoginSuccess(LoginResult result) async {
+    _token = result.token;
     await _secureStorage.saveToken(result.token);
     _applyUser(result.user);
     _applyCompany(result.company);
@@ -460,6 +468,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    _token = null;
     _apiClient.activeStoreId = null;
     await onBeforeLogout?.call();
     await _secureStorage.clearToken();
@@ -473,6 +482,7 @@ class AuthProvider extends ChangeNotifier {
 
   void _handleUnauthenticated() {
     if (_status != AuthStatus.authenticated) return;
+    _token = null;
     _apiClient.activeStoreId = null;
     _secureStorage.clearToken();
     unawaited(SessionCache.instance.clear());

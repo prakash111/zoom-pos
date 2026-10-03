@@ -1961,8 +1961,22 @@ class DynamicSchemaParser {
         schema['footer_actions'] as List<dynamic>? ??
         const [];
 
-    final cardAction = schema['action'] as Map<String, dynamic>? ??
+    var cardAction = schema['action'] as Map<String, dynamic>? ??
         schema['on_click'] as Map<String, dynamic>?;
+    if (cardAction == null) {
+      if (schema['action_target'] != null) {
+        cardAction = <String, dynamic>{
+          'type': schema['action_type'] ?? 'modal_form',
+          'target': schema['action_target'],
+          'item': schema,
+        };
+      } else {
+        cardAction = <String, dynamic>{
+          'type': 'item_detail',
+          'item': schema,
+        };
+      }
+    }
 
     final cardRadius = _parseDouble(schema['border_radius']) ?? 16.0;
     final cardBg = schema['background_color'] != null
@@ -1997,9 +2011,7 @@ class DynamicSchemaParser {
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: cardAction != null
-                      ? () => sduiContext?.dispatchAction(cardAction)
-                      : null,
+                  onTap: () => sduiContext?.dispatchAction(cardAction!),
                   child: Padding(
                     padding: _parseEdgeInsets(schema['padding'],
                         fallback: const EdgeInsets.all(14)),
@@ -3246,6 +3258,7 @@ class DynamicSchemaParser {
         'method',
         'data',
         'payload',
+        'target',
       ]) {
         if (action[key] == null && schema[key] != null) {
           action[key] = schema[key];
@@ -3260,6 +3273,7 @@ class DynamicSchemaParser {
     return <String, dynamic>{
       'type': type,
       'action_type': type,
+      if (schema['target'] != null) 'target': schema['target'],
       if (schema['endpoint'] != null) 'endpoint': schema['endpoint'],
       if (schema['sheet_endpoint'] != null)
         'sheet_endpoint': schema['sheet_endpoint'],

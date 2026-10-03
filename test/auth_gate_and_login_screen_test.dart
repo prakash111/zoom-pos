@@ -46,6 +46,9 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
   @override
   CompanyModel? get company => _company;
 
+  @override
+  String? get token => 'test-token';
+
   set company(CompanyModel? value) {
     _company = value;
     notifyListeners();
