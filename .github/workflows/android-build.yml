@@ -1,4 +1,4 @@
-name: Zoom Sales CRM & Inventory — Android Build
+name: ZooM-POS — Android Build
 
 on:
   workflow_dispatch: {}

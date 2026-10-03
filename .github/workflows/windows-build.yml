@@ -1,4 +1,4 @@
-name: Zoom Sales CRM & Inventory — Windows Build
+name: ZooM-POS — Windows Build
 
 on:
   workflow_dispatch: {}

@@ -1,4 +1,4 @@
-name: Zoom Sales CRM & Inventory — Web Build
+name: ZooM-POS — Web Build
 
 on:
   workflow_dispatch:

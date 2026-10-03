@@ -12,7 +12,7 @@
 ;   build\windows\x64\runner\Release\
 ; ---------------------------------------------------------------------------
 
-#define MyAppName "Zoom Sales CRM & Inventory"
+#define MyAppName "ZooM-POS"
 #define MyAppPublisher "Zoom Nearby"
 #define MyAppURL "https://saas.zoomnearby.com"
 #define MyAppExeName "sales_and_inventory.exe"

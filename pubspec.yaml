@@ -1,5 +1,5 @@
 name: zoom_pos_mobile
-description: "Zoom Sales CRM & Inventory client — Android and Windows desktop app for the multi-tenant SaaS platform."
+description: "ZooM-POS client — Android, Web, and Windows desktop app for the multi-tenant SaaS platform."
 publish_to: 'none'
 version: 1.0.5+7
 

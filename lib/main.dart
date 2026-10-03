@@ -186,7 +186,7 @@ class ZoomPosApp extends StatelessWidget {
           return MaterialApp(
             navigatorKey: appNavigatorKey,
             scaffoldMessengerKey: appMessengerKey,
-            title: 'Zoom Sales CRM & Inventory',
+            title: 'ZooM-POS',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light(
               seedColor: theme.seedColor,
