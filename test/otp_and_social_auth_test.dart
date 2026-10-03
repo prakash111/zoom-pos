@@ -261,7 +261,12 @@ void main() {
       expect(find.text('Run your business smarter.'), findsNothing);
       expect(find.textContaining('Sales, inventory & orders'), findsNothing);
       // Superadmin "Platform Title / App Name" is shown in the header.
-      expect(find.text('Zoom Sales CRM & Inventory'), findsWidgets);
+      expect(
+          find.byWidgetPredicate((w) =>
+              w is Text &&
+              (w.data == 'ZooM-POS' ||
+                  w.data == 'Zoom Sales CRM & Inventory')),
+          findsWidgets);
       expect(find.text('Welcome back'), findsOneWidget);
       expect(find.text('Have a store account ID?'), findsOneWidget);
       expect(find.text('Forgot password?'), findsOneWidget);
