@@ -22,11 +22,13 @@ String _resolveFullUrl(String endpoint, String baseUrl) {
 class SduiDynamicFormSheet extends StatefulWidget {
   final String formEndpoint;
   final VoidCallback? onSubmitted;
+  final bool isBottomSheet;
 
   const SduiDynamicFormSheet({
     Key? key,
     required this.formEndpoint,
     this.onSubmitted,
+    this.isBottomSheet = true,
   }) : super(key: key);
 
   @override
@@ -39,6 +41,7 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
   String? _errorMessage;
   String _title = 'Form';
   String _submitUrl = '';
+  String? _submitButtonLabel;
   String _method = 'POST';
   List<Map<String, dynamic>> _fields = [];
   final Map<String, TextEditingController> _controllers = {};
@@ -90,6 +93,7 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
         setState(() {
           _title = schema['title']?.toString() ?? 'Form';
           _submitUrl = schema['submit_url']?.toString() ?? '';
+          _submitButtonLabel = (schema['submit_button'] is Map ? schema['submit_button']['label'] : null) ?? schema['submit_label']?.toString() ?? 'Save';
           _method = schema['method']?.toString().toUpperCase() ?? 'POST';
 
           final rawFields = schema['fields'] as List<dynamic>? ?? [];
@@ -119,6 +123,11 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
                 } else {
                   _keyValuePairs[name] = [];
                 }
+              } else if (type == 'switch' || type == 'toggle' || type == 'toggle_switch') {
+                final rawVal = field['value'] ?? field['default'] ?? initialValues[name] ?? false;
+                final isChecked = (rawVal == true || rawVal == 1 || rawVal == '1' || rawVal == 'true');
+                _controllers[name] = TextEditingController(text: isChecked ? '1' : '0');
+                _fieldValues[name] = isChecked;
               } else {
                 final defaultVal = field['value'] ?? field['default'] ?? initialValues[name] ?? '';
                 _controllers[name] = TextEditingController(text: defaultVal.toString());
@@ -165,6 +174,8 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
         final type = field['type']?.toString().toLowerCase() ?? 'text';
         if (type == 'key_value_pairs') {
           payload[name] = _keyValuePairs[name] ?? [];
+        } else if (type == 'switch' || type == 'toggle' || type == 'toggle_switch') {
+          payload[name] = (_fieldValues[name] == true || _fieldValues[name] == 1 || _fieldValues[name] == '1');
         } else if (name.isNotEmpty) {
           final text = _controllers[name]?.text.trim() ?? '';
           if (type == 'number') {
@@ -199,7 +210,9 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
 
       if (response.statusCode >= 200 && response.statusCode < 300 && (data['success'] != false)) {
         if (!mounted) return;
-        Navigator.of(context).pop(true);
+        if (widget.isBottomSheet) {
+          Navigator.of(context).pop(true);
+        }
         widget.onSubmitted?.call();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -207,6 +220,11 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
             backgroundColor: const Color(0xFF10B981),
           ),
         );
+        if (!widget.isBottomSheet) {
+          setState(() {
+            _isSubmitting = false;
+          });
+        }
       } else {
         setState(() {
           _errorMessage = data['message'] ?? 'Form submission failed.';
@@ -237,6 +255,42 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
           onChanged: (updated) {
             _keyValuePairs[name] = updated;
           },
+        ),
+      );
+    }
+
+    if (type == 'switch' || type == 'toggle' || type == 'toggle_switch') {
+      final isChecked = _fieldValues[name] == true || _fieldValues[name] == 1 || _fieldValues[name] == '1' || _fieldValues[name] == 'true';
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFF334155)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+              ),
+              Switch(
+                value: isChecked,
+                activeThumbColor: const Color(0xFF10B981),
+                onChanged: (val) {
+                  setState(() {
+                    _fieldValues[name] = val;
+                    _controllers[name]?.text = val ? '1' : '0';
+                  });
+                },
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -364,6 +418,127 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final formBody = Column(
+      mainAxisSize: widget.isBottomSheet ? MainAxisSize.min : MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.isBottomSheet) ...[
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFF334155),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: Color(0xFF334155), height: 1),
+        ],
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.all(40),
+            child: Center(
+              child: CircularProgressIndicator(color: Color(0xFF10B981)),
+            ),
+          )
+        else if (_errorMessage != null)
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
+                const SizedBox(height: 12),
+                Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF334155)),
+                  onPressed: _fetchFormSchema,
+                  child: const Text('Retry', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          )
+        else
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final field in _fields) _buildFieldWidget(field),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: _isSubmitting ? null : _submitForm,
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                _submitButtonLabel ?? 'Save',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+
+    if (!widget.isBottomSheet) {
+      return formBody;
+    }
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -376,120 +551,7 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
           color: Color(0xFF0F172A),
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF334155),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(color: Color(0xFF334155), height: 1),
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.all(40),
-                child: Center(
-                  child: CircularProgressIndicator(color: Color(0xFF10B981)),
-                ),
-              )
-            else if (_errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
-                    const SizedBox(height: 12),
-                    Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.redAccent, fontSize: 14),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF334155)),
-                      onPressed: _fetchFormSchema,
-                      child: const Text('Retry', style: TextStyle(color: Colors.white)),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (final field in _fields) _buildFieldWidget(field),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF10B981),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            onPressed: _isSubmitting ? null : _submitForm,
-                            child: _isSubmitting
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Submit',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+        child: formBody,
       ),
     );
   }
@@ -1053,16 +1115,19 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
 
       case 'action_sheet':
       case 'modal_form':
-        showModalBottomSheet(
+        showModalBottomSheet<bool>(
           context: context,
           isScrollControlled: true,
           backgroundColor: const Color(0xFF0F172A),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          builder: (ctx) => SduiDynamicFormSheet(formEndpoint: target),
+          builder: (ctx) => SduiDynamicFormSheet(
+            formEndpoint: target,
+            onSubmitted: _refreshCurrentView,
+          ),
         ).then((val) {
-          if (val == true) {
+          if (val == true || mounted) {
             _refreshCurrentView();
           }
         });
@@ -1078,7 +1143,7 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
 
   void _handleItemTap(BuildContext context, Map<String, dynamic> item) {
     if (item['action_target'] != null) {
-      showModalBottomSheet(
+      showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
         backgroundColor: const Color(0xFF0F172A),
@@ -1090,14 +1155,14 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
           onReload: () => _refreshCurrentView(),
         ),
       ).then((val) {
-        if (val == true) {
+        if (val == true || mounted) {
           _refreshCurrentView();
         }
       });
     } else if (item['action'] is Map) {
       _handleSduiAction(context, Map<String, dynamic>.from(item['action'] as Map));
     } else {
-      showModalBottomSheet(
+      showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
         backgroundColor: const Color(0xFF0F172A),
@@ -1109,7 +1174,7 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
           onReload: () => _refreshCurrentView(),
         ),
       ).then((val) {
-        if (val == true) {
+        if (val == true || mounted) {
           _refreshCurrentView();
         }
       });
@@ -1133,6 +1198,8 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
     final title = _data?['title'] ?? widget.initialTitle ?? 'List';
     final rawActions = _data?['actions'] as List<dynamic>? ?? const [];
     final rawItems = _data?['items'] as List<dynamic>? ?? const [];
+    final rawFields = _data?['fields'] as List<dynamic>? ?? const [];
+    final isFormView = _data?['layout'] == 'form_view' || (rawFields.isNotEmpty && rawItems.isEmpty);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B132B),
@@ -1155,19 +1222,25 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
                     ],
                   ),
                 )
-              : ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    for (final act in rawActions)
-                      if (act is Map) ...[
-                        _buildTopActionButton(context, Map<String, dynamic>.from(act)),
-                        const SizedBox(height: 16),
+              : isFormView
+                  ? SduiDynamicFormSheet(
+                      formEndpoint: widget.endpoint,
+                      isBottomSheet: false,
+                      onSubmitted: _refreshCurrentView,
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        for (final act in rawActions)
+                          if (act is Map) ...[
+                            _buildTopActionButton(context, Map<String, dynamic>.from(act)),
+                            const SizedBox(height: 16),
+                          ],
+                        for (final it in rawItems)
+                          if (it is Map)
+                            _buildListItemCard(context, Map<String, dynamic>.from(it)),
                       ],
-                    for (final it in rawItems)
-                      if (it is Map)
-                        _buildListItemCard(context, Map<String, dynamic>.from(it)),
-                  ],
-                ),
+                    ),
     );
   }
 }

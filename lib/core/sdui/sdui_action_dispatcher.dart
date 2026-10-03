@@ -472,16 +472,19 @@ class SduiActionDispatcher {
             action['url']?.toString() ??
             '';
         if (target.isNotEmpty && context.mounted) {
-          final result = await showModalBottomSheet(
+          final result = await showModalBottomSheet<bool>(
             context: context,
             isScrollControlled: true,
             backgroundColor: const Color(0xFF0F172A),
             shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            builder: (ctx) => SduiDynamicFormSheet(formEndpoint: target),
+            builder: (ctx) => SduiDynamicFormSheet(
+              formEndpoint: target,
+              onSubmitted: onReload,
+            ),
           );
-          if (result == true) {
+          if (result == true || (context.mounted)) {
             onReload();
           }
         }
