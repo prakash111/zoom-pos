@@ -96,6 +96,7 @@ class ApiClient {
         .readLocale()
         .timeout(AppConfig.localReadTimeout, onTimeout: () => 'en');
     _dio.options.headers['Accept-Language'] = locale;
+    _dio.options.headers['X-App-Locale'] = locale;
     if (activeStoreId == null) {
       _dio.options.headers.remove('X-Store-Id');
     } else {
@@ -236,10 +237,13 @@ class ApiClient {
             'Unsupported SDUI request method: $normalizedMethod');
       }
 
+      final normalizedPath = path.startsWith('http')
+          ? path
+          : (path.startsWith('/') ? path : '/$path');
       final baseUri = Uri.parse(base);
-      final requestedUri = Uri.tryParse(path);
+      final requestedUri = Uri.tryParse(normalizedPath);
       if (requestedUri == null ||
-          (!requestedUri.hasScheme && !path.startsWith('/api/'))) {
+          (!requestedUri.hasScheme && !normalizedPath.startsWith('/api/'))) {
         throw ApiException('SDUI endpoints must start with /api/.');
       }
 
