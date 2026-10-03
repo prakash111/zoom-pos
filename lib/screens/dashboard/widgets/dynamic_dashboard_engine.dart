@@ -5,7 +5,6 @@ import '../../../core/config/theme.dart';
 import '../../../core/models/analytics_model.dart';
 import '../../../core/sdui/sdui_component_registry.dart';
 import '../../../core/utils/currency_formatter.dart';
-import 'amount_receivable_card.dart';
 import 'sales_overview_chart.dart';
 
 /// Dynamic Server-Driven Dashboard Widget Engine.

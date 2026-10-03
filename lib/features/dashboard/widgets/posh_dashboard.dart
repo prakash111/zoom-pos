@@ -255,23 +255,6 @@ class _DashboardHeader extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Total balance
-// ---------------------------------------------------------------------------
-
-class _TotalBalanceCard extends StatelessWidget {
-  const _TotalBalanceCard({this.analytics, this.formatter});
-
-  final AnalyticsModel? analytics;
-  final CurrencyFormatter? formatter;
-
-  @override
-  Widget build(BuildContext context) {
-    // Permanently excluded: Total balance card is removed
-    return const SizedBox.shrink();
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Statistics
 // ---------------------------------------------------------------------------
 

@@ -6,7 +6,17 @@ import 'package:provider/provider.dart';
 import '../../core/config/app_config.dart';
 import '../../core/stores/store_provider.dart';
 import '../../features/auth/auth_provider.dart';
+import '../../widgets/dynamic_custom_fields_editor.dart';
 import '../hrm/widgets/pos_clock_in_dialog.dart';
+
+String _resolveFullUrl(String endpoint, String baseUrl) {
+  if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+    return endpoint;
+  }
+  final cleanBase = baseUrl.replaceAll(RegExp(r'/+$'), '');
+  final cleanPath = endpoint.replaceAll(RegExp(r'^/+'), '');
+  return '$cleanBase/$cleanPath';
+}
 
 /// Centralized SDUI Dynamic Form Modal Sheet
 class SduiDynamicFormSheet extends StatefulWidget {
@@ -33,6 +43,7 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
   List<Map<String, dynamic>> _fields = [];
   final Map<String, TextEditingController> _controllers = {};
   final Map<String, dynamic> _fieldValues = {};
+  final Map<String, List<Map<String, String>>> _keyValuePairs = {};
   final _formKey = GlobalKey<FormState>();
 
   @override
@@ -47,15 +58,6 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
       controller.dispose();
     }
     super.dispose();
-  }
-
-  String _resolveFullUrl(String endpoint, String baseUrl) {
-    if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
-      return endpoint;
-    }
-    final cleanBase = baseUrl.replaceAll(RegExp(r'/+$'), '');
-    final cleanPath = endpoint.replaceAll(RegExp(r'^/+'), '');
-    return '$cleanBase/$cleanPath';
   }
 
   Future<void> _fetchFormSchema() async {
@@ -96,10 +98,32 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
           final initialValues = (schema['initial_values'] as Map?) ?? {};
           for (final field in _fields) {
             final name = field['name']?.toString() ?? '';
+            final type = field['type']?.toString().toLowerCase() ?? 'text';
             if (name.isNotEmpty) {
-              final defaultVal = field['value'] ?? field['default'] ?? initialValues[name] ?? '';
-              _controllers[name] = TextEditingController(text: defaultVal.toString());
-              _fieldValues[name] = defaultVal;
+              if (type == 'key_value_pairs') {
+                final rawVal = field['value'] ?? initialValues[name];
+                if (rawVal is List) {
+                  _keyValuePairs[name] = rawVal.whereType<Map>().map((m) {
+                    return {
+                      'name': (m['name'] ?? m['key'] ?? '').toString(),
+                      'value': (m['value'] ?? '').toString(),
+                    };
+                  }).toList();
+                } else if (rawVal is Map) {
+                  _keyValuePairs[name] = rawVal.entries.map((e) {
+                    return {
+                      'name': e.key.toString(),
+                      'value': e.value.toString(),
+                    };
+                  }).toList();
+                } else {
+                  _keyValuePairs[name] = [];
+                }
+              } else {
+                final defaultVal = field['value'] ?? field['default'] ?? initialValues[name] ?? '';
+                _controllers[name] = TextEditingController(text: defaultVal.toString());
+                _fieldValues[name] = defaultVal;
+              }
             }
           }
           _isLoading = false;
@@ -139,7 +163,9 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
       for (final field in _fields) {
         final name = field['name']?.toString() ?? '';
         final type = field['type']?.toString().toLowerCase() ?? 'text';
-        if (name.isNotEmpty) {
+        if (type == 'key_value_pairs') {
+          payload[name] = _keyValuePairs[name] ?? [];
+        } else if (name.isNotEmpty) {
           final text = _controllers[name]?.text.trim() ?? '';
           if (type == 'number') {
             payload[name] = num.tryParse(text) ?? text;
@@ -201,6 +227,19 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
     final type = field['type']?.toString().toLowerCase() ?? 'text';
     final isRequired = field['required'] == true;
     final controller = _controllers[name];
+
+    if (type == 'key_value_pairs') {
+      final initial = _keyValuePairs[name] ?? [];
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: DynamicCustomFieldsEditor(
+          initialFields: initial,
+          onChanged: (updated) {
+            _keyValuePairs[name] = updated;
+          },
+        ),
+      );
+    }
 
     if (type == 'select' && field['options'] != null) {
       final rawOptions = field['options'];
@@ -459,8 +498,13 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
 /// Centralized SDUI Item Detail Bottom Sheet
 class SduiItemDetailSheet extends StatelessWidget {
   final Map<String, dynamic> item;
+  final VoidCallback? onReload;
 
-  const SduiItemDetailSheet({Key? key, required this.item}) : super(key: key);
+  const SduiItemDetailSheet({
+    Key? key,
+    required this.item,
+    this.onReload,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -471,10 +515,16 @@ class SduiItemDetailSheet extends StatelessWidget {
     final badgeColor = _parseColor(badgeColorHex);
     final avatarText = (item['avatar_text'] ?? (title.toString().isNotEmpty ? title.toString().substring(0, 1) : 'R')).toString().toUpperCase();
 
+    final status = (item['status'] ?? item['badge'] ?? '').toString().toLowerCase();
+    final isLeaveItem = item.containsKey('leave_id') ||
+        item.containsKey('leave_type') ||
+        (item.containsKey('reason') && ['pending', 'approved', 'rejected'].contains(status)) ||
+        (item['subtitle']?.toString().contains(' - ') == true && ['pending', 'approved', 'rejected'].contains(status));
+
     final details = <Map<String, String>>[];
     for (final entry in item.entries) {
       final key = entry.key.toLowerCase();
-      if (['type', 'action', 'actions', 'action_type', 'action_target', 'avatar_text', 'avatar_bg', 'avatar_fg', 'badge_color', 'badge_style', 'meta_items', 'target'].contains(key)) {
+      if (['type', 'action', 'actions', 'action_type', 'action_target', 'avatar_text', 'avatar_bg', 'avatar_fg', 'badge_color', 'badge_style', 'meta_items', 'target', 'leave_id', 'id'].contains(key)) {
         continue;
       }
       final val = entry.value;
@@ -624,53 +674,159 @@ class SduiItemDetailSheet extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFF334155)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Close', style: TextStyle(color: Colors.white)),
-                    ),
-                  ),
-                  if (hasActionTarget) ...[
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              child: isLeaveItem
+                  ? _buildLeaveActionButtons(context, item, () {
+                      onReload?.call();
+                    })
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFF334155)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Close', style: TextStyle(color: Colors.white)),
+                          ),
                         ),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: const Color(0xFF0F172A),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                        if (hasActionTarget) ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF10B981),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: const Color(0xFF0F172A),
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                  ),
+                                  builder: (ctx) => SduiDynamicFormSheet(
+                                    formEndpoint: item['action_target'].toString(),
+                                  ),
+                                );
+                              },
+                              child: const Text('Edit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             ),
-                            builder: (ctx) => SduiDynamicFormSheet(
-                              formEndpoint: item['action_target'].toString(),
-                            ),
-                          );
-                        },
-                        child: const Text('Edit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
-                ],
-              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildLeaveActionButtons(BuildContext context, Map<String, dynamic> leaveItem, VoidCallback onSuccess) {
+    final status = (leaveItem['status'] ?? leaveItem['badge'] ?? '').toString().toLowerCase();
+    final leaveId = leaveItem['id'] ?? leaveItem['leave_id'];
+
+    if (status != 'pending') {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF1E293B),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        // Reject Button
+        Expanded(
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.close, color: Colors.white, size: 18),
+            label: const Text('Reject', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            onPressed: () => _updateLeaveStatus(context, leaveId, 'rejected', onSuccess),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Approve Button
+        Expanded(
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.check, color: Colors.white, size: 18),
+            label: const Text('Approve', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            onPressed: () => _updateLeaveStatus(context, leaveId, 'approved', onSuccess),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _updateLeaveStatus(BuildContext context, dynamic leaveId, String newStatus, VoidCallback onSuccess) async {
+    final authProvider = Provider.of<AuthProvider?>(context, listen: false);
+    final storeProvider = Provider.of<StoreProvider?>(context, listen: false);
+    final token = authProvider?.token ?? '';
+    final baseUrl = AppConfig.defaultBaseUrl;
+    final url = _resolveFullUrl('api/tenant/hrm/leaves/$leaveId/status', baseUrl);
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+          if (storeProvider?.current?.id != null)
+            'X-Store-Id': storeProvider!.current!.id.toString(),
+        },
+        body: jsonEncode({'status': newStatus}),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300 && (data['success'] == true || data['success'] == 1)) {
+        if (context.mounted) {
+          Navigator.pop(context, true);
+        }
+        onSuccess(); // Triggers reload of Leave Requests list
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Leave request ${newStatus == 'approved' ? 'approved' : 'rejected'} successfully.'),
+              backgroundColor: newStatus == 'approved' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+            ),
+          );
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(data['message'] ?? 'Failed to update leave status.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Network error. Could not update status.')),
+        );
+      }
+    }
   }
 
   Color _parseColor(String hex) {
@@ -929,8 +1085,15 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        builder: (ctx) => SduiItemDetailSheet(item: item),
-      );
+        builder: (ctx) => SduiItemDetailSheet(
+          item: item,
+          onReload: () => _refreshCurrentView(),
+        ),
+      ).then((val) {
+        if (val == true) {
+          _refreshCurrentView();
+        }
+      });
     } else if (item['action'] is Map) {
       _handleSduiAction(context, Map<String, dynamic>.from(item['action'] as Map));
     } else {
@@ -941,8 +1104,15 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        builder: (ctx) => SduiItemDetailSheet(item: item),
-      );
+        builder: (ctx) => SduiItemDetailSheet(
+          item: item,
+          onReload: () => _refreshCurrentView(),
+        ),
+      ).then((val) {
+        if (val == true) {
+          _refreshCurrentView();
+        }
+      });
     }
   }
 

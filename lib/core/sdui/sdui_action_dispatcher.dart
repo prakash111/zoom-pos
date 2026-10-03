@@ -493,15 +493,21 @@ class SduiActionDispatcher {
             ? Map<String, dynamic>.from(action['item'] as Map)
             : action;
         if (context.mounted) {
-          await showModalBottomSheet(
+          final res = await showModalBottomSheet(
             context: context,
             isScrollControlled: true,
             backgroundColor: const Color(0xFF0F172A),
             shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            builder: (ctx) => SduiItemDetailSheet(item: item),
+            builder: (ctx) => SduiItemDetailSheet(
+              item: item,
+              onReload: onReload,
+            ),
           );
+          if (res == true) {
+            onReload();
+          }
         }
         break;
 
