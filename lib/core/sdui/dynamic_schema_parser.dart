@@ -1335,9 +1335,18 @@ class DynamicSchemaParser {
     final sduiContext = DynamicSchemaContext.of(context);
     final name = schema['name']?.toString() ?? '';
     final label = context.tr(schema['label']?.toString() ?? '');
-    final rawOptions = schema['options'] as List<dynamic>? ?? const [];
+    final rawOptions = <dynamic>[];
+    if (schema['options'] is List) {
+      rawOptions.addAll(schema['options'] as List);
+    } else if (schema['options'] is Map) {
+      (schema['options'] as Map).forEach((k, v) {
+        rawOptions.add({'value': k.toString(), 'label': v.toString()});
+      });
+    }
     final currentVal = sduiContext?.formValues[name]?.toString() ??
-        schema['initial_value']?.toString();
+        schema['initial_value']?.toString() ??
+        schema['value']?.toString() ??
+        schema['default']?.toString();
 
     // Long option lists (timezones, countries…) get a searchable picker
     // instead of an unfilterable native menu.
@@ -4567,8 +4576,15 @@ class _SduiSearchableSelectState extends State<_SduiSearchableSelect> {
   @override
   void initState() {
     super.initState();
-    _options = ((widget.schema['options'] as List<dynamic>?) ?? const [])
-        .map<_Opt>((o) {
+    final rawList = <dynamic>[];
+    if (widget.schema['options'] is List) {
+      rawList.addAll(widget.schema['options'] as List);
+    } else if (widget.schema['options'] is Map) {
+      (widget.schema['options'] as Map).forEach((k, v) {
+        rawList.add({'value': k.toString(), 'label': v.toString()});
+      });
+    }
+    _options = rawList.map<_Opt>((o) {
       if (o is Map) {
         final label = (o['label'] ?? o['name'] ?? o['value'] ?? '').toString();
         final value = (o['value'] ?? o['code'] ?? label).toString();

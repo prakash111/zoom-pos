@@ -344,10 +344,17 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
         controller?.text = currentVal ?? '';
       }
 
+      final effectiveValue = items.any((i) => i.value == currentVal)
+          ? currentVal
+          : (items.isNotEmpty ? items.first.value : null);
+      if (controller != null && controller.text != (effectiveValue ?? '')) {
+        controller.text = effectiveValue ?? '';
+      }
+
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: DropdownButtonFormField<String>(
-          initialValue: items.any((i) => i.value == currentVal) ? currentVal : null,
+          initialValue: effectiveValue,
           dropdownColor: const Color(0xFF1E293B),
           style: const TextStyle(color: Colors.white, fontSize: 14),
           decoration: InputDecoration(
