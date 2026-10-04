@@ -514,6 +514,23 @@ class SduiActionDispatcher {
         }
         break;
 
+      case 'reload':
+      case 'refresh':
+        final ep = action['endpoint']?.toString() ?? action['target']?.toString();
+        if (ep != null && ep.isNotEmpty && context.mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => SduiComponentRegistry.resolveRoute(
+                ep,
+                arguments: action,
+              ),
+            ),
+          );
+        } else {
+          onReload();
+        }
+        break;
+
       default:
         break;
     }

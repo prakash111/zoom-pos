@@ -12,6 +12,7 @@ import '../../features/subscription/screens/subscription_screen.dart';
 import 'screens/dynamic_schema_page.dart';
 import '../../features/stores/store_management_screen.dart';
 import '../../screens/auth/server_address_screen.dart';
+import '../../screens/sdui/sdui_generic_list_screen.dart';
 
 /// The business-page and public route resolver in the Flutter shell.
 class AppRouter {
@@ -127,6 +128,20 @@ class AppRouter {
       return MaterialPageRoute<void>(
         settings: settings,
         builder: (_) => InventoryScreen(initialFilter: filter),
+      );
+    }
+
+    if (normalized.contains('loyalty/views') ||
+        normalized.contains('views/wallets') ||
+        normalized.contains('views/tiers') ||
+        normalized.contains('views/settings') ||
+        normalized.contains('loyalty_')) {
+      final ep = requested.startsWith('/api/')
+          ? requested
+          : '/api/tenant/views/${requested.replaceFirst(RegExp(r'^/+'), '')}';
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => SduiGenericListScreen(endpoint: ep),
       );
     }
 

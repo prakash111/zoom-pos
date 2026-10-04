@@ -22,12 +22,14 @@ String _resolveFullUrl(String endpoint, String baseUrl) {
 /// Centralized SDUI Dynamic Form Modal Sheet
 class SduiDynamicFormSheet extends StatefulWidget {
   final String formEndpoint;
+  final Map<String, dynamic>? initialSchema;
   final VoidCallback? onSubmitted;
   final bool isBottomSheet;
 
   const SduiDynamicFormSheet({
     Key? key,
     required this.formEndpoint,
+    this.initialSchema,
     this.onSubmitted,
     this.isBottomSheet = true,
   }) : super(key: key);
@@ -53,7 +55,64 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
   @override
   void initState() {
     super.initState();
-    _fetchFormSchema();
+    if (widget.initialSchema != null) {
+      _loadSchemaData(widget.initialSchema!);
+    } else {
+      _fetchFormSchema();
+    }
+  }
+
+  void _loadSchemaData(Map<String, dynamic> raw) {
+    final schema = raw['schema'] is Map ? (raw['schema'] as Map) : raw;
+
+    _title = schema['title']?.toString() ?? 'Form';
+    _submitUrl = schema['submit_url']?.toString() ?? schema['submit_endpoint']?.toString() ?? schema['endpoint']?.toString() ?? '';
+    _submitButtonLabel = (schema['submit_button'] is Map ? schema['submit_button']['label'] : null) ??
+        schema['submit_text']?.toString() ??
+        schema['submit_label']?.toString() ??
+        'Save';
+    _method = schema['method']?.toString().toUpperCase() ?? 'POST';
+
+    final rawFields = schema['fields'] as List<dynamic>? ?? [];
+    _fields = rawFields.whereType<Map>().map((f) => Map<String, dynamic>.from(f)).toList();
+
+    final initialValues = (schema['initial_values'] as Map?) ?? (schema['data'] as Map?) ?? {};
+    for (final field in _fields) {
+      final name = field['name']?.toString() ?? '';
+      final type = field['type']?.toString().toLowerCase() ?? 'text';
+      if (name.isNotEmpty) {
+        if (type == 'key_value_pairs') {
+          final rawVal = field['value'] ?? initialValues[name];
+          if (rawVal is List) {
+            _keyValuePairs[name] = rawVal.whereType<Map>().map((m) {
+              return {
+                'name': (m['name'] ?? m['key'] ?? '').toString(),
+                'value': (m['value'] ?? '').toString(),
+              };
+            }).toList();
+          } else if (rawVal is Map) {
+            _keyValuePairs[name] = rawVal.entries.map((e) {
+              return {
+                'name': e.key.toString(),
+                'value': e.value.toString(),
+              };
+            }).toList();
+          } else {
+            _keyValuePairs[name] = [];
+          }
+        } else if (type == 'switch' || type == 'toggle' || type == 'toggle_switch') {
+          final rawVal = field['value'] ?? field['default'] ?? initialValues[name] ?? false;
+          final isChecked = (rawVal == true || rawVal == 1 || rawVal == '1' || rawVal == 'true');
+          _controllers[name] = TextEditingController(text: isChecked ? '1' : '0');
+          _fieldValues[name] = isChecked;
+        } else {
+          final defaultVal = field['value'] ?? field['default'] ?? initialValues[name] ?? '';
+          _controllers[name] = TextEditingController(text: defaultVal.toString());
+          _fieldValues[name] = defaultVal;
+        }
+      }
+    }
+    _isLoading = false;
   }
 
   @override
@@ -89,54 +148,8 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = jsonDecode(response.body);
-        final schema = data['schema'] ?? data;
-
         setState(() {
-          _title = schema['title']?.toString() ?? 'Form';
-          _submitUrl = schema['submit_url']?.toString() ?? '';
-          _submitButtonLabel = (schema['submit_button'] is Map ? schema['submit_button']['label'] : null) ?? schema['submit_label']?.toString() ?? 'Save';
-          _method = schema['method']?.toString().toUpperCase() ?? 'POST';
-
-          final rawFields = schema['fields'] as List<dynamic>? ?? [];
-          _fields = rawFields.whereType<Map>().map((f) => Map<String, dynamic>.from(f)).toList();
-
-          final initialValues = (schema['initial_values'] as Map?) ?? {};
-          for (final field in _fields) {
-            final name = field['name']?.toString() ?? '';
-            final type = field['type']?.toString().toLowerCase() ?? 'text';
-            if (name.isNotEmpty) {
-              if (type == 'key_value_pairs') {
-                final rawVal = field['value'] ?? initialValues[name];
-                if (rawVal is List) {
-                  _keyValuePairs[name] = rawVal.whereType<Map>().map((m) {
-                    return {
-                      'name': (m['name'] ?? m['key'] ?? '').toString(),
-                      'value': (m['value'] ?? '').toString(),
-                    };
-                  }).toList();
-                } else if (rawVal is Map) {
-                  _keyValuePairs[name] = rawVal.entries.map((e) {
-                    return {
-                      'name': e.key.toString(),
-                      'value': e.value.toString(),
-                    };
-                  }).toList();
-                } else {
-                  _keyValuePairs[name] = [];
-                }
-              } else if (type == 'switch' || type == 'toggle' || type == 'toggle_switch') {
-                final rawVal = field['value'] ?? field['default'] ?? initialValues[name] ?? false;
-                final isChecked = (rawVal == true || rawVal == 1 || rawVal == '1' || rawVal == 'true');
-                _controllers[name] = TextEditingController(text: isChecked ? '1' : '0');
-                _fieldValues[name] = isChecked;
-              } else {
-                final defaultVal = field['value'] ?? field['default'] ?? initialValues[name] ?? '';
-                _controllers[name] = TextEditingController(text: defaultVal.toString());
-                _fieldValues[name] = defaultVal;
-              }
-            }
-          }
-          _isLoading = false;
+          _loadSchemaData(data is Map<String, dynamic> ? data : Map<String, dynamic>.from(data));
         });
       } else {
         setState(() {
@@ -265,7 +278,7 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: const Color(0xFF1E293B),
             borderRadius: BorderRadius.circular(10),
@@ -275,9 +288,21 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                    if (field['helper_text'] != null && field['helper_text'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        field['helper_text'].toString(),
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               Switch(
@@ -404,6 +429,8 @@ class _SduiDynamicFormSheetState extends State<SduiDynamicFormSheet> {
         decoration: InputDecoration(
           labelText: label + (isRequired ? ' *' : ''),
           labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+          helperText: field['helper_text']?.toString(),
+          helperStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
           counterStyle: const TextStyle(color: Color(0xFF64748B)),
           filled: true,
           fillColor: const Color(0xFF1E293B),
@@ -836,10 +863,16 @@ class SduiItemDetailSheet extends StatelessWidget {
                                   ),
                                   builder: (ctx) => SduiDynamicFormSheet(
                                     formEndpoint: item['action_target'].toString(),
+                                    onSubmitted: onReload,
                                   ),
-                                );
+                                ).then((val) {
+                                  if (val == true) onReload?.call();
+                                });
                               },
-                              child: const Text('Edit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              child: Text(
+                                (item['action_label'] ?? (item['action_target'].toString().contains('topup') ? '+ Top-up' : 'Edit')).toString(),
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ),
                         ],
@@ -1059,13 +1092,24 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
   }
 
   Widget _buildSearchBar() {
+    String placeholder = 'Search customer by name or phone...';
+    if (_data?['components'] is List) {
+      final comp = (_data!['components'] as List).firstWhere(
+        (c) => c is Map && c['type'] == 'search_bar',
+        orElse: () => null,
+      );
+      if (comp is Map && comp['placeholder'] != null) {
+        placeholder = comp['placeholder'].toString();
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16.0, 10.0, 16.0, 6.0),
       child: TextField(
         controller: _searchController,
         style: const TextStyle(color: Colors.white, fontSize: 14),
         decoration: InputDecoration(
-          hintText: 'Search customer by name or phone...',
+          hintText: placeholder,
           hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
           prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B), size: 20),
           suffixIcon: _searchController.text.isNotEmpty
@@ -1073,6 +1117,7 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
                   icon: const Icon(Icons.clear, color: Color(0xFF64748B), size: 18),
                   onPressed: () {
                     _searchController.clear();
+                    setState(() {});
                     _fetchData(query: '');
                   },
                 )
@@ -1092,6 +1137,7 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
           ),
         ),
         onChanged: (value) {
+          setState(() {});
           if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel();
           _searchDebounce = Timer(const Duration(milliseconds: 350), () {
             _fetchData(query: value.trim());
@@ -1108,8 +1154,108 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
       'punch_clock' || 'schedule' => Icons.access_time,
       'event_note' || 'calendar_today' => Icons.event_note,
       'calculate' || 'payments' => Icons.calculate,
+      'military_tech' => Icons.military_tech,
+      'account_balance_wallet' || 'wallet' => Icons.account_balance_wallet,
+      'stars' || 'star' => Icons.stars,
+      'groups' || 'group' || 'people' => Icons.groups,
+      'add_circle' || 'add' => Icons.add_circle,
+      'tune' || 'settings' => Icons.tune,
+      'history' => Icons.history,
+      'save' => Icons.save,
       _ => Icons.touch_app,
     };
+  }
+
+  Widget _buildMetricsRow() {
+    List<dynamic> metricsList = [];
+    if (_data?['components'] is List) {
+      final comp = (_data!['components'] as List).firstWhere(
+        (c) => c is Map && (c['type'] == 'metrics_row' || c['type'] == 'stats_row'),
+        orElse: () => null,
+      );
+      if (comp is Map && comp['metrics'] is List) {
+        metricsList = comp['metrics'] as List;
+      }
+    }
+    if (metricsList.isEmpty && _data?['metrics'] is Map) {
+      final m = _data!['metrics'] as Map;
+      metricsList = [
+        if (m['total_wallet_balance'] != null)
+          {
+            'label': 'Total Store Wallet',
+            'value': '₹${((m['total_wallet_balance'] as num).toDouble()).toStringAsFixed(2)}',
+            'icon': 'account_balance_wallet',
+            'color': '#10B981',
+          },
+        if (m['total_points_issued'] != null)
+          {
+            'label': 'Total Points',
+            'value': '${((m['total_points_issued'] as num).toInt())}',
+            'icon': 'stars',
+            'color': '#F59E0B',
+          },
+        if (m['active_wallets_count'] != null)
+          {
+            'label': 'Active Wallets',
+            'value': '${m['active_wallets_count']}',
+            'icon': 'groups',
+            'color': '#3B82F6',
+          },
+      ];
+    }
+    if (metricsList.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final item in metricsList)
+              if (item is Map) ...[
+                Container(
+                  width: 155,
+                  margin: const EdgeInsets.only(right: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              (item['label'] ?? '').toString(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          Icon(
+                            _resolveIcon(item['icon']),
+                            color: item['color'] != null ? _parseColor(item['color'].toString()) : const Color(0xFF10B981),
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        (item['value'] ?? '').toString(),
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+          ],
+        ),
+      ),
+    );
   }
 
   // 1. Primary Top Action Button Handler
@@ -1412,6 +1558,7 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
       body: isFormView
           ? SduiDynamicFormSheet(
               formEndpoint: widget.endpoint,
+              initialSchema: _data,
               isBottomSheet: false,
               onSubmitted: _refreshCurrentView,
             )
@@ -1440,6 +1587,7 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
                           : ListView(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               children: [
+                                _buildMetricsRow(),
                                 for (final act in rawActions)
                                   if (act is Map) ...[
                                     _buildTopActionButton(context, Map<String, dynamic>.from(act)),

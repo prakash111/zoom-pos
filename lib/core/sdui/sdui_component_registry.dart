@@ -42,6 +42,7 @@ import '../widgets/barcode_scanner_screen.dart';
 import '../widgets/coming_soon_screen.dart';
 import 'screens/dynamic_module_screen.dart';
 import 'screens/dynamic_schema_page.dart';
+import '../../screens/sdui/sdui_generic_list_screen.dart';
 
 /// Registry mapping server-driven component identifiers to screen builders.
 class SduiComponentRegistry {
@@ -216,6 +217,58 @@ class SduiComponentRegistry {
     'settings_navigation': (_) => const NavMenuSettingsTab(),
     'tree_builder': (_) => const NavMenuSettingsTab(),
     'navigation_builder': (_) => const NavMenuSettingsTab(),
+    // Loyalty & Customer Wallet Module
+    'loyalty_wallets': (_) => const SduiGenericListScreen(
+          endpoint: '/api/tenant/loyalty/views/wallets',
+          initialTitle: 'Customer Balances & Top-up',
+        ),
+    'loyalty/views/wallets': (_) => const SduiGenericListScreen(
+          endpoint: '/api/tenant/loyalty/views/wallets',
+          initialTitle: 'Customer Balances & Top-up',
+        ),
+    '/api/tenant/loyalty/views/wallets': (_) => const SduiGenericListScreen(
+          endpoint: '/api/tenant/loyalty/views/wallets',
+          initialTitle: 'Customer Balances & Top-up',
+        ),
+    'api/tenant/loyalty/views/wallets': (_) => const SduiGenericListScreen(
+          endpoint: '/api/tenant/loyalty/views/wallets',
+          initialTitle: 'Customer Balances & Top-up',
+        ),
+
+    'loyalty_tiers': (_) => const SduiGenericListScreen(
+          endpoint: '/api/tenant/loyalty/views/tiers',
+          initialTitle: 'VIP Membership Tiers',
+        ),
+    'loyalty/views/tiers': (_) => const SduiGenericListScreen(
+          endpoint: '/api/tenant/loyalty/views/tiers',
+          initialTitle: 'VIP Membership Tiers',
+        ),
+    '/api/tenant/loyalty/views/tiers': (_) => const SduiGenericListScreen(
+          endpoint: '/api/tenant/loyalty/views/tiers',
+          initialTitle: 'VIP Membership Tiers',
+        ),
+    'api/tenant/loyalty/views/tiers': (_) => const SduiGenericListScreen(
+          endpoint: '/api/tenant/loyalty/views/tiers',
+          initialTitle: 'VIP Membership Tiers',
+        ),
+
+    'loyalty_settings': (_) => const SduiGenericListScreen(
+          endpoint: '/api/tenant/loyalty/views/settings',
+          initialTitle: 'Points Earning Rules',
+        ),
+    'loyalty/views/settings': (_) => const SduiGenericListScreen(
+          endpoint: '/api/tenant/loyalty/views/settings',
+          initialTitle: 'Points Earning Rules',
+        ),
+    '/api/tenant/loyalty/views/settings': (_) => const SduiGenericListScreen(
+          endpoint: '/api/tenant/loyalty/views/settings',
+          initialTitle: 'Points Earning Rules',
+        ),
+    'api/tenant/loyalty/views/settings': (_) => const SduiGenericListScreen(
+          endpoint: '/api/tenant/loyalty/views/settings',
+          initialTitle: 'Points Earning Rules',
+        ),
+
     'languages': (_) => const LanguagesScreen(),
     'staff': (_) => const StaffScreen(),
     'devices': (_) => const DevicesScreen(),
@@ -309,6 +362,23 @@ class SduiComponentRegistry {
         return Builder(builder: builder);
       }
     }
+    final stripped = key.replaceFirst(RegExp(r'^/+'), '');
+    if (instance.has(stripped)) {
+      final builder = instance._registry[stripped];
+      if (builder != null) {
+        return Builder(builder: builder);
+      }
+    }
+
+    if (key.contains('loyalty') ||
+        key.contains('wallets') ||
+        key.contains('tiers') ||
+        key.contains('loyalty/views')) {
+      return SduiGenericListScreen(
+        endpoint: clean,
+        initialTitle: arguments?['title']?.toString() ?? arguments?['label']?.toString(),
+      );
+    }
 
     // 2. UNIVERSAL FALLBACK: Every other menu route loads dynamically from the server endpoint
     final title = arguments?['title']?.toString() ??
@@ -351,14 +421,32 @@ class SduiComponentRegistry {
     }
 
     if (targetEndpoint != null && targetEndpoint.trim().isNotEmpty) {
+      final clean = targetEndpoint.trim();
+      final lower = clean.toLowerCase();
+      if (_registry.containsKey(lower)) {
+        return _registry[lower]!;
+      }
+      final strippedLower = lower.replaceFirst(RegExp(r'^/+'), '');
+      if (_registry.containsKey(strippedLower)) {
+        return _registry[strippedLower]!;
+      }
+      if (lower.contains('loyalty') ||
+          lower.contains('wallets') ||
+          lower.contains('tiers') ||
+          lower.contains('loyalty/views')) {
+        return (_) => SduiGenericListScreen(
+              endpoint: clean,
+              initialTitle: title ?? componentKey,
+            );
+      }
       return (_) => DynamicSchemaPage(
-            endpoint: targetEndpoint.trim(),
+            endpoint: clean,
             initialTitle: title ?? componentKey,
             title: title ?? componentKey,
             arguments: {
               'id': componentKey,
               'title': title ?? componentKey,
-              'route': targetEndpoint.trim(),
+              'route': clean,
             },
           );
     }

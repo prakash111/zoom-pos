@@ -14,6 +14,7 @@ import 'components/navigation_tree_builder.dart';
 import 'dynamic_schema_context.dart';
 import 'sdui_icon_registry.dart';
 import 'sdui_tab_advancer.dart';
+import '../../screens/sdui/sdui_generic_list_screen.dart';
 
 /// Declarative schema parser that maps server-driven UI JSON specifications
 /// to base Flutter Material widgets.
@@ -54,6 +55,15 @@ class DynamicSchemaParser {
           schema: schema,
           initial: _navigationConfigFromSchema(schema),
         );
+      case 'metrics_row':
+      case 'stats_row':
+        return _buildMetricsRow(context, schema);
+      case 'list':
+      case 'list_view':
+        return _SduiDynamicList(schema: schema);
+      case 'form':
+      case 'form_view':
+        return _SduiDynamicForm(schema: schema);
 
       // Display
       case 'text':
@@ -194,6 +204,72 @@ class DynamicSchemaParser {
   // ===========================================================================
   // Layouts
   // ===========================================================================
+
+  static Widget _buildMetricsRow(
+      BuildContext context, Map<String, dynamic> schema) {
+    final rawMetrics = schema['metrics'] as List<dynamic>? ?? const [];
+    if (rawMetrics.isEmpty) return const SizedBox.shrink();
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          for (final item in rawMetrics)
+            if (item is Map) ...[
+              Container(
+                width: 155,
+                margin: const EdgeInsets.only(right: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF334155)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            (item['label'] ?? '').toString(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Icon(
+                          SduiIconRegistry.resolve(
+                              item['icon']?.toString() ?? 'star'),
+                          color: item['color'] != null
+                              ? SduiIconRegistry.parseColor(
+                                  item['color'].toString())
+                              : const Color(0xFF10B981),
+                          size: 16,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      (item['value'] ?? '').toString(),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+        ],
+      ),
+    );
+  }
 
   static Widget _buildContainer(
       BuildContext context, Map<String, dynamic> schema) {
@@ -4168,6 +4244,7 @@ class _SduiSearchBar extends StatefulWidget {
 
 class _SduiSearchBarState extends State<_SduiSearchBar> {
   final _controller = TextEditingController();
+  Timer? _searchDebounce;
 
   String get _name => widget.schema['name']?.toString() ?? 'search';
 
@@ -4189,20 +4266,40 @@ class _SduiSearchBarState extends State<_SduiSearchBar> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
   void _dispatch() {
     final sdui = DynamicSchemaContext.of(context);
-    sdui?.setFormValue(_name, _controller.text.trim());
+    final query = _controller.text.trim();
+    sdui?.setFormValue(_name, query);
+
     final action = widget.schema['action'];
     if (action is Map) {
       sdui?.dispatchAction(Map<String, dynamic>.from(action));
+      return;
+    }
+
+    final target = widget.schema['target']?.toString() ??
+        widget.schema['endpoint']?.toString() ??
+        widget.schema['search_endpoint']?.toString() ??
+        widget.schema['url']?.toString();
+    if (target != null && target.trim().isNotEmpty) {
+      final sep = target.contains('?') ? '&' : '?';
+      final searchUrl = '$target${sep}search=${Uri.encodeComponent(query)}';
+      sdui?.dispatchAction({
+        'type': 'reload',
+        'endpoint': searchUrl,
+        'target': searchUrl,
+        'url': searchUrl,
+      });
     }
   }
 
   void _clear() {
+    _searchDebounce?.cancel();
     _controller.clear();
     setState(() {});
     _dispatch();
@@ -4234,6 +4331,10 @@ class _SduiSearchBarState extends State<_SduiSearchBar> {
         onChanged: (val) {
           DynamicSchemaContext.of(context)?.setFormValue(_name, val);
           setState(() {}); // toggle the clear button
+          if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel();
+          _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+            _dispatch();
+          });
         },
         onSubmitted: (_) => _dispatch(),
         decoration: InputDecoration(
@@ -5844,6 +5945,344 @@ class _CustomerSelectorState extends State<_CustomerSelector> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SduiDynamicForm extends StatelessWidget {
+  const _SduiDynamicForm({required this.schema});
+
+  final Map<String, dynamic> schema;
+
+  @override
+  Widget build(BuildContext context) {
+    final endpoint = schema['endpoint']?.toString() ??
+        schema['submit_url']?.toString() ??
+        schema['submit_endpoint']?.toString() ??
+        '';
+
+    return SduiDynamicFormSheet(
+      formEndpoint: endpoint,
+      initialSchema: schema,
+      isBottomSheet: false,
+      onSubmitted: () {
+        DynamicSchemaContext.of(context)?.dispatchAction({'type': 'reload'});
+      },
+    );
+  }
+}
+
+class _SduiDynamicList extends StatelessWidget {
+  const _SduiDynamicList({required this.schema});
+
+  final Map<String, dynamic> schema;
+
+  @override
+  Widget build(BuildContext context) {
+    final rawItems = schema['items'] as List<dynamic>? ?? const [];
+    final items = rawItems
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
+        .toList();
+    final emptyState = schema['empty_state'] as Map?;
+
+    if (items.isEmpty) {
+      final title = emptyState?['title']?.toString() ?? 'No records found';
+      final desc = emptyState?['description']?.toString() ??
+          emptyState?['subtitle']?.toString() ??
+          '';
+      final iconName = emptyState?['icon']?.toString() ?? 'inbox';
+      final actionLabel = emptyState?['action_label']?.toString();
+      final actionKey = emptyState?['action_key']?.toString();
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                SduiIconRegistry.resolve(iconName,
+                    fallback: Icons.inbox_outlined),
+                size: 48,
+                color: const Color(0xFF64748B),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              if (desc.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  desc,
+                  style:
+                      const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              if (actionLabel != null && actionLabel.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    final sdui = DynamicSchemaContext.of(context);
+                    if (actionKey == 'topup_wallet' ||
+                        actionLabel.contains('Top-up') ||
+                        actionLabel.contains('टॉप-अप')) {
+                      sdui?.dispatchAction({
+                        'type': 'modal_form',
+                        'target': 'api/tenant/loyalty/forms/topup',
+                      });
+                    } else {
+                      sdui?.dispatchAction({'type': 'reload'});
+                    }
+                  },
+                  child: Text(
+                    actionLabel,
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      itemBuilder: (ctx, idx) => _buildListItemCard(ctx, items[idx]),
+    );
+  }
+
+  Widget _buildListItemCard(BuildContext context, Map<String, dynamic> item) {
+    final title = item['title'] ?? item['name'] ?? 'Record';
+    final subtitle = item['subtitle'] ?? '';
+    final badge = item['badge'] ?? '';
+    final badgeColor = item['badge_color'] != null
+        ? SduiIconRegistry.parseColor(item['badge_color'].toString())
+        : const Color(0xFF10B981);
+    final initials = (item['avatar_text'] ??
+            (title.toString().isNotEmpty ? title.toString().substring(0, 1) : 'R'))
+        .toString()
+        .toUpperCase();
+    final rawHistory = item['history'] as List<dynamic>? ?? const [];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: const Color(0xFF334155).withValues(alpha: 0.5)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            final action = item['action'];
+            if (action is Map) {
+              DynamicSchemaContext.of(context)
+                  ?.dispatchAction(Map<String, dynamic>.from(action));
+              return;
+            }
+            final target =
+                item['action_target']?.toString() ?? item['target']?.toString();
+            final actionType = item['action_type']?.toString().toLowerCase();
+            if (target != null &&
+                target.isNotEmpty &&
+                actionType == 'modal_form') {
+              DynamicSchemaContext.of(context)?.dispatchAction({
+                'type': 'modal_form',
+                'target': target,
+              });
+              return;
+            }
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: const Color(0xFF0F172A),
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder: (ctx) => SduiItemDetailSheet(
+                item: item,
+                onReload: () {
+                  DynamicSchemaContext.of(context)
+                      ?.dispatchAction({'type': 'reload'});
+                },
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: const Color(0xFF0F172A),
+                      child: Text(
+                        initials,
+                        style: const TextStyle(
+                            color: Color(0xFF10B981),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title.toString(),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15),
+                          ),
+                          if (subtitle.toString().isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              subtitle.toString(),
+                              style: const TextStyle(
+                                  color: Color(0xFF94A3B8), fontSize: 12),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (badge.toString().isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: badgeColor, width: 1),
+                        ),
+                        child: Text(
+                          badge.toString(),
+                          style: TextStyle(
+                              color: badgeColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13),
+                        ),
+                      ),
+                  ],
+                ),
+                if (rawHistory.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Divider(color: Color(0xFF334155), height: 1),
+                  const SizedBox(height: 8),
+                  const Row(
+                    children: [
+                      Icon(Icons.history_rounded,
+                          color: Color(0xFF64748B), size: 14),
+                      SizedBox(width: 4),
+                      Text(
+                        'Recent Top-ups & Activity:',
+                        style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  for (final tx in rawHistory)
+                    if (tx is Map) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    tx['is_credit'] == true
+                                        ? Icons.arrow_downward_rounded
+                                        : Icons.arrow_upward_rounded,
+                                    color: tx['is_credit'] == true
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFFEF4444),
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      "${tx['type'] ?? 'Top-up'} (${tx['method'] ?? 'Cash'})",
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          color: Color(0xFFCBD5E1),
+                                          fontSize: 12),
+                                    ),
+                                  ),
+                                  if (tx['bonus'] != null &&
+                                      tx['bonus'].toString().isNotEmpty) ...[
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      tx['bonus'].toString(),
+                                      style: const TextStyle(
+                                          color: Color(0xFFF59E0B),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  "${tx['is_credit'] == true ? '+' : '-'}${tx['amount'] ?? ''}",
+                                  style: TextStyle(
+                                    color: tx['is_credit'] == true
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFFEF4444),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                if (tx['date'] != null)
+                                  Text(
+                                    tx['date'].toString(),
+                                    style: const TextStyle(
+                                        color: Color(0xFF64748B), fontSize: 10),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
