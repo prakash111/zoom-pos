@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -734,6 +735,68 @@ class SduiItemDetailSheet extends StatelessWidget {
                 },
               ),
             ),
+            if (item['history'] is List && (item['history'] as List).isNotEmpty) ...[
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.history_rounded, color: Color(0xFF64748B), size: 14),
+                    SizedBox(width: 4),
+                    Text(
+                      'Recent Top-ups & Activity:',
+                      style: TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    for (final tx in (item['history'] as List))
+                      if (tx is Map)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    tx['is_credit'] == true ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                                    color: tx['is_credit'] == true ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "${tx['type'] ?? 'Top-up'} (${tx['method'] ?? 'Cash'})",
+                                    style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
+                                  ),
+                                  if (tx['bonus'] != null && tx['bonus'].toString().isNotEmpty) ...[
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      tx['bonus'].toString(),
+                                      style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              Text(
+                                "${tx['is_credit'] == true ? '+' : '-'}${tx['amount'] ?? ''}",
+                                style: TextStyle(
+                                  color: tx['is_credit'] == true ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: isLeaveItem
@@ -923,6 +986,8 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   Map<String, dynamic>? _data;
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -930,7 +995,14 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
     _fetchData();
   }
 
-  Future<void> _fetchData() async {
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchData({String query = ''}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -943,6 +1015,11 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
       final baseUrl = AppConfig.defaultBaseUrl;
 
       String fullUrl = widget.endpoint;
+      if (query.isNotEmpty) {
+        final separator = fullUrl.contains('?') ? '&' : '?';
+        fullUrl = '$fullUrl${separator}search=${Uri.encodeComponent(query)}';
+      }
+
       if (!fullUrl.startsWith('http://') && !fullUrl.startsWith('https://')) {
         fullUrl = '${baseUrl.replaceAll(RegExp(r'/+$'), '')}/${fullUrl.replaceAll(RegExp(r'^/+'), '')}';
       }
@@ -978,7 +1055,50 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
   }
 
   void _refreshCurrentView() {
-    _fetchData();
+    _fetchData(query: _searchController.text.trim());
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16.0, 10.0, 16.0, 6.0),
+      child: TextField(
+        controller: _searchController,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: 'Search customer by name or phone...',
+          hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+          prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B), size: 20),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, color: Color(0xFF64748B), size: 18),
+                  onPressed: () {
+                    _searchController.clear();
+                    _fetchData(query: '');
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: const Color(0xFF1E293B),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFF334155), width: 0.5),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.0),
+          ),
+        ),
+        onChanged: (value) {
+          if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel();
+          _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+            _fetchData(query: value.trim());
+          });
+        },
+      ),
+    );
   }
 
   IconData _resolveIcon(dynamic icon) {
@@ -1014,7 +1134,7 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
     );
   }
 
-  // 2. Individual List Item Tap Handler
+  // 2. Individual List Item Card Handler
   Widget _buildListItemCard(BuildContext context, Map<String, dynamic> item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1045,49 +1165,129 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
     final badge = item['badge'] ?? '';
     final badgeColor = item['badge_color'] != null ? _parseColor(item['badge_color'].toString()) : const Color(0xFF10B981);
     final initials = (item['avatar_text'] ?? (title.toString().isNotEmpty ? title.toString().substring(0, 1) : 'R')).toString().toUpperCase();
+    final rawHistory = item['history'] as List<dynamic>? ?? const [];
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CircleAvatar(
-          radius: 20,
-          backgroundColor: const Color(0xFF0F172A),
-          child: Text(
-            initials,
-            style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 14),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title.toString(),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: const Color(0xFF0F172A),
+              child: Text(
+                initials,
+                style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 14),
               ),
-              if (subtitle.toString().isNotEmpty) ...[
-                const SizedBox(height: 3),
-                Text(
-                  subtitle.toString(),
-                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title.toString(),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  if (subtitle.toString().isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle.toString(),
+                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (badge.toString().isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: badgeColor, width: 1),
                 ),
-              ],
+                child: Text(
+                  badge.toString(),
+                  style: TextStyle(color: badgeColor, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+          ],
+        ),
+
+        // Recent Top-up History Sub-Section
+        if (rawHistory.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Divider(color: Color(0xFF334155), height: 1),
+          const SizedBox(height: 8),
+          const Row(
+            children: [
+              Icon(Icons.history_rounded, color: Color(0xFF64748B), size: 14),
+              SizedBox(width: 4),
+              Text(
+                'Recent Top-ups & Activity:',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w600),
+              ),
             ],
           ),
-        ),
-        if (badge.toString().isNotEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: badgeColor.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: badgeColor, width: 1),
-            ),
-            child: Text(
-              badge.toString(),
-              style: TextStyle(color: badgeColor, fontWeight: FontWeight.bold, fontSize: 11),
-            ),
-          ),
+          const SizedBox(height: 6),
+          for (final tx in rawHistory)
+            if (tx is Map) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            tx['is_credit'] == true ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                            color: tx['is_credit'] == true ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              "${tx['type'] ?? 'Top-up'} (${tx['method'] ?? 'Cash'})",
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
+                            ),
+                          ),
+                          if (tx['bonus'] != null && tx['bonus'].toString().isNotEmpty) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              tx['bonus'].toString(),
+                              style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          "${tx['is_credit'] == true ? '+' : '-'}${tx['amount'] ?? ''}",
+                          style: TextStyle(
+                            color: tx['is_credit'] == true ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (tx['date'] != null)
+                          Text(
+                            tx['date'].toString(),
+                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 10),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+        ],
       ],
     );
   }
@@ -1200,6 +1400,8 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
     final rawItems = _data?['items'] as List<dynamic>? ?? const [];
     final rawFields = _data?['fields'] as List<dynamic>? ?? const [];
     final isFormView = _data?['layout'] == 'form_view' || (rawFields.isNotEmpty && rawItems.isEmpty);
+    final emptyState = _data?['empty_state'] as Map<String, dynamic>?;
+    final showSearchBar = !isFormView && (_data?['search_endpoint'] != null || (_data?['components'] is List && (_data!['components'] as List).any((c) => c is Map && c['type'] == 'search_bar')) || widget.endpoint.contains('wallet') || widget.endpoint.contains('customer'));
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B132B),
@@ -1207,40 +1409,99 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
         title: Text(title.toString()),
         backgroundColor: const Color(0xFF0F172A),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)))
-          : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
-                      const SizedBox(height: 12),
-                      Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent)),
-                      const SizedBox(height: 16),
-                      ElevatedButton(onPressed: _fetchData, child: const Text('Retry')),
-                    ],
-                  ),
-                )
-              : isFormView
-                  ? SduiDynamicFormSheet(
-                      formEndpoint: widget.endpoint,
-                      isBottomSheet: false,
-                      onSubmitted: _refreshCurrentView,
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        for (final act in rawActions)
-                          if (act is Map) ...[
-                            _buildTopActionButton(context, Map<String, dynamic>.from(act)),
-                            const SizedBox(height: 16),
-                          ],
-                        for (final it in rawItems)
-                          if (it is Map)
-                            _buildListItemCard(context, Map<String, dynamic>.from(it)),
-                      ],
-                    ),
+      body: isFormView
+          ? SduiDynamicFormSheet(
+              formEndpoint: widget.endpoint,
+              isBottomSheet: false,
+              onSubmitted: _refreshCurrentView,
+            )
+          : Column(
+              children: [
+                if (showSearchBar) _buildSearchBar(),
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)))
+                      : _errorMessage != null
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
+                                  const SizedBox(height: 12),
+                                  Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent)),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: () => _fetchData(query: _searchController.text.trim()),
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              children: [
+                                for (final act in rawActions)
+                                  if (act is Map) ...[
+                                    _buildTopActionButton(context, Map<String, dynamic>.from(act)),
+                                    const SizedBox(height: 14),
+                                  ],
+                                if (rawItems.isEmpty) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.search_off_rounded, color: Color(0xFF64748B), size: 48),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            emptyState?['title']?.toString() ?? (_searchController.text.isNotEmpty ? 'No Customers Matched' : 'No Records Found'),
+                                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            emptyState?['description']?.toString() ?? emptyState?['subtitle']?.toString() ?? (_searchController.text.isNotEmpty ? "No customer records matching '${_searchController.text}'." : ''),
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                          ),
+                                          if (emptyState?['action_label'] != null && rawActions.isNotEmpty) ...[
+                                            const SizedBox(height: 16),
+                                            ElevatedButton.icon(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFF10B981),
+                                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              ),
+                                              icon: const Icon(Icons.add_circle, color: Colors.white, size: 18),
+                                              label: Text(
+                                                emptyState!['action_label'].toString(),
+                                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                              ),
+                                              onPressed: () {
+                                                final act = rawActions.firstWhere(
+                                                  (a) => a is Map && (a['id'] == emptyState['action_key'] || a['type'] == 'modal_form' || a['type'] == 'action_sheet'),
+                                                  orElse: () => rawActions.first,
+                                                );
+                                                if (act is Map) {
+                                                  _handleSduiAction(context, Map<String, dynamic>.from(act));
+                                                }
+                                              },
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ] else ...[
+                                  for (final it in rawItems)
+                                    if (it is Map)
+                                      _buildListItemCard(context, Map<String, dynamic>.from(it)),
+                                ],
+                              ],
+                            ),
+                ),
+              ],
+            ),
     );
   }
 }
