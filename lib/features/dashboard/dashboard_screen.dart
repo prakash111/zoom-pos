@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../widgets/tenant_logo_avatar.dart';
+import '../../widgets/help_support_bottom_sheet.dart';
 import '../../core/config/platform_branding_provider.dart';
 
 import '../../core/api/api_client.dart';
@@ -741,142 +742,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _launchHelpSupport(BuildContext context, String phone) async {
     final branding = context.read<PlatformBrandingProvider>();
-    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
-    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
     final email = branding.supportEmail.isNotEmpty
         ? branding.supportEmail
         : 'support@zoomnearby.com';
 
     await showModalBottomSheet<void>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetCtx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.support_agent,
-                        color: Color(0xFF10B981), size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Help & Customer Support',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'We are here to assist you anytime',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              if (digits.isNotEmpty) ...[
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF25D366).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.chat, color: Color(0xFF25D366)),
-                  ),
-                  title: const Text('Chat on WhatsApp',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(phone),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                  onTap: () async {
-                    Navigator.pop(sheetCtx);
-                    final waUrl = Uri.parse(
-                        'https://wa.me/$digits?text=${Uri.encodeComponent('Hello, I need assistance with Zoom Sales CRM & Inventory.')}');
-                    if (await canLaunchUrl(waUrl)) {
-                      await launchUrl(waUrl,
-                          mode: LaunchMode.externalApplication);
-                    }
-                  },
-                ),
-                const Divider(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.phone, color: Color(0xFF3B82F6)),
-                  ),
-                  title: const Text('Call Support Hotline',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(cleanPhone),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                  onTap: () async {
-                    Navigator.pop(sheetCtx);
-                    final telUrl = Uri.parse('tel:$cleanPhone');
-                    if (await canLaunchUrl(telUrl)) {
-                      await launchUrl(telUrl);
-                    }
-                  },
-                ),
-              ],
-              if (email.isNotEmpty) ...[
-                const Divider(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.email_outlined,
-                        color: Color(0xFF6366F1)),
-                  ),
-                  title: const Text('Email Support Desk',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(email),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                  onTap: () async {
-                    Navigator.pop(sheetCtx);
-                    final mailUrl = Uri.parse(
-                        'mailto:$email?subject=${Uri.encodeComponent('Zoom Sales CRM & Inventory Support Inquiry')}');
-                    if (await canLaunchUrl(mailUrl)) {
-                      await launchUrl(mailUrl);
-                    }
-                  },
-                ),
-              ],
-            ],
-          ),
-        ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => buildHelpSupportDrawerSheet(
+        context,
+        customPhone: phone.isNotEmpty ? phone : null,
+        customEmail: email,
       ),
     );
   }
