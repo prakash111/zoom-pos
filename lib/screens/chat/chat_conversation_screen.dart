@@ -77,7 +77,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final client = context.read<ApiClient>();
 
     try {
-      final res = await client.get('/api/chat/conversations/${widget.conversationId}/messages');
+      final res = await client.get('/chat/conversations/${widget.conversationId}/messages');
       if (!mounted) return;
 
       if (res['success'] == true) {
@@ -150,7 +150,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final client = context.read<ApiClient>();
 
     try {
-      final res = await client.post('/api/chat/messages', data: {
+      final res = await client.post('/chat/messages', data: {
         'conversation_id': widget.conversationId,
         'message': text,
       });

@@ -31,7 +31,7 @@ class _InternalStaffChatListScreenState extends State<InternalStaffChatListScree
     final client = context.read<ApiClient>();
 
     try {
-      final res = await client.get('/api/chat/staff');
+      final res = await client.get('/chat/staff');
       if (mounted) {
         if (res['success'] == true) {
           setState(() {
@@ -58,7 +58,7 @@ class _InternalStaffChatListScreenState extends State<InternalStaffChatListScree
   Future<void> _openSupportChat() async {
     final client = context.read<ApiClient>();
     try {
-      final res = await client.post('/api/chat/conversations', data: {
+      final res = await client.post('/chat/conversations', data: {
         'type': 'support',
       });
       if (mounted && res['success'] == true && res['conversation_id'] != null) {
@@ -88,7 +88,7 @@ class _InternalStaffChatListScreenState extends State<InternalStaffChatListScree
   Future<void> _openStaffChat(Map<String, dynamic> staff) async {
     final client = context.read<ApiClient>();
     try {
-      final res = await client.post('/api/chat/conversations', data: {
+      final res = await client.post('/chat/conversations', data: {
         'type': 'direct',
         'user_id': staff['id'],
       });

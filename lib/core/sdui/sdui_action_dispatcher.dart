@@ -27,6 +27,7 @@ import 'sdui_tab_advancer.dart';
 import '../stores/store_provider.dart';
 import '../../screens/hrm/widgets/pos_clock_in_dialog.dart';
 import '../../screens/sdui/sdui_generic_list_screen.dart';
+import '../../screens/chat/chat_conversation_screen.dart';
 
 /// Endpoints whose effect only exists on the server — queuing them offline
 /// would be a lie. Matched as substrings of the action endpoint.
@@ -528,6 +529,37 @@ class SduiActionDispatcher {
           );
         } else {
           onReload();
+        }
+        break;
+
+      case 'open_chat':
+        final params = action['params'] is Map ? action['params'] as Map : {};
+        final userId = params['user_id'] ?? action['user_id'];
+        final name = params['name']?.toString() ?? action['name']?.toString() ?? 'Staff Chat';
+        final client = resolveApiClient();
+        if (client != null && userId != null) {
+          try {
+            final res = await client.post('/chat/conversations', data: {
+              'type': 'direct',
+              'user_id': userId,
+            });
+            final convId = res['conversation_id'] is int
+                ? res['conversation_id'] as int
+                : int.tryParse(res['conversation_id']?.toString() ?? '') ?? 1;
+            if (context.mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChatConversationScreen(
+                    conversationId: convId,
+                    title: name,
+                  ),
+                ),
+              );
+            }
+          } catch (e) {
+            showToast('Could not open conversation: $e', isError: true);
+          }
         }
         break;
 

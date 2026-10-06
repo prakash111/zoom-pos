@@ -14,6 +14,7 @@ import 'components/navigation_tree_builder.dart';
 import 'dynamic_schema_context.dart';
 import 'sdui_icon_registry.dart';
 import 'sdui_tab_advancer.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../screens/sdui/sdui_generic_list_screen.dart';
 
 /// Declarative schema parser that maps server-driven UI JSON specifications
@@ -85,6 +86,16 @@ class DynamicSchemaParser {
         return _buildEmptyState(context, schema);
       case 'document_preview_card':
         return _buildDocumentPreviewCard(context, schema);
+      case 'header_banner':
+        return _buildHeaderBanner(context, schema);
+      case 'section_title':
+        return _buildSectionTitle(context, schema);
+      case 'list_container':
+        return _buildListContainer(context, schema);
+      case 'user_card':
+        return _buildUserCard(context, schema);
+      case 'promotion_card':
+        return _buildPromotionCard(context, schema);
 
       // Forms & Inputs
       case 'text_input':
@@ -1187,6 +1198,353 @@ class DynamicSchemaParser {
                 ),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildHeaderBanner(
+      BuildContext context, Map<String, dynamic> schema) {
+    final title = context.tr(schema['title']?.toString() ?? '');
+    final subtitle = schema['subtitle'] == null
+        ? null
+        : context.tr(schema['subtitle'].toString());
+    final iconName = schema['icon']?.toString() ?? 'chat';
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F766E), Color(0xFF065F46)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              SduiIconRegistry.resolve(iconName),
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (subtitle != null && subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFFCCFBF1),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildSectionTitle(
+      BuildContext context, Map<String, dynamic> schema) {
+    final title = context.tr(schema['title']?.toString() ?? '');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Color(0xFF94A3B8),
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildListContainer(
+      BuildContext context, Map<String, dynamic> schema) {
+    final rawItems = schema['items'] ?? schema['components'] ?? schema['children'];
+    final items = rawItems is List ? rawItems : [];
+
+    if (items.isEmpty) {
+      final empty = schema['empty_state'] is Map
+          ? Map<String, dynamic>.from(schema['empty_state'] as Map)
+          : null;
+      if (empty != null) {
+        return _buildEmptyState(context, empty);
+      }
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: items.map((item) {
+        if (item is Map<String, dynamic>) {
+          return buildComponent(context, item);
+        } else if (item is Map) {
+          return buildComponent(context, Map<String, dynamic>.from(item));
+        }
+        return const SizedBox.shrink();
+      }).toList(),
+    );
+  }
+
+  static Widget _buildUserCard(
+      BuildContext context, Map<String, dynamic> schema) {
+    final sduiContext = DynamicSchemaContext.of(context);
+    final title = schema['title']?.toString() ?? '';
+    final subtitle = schema['subtitle']?.toString() ?? '';
+    final badge = schema['badge']?.toString() ?? '';
+    final badgeColorHex = schema['badge_color']?.toString() ?? '#10B981';
+    final action = _componentAction(schema);
+
+    Color badgeColor = const Color(0xFF10B981);
+    try {
+      final clean = badgeColorHex.replaceFirst('#', '');
+      badgeColor = Color(int.parse('FF$clean', radix: 16));
+    } catch (_) {}
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: action != null ? () => sduiContext?.dispatchAction(action) : null,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: const Color(0xFF334155),
+                  child: Text(
+                    title.isNotEmpty ? title[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (badge.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: badgeColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: badgeColor,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          badge,
+                          style: TextStyle(
+                            color: badgeColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: Color(0xFF10B981),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildPromotionCard(
+      BuildContext context, Map<String, dynamic> schema) {
+    final title = schema['title']?.toString() ?? '';
+    final subtitle = schema['subtitle']?.toString() ?? '';
+    final bannerImageUrl = schema['banner_image_url']?.toString();
+    final pdfUrl = schema['pdf_url']?.toString();
+    final ctaLabel = schema['cta_label']?.toString();
+    final ctaUrl = schema['cta_url']?.toString();
+    final createdAt = schema['created_at']?.toString();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (bannerImageUrl != null && bannerImageUrl.isNotEmpty)
+            Image.network(
+              bannerImageUrl,
+              height: 150,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (createdAt != null)
+                      Text(
+                        createdAt,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 11,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFFCBD5E1),
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+                if ((ctaLabel != null && ctaLabel.isNotEmpty) || (pdfUrl != null && pdfUrl.isNotEmpty)) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      if (ctaLabel != null && ctaLabel.isNotEmpty && ctaUrl != null)
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final uri = Uri.tryParse(ctaUrl);
+                            if (uri != null) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            }
+                          },
+                          child: Text(ctaLabel),
+                        ),
+                      if (ctaLabel != null && ctaLabel.isNotEmpty && pdfUrl != null && pdfUrl.isNotEmpty)
+                        const SizedBox(width: 8),
+                      if (pdfUrl != null && pdfUrl.isNotEmpty)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF38BDF8),
+                            side: const BorderSide(color: Color(0xFF38BDF8)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onPressed: () async {
+                            final uri = Uri.tryParse(pdfUrl);
+                            if (uri != null) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            }
+                          },
+                          icon: const Icon(Icons.picture_as_pdf, size: 16),
+                          label: const Text('Brochure'),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),

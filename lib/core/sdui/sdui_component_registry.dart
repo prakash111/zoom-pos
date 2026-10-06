@@ -43,6 +43,7 @@ import '../widgets/coming_soon_screen.dart';
 import 'screens/dynamic_module_screen.dart';
 import 'screens/dynamic_schema_page.dart';
 import '../../screens/sdui/sdui_generic_list_screen.dart';
+import '../../screens/chat/internal_staff_chat_list_screen.dart';
 
 /// Registry mapping server-driven component identifiers to screen builders.
 class SduiComponentRegistry {
@@ -217,6 +218,11 @@ class SduiComponentRegistry {
     'settings_navigation': (_) => const NavMenuSettingsTab(),
     'tree_builder': (_) => const NavMenuSettingsTab(),
     'navigation_builder': (_) => const NavMenuSettingsTab(),
+    // Internal Staff Chat & Live Support Module
+    'chat_messages': (_) => const InternalStaffChatListScreen(),
+    'chat_staff': (_) => const InternalStaffChatListScreen(),
+    'internal_staff_chat': (_) => const InternalStaffChatListScreen(),
+    'staff_chat': (_) => const InternalStaffChatListScreen(),
     // Loyalty & Customer Wallet Module
     'loyalty_wallets': (_) => const SduiGenericListScreen(
           endpoint: '/api/tenant/loyalty/views/wallets',
