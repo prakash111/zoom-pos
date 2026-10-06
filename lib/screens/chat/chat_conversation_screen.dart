@@ -213,20 +213,25 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   // Build Super Admin Promotional Banner Card inside the chat
-  Widget _buildPromotionalCard() {
+  Widget _buildPromotionalCard(BuildContext context) {
     if (_promotion == null) return const SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+        gradient: LinearGradient(
+          colors: isDark
+              ? const [Color(0xFF1E293B), Color(0xFF0F172A)]
+              : const [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.5)),
+        border: Border.all(
+          color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.5 : 0.8),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,11 +243,19 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               Expanded(
                 child: Text(
                   _promotion!['title'] ?? 'Official Announcement',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF92400E),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close, color: Color(0xFF64748B), size: 16),
+                icon: Icon(
+                  Icons.close,
+                  color: isDark ? const Color(0xFF64748B) : const Color(0xFFB45309),
+                  size: 16,
+                ),
                 onPressed: () {
                   final promoId = _promotion?['id'] is int
                       ? _promotion!['id'] as int
@@ -270,7 +283,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           const SizedBox(height: 6),
           Text(
             _promotion!['message'] ?? '',
-            style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
+            style: TextStyle(
+              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF78350F),
+              fontSize: 12,
+            ),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -305,8 +321,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   // Build AI Smart Reply Quick Chips
-  Widget _buildAiSuggestionChips() {
+  Widget _buildAiSuggestionChips(BuildContext context) {
     if (_aiSuggestions.isEmpty) return const SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       height: 38,
@@ -318,10 +335,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         itemBuilder: (context, idx) {
           final replyText = _aiSuggestions[idx];
           return ActionChip(
-            backgroundColor: const Color(0xFF1E293B),
+            backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
             side: const BorderSide(color: Color(0xFF38BDF8), width: 0.8),
-            avatar: const Icon(Icons.auto_awesome, color: Color(0xFF38BDF8), size: 14),
-            label: Text(replyText, style: const TextStyle(color: Colors.white, fontSize: 11)),
+            avatar: const Icon(Icons.auto_awesome, color: Color(0xFF0284C7), size: 14),
+            label: Text(
+              replyText,
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                fontSize: 11,
+              ),
+            ),
             onPressed: () {
               _msgController.text = replyText;
             },
@@ -331,27 +354,190 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
+  Widget _buildChatBubble(BuildContext context, Map<String, dynamic> msg, bool isMe) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bubbleBg = isMe
+        ? (isDark ? const Color(0xFF059669) : const Color(0xFF10B981))
+        : (isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFFFF));
+    final textColor = isMe
+        ? Colors.white
+        : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A));
+    final senderColor = isMe
+        ? Colors.white70
+        : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7));
+    final borderColor = isMe
+        ? null
+        : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        padding: const EdgeInsets.all(12),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
+        decoration: BoxDecoration(
+          color: bubbleBg,
+          borderRadius: BorderRadius.circular(12),
+          border: borderColor != null ? Border.all(color: borderColor) : null,
+          boxShadow: isDark || isMe
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!isMe && msg['sender'] != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text(
+                  msg['sender']['name'] ?? '',
+                  style: TextStyle(
+                    color: senderColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            if (msg['attachment_url'] != null) ...[
+              if (msg['attachment_type'] == 'image')
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    msg['attachment_url'],
+                    height: 180,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              else
+                InkWell(
+                  onTap: () => _openUrl(msg['attachment_url']),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.attach_file, color: textColor, size: 16),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          msg['attachment_name'] ?? 'Attachment',
+                          style: TextStyle(
+                            color: textColor,
+                            decoration: TextDecoration.underline,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 6),
+            ],
+            if ((msg['message'] ?? '').isNotEmpty)
+              Text(
+                msg['message'] ?? '',
+                style: TextStyle(color: textColor, fontSize: 13),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputArea(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inputFill = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+    final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final hintColor = isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _msgController,
+              style: TextStyle(color: textColor, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Type message...',
+                hintStyle: TextStyle(color: hintColor),
+                filled: true,
+                fillColor: inputFill,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(color: borderColor),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(color: borderColor),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              onSubmitted: (_) => _sendMessage(),
+            ),
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            icon: const Icon(Icons.send_rounded, color: Color(0xFF10B981)),
+            onPressed: _sendMessage,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text(widget.title, style: const TextStyle(fontSize: 16, color: Colors.white)),
-        backgroundColor: const Color(0xFF1E293B),
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
+        title: Text(
+          widget.title,
+          style: TextStyle(
+            fontSize: 16,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        iconTheme: IconThemeData(color: isDark ? Colors.white : const Color(0xFF0F172A)),
+        elevation: isDark ? 0 : 0.5,
       ),
       body: Column(
         children: [
-          _buildPromotionalCard(),
+          _buildPromotionalCard(context),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)))
                 : _messages.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'No messages yet. Send a greeting!',
-                          style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                            fontSize: 13,
+                          ),
                         ),
                       )
                     : ListView.builder(
@@ -362,109 +548,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           final senderId = msg['sender_id']?.toString();
                           final isMe = senderId != null && senderId == _currentUserId;
 
-                          return Align(
-                            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                              padding: const EdgeInsets.all(12),
-                              constraints: BoxConstraints(
-                                maxWidth: MediaQuery.of(context).size.width * 0.75,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isMe ? const Color(0xFF10B981) : const Color(0xFF1E293B),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (!isMe && msg['sender'] != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(bottom: 3),
-                                      child: Text(
-                                        msg['sender']['name'] ?? '',
-                                        style: const TextStyle(
-                                          color: Color(0xFF38BDF8),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  if (msg['attachment_url'] != null) ...[
-                                    if (msg['attachment_type'] == 'image')
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.network(
-                                          msg['attachment_url'],
-                                          height: 180,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      )
-                                    else
-                                      InkWell(
-                                        onTap: () => _openUrl(msg['attachment_url']),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.attach_file, color: Colors.white, size: 16),
-                                            const SizedBox(width: 4),
-                                            Flexible(
-                                              child: Text(
-                                                msg['attachment_name'] ?? 'Attachment',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  decoration: TextDecoration.underline,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    const SizedBox(height: 6),
-                                  ],
-                                  if ((msg['message'] ?? '').isNotEmpty)
-                                    Text(
-                                      msg['message'] ?? '',
-                                      style: const TextStyle(color: Colors.white, fontSize: 13),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          );
+                          return _buildChatBubble(context, msg, isMe);
                         },
                       ),
           ),
-          _buildAiSuggestionChips(),
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _msgController,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: 'Type message...',
-                      hintStyle: const TextStyle(color: Color(0xFF64748B)),
-                      filled: true,
-                      fillColor: const Color(0xFF1E293B),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    ),
-                    onSubmitted: (_) => _sendMessage(),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                IconButton(
-                  icon: const Icon(Icons.send_rounded, color: Color(0xFF10B981)),
-                  onPressed: _sendMessage,
-                ),
-              ],
-            ),
-          ),
+          _buildAiSuggestionChips(context),
+          _buildInputArea(context),
         ],
       ),
     );

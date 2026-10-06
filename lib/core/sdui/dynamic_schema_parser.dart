@@ -66,6 +66,8 @@ class DynamicSchemaParser {
       case 'form_view':
       case 'dynamic_form':
         return _SduiDynamicForm(schema: schema);
+      case 'form_fields':
+        return _buildFormFields(context, schema);
 
       // Display
       case 'text':
@@ -1558,6 +1560,9 @@ class DynamicSchemaParser {
 
   static Widget _buildAnnouncementCard(
       BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final sduiContext = DynamicSchemaContext.of(context);
     final title = schema['title']?.toString() ?? '';
     final description =
         schema['description']?.toString() ?? schema['message']?.toString() ?? '';
@@ -1565,84 +1570,242 @@ class DynamicSchemaParser {
     final badgeColorHex = schema['badge_color']?.toString() ?? '#10B981';
     final badgeColor = SduiIconRegistry.parseColor(badgeColorHex,
         fallback: const Color(0xFF10B981));
-    final date = schema['date']?.toString() ?? '';
+    final date = schema['date']?.toString() ?? schema['created_at']?.toString() ?? '';
+    final bannerImageUrl = schema['banner_image_url']?.toString();
+    final pdfUrl = schema['pdf_url']?.toString();
+    final ctaLabel = schema['cta_label']?.toString();
+    final ctaUrl = schema['cta_url']?.toString();
+    final dismissAction = schema['dismiss_action'] is Map
+        ? Map<String, dynamic>.from(schema['dismiss_action'] as Map)
+        : null;
+
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final titleColor = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+    final descColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
+    final dateColor = isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: cardBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(color: borderColor),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (badge.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        margin: const EdgeInsets.only(bottom: 6),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
+                        ),
+                        child: Text(
+                          badge,
+                          style: TextStyle(
+                            color: badgeColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: titleColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              if (badge.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: badgeColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6),
-                    border:
-                        Border.all(color: badgeColor.withValues(alpha: 0.6)),
-                  ),
-                  child: Text(
-                    badge,
-                    style: TextStyle(
-                      color: badgeColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+              if (dismissAction != null) ...[
+                IconButton(
+                  icon: Icon(Icons.close, size: 18, color: dateColor),
+                  tooltip: 'Dismiss',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: () => sduiContext?.dispatchAction(dismissAction),
                 ),
               ],
             ],
           ),
+          if (bannerImageUrl != null && bannerImageUrl.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                bannerImageUrl,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: 130,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          ],
           if (description.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
               description,
-              style: const TextStyle(
-                color: Color(0xFF94A3B8),
+              style: TextStyle(
+                color: descColor,
                 fontSize: 13,
                 height: 1.4,
               ),
+            ),
+          ],
+          if (pdfUrl != null && pdfUrl.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            InkWell(
+              onTap: () async {
+                final uri = Uri.tryParse(pdfUrl);
+                if (uri != null && await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      'View Attached Document / PDF',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (ctaLabel != null && ctaLabel.isNotEmpty && ctaUrl != null && ctaUrl.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              onPressed: () async {
+                final uri = Uri.tryParse(ctaUrl);
+                if (uri != null && await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+              child: Text(ctaLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             ),
           ],
           if (date.isNotEmpty) ...[
             const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.access_time,
-                    size: 12, color: Color(0xFF64748B)),
+                Icon(Icons.access_time, size: 12, color: dateColor),
                 const SizedBox(width: 4),
                 Text(
                   date,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: dateColor, fontSize: 11),
                 ),
               ],
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  static Widget _buildFormFields(
+      BuildContext context, Map<String, dynamic> schema) {
+    final rawFields = schema['fields'] as List<dynamic>? ?? const [];
+    if (rawFields.isEmpty) return const SizedBox.shrink();
+
+    final children = <Widget>[];
+    for (final raw in rawFields) {
+      if (raw is! Map) continue;
+      final field = Map<String, dynamic>.from(raw);
+      final fieldType = field['type']?.toString().toLowerCase().trim() ?? 'text';
+
+      switch (fieldType) {
+        case 'text':
+          children.add(_buildTextInput(context, field));
+          break;
+        case 'textarea':
+        case 'multiline':
+          field['max_lines'] = field['max_lines'] ?? 4;
+          field['keyboard_type'] = 'multiline';
+          children.add(_buildTextInput(context, field));
+          break;
+        case 'select':
+        case 'dropdown':
+        case 'dropdown_select':
+          children.add(_buildDropdownSelect(context, field));
+          break;
+        case 'multi_select':
+          children.add(_SduiMultiSelectField(schema: field));
+          break;
+        case 'checkbox':
+          children.add(_buildCheckbox(context, field));
+          break;
+        case 'toggle_switch':
+          children.add(_buildToggleSwitch(context, field));
+          break;
+        default:
+          children.add(buildComponent(context, field));
+          break;
+      }
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 0,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
       ),
     );
   }
@@ -6798,3 +6961,137 @@ class _SduiDynamicList extends StatelessWidget {
     );
   }
 }
+
+class _SduiMultiSelectField extends StatefulWidget {
+  final Map<String, dynamic> schema;
+
+  const _SduiMultiSelectField({required this.schema});
+
+  @override
+  State<_SduiMultiSelectField> createState() => _SduiMultiSelectFieldState();
+}
+
+class _SduiMultiSelectFieldState extends State<_SduiMultiSelectField> {
+  late final String _name;
+  late final String _label;
+  final List<String> _selectedIds = [];
+  final List<Map<String, String>> _options = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _name = widget.schema['name']?.toString() ?? 'staff_ids';
+    _label = widget.schema['label']?.toString() ?? 'Choose Staff Members';
+
+    final rawOpts = widget.schema['options'];
+    if (rawOpts is Map) {
+      rawOpts.forEach((k, v) {
+        _options.add({'id': k.toString(), 'label': v.toString()});
+      });
+    } else if (rawOpts is List) {
+      for (final o in rawOpts) {
+        if (o is Map) {
+          _options.add({
+            'id': o['id']?.toString() ?? o['value']?.toString() ?? '',
+            'label': o['name']?.toString() ?? o['label']?.toString() ?? '',
+          });
+        } else {
+          _options.add({'id': o.toString(), 'label': o.toString()});
+        }
+      }
+    }
+
+    final initial = widget.schema['initial_value'] ?? widget.schema['default'];
+    if (initial is List) {
+      _selectedIds.addAll(initial.map((e) => e.toString()));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sduiContext = DynamicSchemaContext.of(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = const Color(0xFF10B981);
+
+    // Sync from form context if set
+    final currentVal = sduiContext?.formValues[_name];
+    if (currentVal is List) {
+      final listStrings = currentVal.map((e) => e.toString()).toList();
+      _selectedIds.clear();
+      _selectedIds.addAll(listStrings);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.tr(_label),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_options.isEmpty)
+            Text(
+              context.tr('No staff members available'),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _options.map((opt) {
+                final id = opt['id']!;
+                final label = opt['label']!;
+                final isSelected = _selectedIds.contains(id);
+
+                return FilterChip(
+                  label: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B)),
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  selected: isSelected,
+                  selectedColor: primaryColor,
+                  checkmarkColor: Colors.white,
+                  backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(
+                      color: isSelected
+                          ? primaryColor
+                          : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                    ),
+                  ),
+                  onSelected: (selected) {
+                    setState(() {
+                      if (selected) {
+                        if (!_selectedIds.contains(id)) _selectedIds.add(id);
+                      } else {
+                        _selectedIds.remove(id);
+                      }
+                      sduiContext?.setFormValue(_name, List<String>.from(_selectedIds));
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+

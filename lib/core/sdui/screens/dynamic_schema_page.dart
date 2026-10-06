@@ -234,14 +234,15 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
 
   void _collectInitialValues(Map<String, dynamic> node) {
     final name = node['name']?.toString();
-    if (name != null && name.isNotEmpty && node.containsKey('initial_value')) {
-      _formValues[name] = node['initial_value'];
+    if (name != null && name.isNotEmpty && (node.containsKey('initial_value') || node.containsKey('default'))) {
+      _formValues[name] = node['initial_value'] ?? node['default'];
     }
 
     final children = node['components'] ??
         node['children'] ??
         node['child'] ??
         node['tabs'] ??
+        node['fields'] ??
         node['steps'];
     if (children is List) {
       for (final child in children) {
@@ -409,13 +410,106 @@ class _DynamicSchemaPageState extends State<DynamicSchemaPage> {
                   Share.share('{$title}\n${widget.endpoint ?? ''}');
                 },
               )
-            : null,
+            : (_schema?['submit_url'] != null
+                ? _buildFormSubmitBottomBar(context)
+                : null),
         floatingActionButton: fabConfig != null
             ? Builder(
                 builder: (fabContext) =>
                     DynamicSchemaParser.buildComponent(fabContext, fabConfig),
               )
             : null,
+      ),
+    );
+  }
+
+  bool _isSubmitting = false;
+
+  Future<void> _handleFormSubmit(String? submitUrl) async {
+    if (submitUrl == null || submitUrl.isEmpty) return;
+    if (!(_formKey.currentState?.validate() ?? true)) {
+      _showToast('Please check the required fields', isError: true);
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final method = _schema?['method']?.toString().toUpperCase() ?? 'POST';
+      final res = await _request(submitUrl, method: method, data: _formValues);
+      if (!mounted) return;
+      _showToast(res['message']?.toString() ?? 'Submitted successfully');
+      Navigator.of(context).maybePop(true);
+    } catch (e) {
+      if (!mounted) return;
+      _showToast(e is ApiException ? e.message : e.toString(), isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  Widget _buildFormSubmitBottomBar(BuildContext context) {
+    final submitUrl = _schema?['submit_url']?.toString();
+    final submitText = context.tr(
+      _schema?['submit_text']?.toString() ??
+          _schema?['submit_label']?.toString() ??
+          'Submit',
+    );
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        MediaQuery.of(context).viewPadding.bottom + 12,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+          ),
+        ),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF10B981),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            elevation: 2,
+          ),
+          onPressed: _isSubmitting ? null : () => _handleFormSubmit(submitUrl),
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.send_rounded, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      submitText,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }

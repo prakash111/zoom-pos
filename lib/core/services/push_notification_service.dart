@@ -15,6 +15,7 @@ import '../../features/pos/sales_repository.dart';
 import '../../features/receivables/screens/due_receivables_screen.dart';
 import '../../features/restaurant/screens/restaurant_kds_screen.dart';
 import '../../features/sales/screens/sale_detail_screen.dart';
+import '../../screens/chat/chat_conversation_screen.dart';
 import '../api/api_client.dart';
 import '../config/app_config.dart';
 import '../utils/currency_formatter.dart';
@@ -80,6 +81,28 @@ int _notificationId(Map<String, dynamic> data) {
 }
 
 AndroidNotificationChannel _channelFor(Map<String, dynamic> data) {
+  final type = data['type']?.toString();
+  if (type == 'chat') {
+    return const AndroidNotificationChannel(
+      'chat_messages',
+      'Staff Chat Messages',
+      description: 'Instant messages from team members and live support',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+    );
+  }
+  if (type == 'announcement') {
+    return const AndroidNotificationChannel(
+      'staff_announcements',
+      'Store Announcements',
+      description: 'Promotional and store team bulletins',
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+    );
+  }
+
   final isOrder = data['type'] == 'delayed_order_alarm';
   final preset =
       (data[isOrder ? 'order_sound' : 'invoice_sound'] ?? 'alarm').toString();
@@ -408,6 +431,19 @@ class PushNotificationService {
     if (_authProvider?.status != AuthStatus.authenticated) return;
     final navigator = appNavigatorKey.currentState;
     if (navigator == null) return;
+
+    if (data['type'] == 'chat') {
+      final conversationId = int.tryParse(data['conversation_id']?.toString() ?? '');
+      if (conversationId != null) {
+        await navigator.push(MaterialPageRoute(
+          builder: (_) => ChatConversationScreen(
+            conversationId: conversationId,
+            title: data['title']?.toString() ?? 'Staff Chat',
+          ),
+        ));
+      }
+      return;
+    }
 
     if (data['type'] == 'delayed_order_alarm') {
       await navigator

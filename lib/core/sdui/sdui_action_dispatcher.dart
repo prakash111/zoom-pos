@@ -1041,7 +1041,34 @@ class SduiActionDispatcher {
               if (modalAction['refresh_in_place'] == true &&
                   (t == 'open_remote_sheet' ||
                       t == 'navigate' ||
-                      t == 'refresh_sheet')) {
+                      t == 'refresh_sheet' ||
+                      t == 'form_submit')) {
+                if (t == 'form_submit') {
+                  final ep = (modalAction['endpoint'] ??
+                          modalAction['url'] ??
+                          modalAction['target_endpoint'])
+                      ?.toString();
+                  if (ep != null && ep.isNotEmpty) {
+                    try {
+                      final submitData = modalAction['data'] is Map
+                          ? Map<String, dynamic>.from(modalAction['data'] as Map)
+                          : formValues;
+                      final m = modalAction['method']?.toString().toUpperCase() ?? 'POST';
+                      await _request(ep, method: m, data: submitData);
+                    } catch (e) {
+                      showToast(e is ApiException ? e.message : 'Error submitting: $e',
+                          isError: true);
+                    }
+                  }
+                  if (currentSource != null && currentSource!.isNotEmpty) {
+                    await reloadInPlace(currentSource!);
+                  }
+                  if (modalAction['reload'] == true) {
+                    onReload();
+                  }
+                  return;
+                }
+
                 final ep = (modalAction['sheet_endpoint'] ??
                         modalAction['endpoint'] ??
                         currentSource)
