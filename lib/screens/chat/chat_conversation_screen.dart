@@ -442,6 +442,189 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   // --------------------------------------------------------------------------
+  // WhatsApp Style Reactions
+  // --------------------------------------------------------------------------
+  Future<void> _toggleReaction(dynamic messageId, String emoji) async {
+    final client = context.read<ApiClient>();
+    try {
+      final res = await client.post('/chat/messages/$messageId/reactions', data: {
+        'emoji': emoji,
+      });
+      if (res['success'] == true) {
+        await _loadMessages(isPoll: false);
+      }
+    } catch (_) {}
+  }
+
+  void _showReactionPicker(BuildContext context, Map<String, dynamic> msg) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const quickEmojis = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: quickEmojis.map((emoji) {
+            return InkWell(
+              onTap: () {
+                Navigator.pop(ctx);
+                _toggleReaction(msg['id'], emoji);
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Text(emoji, style: const TextStyle(fontSize: 26)),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // Interactive Image Zoom Dialog
+  // --------------------------------------------------------------------------
+  void _showZoomImage(BuildContext context, String url, String? name) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.92),
+      builder: (ctx) => Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Center(
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Text(
+                      'Could not load image',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 10,
+                left: 16,
+                right: 16,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name ?? 'Image Preview',
+                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // In-App PDF Preview Dialog
+  // --------------------------------------------------------------------------
+  void _openPdfViewer(BuildContext context, String url, String? name) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Icon(Icons.picture_as_pdf, color: Colors.red, size: 48),
+              const SizedBox(height: 12),
+              Text(
+                name ?? 'PDF Document',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _openUrl(url);
+                      },
+                      icon: const Icon(Icons.open_in_browser, size: 18),
+                      label: const Text('Open / View'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _openUrl(url);
+                      },
+                      icon: const Icon(Icons.download, size: 18),
+                      label: const Text('Download'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // --------------------------------------------------------------------------
   // Send Message (Text, Emoji, and/or Attachment)
   // --------------------------------------------------------------------------
   Future<void> _sendMessage() async {
@@ -872,103 +1055,233 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             ? const Color(0xFF38BDF8).withValues(alpha: 0.3)
             : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)));
 
+    String timeStr = '';
+    if (msg['created_at'] != null) {
+      try {
+        final dt = DateTime.parse(msg['created_at'].toString()).toLocal();
+        timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      } catch (_) {
+        timeStr = '';
+      }
+    }
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        padding: const EdgeInsets.all(12),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        decoration: BoxDecoration(
-          color: bubbleBg,
-          borderRadius: BorderRadius.circular(12),
-          border: borderColor != null ? Border.all(color: borderColor) : null,
-          boxShadow: isDark || isMe
-              ? null
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!isMe)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 3),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      isSuperAdmin
-                          ? 'Platform Support (Super Admin)'
-                          : (msg['sender']?['name'] ?? ''),
-                      style: TextStyle(
-                        color: senderColor,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
+      child: GestureDetector(
+        onLongPress: () => _showReactionPicker(context, msg),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          padding: const EdgeInsets.all(12),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.75,
+          ),
+          decoration: BoxDecoration(
+            color: bubbleBg,
+            borderRadius: BorderRadius.circular(12),
+            border: borderColor != null ? Border.all(color: borderColor) : null,
+            boxShadow: isDark || isMe
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
                     ),
-                    if (isSuperAdmin) ...[
-                      const SizedBox(width: 4),
-                      const Icon(Icons.verified, size: 12, color: Color(0xFF0284C7)),
-                    ],
                   ],
-                ),
-              ),
-            if (msg['attachment_url'] != null) ...[
-              if (msg['attachment_type'] == 'image')
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    msg['attachment_url'],
-                    height: 180,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Text('Could not load image', style: TextStyle(fontSize: 11)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!isMe)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        isSuperAdmin
+                            ? 'Platform Support (Super Admin)'
+                            : (msg['sender']?['name'] ?? ''),
+                        style: TextStyle(
+                          color: senderColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (isSuperAdmin) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.verified, size: 12, color: Color(0xFF0284C7)),
+                      ],
+                    ],
                   ),
-                )
-              else
-                InkWell(
-                  onTap: () => _openUrl(msg['attachment_url']),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                ),
+              if (msg['attachment_url'] != null) ...[
+                if (msg['attachment_type'] == 'image')
+                  GestureDetector(
+                    onTap: () => _showZoomImage(context, msg['attachment_url'], msg['attachment_name']),
+                    child: Stack(
+                      alignment: Alignment.bottomRight,
                       children: [
-                        const Icon(Icons.description, color: Color(0xFF0284C7), size: 18),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            msg['attachment_name'] ?? 'Attachment',
-                            style: TextStyle(
-                              color: textColor,
-                              decoration: TextDecoration.underline,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            msg['attachment_url'],
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Text('Could not load image', style: TextStyle(fontSize: 11)),
+                          ),
+                        ),
+                        Container(
+                          margin: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.zoom_in, color: Colors.white, size: 13),
+                              SizedBox(width: 2),
+                              Text('Zoom', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ],
                           ),
                         ),
                       ],
                     ),
+                  )
+                else if (msg['attachment_type'] == 'pdf' || (msg['attachment_url']?.toString().toLowerCase().endsWith('.pdf') ?? false))
+                  InkWell(
+                    onTap: () => _openPdfViewer(context, msg['attachment_url'], msg['attachment_name']),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.picture_as_pdf, color: Colors.red, size: 20),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  msg['attachment_name'] ?? 'PDF Document',
+                                  style: TextStyle(
+                                    color: textColor,
+                                    decoration: TextDecoration.underline,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const Text(
+                                  'Tap to preview document',
+                                  style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  InkWell(
+                    onTap: () => _openUrl(msg['attachment_url']),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.description, color: Color(0xFF0284C7), size: 18),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              msg['attachment_name'] ?? 'Attachment',
+                              style: TextStyle(
+                                color: textColor,
+                                decoration: TextDecoration.underline,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 6),
+              ],
+              if ((msg['message'] ?? '').isNotEmpty)
+                Text(
+                  msg['message'] ?? '',
+                  style: TextStyle(color: textColor, fontSize: 13),
+                ),
+              // Meta time row & double checkmarks
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (timeStr.isNotEmpty)
+                      Text(
+                        timeStr,
+                        style: TextStyle(
+                          color: isMe ? Colors.white.withValues(alpha: 0.7) : Colors.grey,
+                          fontSize: 9,
+                        ),
+                      ),
+                    if (isMe) ...[
+                      const SizedBox(width: 3),
+                      const Text('✓✓', style: TextStyle(color: Color(0xFF53BDEB), fontSize: 10, fontWeight: FontWeight.bold)),
+                    ],
+                  ],
+                ),
+              ),
+              // WhatsApp Style Reaction Badges
+              if (msg['reactions'] != null && (msg['reactions'] as List).isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: (msg['reactions'] as List).map<Widget>((r) {
+                      final emoji = r['emoji']?.toString() ?? '👍';
+                      final count = r['count']?.toString() ?? '1';
+                      return InkWell(
+                        onTap: () => _toggleReaction(msg['id'], emoji),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(emoji, style: const TextStyle(fontSize: 11)),
+                              const SizedBox(width: 3),
+                              Text(count, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textColor)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
-              const SizedBox(height: 6),
             ],
-            if ((msg['message'] ?? '').isNotEmpty)
-              Text(
-                msg['message'] ?? '',
-                style: TextStyle(color: textColor, fontSize: 13),
-              ),
-          ],
+          ),
         ),
       ),
     );
