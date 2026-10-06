@@ -223,6 +223,22 @@ class SduiComponentRegistry {
     'chat_staff': (_) => const InternalStaffChatListScreen(),
     'internal_staff_chat': (_) => const InternalStaffChatListScreen(),
     'staff_chat': (_) => const InternalStaffChatListScreen(),
+    'send_staff_notification': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/chat/forms/tenant-broadcast',
+          initialTitle: 'Send Staff Notification',
+        ),
+    'chat_tenant_announcements': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/chat/forms/tenant-broadcast',
+          initialTitle: 'Send Staff Notification',
+        ),
+    '/api/tenant/chat/forms/tenant-broadcast': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/chat/forms/tenant-broadcast',
+          initialTitle: 'Send Staff Notification',
+        ),
+    'api/tenant/chat/forms/tenant-broadcast': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/chat/forms/tenant-broadcast',
+          initialTitle: 'Send Staff Notification',
+        ),
     // Loyalty & Customer Wallet Module
     'loyalty_wallets': (_) => const SduiGenericListScreen(
           endpoint: '/api/tenant/loyalty/views/wallets',

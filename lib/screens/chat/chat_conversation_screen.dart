@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
@@ -30,15 +31,52 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   bool _isLoading = true;
   Timer? _pollTimer;
   String? _currentUserId;
+  Set<int> _dismissedPromoIds = {};
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _currentUserId = context.read<AuthProvider>().user?.id;
+      await _loadDismissedPromotions();
       _loadMessages();
       _startPolling();
     });
+  }
+
+  Future<void> _loadDismissedPromotions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('dismissed_promotions') ?? [];
+      _dismissedPromoIds = list.map((e) => int.tryParse(e)).whereType<int>().toSet();
+    } catch (_) {}
+  }
+
+  Future<void> _dismissPromotion(int? promoId) async {
+    if (promoId == null) {
+      setState(() => _promotion = null);
+      return;
+    }
+
+    setState(() {
+      _dismissedPromoIds.add(promoId);
+      _promotion = null;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('dismissed_promotions') ?? [];
+      final idStr = promoId.toString();
+      if (!list.contains(idStr)) {
+        list.add(idStr);
+        await prefs.setStringList('dismissed_promotions', list);
+      }
+    } catch (_) {}
+
+    try {
+      final client = context.read<ApiClient>();
+      await client.post('/chat/promotions/$promoId/dismiss');
+    } catch (_) {}
   }
 
   @override
@@ -82,8 +120,15 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
       if (res['success'] == true) {
         final newMsgs = List<dynamic>.from(res['messages'] ?? []);
-        final newPromo = res['active_promotion'] as Map<String, dynamic>?;
+        Map<String, dynamic>? newPromo = res['active_promotion'] as Map<String, dynamic>?;
         final newAi = List<String>.from(res['ai_suggestions'] ?? []);
+
+        final promoId = newPromo?['id'] is int
+            ? newPromo!['id'] as int
+            : int.tryParse(newPromo?['id']?.toString() ?? '');
+        if (promoId != null && _dismissedPromoIds.contains(promoId)) {
+          newPromo = null;
+        }
 
         if (isPoll && newMsgs.length > _messages.length) {
           final lastMsg = newMsgs.isNotEmpty ? newMsgs.last : null;
@@ -97,9 +142,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         setState(() {
           // Store reversed for reverse: true ListView
           _messages = newMsgs.reversed.toList();
-          if (!isPoll || _promotion == null) {
-            _promotion = newPromo;
-          }
+          _promotion = newPromo;
           _aiSuggestions = newAi;
           _isLoading = false;
         });
@@ -200,7 +243,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.close, color: Color(0xFF64748B), size: 16),
-                onPressed: () => setState(() => _promotion = null),
+                onPressed: () {
+                  final promoId = _promotion?['id'] is int
+                      ? _promotion!['id'] as int
+                      : int.tryParse(_promotion?['id']?.toString() ?? '');
+                  _dismissPromotion(promoId);
+                },
                 constraints: const BoxConstraints(),
                 padding: EdgeInsets.zero,
               ),
