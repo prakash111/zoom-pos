@@ -890,10 +890,18 @@ class DynamicSchemaParser {
       schema['text_color'],
       fallback: theme.colorScheme.onSurface,
     );
+    final subtitleColor = _semanticColor(
+      context,
+      schema['subtitle_color'],
+      fallback: theme.colorScheme.onSurfaceVariant,
+    );
+
+    final title = schema['title']?.toString();
+    final description = schema['description']?.toString() ?? schema['message']?.toString() ?? '';
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 8),
+      margin: const EdgeInsets.symmetric(vertical: 16),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: background,
@@ -901,19 +909,33 @@ class DynamicSchemaParser {
         border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             SduiIconRegistry.resolve(
                 schema['icon']?.toString() ?? 'notifications_none'),
-            size: 34,
+            size: 38,
             color: theme.colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(height: 10),
-          Text(
-            context.tr(schema['message']?.toString() ?? ''),
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
-          ),
+          if (title != null && title.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              context.tr(title),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+            ),
+          ],
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              context.tr(description),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(color: subtitleColor),
+            ),
+          ],
         ],
       ),
     );
@@ -1213,27 +1235,44 @@ class DynamicSchemaParser {
 
   static Widget _buildHeaderBanner(
       BuildContext context, Map<String, dynamic> schema) {
+    final sduiContext = DynamicSchemaContext.of(context);
     final title = context.tr(schema['title']?.toString() ?? '');
     final subtitle = schema['subtitle'] == null
         ? null
         : context.tr(schema['subtitle'].toString());
     final iconName = schema['icon']?.toString() ?? 'chat';
+    final action = _componentAction(schema);
 
-    return Container(
+    // Custom gradient colors from server schema
+    List<Color> gradientColors = const [Color(0xFF0F766E), Color(0xFF065F46)];
+    if (schema['gradient_colors'] is List && (schema['gradient_colors'] as List).isNotEmpty) {
+      gradientColors = (schema['gradient_colors'] as List)
+          .map((c) => SduiIconRegistry.parseColor(c.toString()))
+          .toList();
+    } else if (schema['colors'] is List && (schema['colors'] as List).isNotEmpty) {
+      gradientColors = (schema['colors'] as List)
+          .map((c) => SduiIconRegistry.parseColor(c.toString()))
+          .toList();
+    } else if (schema['background_color'] != null || schema['color'] != null) {
+      final c = SduiIconRegistry.parseColor((schema['background_color'] ?? schema['color']).toString());
+      gradientColors = [c, c];
+    }
+
+    Widget banner = Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F766E), Color(0xFF065F46)],
+        gradient: LinearGradient(
+          colors: gradientColors.length >= 2 ? gradientColors : [gradientColors.first, gradientColors.first],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 8,
+            color: gradientColors.first.withValues(alpha: 0.25),
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
@@ -1243,11 +1282,11 @@ class DynamicSchemaParser {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
             ),
             child: Icon(
-              SduiIconRegistry.resolve(iconName),
+              SduiIconRegistry.resolve(iconName, fallback: Icons.support_agent_rounded),
               color: Colors.white,
               size: 28,
             ),
@@ -1261,16 +1300,16 @@ class DynamicSchemaParser {
                   title,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 if (subtitle != null && subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Text(
                     subtitle,
                     style: const TextStyle(
-                      color: Color(0xFFCCFBF1),
+                      color: Colors.white70,
                       fontSize: 12,
                     ),
                   ),
@@ -1278,24 +1317,62 @@ class DynamicSchemaParser {
               ],
             ),
           ),
+          if (action != null)
+            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
         ],
       ),
     );
+
+    if (action != null) {
+      return InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => sduiContext?.dispatchAction(action),
+        child: banner,
+      );
+    }
+
+    return banner;
   }
 
   static Widget _buildSectionTitle(
       BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final title = context.tr(schema['title']?.toString() ?? '');
+    final badge = schema['badge']?.toString() ?? schema['count']?.toString();
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Color(0xFF94A3B8),
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
-        ),
+      padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.3,
+            ),
+          ),
+          if (badge != null && badge.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                badge,
+                style: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -1330,12 +1407,44 @@ class DynamicSchemaParser {
 
   static Widget _buildUserCard(
       BuildContext context, Map<String, dynamic> schema) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final sduiContext = DynamicSchemaContext.of(context);
+
     final title = schema['title']?.toString() ?? '';
     final subtitle = schema['subtitle']?.toString() ?? '';
+    final time = schema['time']?.toString() ?? schema['timestamp']?.toString() ?? '';
+    final subtitleIcon = schema['subtitle_icon']?.toString() ?? schema['icon']?.toString();
     final badge = schema['badge']?.toString() ?? '';
     final badgeColorHex = schema['badge_color']?.toString() ?? '#10B981';
     final action = _componentAction(schema);
+
+    final unreadCount = schema['unread_count'] is int
+        ? schema['unread_count'] as int
+        : int.tryParse(schema['unread_count']?.toString() ?? '0') ?? 0;
+    final unreadBadge = schema['unread_badge']?.toString() ?? (unreadCount > 0 ? '$unreadCount' : '');
+    final isOnline = schema['is_online'] == true || badge.toLowerCase() == 'online';
+
+    // Theme-driven colors following system dark / light design
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF334155).withValues(alpha: 0.6) : const Color(0xFFE2E8F0);
+    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final subtitleColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final timeColor = isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
+
+    // Avatar styling (initials + online presence)
+    final initials = (schema['initials']?.toString().isNotEmpty == true)
+        ? schema['initials'].toString()
+        : (title.isNotEmpty
+            ? title.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join('').toUpperCase()
+            : '?');
+    final avatarUrl = schema['avatar']?.toString() ?? schema['image_url']?.toString();
+    final avatarBgHex = schema['avatar_color']?.toString() ?? schema['avatar_bg']?.toString() ?? '#10B981';
+    Color avatarBg = const Color(0xFF10B981);
+    try {
+      final clean = avatarBgHex.replaceFirst('#', '');
+      avatarBg = Color(int.parse('FF$clean', radix: 16));
+    } catch (_) {}
 
     Color badgeColor = const Color(0xFF10B981);
     try {
@@ -1346,91 +1455,150 @@ class DynamicSchemaParser {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF334155)),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           onTap: action != null ? () => sduiContext?.dispatchAction(action) : null,
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: const Color(0xFF334155),
-                  child: Text(
-                    title.isNotEmpty ? title[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                // Avatar with online presence dot
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 21,
+                      backgroundColor: avatarBg,
+                      backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+                          ? NetworkImage(avatarUrl)
+                          : null,
+                      child: (avatarUrl == null || avatarUrl.isEmpty)
+                          ? Text(
+                              initials,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            )
+                          : null,
                     ),
-                  ),
+                    if (isOnline)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 11,
+                          height: 11,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: cardBg, width: 2),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 12),
+                // Title and Subtitle with optional icon
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: titleColor,
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 12,
-                        ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          if (subtitleIcon != null && subtitleIcon.isNotEmpty) ...[
+                            Icon(
+                              SduiIconRegistry.resolve(subtitleIcon, fallback: Icons.chat_bubble_outline),
+                              size: 13,
+                              color: subtitleIcon == 'auto_awesome'
+                                  ? const Color(0xFFA855F7)
+                                  : subtitleColor,
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Expanded(
+                            child: Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: subtitleColor,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                if (badge.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: badgeColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: badgeColor,
+                const SizedBox(width: 8),
+                // Right side: Timestamp & Unread badge
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (time.isNotEmpty)
+                      Text(
+                        time,
+                        style: TextStyle(
+                          color: timeColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    if (unreadBadge.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          unreadBadge,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 5),
-                        Text(
+                      )
+                    else if (badge.isNotEmpty && !isOnline)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
                           badge,
                           style: TextStyle(
                             color: badgeColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.chat_bubble_outline_rounded,
-                  color: Color(0xFF10B981),
-                  size: 20,
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -3405,18 +3573,23 @@ class DynamicSchemaParser {
 
     final action = chip['action'] as Map<String, dynamic>?;
 
+    final fillActive = chip['fill_active'] == true || chip['solid'] == true;
     final bg = isSelected
-        ? (isDark
-            ? activeColor.withValues(alpha: 0.15)
-            : activeColor.withValues(alpha: 0.1))
-        : (isDark ? const Color(0xFF161F30) : Colors.white);
+        ? (fillActive
+            ? activeColor
+            : (isDark
+                ? activeColor.withValues(alpha: 0.15)
+                : activeColor.withValues(alpha: 0.1)))
+        : (isDark ? const Color(0xFF1E293B) : Colors.white);
 
     final border = isSelected
         ? activeColor
         : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
 
     final textColor = isSelected
-        ? (isDark ? activeColor : const Color(0xFF0F766E))
+        ? (fillActive
+            ? Colors.white
+            : (isDark ? activeColor : const Color(0xFF0F766E)))
         : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B));
 
     return InkWell(
@@ -4974,6 +5147,8 @@ class _SduiSearchBarState extends State<_SduiSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final hint = context.tr(widget.schema['placeholder']?.toString() ??
         widget.schema['hint']?.toString() ??
         'Search…');
@@ -4983,17 +5158,24 @@ class _SduiSearchBarState extends State<_SduiSearchBar> {
     final clearable = widget.schema['clearable'] != false;
     final autofocus = widget.schema['autofocus'] == true;
 
+    final bgColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+    final borderColor = isDark ? const Color(0xFF334155).withValues(alpha: 0.7) : const Color(0xFFE2E8F0);
+    final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final hintColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final iconColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     return Container(
       height: 48,
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: bgColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: borderColor),
       ),
       child: TextField(
         controller: _controller,
         autofocus: autofocus,
+        style: TextStyle(color: textColor, fontSize: 14),
         textInputAction: TextInputAction.search,
         onChanged: (val) {
           DynamicSchemaContext.of(context)?.setFormValue(_name, val);
@@ -5007,11 +5189,12 @@ class _SduiSearchBarState extends State<_SduiSearchBar> {
         decoration: InputDecoration(
           isDense: true,
           hintText: hint,
-          prefixIcon: Icon(prefixIcon, size: 22, color: Colors.grey.shade600),
+          hintStyle: TextStyle(color: hintColor, fontSize: 14),
+          prefixIcon: Icon(prefixIcon, size: 22, color: iconColor),
           suffixIcon: (clearable && _controller.text.isNotEmpty)
               ? IconButton(
                   icon: const Icon(Icons.clear, size: 20),
-                  color: Colors.grey.shade600,
+                  color: iconColor,
                   onPressed: _clear,
                 )
               : null,

@@ -534,24 +534,45 @@ class SduiActionDispatcher {
 
       case 'open_chat':
         final params = action['params'] is Map ? action['params'] as Map : {};
+        final target = action['target']?.toString();
+        final chatType = params['type']?.toString() ?? action['type']?.toString();
+        final rawConvId = params['conversation_id'] ?? action['conversation_id'];
         final userId = params['user_id'] ?? action['user_id'];
-        final name = params['name']?.toString() ?? action['name']?.toString() ?? 'Staff Chat';
+        final name = params['name']?.toString() ?? action['name']?.toString() ?? (target == 'support' || chatType == 'support' ? 'Help & Support Live Desk' : 'Staff Chat');
         final client = resolveApiClient();
-        if (client != null && userId != null) {
+
+        if (client != null) {
           try {
-            final res = await client.post('/chat/conversations', data: {
-              'type': 'direct',
-              'user_id': userId,
-            });
-            final convId = res['conversation_id'] is int
-                ? res['conversation_id'] as int
-                : int.tryParse(res['conversation_id']?.toString() ?? '') ?? 1;
-            if (context.mounted) {
+            int? convId;
+            if (rawConvId != null) {
+              convId = rawConvId is int ? rawConvId : int.tryParse(rawConvId.toString());
+            }
+
+            if (convId == null) {
+              if (target == 'support' || chatType == 'support') {
+                final res = await client.post('/chat/conversations', data: {
+                  'type': 'support',
+                });
+                convId = res['conversation_id'] is int
+                    ? res['conversation_id'] as int
+                    : int.tryParse(res['conversation_id']?.toString() ?? '') ?? 1;
+              } else if (userId != null) {
+                final res = await client.post('/chat/conversations', data: {
+                  'type': 'direct',
+                  'user_id': userId,
+                });
+                convId = res['conversation_id'] is int
+                    ? res['conversation_id'] as int
+                    : int.tryParse(res['conversation_id']?.toString() ?? '') ?? 1;
+              }
+            }
+
+            if (convId != null && context.mounted) {
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => ChatConversationScreen(
-                    conversationId: convId,
+                    conversationId: convId!,
                     title: name,
                   ),
                 ),
