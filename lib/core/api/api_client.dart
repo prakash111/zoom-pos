@@ -188,12 +188,27 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> post(String path, {Map<String, dynamic>? data}) {
+  Future<Map<String, dynamic>> post(String path, {dynamic data}) {
     return _send(() => _dio.post(path, data: data));
   }
 
+  Future<Map<String, dynamic>> postMultipartWithFields(
+    String path, {
+    required Map<String, dynamic> fields,
+    required String fileField,
+    required List<int> bytes,
+    required String filename,
+  }) {
+    final map = Map<String, dynamic>.from(fields);
+    map[fileField] = MultipartFile.fromBytes(bytes, filename: filename);
+    return _send(() => _dio.post(
+          path,
+          data: FormData.fromMap(map),
+        ));
+  }
+
   Future<Map<String, dynamic>> postForStore(String path,
-      {required int storeId, Map<String, dynamic>? data}) {
+      {required int storeId, dynamic data}) {
     return _send(() => _dio.post(path,
         data: data,
         options: Options(headers: {'X-Store-Id': storeId.toString()})));

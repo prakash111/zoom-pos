@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -32,6 +35,42 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   Timer? _pollTimer;
   String? _currentUserId;
   Set<int> _dismissedPromoIds = {};
+
+  // Attachment state
+  List<int>? _selectedFileBytes;
+  String? _selectedFileName;
+  String? _selectedFileType; // 'image' or 'document'
+  int? _selectedFileSize;
+  bool _isSending = false;
+  bool _isAutoCorrecting = false;
+
+  // Emoji picker state
+  bool _showEmojiPicker = false;
+  String _activeEmojiTab = 'quick';
+
+  // Emoji categories matching Laravel
+  static const Map<String, Map<String, dynamic>> _emojiCategories = {
+    'quick': {
+      'name': 'Quick',
+      'icon': '⚡',
+      'emojis': ['👍', '👎', '👏', '🙌', '🤝', '❤️', '🔥', '🎉', '✅', '❌', '💯', '🚀'],
+    },
+    'smileys': {
+      'name': 'Smileys',
+      'icon': '😊',
+      'emojis': ['😊', '😂', '😃', '😄', '😁', '😆', '😎', '🤔', '😅', '😍', '🥳', '😉', '😇', '🤫', '😋', '😜', '🤤', '🤠', '🤩', '🥺', '😢', '😭', '👀', '🙏'],
+    },
+    'business': {
+      'name': 'Business',
+      'icon': '🏪',
+      'emojis': ['📦', '💰', '🧾', '🏷️', '🛒', '💳', '🏪', '🛍️', '🚚', '📋', '⚡', '🔔', '📍', '📱', '💻', '💵', '🪙', '📈', '📊', '⏰', '⏳', '💡', '🎯', '📢'],
+    },
+    'symbols': {
+      'name': 'Symbols',
+      'icon': '⭐',
+      'emojis': ['⭐', '🌟', '✨', '💬', '📞', '🔒', '🔑', '📌', '🎁', '☕', '🍽️', '🥇', '🏆', '⚠️', '🚨', '❓', '❗', '🆗', '💪', '✌️', '👋', '🍕', '🛡️'],
+    },
+  };
 
   @override
   void initState() {
@@ -135,7 +174,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           final senderId = lastMsg?['sender_id']?.toString();
           if (senderId != null && senderId != _currentUserId) {
             _playAlertChime();
-            _showIncomingBannerAlert(lastMsg?['message']?.toString() ?? 'New attachment received');
+            _showIncomingBannerAlert(lastMsg?['message']?.toString() ?? 'New message received');
           }
         }
 
@@ -183,20 +222,267 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
-  Future<void> _sendMessage() async {
+  // --------------------------------------------------------------------------
+  // Attachment Handlers
+  // --------------------------------------------------------------------------
+  void _clearAttachment() {
+    setState(() {
+      _selectedFileBytes = null;
+      _selectedFileName = null;
+      _selectedFileType = null;
+      _selectedFileSize = null;
+    });
+  }
+
+  Future<void> _showAttachmentPicker() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.photo_camera_rounded, color: Color(0xFF10B981), size: 20),
+                ),
+                title: Text(
+                  'Take Photo',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                subtitle: const Text('Capture photo with camera', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                onTap: () => Navigator.pop(sheetCtx, 'camera'),
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0284C7).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: Color(0xFF0284C7), size: 20),
+                ),
+                title: Text(
+                  'Upload Photo from Gallery',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                subtitle: const Text('Select JPG, PNG, WEBP', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                onTap: () => Navigator.pop(sheetCtx, 'gallery'),
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.description_rounded, color: Color(0xFF8B5CF6), size: 20),
+                ),
+                title: Text(
+                  'Select Document / PDF',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                subtitle: const Text('PDF, Word document, Excel sheet, Text file', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                onTap: () => Navigator.pop(sheetCtx, 'document'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (choice == null) return;
+
+    try {
+      if (choice == 'camera' || choice == 'gallery') {
+        final source = choice == 'camera' ? ImageSource.camera : ImageSource.gallery;
+        final picked = await ImagePicker().pickImage(
+          source: source,
+          imageQuality: 85,
+          maxWidth: 2400,
+        );
+        if (picked != null) {
+          final bytes = await picked.readAsBytes();
+          if (bytes.length > 10 * 1024 * 1024) {
+            _showSnack('File is larger than 10MB limit.', isError: true);
+            return;
+          }
+          setState(() {
+            _selectedFileBytes = bytes;
+            _selectedFileName = picked.name;
+            _selectedFileType = 'image';
+            _selectedFileSize = bytes.length;
+          });
+        }
+      } else if (choice == 'document') {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'png', 'jpg', 'jpeg'],
+          withData: true,
+        );
+        if (result != null && result.files.isNotEmpty) {
+          final file = result.files.first;
+          final bytes = file.bytes;
+          if (bytes != null) {
+            if (bytes.length > 10 * 1024 * 1024) {
+              _showSnack('File is larger than 10MB limit.', isError: true);
+              return;
+            }
+            final ext = (file.extension ?? '').toLowerCase();
+            final isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext);
+            setState(() {
+              _selectedFileBytes = bytes;
+              _selectedFileName = file.name;
+              _selectedFileType = isImg ? 'image' : 'document';
+              _selectedFileSize = bytes.length;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      _showSnack('Could not pick file: $e', isError: true);
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Emoji Picker Logic
+  // --------------------------------------------------------------------------
+  void _toggleEmojiPicker() {
+    if (!_showEmojiPicker) {
+      // Dismiss soft keyboard when opening emoji picker
+      FocusScope.of(context).unfocus();
+    }
+    setState(() {
+      _showEmojiPicker = !_showEmojiPicker;
+    });
+  }
+
+  void _insertEmoji(String emoji) {
+    final text = _msgController.text;
+    final selection = _msgController.selection;
+    final start = selection.start >= 0 ? selection.start : text.length;
+    final end = selection.end >= 0 ? selection.end : text.length;
+    final newText = text.replaceRange(start, end, emoji);
+    _msgController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // AI Polish & Auto-Correct
+  // --------------------------------------------------------------------------
+  Future<void> _autoCorrectMessage() async {
     final text = _msgController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isAutoCorrecting) return;
 
-    _msgController.clear();
-    setState(() => _aiSuggestions = []);
-
+    setState(() => _isAutoCorrecting = true);
     final client = context.read<ApiClient>();
 
     try {
-      final res = await client.post('/chat/messages', data: {
-        'conversation_id': widget.conversationId,
+      final res = await client.post('/chat/ai/autocorrect', data: {
         'message': text,
       });
+
+      if (res['success'] == true && res['corrected'] != null) {
+        final corrected = res['corrected'].toString();
+        _msgController.text = corrected;
+        _msgController.selection = TextSelection.collapsed(offset: corrected.length);
+        _showSnack('Polished with AI ✨');
+      }
+    } catch (_) {} finally {
+      if (mounted) {
+        setState(() => _isAutoCorrecting = false);
+      }
+    }
+  }
+
+  void _showSnack(String msg, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? Colors.red.shade700 : const Color(0xFF10B981),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // Send Message (Text, Emoji, and/or Attachment)
+  // --------------------------------------------------------------------------
+  Future<void> _sendMessage() async {
+    final text = _msgController.text.trim();
+    if (text.isEmpty && _selectedFileBytes == null) return;
+    if (_isSending) return;
+
+    setState(() => _isSending = true);
+
+    final client = context.read<ApiClient>();
+    final fileBytes = _selectedFileBytes;
+    final fileName = _selectedFileName;
+
+    // Clear local inputs
+    _msgController.clear();
+    _clearAttachment();
+    setState(() {
+      _aiSuggestions = [];
+      _showEmojiPicker = false;
+    });
+
+    try {
+      Map<String, dynamic> res;
+
+      if (fileBytes != null) {
+        res = await client.postMultipartWithFields(
+          '/chat/messages',
+          fields: {
+            'conversation_id': widget.conversationId.toString(),
+            'message': text,
+          },
+          fileField: 'attachment',
+          bytes: fileBytes,
+          filename: fileName ?? 'attachment.jpg',
+        );
+      } else {
+        res = await client.post('/chat/messages', data: {
+          'conversation_id': widget.conversationId,
+          'message': text,
+        });
+      }
 
       if (res['success'] == true && res['message'] != null) {
         setState(() {
@@ -206,13 +492,218 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to send message')),
+          SnackBar(content: Text('Failed to send message: $e')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
       }
     }
   }
 
-  // Build Super Admin Promotional Banner Card inside the chat
+  String _formatFileSize(int? bytes) {
+    if (bytes == null) return '';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  // --------------------------------------------------------------------------
+  // UI Builders
+  // --------------------------------------------------------------------------
+
+  // Selected File Preview Chip Bar
+  Widget _buildAttachmentPreviewBar(BuildContext context) {
+    if (_selectedFileBytes == null) return const SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        border: Border(
+          top: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+            ),
+            child: _selectedFileType == 'image'
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(7),
+                    child: Image.memory(
+                      Uint8List.fromList(_selectedFileBytes!),
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : const Icon(Icons.description, color: Color(0xFF0284C7), size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _selectedFileName ?? 'Selected Attachment',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                Text(
+                  _formatFileSize(_selectedFileSize),
+                  style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            onPressed: _clearAttachment,
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(4),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Docked Emoji Keyboard Drawer (Matching Laravel Emojis)
+  Widget _buildEmojiPickerDrawer(BuildContext context) {
+    if (!_showEmojiPicker) return const SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final currentCat = _emojiCategories[_activeEmojiTab] ?? _emojiCategories['quick']!;
+    final emojis = List<String>.from(currentCat['emojis'] ?? []);
+
+    return Container(
+      height: 220,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        border: Border(
+          top: BorderSide(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Header Category Pills Switcher
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.8),
+              border: Border(
+                bottom: BorderSide(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _emojiCategories.entries.map((entry) {
+                        final key = entry.key;
+                        final data = entry.value;
+                        final isSelected = _activeEmojiTab == key;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: InkWell(
+                            onTap: () => setState(() => _activeEmojiTab = key),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))
+                                      : Colors.transparent,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(data['icon'], style: const TextStyle(fontSize: 13)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    data['name'],
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      color: isSelected
+                                          ? (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7))
+                                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 16),
+                  color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  onPressed: () => setState(() => _showEmojiPicker = false),
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(4),
+                ),
+              ],
+            ),
+          ),
+
+          // Emojis Grid
+          Expanded(
+            child: GridView.builder(
+              padding: const EdgeInsets.all(8),
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 48,
+                mainAxisSpacing: 6,
+                crossAxisSpacing: 6,
+                childAspectRatio: 1.0,
+              ),
+              itemCount: emojis.length,
+              itemBuilder: (context, idx) {
+                final emo = emojis[idx];
+                return InkWell(
+                  onTap: () => _insertEmoji(emo),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Center(
+                    child: Text(
+                      emo,
+                      style: const TextStyle(fontSize: 22),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Promotional Announcement Card
   Widget _buildPromotionalCard(BuildContext context) {
     if (_promotion == null) return const SizedBox.shrink();
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -320,7 +811,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
-  // Build AI Smart Reply Quick Chips
+  // AI Smart Reply Quick Chips
   Widget _buildAiSuggestionChips(BuildContext context) {
     if (_aiSuggestions.isEmpty) return const SizedBox.shrink();
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -354,20 +845,32 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
+  // Chat Bubble
   Widget _buildChatBubble(BuildContext context, Map<String, dynamic> msg, bool isMe) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isSuperAdmin = msg['sender_type'] == 'super_admin';
+
     final bubbleBg = isMe
         ? (isDark ? const Color(0xFF059669) : const Color(0xFF10B981))
-        : (isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFFFF));
+        : (isSuperAdmin
+            ? (isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.5) : const Color(0xFFE0F2FE))
+            : (isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFFFF)));
+
     final textColor = isMe
         ? Colors.white
         : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A));
+
     final senderColor = isMe
         ? Colors.white70
-        : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7));
+        : (isSuperAdmin
+            ? const Color(0xFF0284C7)
+            : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)));
+
     final borderColor = isMe
         ? null
-        : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+        : (isSuperAdmin
+            ? const Color(0xFF38BDF8).withValues(alpha: 0.3)
+            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)));
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -394,16 +897,27 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!isMe && msg['sender'] != null)
+            if (!isMe)
               Padding(
                 padding: const EdgeInsets.only(bottom: 3),
-                child: Text(
-                  msg['sender']['name'] ?? '',
-                  style: TextStyle(
-                    color: senderColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isSuperAdmin
+                          ? 'Platform Support (Super Admin)'
+                          : (msg['sender']?['name'] ?? ''),
+                      style: TextStyle(
+                        color: senderColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (isSuperAdmin) ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.verified, size: 12, color: Color(0xFF0284C7)),
+                    ],
+                  ],
                 ),
               ),
             if (msg['attachment_url'] != null) ...[
@@ -413,28 +927,38 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   child: Image.network(
                     msg['attachment_url'],
                     height: 180,
+                    width: double.infinity,
                     fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Text('Could not load image', style: TextStyle(fontSize: 11)),
                   ),
                 )
               else
                 InkWell(
                   onTap: () => _openUrl(msg['attachment_url']),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.attach_file, color: textColor, size: 16),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          msg['attachment_name'] ?? 'Attachment',
-                          style: TextStyle(
-                            color: textColor,
-                            decoration: TextDecoration.underline,
-                            fontSize: 12,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.description, color: Color(0xFF0284C7), size: 18),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            msg['attachment_name'] ?? 'Attachment',
+                            style: TextStyle(
+                              color: textColor,
+                              decoration: TextDecoration.underline,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               const SizedBox(height: 6),
@@ -450,6 +974,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
+  // Input Area with Attachment Button, Emoji Button, AI Polish Button, and Send
   Widget _buildInputArea(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final inputFill = isDark ? const Color(0xFF1E293B) : Colors.white;
@@ -458,7 +983,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final hintColor = isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
 
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
         border: Border(
@@ -468,7 +993,31 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Attachment Button (Paperclip)
+          IconButton(
+            icon: const Icon(Icons.attach_file_rounded),
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            tooltip: 'Attach photo or document',
+            onPressed: _showAttachmentPicker,
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(8),
+          ),
+
+          // Emoji Picker Toggle Button
+          IconButton(
+            icon: Icon(
+              _showEmojiPicker ? Icons.keyboard_rounded : Icons.emoji_emotions_outlined,
+              color: _showEmojiPicker ? const Color(0xFFF59E0B) : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+            ),
+            tooltip: 'Insert emoji',
+            onPressed: _toggleEmojiPicker,
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(8),
+          ),
+
+          // Text Field
           Expanded(
             child: TextField(
               controller: _msgController,
@@ -490,14 +1039,49 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   borderRadius: BorderRadius.circular(24),
                   borderSide: const BorderSide(color: Color(0xFF10B981), width: 1.5),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               ),
+              onTap: () {
+                if (_showEmojiPicker) {
+                  setState(() => _showEmojiPicker = false);
+                }
+              },
               onSubmitted: (_) => _sendMessage(),
             ),
           ),
-          const SizedBox(width: 6),
+
+          // AI Polish Button (✨)
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _msgController,
+            builder: (context, val, _) {
+              if (val.text.trim().isEmpty) return const SizedBox.shrink();
+              return IconButton(
+                icon: _isAutoCorrecting
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0284C7)),
+                      )
+                    : const Icon(Icons.auto_awesome, color: Color(0xFF0284C7), size: 18),
+                tooltip: 'Polish with AI',
+                onPressed: _autoCorrectMessage,
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(6),
+              );
+            },
+          ),
+
+          const SizedBox(width: 4),
+
+          // Send Button
           IconButton(
-            icon: const Icon(Icons.send_rounded, color: Color(0xFF10B981)),
+            icon: _isSending
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF10B981)),
+                  )
+                : const Icon(Icons.send_rounded, color: Color(0xFF10B981)),
             onPressed: _sendMessage,
           ),
         ],
@@ -553,7 +1137,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                       ),
           ),
           _buildAiSuggestionChips(context),
+          _buildAttachmentPreviewBar(context),
           _buildInputArea(context),
+          _buildEmojiPickerDrawer(context),
         ],
       ),
     );
