@@ -64,6 +64,7 @@ class DynamicSchemaParser {
         return _SduiDynamicList(schema: schema);
       case 'form':
       case 'form_view':
+      case 'dynamic_form':
         return _SduiDynamicForm(schema: schema);
 
       // Display
@@ -96,6 +97,8 @@ class DynamicSchemaParser {
         return _buildUserCard(context, schema);
       case 'promotion_card':
         return _buildPromotionCard(context, schema);
+      case 'announcement_card':
+        return _buildAnnouncementCard(context, schema);
 
       // Forms & Inputs
       case 'text_input':
@@ -160,6 +163,8 @@ class DynamicSchemaParser {
         return _buildFab(context, schema);
       case 'action_sheet_trigger':
         return _buildActionSheetTrigger(context, schema);
+      case 'action_button':
+        return _buildActionButton(context, schema);
 
       default:
         return const SizedBox.shrink();
@@ -1546,6 +1551,97 @@ class DynamicSchemaParser {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildAnnouncementCard(
+      BuildContext context, Map<String, dynamic> schema) {
+    final title = schema['title']?.toString() ?? '';
+    final description =
+        schema['description']?.toString() ?? schema['message']?.toString() ?? '';
+    final badge = schema['badge']?.toString() ?? '';
+    final badgeColorHex = schema['badge_color']?.toString() ?? '#10B981';
+    final badgeColor = SduiIconRegistry.parseColor(badgeColorHex,
+        fallback: const Color(0xFF10B981));
+    final date = schema['date']?.toString() ?? '';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (badge.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: badgeColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(6),
+                    border:
+                        Border.all(color: badgeColor.withValues(alpha: 0.6)),
+                  ),
+                  child: Text(
+                    badge,
+                    style: TextStyle(
+                      color: badgeColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              description,
+              style: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+          ],
+          if (date.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.access_time,
+                    size: 12, color: Color(0xFF64748B)),
+                const SizedBox(width: 4),
+                Text(
+                  date,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -3676,6 +3772,47 @@ class DynamicSchemaParser {
           ),
         );
       },
+    );
+  }
+
+  static Widget _buildActionButton(
+      BuildContext context, Map<String, dynamic> schema) {
+    final sduiContext = DynamicSchemaContext.of(context);
+    final label = context.tr(schema['label']?.toString() ?? 'Action');
+    final iconName = schema['icon']?.toString();
+    final action = _componentAction(schema) ?? const {};
+    final colorHex = schema['color']?.toString() ?? '#10B981';
+    final bgColor = SduiIconRegistry.parseColor(colorHex,
+        fallback: const Color(0xFF10B981));
+    final enabled = schema['enabled'] != false;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: bgColor,
+            foregroundColor: Colors.white,
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: iconName != null && iconName.isNotEmpty
+              ? Icon(SduiIconRegistry.resolve(iconName), size: 20)
+              : const SizedBox.shrink(),
+          label: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          onPressed: enabled ? () => sduiContext?.dispatchAction(action) : null,
+        ),
+      ),
     );
   }
 

@@ -224,11 +224,27 @@ class SduiComponentRegistry {
     'internal_staff_chat': (_) => const InternalStaffChatListScreen(),
     'staff_chat': (_) => const InternalStaffChatListScreen(),
     'send_staff_notification': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/chat/forms/tenant-broadcast',
+          endpoint: '/api/tenant/chat/views/staff-notifications',
           initialTitle: 'Send Staff Notification',
         ),
     'chat_tenant_announcements': (_) => const DynamicSchemaPage(
-          endpoint: '/api/tenant/chat/forms/tenant-broadcast',
+          endpoint: '/api/tenant/chat/views/staff-notifications',
+          initialTitle: 'Send Staff Notification',
+        ),
+    'staff_notifications': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/chat/views/staff-notifications',
+          initialTitle: 'Send Staff Notification',
+        ),
+    'chat_notifications': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/chat/views/staff-notifications',
+          initialTitle: 'Send Staff Notification',
+        ),
+    '/api/tenant/chat/views/staff-notifications': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/chat/views/staff-notifications',
+          initialTitle: 'Send Staff Notification',
+        ),
+    'api/tenant/chat/views/staff-notifications': (_) => const DynamicSchemaPage(
+          endpoint: '/api/tenant/chat/views/staff-notifications',
           initialTitle: 'Send Staff Notification',
         ),
     '/api/tenant/chat/forms/tenant-broadcast': (_) => const DynamicSchemaPage(
