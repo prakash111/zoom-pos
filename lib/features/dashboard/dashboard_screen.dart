@@ -1,7 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -947,82 +945,122 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 : const Color(0xFF94A3B8)); // slate-400
         final selectedItemColor = primaryColor;
 
-        final headerWidget = Container(
-          width: double.infinity,
-          padding: EdgeInsets.fromLTRB(
-              16, MediaQuery.of(context).padding.top + 12, 16, 14),
-          decoration: BoxDecoration(
-            color: primaryColor,
-            image: hasCover
-                ? DecorationImage(
-                    image: kIsWeb
-                        ? NetworkImage(coverUrl,
-                            webHtmlElementStrategy:
-                                WebHtmlElementStrategy.prefer)
-                        : CachedNetworkImageProvider(coverUrl) as ImageProvider,
-                    fit: BoxFit.cover,
-                  )
-                : null,
-            gradient: hasCover
-                ? LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.15),
-                      Colors.black.withValues(alpha: 0.55)
-                    ],
-                  )
-                : null,
-          ),
-          child: Row(
+        // Mobile / narrow-web drawer header: mirrors the desktop top-bar
+        // store switcher (logo, store name, type badge, "Switch store",
+        // chevron). It is built from plain canvas widgets (no HTML platform
+        // views) on an opaque background so it can never vanish inside the
+        // sliding Drawer on mobile browsers.
+        final headerBadge = _resolveTenantBadge(company, bootstrap);
+        final headerBg = hasCover
+            ? Colors.black
+            : (primaryColor.computeLuminance() > 0.85
+                ? const Color(0xFF0F172A)
+                : primaryColor);
+        final headerWidget = Material(
+          color: headerBg,
+          child: Stack(
             children: [
-              TenantLogoAvatar(
-                logoUrl: logoUrl,
-                tenantName: storeTitle,
-                size: 38,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        storeTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        _resolveTenantBadge(company, bootstrap),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.95),
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
+              if (hasCover)
+                Positioned.fill(
+                  child: Image.network(
+                    coverUrl,
+                    fit: BoxFit.cover,
+                    webHtmlElementStrategy: WebHtmlElementStrategy.never,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
                 ),
-              ),
-              IconButton(
-                tooltip: 'Switch store',
-                onPressed: _openStoreSwitcher,
-                icon:
-                    const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+              if (hasCover)
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.15),
+                          Colors.black.withValues(alpha: 0.55),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              InkWell(
+                onTap: _openStoreSwitcher,
+                child: Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(minHeight: 64),
+                  padding: EdgeInsets.fromLTRB(
+                      16, MediaQuery.of(context).padding.top + 12, 8, 12),
+                  child: Row(
+                    children: [
+                      TenantLogoAvatar(
+                        logoUrl: logoUrl,
+                        tenantName: storeTitle,
+                        size: 38,
+                        borderRadius: BorderRadius.circular(8),
+                        preferHtmlElement: false,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    storeTitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                if (headerBadge.isNotEmpty) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      headerBadge,
+                                      style: TextStyle(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.95),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Switch store',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.75),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.keyboard_arrow_down,
+                          color: Colors.white),
+                      const SizedBox(width: 4),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),

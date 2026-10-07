@@ -31,6 +31,7 @@ class TenantLogoAvatar extends StatelessWidget {
     this.fit = BoxFit.contain,
     this.backgroundColor = Colors.white,
     this.showBorder = true,
+    this.preferHtmlElement = true,
   });
 
   final String? imageUrl;
@@ -42,6 +43,12 @@ class TenantLogoAvatar extends StatelessWidget {
   final BoxFit fit;
   final Color backgroundColor;
   final bool showBorder;
+
+  /// On Flutter Web, render the logo through an HTML <img> platform view.
+  /// Set to false inside overlays (Drawer / sheets) where platform views can
+  /// be clipped or hidden on mobile browsers; the canvas path is used and an
+  /// initial-letter avatar shows if the image can't be decoded.
+  final bool preferHtmlElement;
 
   /// Extracts the uppercase first initial from [name], falling back to 'T'.
   static String extractInitial(String? name) {
@@ -113,7 +120,9 @@ class TenantLogoAvatar extends StatelessWidget {
         width: size,
         height: size,
         fit: fit,
-        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+        webHtmlElementStrategy: preferHtmlElement
+            ? WebHtmlElementStrategy.prefer
+            : WebHtmlElementStrategy.never,
         errorBuilder: (context, error, stackTrace) {
           return _buildInitialAvatar(effectiveRadius);
         },
