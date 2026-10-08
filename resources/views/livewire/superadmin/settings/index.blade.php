@@ -1,4 +1,4 @@
-<div class="space-y-6 max-w-7xl mx-auto pb-36 sm:pb-28">
+<div class="space-y-6 w-full max-w-none pb-36 sm:pb-28">
     
     <!-- Top Header Banner & Quick Actions -->
     <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-8 shadow-xl border border-slate-200/80 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6 relative overflow-hidden">

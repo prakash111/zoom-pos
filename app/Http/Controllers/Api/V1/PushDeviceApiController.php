@@ -96,6 +96,12 @@ class PushDeviceApiController extends Controller
             ],
         );
 
+        if ($user) {
+            try {
+                $user->update(['fcm_token' => $validated['token']]);
+            } catch (\Throwable $e) {}
+        }
+
         return response()->json(['success' => true, 'device_id' => $device->id]);
     }
 

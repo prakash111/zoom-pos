@@ -107,18 +107,23 @@ class SalesController extends Controller
                 break;
 
             case 'custom_date':
-                if ($request->filled('start_date') && $request->filled('end_date')) {
-                    $query->whereBetween('created_at', [
-                        Carbon::parse($request->start_date)->startOfDay(),
-                        Carbon::parse($request->end_date)->endOfDay(),
-                    ]);
-                }
-                $query->latest();
-                break;
-
             default:
                 $query->latest();
                 break;
+        }
+
+        $startDateInput = $request->get('start_date') ?? $request->get('startDate') ?? $request->get('from');
+        $endDateInput = $request->get('end_date') ?? $request->get('endDate') ?? $request->get('to');
+
+        if ($startDateInput && $endDateInput) {
+            $query->whereBetween('created_at', [
+                Carbon::parse($startDateInput)->startOfDay(),
+                Carbon::parse($endDateInput)->endOfDay(),
+            ]);
+        } elseif ($startDateInput) {
+            $query->where('created_at', '>=', Carbon::parse($startDateInput)->startOfDay());
+        } elseif ($endDateInput) {
+            $query->where('created_at', '<=', Carbon::parse($endDateInput)->endOfDay());
         }
 
         $sales = $query->with('customer')->paginate((int) $request->get('per_page', 20));

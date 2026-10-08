@@ -174,8 +174,13 @@ class ReportsApiController extends Controller
     /** @return array{0: ?string, 1: ?string} */
     private function dateRange(Request $request): array
     {
-        $start = $request->query('start_date');
-        $end = $request->query('end_date');
+        $period = $request->query('period') ?? $request->query('range');
+        if ($period === 'all_time' || $period === 'all') {
+            return [null, null];
+        }
+
+        $start = $request->query('start_date') ?? $request->query('startDate') ?? $request->query('from');
+        $end = $request->query('end_date') ?? $request->query('endDate') ?? $request->query('to');
 
         if (! $start && ! $end) {
             $now = now();
@@ -241,7 +246,7 @@ class ReportsApiController extends Controller
     private function kpiMetrics(Company $company, ?string $start, ?string $end, ?string $salesperson): array
     {
         $currentSales = (clone $this->baseSalesQuery($company, $start, $end, $salesperson))
-            ->where('status', 'completed')->get();
+            ->whereIn('status', ['completed', 'paid'])->get();
 
         $totalRevenue = (float) $currentSales->sum('total');
         $transactionsCount = $currentSales->count();
@@ -253,7 +258,7 @@ class ReportsApiController extends Controller
 
         if ($prevStart && $prevEnd) {
             $prevSales = (clone $this->baseSalesQuery($company, $prevStart, $prevEnd, $salesperson))
-                ->where('status', 'completed')->get();
+                ->whereIn('status', ['completed', 'paid'])->get();
             $prevRevenue = (float) $prevSales->sum('total');
             $prevTransactions = $prevSales->count();
         }
@@ -273,7 +278,7 @@ class ReportsApiController extends Controller
     private function salesSummary(Company $company, ?string $start, ?string $end, ?string $salesperson): array
     {
         $base = $this->baseSalesQuery($company, $start, $end, $salesperson);
-        $completed = (clone $base)->where('status', 'completed')->get();
+        $completed = (clone $base)->whereIn('status', ['completed', 'paid'])->get();
         $cancelled = (clone $base)->where('status', 'cancelled')->get();
 
         $grossSales = (float) $completed->sum('total');
@@ -304,7 +309,7 @@ class ReportsApiController extends Controller
     private function topProducts(Company $company, ?string $start, ?string $end, ?string $salesperson): array
     {
         $sales = (clone $this->baseSalesQuery($company, $start, $end, $salesperson))
-            ->where('status', 'completed')->get(['items']);
+            ->whereIn('status', ['completed', 'paid'])->get(['items']);
 
         $map = [];
         foreach ($sales as $sale) {

@@ -35,18 +35,6 @@ return [
         ],
     ],
 
-    'openai' => [
-        'api_key' => env('OPENAI_API_KEY'),
-    ],
-
-    'gemini' => [
-        'api_key' => env('GEMINI_API_KEY'),
-    ],
-
-    'anthropic' => [
-        'api_key' => env('ANTHROPIC_API_KEY'),
-    ],
-
     'envato' => [
         'api_token' => env('ENVATO_API_TOKEN'),
         'item_id' => env('ENVATO_ITEM_ID'),
@@ -61,6 +49,10 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL') . '/store/auth/google/callback'),
+    ],
+
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY', ''),
     ],
 
     /*
@@ -79,6 +71,10 @@ return [
         'store_url' => 'https://license.zoomnearby.com/buy.php',
         'secret' => env('LICENSE_SERVER_SECRET'),
         'timeout' => (int) env('LICENSE_SERVER_TIMEOUT', 10),
+    ],
+
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
     ],
 
 ];

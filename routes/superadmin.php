@@ -53,6 +53,7 @@ Route::prefix('superadmin')->name('superadmin.')->group(function () {
         Route::get('/branding', fn () => redirect()->route('superadmin.settings.index', ['tab' => 'whitelabel']))->name('branding.index');
         Route::get('/menus', MenuBuilderComponent::class)->name('menus.index');
         Route::get('/inquiries', \App\Livewire\SuperAdmin\Inquiries\Index::class)->name('inquiries.index');
+        Route::get('/live-chat-support', \App\Livewire\SuperAdmin\LiveChatSupport\Index::class)->name('chat-support.index');
         Route::get('/pages', Pages\Index::class)->name('pages.index');
         Route::get('/pages/create', Pages\Create::class)->name('pages.create');
         Route::get('/pages/{page}', Pages\Edit::class)->name('pages.edit');
@@ -61,6 +62,13 @@ Route::prefix('superadmin')->name('superadmin.')->group(function () {
         Route::get('/languages', Languages\Index::class)->name('languages.index');
         Route::get('/backups', Backups\Index::class)->name('backups.index');
         Route::get('/modules', Modules\Index::class)->name('modules.index');
+        Route::get('/broadcasts', [\App\Http\Controllers\SuperAdmin\PromotionalBroadcastController::class, 'index'])->name('broadcasts.index');
+        Route::post('/broadcasts', [\App\Http\Controllers\SuperAdmin\PromotionalBroadcastController::class, 'store'])->name('broadcasts.store');
+        Route::delete('/broadcasts/{id}', [\App\Http\Controllers\SuperAdmin\PromotionalBroadcastController::class, 'destroy'])->name('broadcasts.destroy');
+        Route::patch('/broadcasts/{id}/toggle', [\App\Http\Controllers\SuperAdmin\PromotionalBroadcastController::class, 'toggleActive'])->name('broadcasts.toggle');
+        Route::get('/promotions', [\App\Http\Controllers\SuperAdmin\PromotionalBroadcastController::class, 'index'])->name('promotions.index');
+        Route::post('/promotions', [\App\Http\Controllers\SuperAdmin\PromotionalBroadcastController::class, 'store'])->name('promotions.store');
+        Route::delete('/promotions/{id}', [\App\Http\Controllers\SuperAdmin\PromotionalBroadcastController::class, 'destroy'])->name('promotions.destroy');
         Route::get('/system', System\Index::class)->name('system.index');
         Route::get('/audit', AuditLogs\Index::class)->name('audit.index');
     });

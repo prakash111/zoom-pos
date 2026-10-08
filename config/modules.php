@@ -31,38 +31,12 @@ return [
     */
     'registration' => [
         'free' => ['retail', 'restaurant'],
-        'premium' => [
-            'pharmacy' => 'pharmacy',
-            'service_booking' => 'salon',
-            'repair_technician' => 'repairtechnician',
-        ],
+        'premium' => [],
     ],
 
-    // Additive packages managed by Super Admin, never signup operating modes.
-    'extensions' => ['leadmanagement'],
+    // Additive packages managed by Super Admin
+    'extensions' => [],
 
-    'catalog' => [
-        [
-            'slug' => 'leadmanagement',
-            'name' => 'Lead Management System',
-            'description' => 'Optional CRM extension for lead pipelines, follow-ups and customer conversion.',
-            'type' => 'extension',
-        ],
-        [
-            'slug' => 'pharmacy',
-            'name' => 'Pharmacy POS Module',
-            'description' => 'Drug batch & expiry tracking, prescription intake and dispensing.',
-        ],
-        [
-            'slug' => 'salon',
-            'name' => 'Salon & Bookings Module',
-            'description' => 'Service catalogue, stylists / specialists, appointment booking and lifecycle.',
-        ],
-        [
-            'slug' => 'repairtechnician',
-            'name' => 'Repair & Service Workbench Module',
-            'description' => 'Device intake tickets, diagnostic checklist, parts & labour, pickup lifecycle.',
-        ],
-    ],
+    'catalog' => [],
 
 ];

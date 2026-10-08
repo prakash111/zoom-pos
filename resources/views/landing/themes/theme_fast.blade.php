@@ -55,7 +55,7 @@
     $muted = 'text-slate-600 dark:text-slate-400';
     $rule = 'border-slate-200 dark:border-white/10';
     $altBg = 'bg-slate-50 dark:bg-slate-900/40';
-    $badge = 'inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-3 bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/25';
+    $badge = 'reference-badge mb-3 bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/25';
 @endphp
 
 @section('content')
@@ -229,10 +229,20 @@
             @case('solutions')
                 {{-- 5. Value pillars --}}
                 <section id="solutions" class="landing-sec-solutions scroll-mt-20 border-y {{ $rule }} {{ $altBg }} transition-colors duration-300">
-                    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
+                    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-0 pb-8 sm:pb-12">
                         <div class="max-w-2xl">
-                            <span class="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-3 bg-lime-100 text-lime-800 border border-lime-200 dark:bg-brand-lime/10 dark:text-brand-lime dark:border-brand-lime/20">{{ __($branding->getSectionBadge('solutions', __('Engineered For Maximum Conversion'))) }}</span>
-                            <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">{{ __($branding->getSectionTitle('solutions', __('Why Modern Online Stores & Retailers Choose Our Platform'))) }}</h2>
+                            <span class="reference-badge mb-3 bg-lime-100 text-lime-800 border border-lime-200 dark:bg-brand-lime/10 dark:text-brand-lime dark:border-brand-lime/20">{{ __($branding->getSectionBadge('solutions', __('Engineered For Maximum Conversion'))) }}</span>
+                            <h2 class="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
+                                @php
+                                    $solTitle = $branding->getSectionTitle('solutions', __('Why Modern Online Stores & Retailers Choose Our Platform'));
+                                    $solParts = preg_split('/(\s+Choose\s+)/i', $solTitle, 2, PREG_SPLIT_DELIM_CAPTURE);
+                                @endphp
+                                @if (count($solParts) === 3)
+                                    {{ __($solParts[0]) }}{{ $solParts[1] }}<span class="reference-text-blue">{{ __($solParts[2]) }}</span>
+                                @else
+                                    {{ __($solTitle) }}
+                                @endif
+                            </h2>
                             <p class="mt-2 text-sm {{ $muted }}">{{ __($branding->getSectionSubtitle('solutions', __('Designed from the ground up to boost online revenue, eliminate inventory discrepancies, and keep counter checkouts flying during peak rushes.'))) }}</p>
                         </div>
                         <div class="mt-10 grid sm:grid-cols-2 gap-6">

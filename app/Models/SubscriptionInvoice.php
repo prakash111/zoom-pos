@@ -73,4 +73,61 @@ class SubscriptionInvoice extends Model
     {
         return number_format((float) $this->tax_amount, 2);
     }
+
+    public function getCurrencySymbol(): string
+    {
+        $code = strtoupper((string) ($this->currency ?: config('app.currency', 'INR')));
+
+        return match ($code) {
+            'INR' => '₹',
+            'USD' => '$',
+            'EUR' => '€',
+            'GBP' => '£',
+            'JPY' => '¥',
+            'CAD' => 'CA$',
+            'AUD' => 'AU$',
+            'BRL' => 'R$',
+            default => $code.' ',
+        };
+    }
+
+    public function getCurrencySymbolAttribute(): string
+    {
+        return $this->getCurrencySymbol();
+    }
+
+    public function getTotalAmountAttribute(): float
+    {
+        return (float) ($this->total ?? 0);
+    }
+
+    public function getCgstAttribute(): float
+    {
+        return (float) ($this->tax_breakdown['cgst_amount'] ?? 0);
+    }
+
+    public function getSgstAttribute(): float
+    {
+        return (float) ($this->tax_breakdown['sgst_amount'] ?? 0);
+    }
+
+    public function getIgstAttribute(): float
+    {
+        return (float) ($this->tax_breakdown['igst_amount'] ?? 0);
+    }
+
+    public function getCgstRateAttribute(): float
+    {
+        return (float) ($this->tax_breakdown['cgst_rate'] ?? 9.00);
+    }
+
+    public function getSgstRateAttribute(): float
+    {
+        return (float) ($this->tax_breakdown['sgst_rate'] ?? 9.00);
+    }
+
+    public function getIgstRateAttribute(): float
+    {
+        return (float) ($this->tax_breakdown['igst_rate'] ?? 0.00);
+    }
 }

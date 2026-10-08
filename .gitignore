@@ -44,3 +44,4 @@ docker-compose.override.yml
 __pycache__/
 *.pyc
 
+cookies.txt

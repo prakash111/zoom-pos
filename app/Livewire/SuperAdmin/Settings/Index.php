@@ -1304,6 +1304,29 @@ class Index extends Component
         ]);
     }
 
+    public function removeLogo(): void
+    {
+        $this->logoImage = null;
+        $this->logoUrl = '';
+        \App\Models\DynamicSetting::put('platform_logo_url', '');
+        PlatformBranding::current()->update(['logo_url' => null]);
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => __('Platform logo removed successfully.'),
+        ]);
+    }
+
+    public function removeFavicon(): void
+    {
+        $this->faviconUrl = '';
+        \App\Models\DynamicSetting::put('platform_favicon_url', '');
+        PlatformBranding::current()->update(['favicon_url' => null]);
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => __('Favicon removed successfully.'),
+        ]);
+    }
+
     public function updatedLandingPageId($value): void
     {
         if ($value) {
@@ -1673,9 +1696,8 @@ class Index extends Component
         \App\Models\DynamicSetting::put('auth_banner_image_url', $this->authBannerImageUrl);
         \App\Models\DynamicSetting::put('enable_registration_domain_setup', $this->enableRegistrationDomainSetup);
         \App\Models\DynamicSetting::put('pwa_enabled', $this->pwaEnabled);
-        if (! empty($data['logoUrl'])) {
-            \App\Models\DynamicSetting::put('platform_logo_url', $data['logoUrl']);
-        }
+        \App\Models\DynamicSetting::put('platform_logo_url', $data['logoUrl'] ?: '');
+        \App\Models\DynamicSetting::put('platform_favicon_url', $data['faviconUrl'] ?: '');
         if (! empty($data['platformName'])) {
             \App\Models\DynamicSetting::put('platform_brand_name', $data['platformName']);
         }

@@ -209,6 +209,15 @@
                                 <span class="text-emerald-500 font-black">✓</span>
                                 <span>{{ __("Unlimited Inventory & Sales History") }}</span>
                             </li>
+                            <li class="flex items-center gap-2">
+                                @if ($plan->has_hrm_module)
+                                    <span class="text-emerald-500 font-black">✓</span>
+                                    <span><strong>{{ __("HRM & Staff Attendance / Payroll") }}</strong> <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold">{{ __("Included") }}</span></span>
+                                @else
+                                    <span class="text-slate-400 font-black">✕</span>
+                                    <span class="text-slate-400">{{ __("HRM & Staff Attendance / Payroll") }} <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-medium">({{ __("₹499 Add-on") }})</span></span>
+                                @endif
+                            </li>
                         </ul>
                     </div>
 
@@ -233,6 +242,103 @@
                     </div>
                 </div>
             @endforeach
+        </div>
+
+        <!-- Plan Feature Comparison Matrix -->
+        <div class="mt-8 pt-6 border-t border-slate-200/80 dark:border-slate-800">
+            <h4 class="font-extrabold text-sm text-slate-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                <span>📊 {{ __("Plan Feature Comparison Matrix") }}</span>
+            </h4>
+            <div class="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
+                <table class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200/80 dark:border-slate-800">
+                            <th class="py-3 px-4">{{ __("Platform Features & Capabilities") }}</th>
+                            @foreach ($plans as $p)
+                                <th class="py-3 px-4 text-center">
+                                    <span class="block text-slate-900 dark:text-white font-black text-xs">{{ $p->display_name }}</span>
+                                    <span class="text-[10px] text-slate-400 font-normal">${{ number_format((float) $p->price, 0) }}</span>
+                                </th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-600 dark:text-slate-300">
+                        <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                            <td class="py-3 px-4 font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span>👥 {{ __("HRM & Staff Attendance / Payroll") }}</span>
+                                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700">PRO FEATURE</span>
+                            </td>
+                            @foreach ($plans as $p)
+                                <td class="py-3 px-4 text-center">
+                                    @if ($p->has_hrm_module)
+                                        <span class="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-black text-xs">
+                                            ✓ {{ __("Included") }}
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 text-slate-400 text-xs">
+                                            ✕ <span class="text-[10px] font-medium text-slate-500">({{ __("₹499 Add-on") }})</span>
+                                        </span>
+                                    @endif
+                                </td>
+                            @endforeach
+                        </tr>
+                        <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                            <td class="py-3 px-4 font-medium">{{ __("POS Terminal PIN Clock In / Out") }}</td>
+                            @foreach ($plans as $p)
+                                <td class="py-3 px-4 text-center">
+                                    @if ($p->has_hrm_module)
+                                        <span class="text-emerald-500 font-black">✓</span>
+                                    @else
+                                        <span class="text-slate-400">✕</span>
+                                    @endif
+                                </td>
+                            @endforeach
+                        </tr>
+                        <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                            <td class="py-3 px-4 font-medium">{{ __("Sales Commission Payroll Calculator") }}</td>
+                            @foreach ($plans as $p)
+                                <td class="py-3 px-4 text-center">
+                                    @if ($p->has_hrm_module)
+                                        <span class="text-emerald-500 font-black">✓</span>
+                                    @else
+                                        <span class="text-slate-400">✕</span>
+                                    @endif
+                                </td>
+                            @endforeach
+                        </tr>
+                        <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                            <td class="py-3 px-4 font-medium">{{ __("Max Staff Members Limit") }}</td>
+                            @foreach ($plans as $p)
+                                <td class="py-3 px-4 text-center font-bold text-slate-800 dark:text-slate-200">
+                                    {{ $p->max_staff_limit == -1 || $p->max_staff_limit >= 100 ? __('Unlimited') : $p->max_staff_limit . ' ' . __('Staff') }}
+                                </td>
+                            @endforeach
+                        </tr>
+                        <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                            <td class="py-3 px-4 font-medium">{{ __("Authorized POS Devices") }}</td>
+                            @foreach ($plans as $p)
+                                <td class="py-3 px-4 text-center font-bold text-slate-800 dark:text-slate-200">
+                                    {{ $p->limits['dispositivos'] ?? ($p->name === 'professional' ? 10 : ($p->name === 'starter' ? 3 : 1)) }} {{ __('Devices') }}
+                                </td>
+                            @endforeach
+                        </tr>
+                        <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                            <td class="py-3 px-4 font-medium">{{ __("Monthly Invoices Limit") }}</td>
+                            @foreach ($plans as $p)
+                                <td class="py-3 px-4 text-center font-bold text-slate-800 dark:text-slate-200">
+                                    {{ $p->invoice_limit == -1 ? __('Unlimited') : number_format($p->invoice_limit) }}
+                                </td>
+                            @endforeach
+                        </tr>
+                        <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                            <td class="py-3 px-4 font-medium">{{ __("Itemized GST/VAT Tax Invoices & PDF Sharing") }}</td>
+                            @foreach ($plans as $p)
+                                <td class="py-3 px-4 text-center text-emerald-500 font-black">✓</td>
+                            @endforeach
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -262,6 +368,10 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                     @forelse ($invoices as $inv)
+                        @php
+                            $invCurrencyCode = strtoupper($inv->currency ?? config('app.currency', 'INR'));
+                            $invCurrencySymbol = $inv->getCurrencySymbol();
+                        @endphp
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
                             <td class="py-3.5 pl-2 font-mono font-black text-blue-600 dark:text-blue-400">
                                 {{ $inv->invoice_number }}
@@ -273,13 +383,20 @@
                                 {{ $inv->plan_name }} <span class="text-[10px] font-normal text-slate-400">({{ $inv->billing_cycle }})</span>
                             </td>
                             <td class="py-3.5 text-slate-600 dark:text-slate-300 font-bold">
-                                ${{ $inv->getFormattedSubtotal() }}
+                                {{ $invCurrencySymbol }}{{ number_format($inv->subtotal, 2) }}
                             </td>
                             <td class="py-3.5 text-slate-600 dark:text-slate-300 font-bold">
-                                ${{ $inv->getFormattedTax() }} <span class="text-[10px] text-slate-400">({{ (float)$inv->tax_rate }}%)</span>
+                                {{ $invCurrencySymbol }}{{ number_format($inv->tax_amount, 2) }} <span class="text-[10px] text-slate-400">({{ (float)$inv->tax_rate }}%)</span>
                             </td>
                             <td class="py-3.5 font-black text-slate-900 dark:text-white">
-                                ${{ $inv->getFormattedTotal() }} {{ $inv->currency }}
+                                <div class="flex flex-col">
+                                    <span class="text-xs font-bold text-slate-900 dark:text-white">
+                                        {{ $invCurrencySymbol }}{{ number_format($inv->total_amount, 2) }}
+                                    </span>
+                                    <span class="text-[10px] text-slate-400 font-semibold tracking-wider">
+                                        {{ $invCurrencyCode }}
+                                    </span>
+                                </div>
                             </td>
                             <td class="py-3.5 font-semibold text-slate-600 dark:text-slate-400 capitalize">
                                 {{ str_replace('_', ' ', $inv->payment_method) }}
@@ -371,6 +488,18 @@
             $taxRate = 18.00;
             $taxAmount = round(($basePrice * $taxRate) / 100, 2);
             $totalPayable = $basePrice + $taxAmount;
+            $compCurrencyCode = strtoupper($company->currency ?: 'USD');
+            $compCurrencySymbol = match($compCurrencyCode) {
+                'INR' => '₹',
+                'USD' => '$',
+                'EUR' => '€',
+                'GBP' => '£',
+                'JPY' => '¥',
+                'CAD' => 'CA$',
+                'AUD' => 'AU$',
+                'BRL' => 'R$',
+                default => $compCurrencyCode . ' ',
+            };
         @endphp
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto">
             <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-800 space-y-5 animate-in fade-in zoom-in-95 my-8">
@@ -405,18 +534,18 @@
                             <span class="text-xs font-black text-slate-900 dark:text-white">{{ $activePlan?->display_name }} {{ __("Plan") }}</span>
                             <span class="text-[11px] text-slate-400">({{ ucfirst($activePlan?->billing_cycle ?? 'monthly') }})</span>
                         </div>
-                        <span class="text-xs font-extrabold text-slate-900 dark:text-white">${{ number_format($basePrice, 2) }}</span>
+                        <span class="text-xs font-extrabold text-slate-900 dark:text-white">{{ $compCurrencySymbol }}{{ number_format($basePrice, 2) }}</span>
                     </div>
 
                     <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                         <span>{{ __("Platform GST / Tax (18% • CGST 9% + SGST 9%)") }}</span>
-                        <span class="font-semibold">+${{ number_format($taxAmount, 2) }}</span>
+                        <span class="font-semibold">+{{ $compCurrencySymbol }}{{ number_format($taxAmount, 2) }}</span>
                     </div>
 
                     <div class="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
                         <span class="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">{{ __("Total Amount Due") }}</span>
                         <span class="text-base sm:text-lg font-black text-blue-600 dark:text-blue-400">
-                            ${{ number_format($totalPayable, 2) }} <span class="text-xs text-slate-400">{{ $company->currency ?: 'USD' }}</span>
+                            {{ $compCurrencySymbol }}{{ number_format($totalPayable, 2) }} <span class="text-xs text-slate-400">{{ $compCurrencyCode }}</span>
                         </span>
                     </div>
                 </div>
@@ -563,13 +692,13 @@
                             class="px-6 py-2.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer">
                         <span wire:loading.remove>
                             @if ($paymentGateway === 'razorpay')
-                                ⚡ {{ __("Pay") }} ${{ number_format($totalPayable, 2) }} {{ __("with Razorpay") }}
+                                ⚡ {{ __("Pay") }} {{ $compCurrencySymbol }}{{ number_format($totalPayable, 2) }} {{ __("with Razorpay") }}
                             @elseif ($paymentGateway === 'mercadopago')
-                                🟦 {{ __("Pay") }} ${{ number_format($totalPayable, 2) }} {{ __("with Mercado Pago") }}
+                                🟦 {{ __("Pay") }} {{ $compCurrencySymbol }}{{ number_format($totalPayable, 2) }} {{ __("with Mercado Pago") }}
                             @elseif ($paymentGateway === 'activation_key')
                                 {{ __("Verify Key & Upgrade") }}
                             @else
-                                🔒 {{ __("Pay") }} ${{ number_format($totalPayable, 2) }} & {{ __("Activate") }}
+                                🔒 {{ __("Pay") }} {{ $compCurrencySymbol }}{{ number_format($totalPayable, 2) }} & {{ __("Activate") }}
                             @endif
                         </span>
                         <span wire:loading class="inline-flex items-center gap-1.5">

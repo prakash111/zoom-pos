@@ -175,7 +175,7 @@ const WhitelabelPreview = {
             web: 'web-desktop'
         },
         orientation: 'portrait', // 'portrait' | 'landscape'
-        screen: 'dashboard',     // 'dashboard' | 'login' | 'splash'
+        screen: 'live',          // 'live' | 'dashboard' | 'pos' | 'cart' | 'login' | 'splash'
         themeMode: 'light',      // 'light' | 'dark'
         zoom: 1.0,
         isFullscreen: false,
@@ -194,7 +194,7 @@ const WhitelabelPreview = {
         productName: 'Zoom Sales CRM',
         packageId: 'com.zoomnearby.zoompos',
         serverUrl: 'https://saas.zoomnearby.com',
-        websiteUrl: 'https://zoomnearby.com',
+        websiteUrl: 'https://saas.zoomnearby.com/pos-web/',
         supportEmail: 'support@zoomnearby.com',
         supportPhone: '+918535075196',
         copyright: 'Copyright (C) 2026 Zoom Nearby. All rights reserved.',
@@ -271,7 +271,11 @@ const WhitelabelPreview = {
         if (prefill.display_name) this.state.displayName = prefill.display_name;
         if (prefill.package_id) this.state.packageId = prefill.package_id;
         if (prefill.server_url) this.state.serverUrl = prefill.server_url;
-        if (prefill.website_url) this.state.websiteUrl = prefill.website_url;
+        if (prefill.website_url && prefill.website_url !== 'https://zoomnearby.com' && prefill.website_url !== 'https://saas.zoomnearby.com') {
+            this.state.websiteUrl = prefill.website_url;
+        } else {
+            this.state.websiteUrl = 'https://saas.zoomnearby.com/pos-web/';
+        }
         if (prefill.support_email) this.state.supportEmail = prefill.support_email;
         if (prefill.support_phone) this.state.supportPhone = prefill.support_phone;
         if (prefill.copyright) this.state.copyright = prefill.copyright;
@@ -302,7 +306,7 @@ const WhitelabelPreview = {
         this.state.productName = prefill.product_name || 'Zoom Sales CRM';
         this.state.packageId = prefill.package_id || 'com.zoomnearby.zoompos';
         this.state.serverUrl = prefill.server_url || 'https://saas.zoomnearby.com';
-        this.state.websiteUrl = prefill.website_url || 'https://zoomnearby.com';
+        this.state.websiteUrl = (prefill.website_url && prefill.website_url !== 'https://zoomnearby.com' && prefill.website_url !== 'https://saas.zoomnearby.com') ? prefill.website_url : 'https://saas.zoomnearby.com/pos-web/';
         this.state.supportEmail = prefill.support_email || 'support@zoomnearby.com';
         this.state.supportPhone = prefill.support_phone || '+918535075196';
         this.state.copyright = prefill.copyright || ('Copyright (C) ' + new Date().getFullYear() + ' Zoom Nearby. All rights reserved.');
@@ -388,6 +392,35 @@ const WhitelabelPreview = {
         this.state.bgColor = getVal('inp_bg_color', this.state.bgColor);
         this.state.sidebarColor = getVal('inp_sidebar_color', this.state.sidebarColor);
         this.state.textColor = getVal('inp_text_color', this.state.textColor);
+
+        // Update live Flutter Web URL labels and iframe dynamically
+        const webDisplay = document.getElementById('preview_web_url_display') || document.getElementById('preview_server_url_display');
+        if (webDisplay) {
+            const curUrl = this.state.websiteUrl || 'https://saas.zoomnearby.com/pos-web/';
+            webDisplay.innerText = curUrl;
+            webDisplay.title = curUrl;
+        }
+        const webFrame = document.getElementById('preview_web_frame') || document.getElementById('preview_server_frame');
+        if (webFrame && (this.state.screen === 'live' || this.state.screen === 'server')) {
+            const raw = this.state.websiteUrl || 'https://saas.zoomnearby.com/pos-web/';
+            const norm = raw.startsWith('http') ? raw : 'https://' + raw;
+            if (webFrame.src !== norm && norm.length > 8) {
+                webFrame.src = norm;
+            }
+        }
+    },
+
+    reloadWebFrame: function() {
+        const frame = document.getElementById('preview_web_frame') || document.getElementById('preview_server_frame');
+        if (frame) {
+            const rawUrl = this.state.websiteUrl || (document.getElementById('inp_website_url') ? document.getElementById('inp_website_url').value : '') || 'https://saas.zoomnearby.com/pos-web/';
+            const webUrl = rawUrl.startsWith('http') ? rawUrl : 'https://' + rawUrl;
+            frame.src = webUrl;
+        }
+    },
+
+    reloadServerFrame: function() {
+        this.reloadWebFrame();
     },
 
     bindFormEvents: function() {
@@ -514,7 +547,9 @@ const WhitelabelPreview = {
     setScreen: function(scr) {
         this.state.screen = scr;
         document.querySelectorAll('.screen-mode-btn').forEach(el => {
-            el.classList.toggle('active', el.getAttribute('data-screen') === scr);
+            const elScr = el.getAttribute('data-screen');
+            const isActive = (elScr === scr) || (scr === 'live' && elScr === 'server') || (scr === 'server' && elScr === 'live');
+            el.classList.toggle('active', isActive);
         });
         this.render();
     },
@@ -699,7 +734,17 @@ const WhitelabelPreview = {
         const screenBody = frame.querySelector('.device-screen-body');
         if (screenBody) {
             screenBody.className = `device-screen-body ${s.themeMode === 'dark' ? 'theme-dark' : ''}`;
-            screenBody.innerHTML = this.getScreenHTML();
+            const existingWebFrame = screenBody.querySelector('#preview_web_frame') || screenBody.querySelector('#preview_server_frame');
+            if ((s.screen === 'live' || s.screen === 'server') && existingWebFrame) {
+                const webDisplay = screenBody.querySelector('#preview_web_url_display') || screenBody.querySelector('#preview_server_url_display');
+                const curUrl = s.websiteUrl || 'https://saas.zoomnearby.com/pos-web/';
+                if (webDisplay) {
+                    webDisplay.innerText = curUrl;
+                    webDisplay.title = curUrl;
+                }
+            } else {
+                screenBody.innerHTML = this.getScreenHTML();
+            }
         }
 
         // Apply scale fitting
@@ -817,7 +862,7 @@ const WhitelabelPreview = {
         if (winStatusbar) {
             winStatusbar.style.display = (s.platform === 'windows') ? 'flex' : 'none';
             const winStatusUrl = frame.querySelector('.windows-status-server');
-            if (winStatusUrl) winStatusUrl.innerText = `Connected: ${s.serverUrl}`;
+            if (winStatusUrl) winStatusUrl.innerText = `Connected: ${s.websiteUrl || s.serverUrl}`;
         }
 
         // Web Chrome
@@ -840,7 +885,7 @@ const WhitelabelPreview = {
         if (webOmnibox) {
             webOmnibox.style.display = (s.platform === 'web') ? 'flex' : 'none';
             const webUrlText = frame.querySelector('.web-address-text');
-            if (webUrlText) webUrlText.innerText = `${s.serverUrl}/pos/register`;
+            if (webUrlText) webUrlText.innerText = s.websiteUrl || `${s.serverUrl}/pos-web/`;
         }
     },
 
@@ -859,6 +904,33 @@ const WhitelabelPreview = {
         const secCol = s.secondaryColor || '#0ea5e9';
         const brandTitle = s.displayName || s.appName || 'Zoom POS';
         const company = s.companyName || 'ZoomNearby Enterprise';
+
+        // -------------------------------------------------------------
+        // SCREEN 0: LIVE FLUTTER WEB APP SIMULATOR (Loads Flutter Web URL)
+        // -------------------------------------------------------------
+        if (s.screen === 'live' || s.screen === 'server') {
+            const rawUrl = s.websiteUrl || (document.getElementById('inp_website_url') ? document.getElementById('inp_website_url').value : '') || 'https://saas.zoomnearby.com/pos-web/';
+            const webUrl = rawUrl.startsWith('http') ? rawUrl : 'https://' + rawUrl;
+            return `
+                <div class="live-server-preview-container" style="width:100%;height:100%;min-height:100%;display:flex;flex-direction:column;background:#ffffff;position:relative;overflow:hidden;flex:1;">
+                    <!-- Mini In-App Header Bar -->
+                    <div class="live-server-app-bar" style="height:36px;background:#ffffff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:11px;color:#64748b;flex-shrink:0;z-index:10;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                        <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;">
+                            <span style="font-size:11px;">🔒</span>
+                            <span id="preview_web_url_display" style="font-family:monospace;font-size:10.5px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${webUrl}">${webUrl}</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                            <button type="button" onclick="WhitelabelPreview.reloadWebFrame()" title="Reload Web App" style="border:none;background:#f1f5f9;color:#475569;width:24px;height:24px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;transition:background 0.15s;">↻</button>
+                            <a href="${webUrl}" target="_blank" title="Open Web App in New Tab" style="border:none;background:#f1f5f9;color:#475569;width:24px;height:24px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;text-decoration:none;transition:background 0.15s;">↗</a>
+                        </div>
+                    </div>
+                    <!-- Live Web Iframe -->
+                    <div style="flex:1;height:calc(100% - 36px);position:relative;overflow:hidden;background:#f8fafc;">
+                        <iframe id="preview_web_frame" src="${webUrl}" style="width:100%;height:100%;border:none;background:#ffffff;" allow="fullscreen; camera; geolocation; microphone; clipboard-read; clipboard-write" loading="lazy"></iframe>
+                    </div>
+                </div>
+            `;
+        }
 
         // -------------------------------------------------------------
         // SCREEN 1: REAL METRO DASHBOARD (Screenshots 1 & 2 in /read)

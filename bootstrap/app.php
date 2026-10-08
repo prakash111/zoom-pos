@@ -23,8 +23,58 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-if (! file_exists(dirname(__DIR__).'/.env') && file_exists(dirname(__DIR__).'/.env.example')) {
-    @copy(dirname(__DIR__).'/.env.example', dirname(__DIR__).'/.env');
+$baseDir = dirname(__DIR__);
+$envPath = $baseDir.'/.env';
+$envExamplePath = $baseDir.'/.env.example';
+
+if (! file_exists($envPath) && file_exists($envExamplePath)) {
+    @copy($envExamplePath, $envPath);
+}
+
+// Ensure .env has a valid application key so the web installer and sessions never throw MissingAppKeyException on fresh hosting
+if (file_exists($envPath)) {
+    $envContent = @file_get_contents($envPath) ?: '';
+    if (preg_match('/^APP_KEY=(.*)$/m', $envContent, $m)) {
+        $existingKey = trim($m[1], " \t\n\r\0\x0B\"'");
+        if ($existingKey === '') {
+            $freshKey = 'base64:'.base64_encode(random_bytes(32));
+            $envContent = preg_replace('/^APP_KEY=.*$/m', 'APP_KEY='.$freshKey, $envContent);
+            @file_put_contents($envPath, $envContent);
+            putenv('APP_KEY='.$freshKey);
+            $_ENV['APP_KEY'] = $freshKey;
+            $_SERVER['APP_KEY'] = $freshKey;
+        } else {
+            putenv('APP_KEY='.$existingKey);
+            $_ENV['APP_KEY'] = $existingKey;
+            $_SERVER['APP_KEY'] = $existingKey;
+        }
+    } else {
+        $freshKey = 'base64:'.base64_encode(random_bytes(32));
+        $envContent .= "\nAPP_KEY=".$freshKey."\n";
+        @file_put_contents($envPath, $envContent);
+        putenv('APP_KEY='.$freshKey);
+        $_ENV['APP_KEY'] = $freshKey;
+        $_SERVER['APP_KEY'] = $freshKey;
+    }
+} elseif (empty(getenv('APP_KEY'))) {
+    $fallbackKey = 'base64:'.base64_encode(random_bytes(32));
+    putenv('APP_KEY='.$fallbackKey);
+    $_ENV['APP_KEY'] = $fallbackKey;
+    $_SERVER['APP_KEY'] = $fallbackKey;
+}
+
+// Auto-create required writable storage subdirectories for shared hosting compatibility
+foreach ([
+    $baseDir.'/storage/app/public',
+    $baseDir.'/storage/framework/cache/data',
+    $baseDir.'/storage/framework/sessions',
+    $baseDir.'/storage/framework/views',
+    $baseDir.'/storage/logs',
+    $baseDir.'/bootstrap/cache',
+] as $storageDir) {
+    if (! is_dir($storageDir)) {
+        @mkdir($storageDir, 0775, true);
+    }
 }
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -57,18 +107,24 @@ return Application::configure(basePath: dirname(__DIR__))
             // (see LocalizationService::getActiveLocale) so validation errors
             // and any translated strings in API responses match the client's
             // chosen locale.
-            Route::middleware([EnsureAppIsInstalled::class, CheckMaintenanceMode::class, SetLocale::class, ClearStoreContext::class, PreventDemoChanges::class, FormatMobileStoreName::class])
+            Route::middleware([EnsureAppIsInstalled::class, CheckMaintenanceMode::class, \App\Http\Middleware\SetAppLocale::class, ClearStoreContext::class, PreventDemoChanges::class, FormatMobileStoreName::class])
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));
         },
     )
     ->withCommands([__DIR__.'/../app/Console/Commands'])
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->api(append: [
+            \App\Http\Middleware\SetAppLocale::class,
+            \App\Http\Middleware\UpdateUserPresence::class,
+        ]);
+
         $middleware->web(append: [
             ResolveTenantContext::class,
             SetLocale::class,
             SecurityHeaders::class,
             PreventDemoChanges::class,
+            \App\Http\Middleware\UpdateUserPresence::class,
         ]);
 
         // The public landing page is served from a whole-response cache shared
@@ -104,6 +160,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'maintenance_check' => CheckMaintenanceMode::class,
             'security_headers' => SecurityHeaders::class,
             'tenant_context' => ResolveTenantContext::class,
+            'tenant.context' => ResolveTenantContext::class,
             'tenant' => \App\Http\Middleware\AuthenticateTenantApi::class,
             'tenant.permission' => CheckTenantPermission::class,
             'tenant.api.permission' => CheckTenantApiUserPermission::class,

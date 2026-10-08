@@ -21,30 +21,38 @@ use Livewire\Component;
 #[Layout('layouts.guest')]
 class TenantRegister extends Component
 {
-    public function mount(): void
+    public function mount(?\App\Services\Module\ModuleManagerService $moduleService = null): void
     {
+        $moduleService = $moduleService ?: app(\App\Services\Module\ModuleManagerService::class);
+
         if ($profile = session()->pull('social_registration')) {
             $this->ownerName = (string) ($profile['name'] ?? '');
             $this->email = (string) ($profile['email'] ?? '');
         }
 
-        $activeKeys = array_keys(\App\Services\Modular\ModuleRegistry::registrationModules());
+        $activeTypes = $moduleService->getAvailableBusinessTypes();
+        $activeKeys = array_column($activeTypes, 'id');
         if (! empty($activeKeys)) {
-            $normalizedCurrent = $this->posMode === 'general' ? 'retail' : $this->posMode;
+            $normalizedCurrent = $moduleService->canonicalKeyForRegistry($this->posMode);
             if (! in_array($normalizedCurrent, $activeKeys, true)) {
-                $this->posMode = $activeKeys[0] === 'retail' ? 'general' : $activeKeys[0];
+                $this->posMode = $activeKeys[0];
             }
         }
     }
 
+    public function getBusinessTypesProperty(): array
+    {
+        return app(\App\Services\Module\ModuleManagerService::class)->getAvailableBusinessTypes();
+    }
+
     public function getActiveRegistrationModulesProperty(): array
     {
-        return \App\Services\Modular\ModuleRegistry::registrationModules();
+        return app(\App\Services\Module\ModuleManagerService::class)->getAvailableBusinessTypes();
     }
 
     public function getAllowedRegistrationModesProperty(): string
     {
-        $enabled = \App\Services\Modular\ModuleRegistry::enabledRegistrationModes();
+        $enabled = array_column(app(\App\Services\Module\ModuleManagerService::class)->getAvailableBusinessTypes(), 'id');
         if (in_array('restaurant', $enabled, true) && in_array('retail', $enabled, true)) {
             return 'both';
         }
@@ -172,7 +180,7 @@ class TenantRegister extends Component
                 Rule::unique('companies', 'slug'),
             ],
             'customDomain' => ['nullable', 'string', 'min:3', 'max:100'],
-            'posMode' => ['required', 'string', Rule::in(array_unique(array_merge(array_keys(\App\Services\Modular\ModuleRegistry::registrationModules()), ['general', 'retail'])))],
+            'posMode' => ['required', 'string', Rule::in(app(\App\Services\Module\ModuleManagerService::class)->getAllowedKeys())],
             'ownerName' => ['required', 'string', 'min:2', 'max:100'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30'],
@@ -184,19 +192,22 @@ class TenantRegister extends Component
 
         $this->validate($rules);
 
-        $activeKeys = array_keys(\App\Services\Modular\ModuleRegistry::registrationModules());
-        $normalizedMode = $this->posMode === 'general' ? 'retail' : $this->posMode;
+        $moduleService = app(\App\Services\Module\ModuleManagerService::class);
+        $activeKeys = array_column($moduleService->getAvailableBusinessTypes(), 'id');
+        $normalizedMode = $moduleService->canonicalKeyForRegistry($this->posMode);
         if (! in_array($normalizedMode, $activeKeys, true)) {
             $this->addError('posMode', 'Selected operating mode is currently disabled for registration.');
 
             return;
         }
 
+        $systemMode = $moduleService->toSystemPosMode($this->posMode);
+
         $payload = [
             'store_name' => $this->storeName,
             'slug' => $this->slug,
             'custom_domain' => $cleanCustomDomain,
-            'pos_mode' => $this->posMode,
+            'pos_mode' => $systemMode,
             'owner_name' => $this->ownerName,
             'email' => $this->email,
             'phone' => NormalizesPhoneNumber::normalizePhoneNumber($this->phone),

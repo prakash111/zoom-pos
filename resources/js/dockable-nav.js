@@ -35,6 +35,7 @@ export const ADMIN_DOCK_ITEMS = [
     { key: 'dashboard', label: 'Dashboard Overview', icon: '📊', route: 'superadmin.dashboard' },
     { key: 'tenants', label: 'Tenant Stores', icon: '🏢', route: 'superadmin.tenants.index' },
     { key: 'modules', label: 'Modules & Add-ons', icon: '🧩', route: 'superadmin.modules.index' },
+    { key: 'broadcasts', label: 'Promotional Broadcasts', icon: '📢', route: 'superadmin.broadcasts.index' },
     { key: 'plans', label: 'SaaS Plans & Pricing', icon: '👑', route: 'superadmin.plans.index' },
     { key: 'taxes', label: 'Global Tax Engine', icon: '⚖️', route: 'superadmin.tax.index' },
     { key: 'menus', label: 'Menu Builder', icon: '🧭', route: 'superadmin.menus.index' },
@@ -63,13 +64,20 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
         navTextActiveColor: '#60a5fa', // Active / Highlight Nav Text Color
         visibleItems: [],
         availableDockItems: [],
-        adminDockItems: ADMIN_DOCK_ITEMS,
+        adminDockItems: (typeof window !== 'undefined' && window.hasChatModule === false)
+            ? ADMIN_DOCK_ITEMS.filter(i => i.key !== 'broadcasts')
+            : ADMIN_DOCK_ITEMS,
         visibleAdminItems: (function() {
+            const hasChat = typeof window === 'undefined' || window.hasChatModule !== false;
+            const baseDefaults = ['dashboard', 'tenants', 'modules', 'broadcasts', 'plans', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp'];
+            const defaults = hasChat ? baseDefaults : baseDefaults.filter(k => k !== 'broadcasts');
             try {
                 const raw = localStorage.getItem('nav_visible_items');
-                return raw ? JSON.parse(raw) : ['dashboard', 'tenants', 'modules', 'plans', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp'];
+                if (!raw) return defaults;
+                const parsed = JSON.parse(raw);
+                return hasChat ? parsed : (Array.isArray(parsed) ? parsed.filter(k => k !== 'broadcasts') : defaults);
             } catch(e) {
-                return ['dashboard', 'tenants', 'modules', 'plans', 'taxes', 'menus', 'inquiries', 'pages', 'settings', 'smtp'];
+                return defaults;
             }
         })(),
         x: 24,
@@ -144,7 +152,9 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
 
             try {
                 if (isAdmin) {
-                    this.availableDockItems = [...ADMIN_DOCK_ITEMS];
+                    const hasChat = typeof window === 'undefined' || window.hasChatModule !== false;
+                    this.adminDockItems = hasChat ? [...ADMIN_DOCK_ITEMS] : ADMIN_DOCK_ITEMS.filter(i => i.key !== 'broadcasts');
+                    this.availableDockItems = [...this.adminDockItems];
                     const validAdminKeys = this.adminDockItems.map(i => i.key);
                     try {
                         const storedAdmin = useStoredState ? localStorage.getItem('nav_visible_items') : null;
@@ -153,6 +163,8 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
                             if (Array.isArray(parsed)) {
                                 this.visibleAdminItems = parsed.filter(k => validAdminKeys.includes(k));
                             }
+                        } else if (!hasChat) {
+                            this.visibleAdminItems = this.visibleAdminItems.filter(k => k !== 'broadcasts');
                         }
                     } catch(e) {}
                     this.visibleItems = [...this.visibleAdminItems];
@@ -593,6 +605,7 @@ export function dockableNav(storageKey = 'sa_dock_nav_state', defaultPosition = 
         isItemVisible(itemKey) {
             const isAdmin = this.storageKey === 'sa_dock_nav_state' || this.operatingMode === 'admin' || this.operatingMode === 'superadmin';
             if (isAdmin) {
+                if (itemKey === 'broadcasts' || itemKey === 'promotions' || itemKey === 'chat_support') return true;
                 const list = (this.visibleAdminItems && this.visibleAdminItems.length > 0) ? this.visibleAdminItems : this.visibleItems;
                 return Array.isArray(list) && list.includes(itemKey);
             }

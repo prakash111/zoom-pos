@@ -25,6 +25,15 @@
   var modalItemTitle = document.getElementById("modal-item-title");
   var modalItemPrice = document.getElementById("modal-item-price");
   var modalItemList = document.getElementById("modal-item-list");
+  var modalPlanBadge = document.getElementById("modal-plan-badge");
+  var modalItemsCount = document.getElementById("modal-items-count");
+  var modalCalcBreakdown = document.getElementById("modal-calc-breakdown");
+  var modalCalcRegularRow = document.getElementById("modal-calc-regular-row");
+  var modalCalcOriginal = document.getElementById("modal-calc-original");
+  var modalCalcDiscountRow = document.getElementById("modal-calc-discount-row");
+  var modalCalcDiscount = document.getElementById("modal-calc-discount");
+  var modalCalcFinal = document.getElementById("modal-calc-final");
+  var modalBtnPrice = document.getElementById("modal-btn-price");
   var modalForm = document.getElementById("modal-checkout-form");
   var modalBundleInput = document.getElementById("modal-bundle-input");
   var modalProductInput = document.getElementById("modal-product-input");
@@ -154,6 +163,35 @@
     });
   }
 
+  // Helper to create an itemized product row for checkout modal
+  function createModalProductRow(badgeText, isCore, name, price, sym, cur) {
+    var itemRow = document.createElement("div");
+    itemRow.className = "modal-product-item";
+
+    var leftDiv = document.createElement("div");
+    leftDiv.className = "item-left";
+
+    var tagSpan = document.createElement("span");
+    tagSpan.className = "badge-tag " + (isCore ? "tag-core" : "tag-mod");
+    tagSpan.textContent = badgeText;
+
+    var nameSpan = document.createElement("span");
+    nameSpan.className = "item-name";
+    nameSpan.textContent = name;
+    nameSpan.title = name;
+
+    leftDiv.appendChild(tagSpan);
+    leftDiv.appendChild(nameSpan);
+
+    var priceDiv = document.createElement("div");
+    priceDiv.className = "item-price";
+    priceDiv.textContent = sym + parseFloat(price).toFixed(2) + " " + (cur || "USD");
+
+    itemRow.appendChild(leftDiv);
+    itemRow.appendChild(priceDiv);
+    return itemRow;
+  }
+
   // Buy buttons & Modal Trigger
   document.querySelectorAll(".open-checkout-btn").forEach(function (btn) {
     btn.addEventListener("click", function (e) {
@@ -162,26 +200,130 @@
       var type = btn.getAttribute("data-type"); // 'bundle', 'product', or 'custom'
       var slug = btn.getAttribute("data-slug") || "";
       var title = btn.getAttribute("data-title") || "Software License";
-      var price = btn.getAttribute("data-price") || "0.00";
+      var price = parseFloat(btn.getAttribute("data-price") || 0);
       var items = btn.getAttribute("data-items") || "";
       var modules = btn.getAttribute("data-modules") || "";
 
-      var sym = (window.LANDING_DATA && window.LANDING_DATA.branding && window.LANDING_DATA.branding.currency_symbol) || "$";
-      // Populate modal
-      if (modalItemTitle) modalItemTitle.textContent = title;
-      if (modalItemPrice) modalItemPrice.textContent = sym + parseFloat(price).toFixed(2);
+      var branding = (window.LANDING_DATA && window.LANDING_DATA.branding) || {};
+      var sym = branding.currency_symbol || "$";
+      var cur = branding.currency || "USD";
 
-      if (modalItemList) {
-        modalItemList.innerHTML = "";
-        if (items) {
-          var arr = items.split(",");
-          arr.forEach(function (it) {
-            var div = document.createElement("div");
-            div.style.cssText = "font-size:12px;color:#334155;padding:2px 0;";
-            div.innerHTML = "<strong>•</strong> " + it.trim();
-            modalItemList.appendChild(div);
+      if (modalItemList) modalItemList.innerHTML = "";
+
+      if (type === "bundle") {
+        var bundleData = (window.LANDING_DATA && window.LANDING_DATA.bundle_details && window.LANDING_DATA.bundle_details[slug]) || null;
+
+        if (bundleData && Array.isArray(bundleData.items) && bundleData.items.length > 0) {
+          if (modalItemTitle) modalItemTitle.textContent = bundleData.name;
+          if (modalPlanBadge) modalPlanBadge.textContent = "Enterprise Bundle";
+          if (modalItemsCount) {
+            modalItemsCount.style.display = "inline-block";
+            modalItemsCount.textContent = bundleData.items.length + " Products Included";
+          }
+
+          bundleData.items.forEach(function (it) {
+            var badgeText = it.is_core ? "[CORE]" : "[MODULE]";
+            var row = createModalProductRow(badgeText, it.is_core, it.name, it.price, sym, it.currency || cur);
+            modalItemList.appendChild(row);
+          });
+
+          var regSum = parseFloat(bundleData.regular_sum || bundleData.price);
+          var bPrice = parseFloat(bundleData.price || price);
+          var savings = parseFloat(bundleData.savings || (regSum - bPrice));
+          var discPct = bundleData.discount_pct || (regSum > 0 ? Math.round((savings / regSum) * 100) : 0);
+
+          if (savings > 0) {
+            if (modalCalcRegularRow) modalCalcRegularRow.style.display = "flex";
+            if (modalCalcOriginal) modalCalcOriginal.textContent = sym + regSum.toFixed(2) + " " + cur;
+            if (modalCalcDiscountRow) modalCalcDiscountRow.style.display = "flex";
+            if (modalCalcDiscount) modalCalcDiscount.textContent = "-" + sym + savings.toFixed(2) + " (" + discPct + "% OFF)";
+          } else {
+            if (modalCalcRegularRow) modalCalcRegularRow.style.display = "none";
+            if (modalCalcDiscountRow) modalCalcDiscountRow.style.display = "none";
+          }
+
+          if (modalCalcFinal) modalCalcFinal.textContent = sym + bPrice.toFixed(2) + " " + cur;
+          if (modalBtnPrice) modalBtnPrice.textContent = sym + bPrice.toFixed(2);
+          if (modalItemPrice) modalItemPrice.textContent = sym + bPrice.toFixed(2);
+        } else {
+          // Fallback if not found in bundle_details
+          if (modalItemTitle) modalItemTitle.textContent = title;
+          if (modalPlanBadge) modalPlanBadge.textContent = "Software Bundle";
+          if (modalItemsCount) modalItemsCount.style.display = "none";
+          if (modalCalcRegularRow) modalCalcRegularRow.style.display = "none";
+          if (modalCalcDiscountRow) modalCalcDiscountRow.style.display = "none";
+          if (modalCalcFinal) modalCalcFinal.textContent = sym + price.toFixed(2) + " " + cur;
+          if (modalBtnPrice) modalBtnPrice.textContent = sym + price.toFixed(2);
+          if (modalItemPrice) modalItemPrice.textContent = sym + price.toFixed(2);
+        }
+      } else if (type === "custom") {
+        if (modalItemTitle) modalItemTitle.textContent = "Custom Module Bundle";
+        if (modalPlanBadge) modalPlanBadge.textContent = "Custom Configuration";
+
+        var customItems = [];
+        var customSubtotal = 0;
+        if (customCheckboxes) {
+          customCheckboxes.forEach(function (chk) {
+            if (chk.checked) {
+              var cSlug = chk.getAttribute("data-slug");
+              var cName = chk.getAttribute("data-name");
+              var cPrice = parseFloat(chk.getAttribute("data-price") || 0);
+              var isCore = (cSlug === "core");
+              customItems.push({
+                badge: isCore ? "[CORE]" : "[MODULE]",
+                isCore: isCore,
+                name: cName,
+                price: cPrice
+              });
+              customSubtotal += cPrice;
+            }
           });
         }
+
+        if (modalItemsCount) {
+          modalItemsCount.style.display = "inline-block";
+          modalItemsCount.textContent = customItems.length + " Products Selected";
+        }
+
+        customItems.forEach(function (it) {
+          var row = createModalProductRow(it.badge, it.isCore, it.name, it.price, sym, cur);
+          modalItemList.appendChild(row);
+        });
+
+        var finalAmount = price;
+        var discountAmount = customSubtotal - finalAmount;
+        if (discountAmount > 0.01) {
+          var discPct = Math.round((discountAmount / customSubtotal) * 100);
+          if (modalCalcRegularRow) modalCalcRegularRow.style.display = "flex";
+          if (modalCalcOriginal) modalCalcOriginal.textContent = sym + customSubtotal.toFixed(2) + " " + cur;
+          if (modalCalcDiscountRow) modalCalcDiscountRow.style.display = "flex";
+          if (modalCalcDiscount) modalCalcDiscount.textContent = "-" + sym + discountAmount.toFixed(2) + " (" + discPct + "% OFF)";
+        } else {
+          if (modalCalcRegularRow) modalCalcRegularRow.style.display = "none";
+          if (modalCalcDiscountRow) modalCalcDiscountRow.style.display = "none";
+        }
+
+        if (modalCalcFinal) modalCalcFinal.textContent = sym + finalAmount.toFixed(2) + " " + cur;
+        if (modalBtnPrice) modalBtnPrice.textContent = sym + finalAmount.toFixed(2);
+        if (modalItemPrice) modalItemPrice.textContent = sym + finalAmount.toFixed(2);
+      } else {
+        // Single module / product
+        if (modalItemTitle) modalItemTitle.textContent = title;
+        if (modalPlanBadge) modalPlanBadge.textContent = "Add-On Module";
+        if (modalItemsCount) {
+          modalItemsCount.style.display = "inline-block";
+          modalItemsCount.textContent = "1 Module";
+        }
+
+        var isCore = (slug === "core" || slug === "core_saas");
+        var row = createModalProductRow(isCore ? "[CORE]" : "[MODULE]", isCore, title, price, sym, cur);
+        modalItemList.appendChild(row);
+
+        if (modalCalcRegularRow) modalCalcRegularRow.style.display = "none";
+        if (modalCalcDiscountRow) modalCalcDiscountRow.style.display = "none";
+        if (modalCalcFinal) modalCalcFinal.textContent = sym + price.toFixed(2) + " " + cur;
+        if (modalBtnPrice) modalBtnPrice.textContent = sym + price.toFixed(2);
+        if (modalItemPrice) modalItemPrice.textContent = sym + price.toFixed(2);
       }
 
       // Set hidden inputs

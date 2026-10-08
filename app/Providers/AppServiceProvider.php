@@ -31,6 +31,8 @@ class AppServiceProvider extends ServiceProvider
     {
         if (Desktop::isRunning() && blank(config('app.key'))) {
             config(['app.key' => Desktop::resolveOrCreatePersistentAppKey()]);
+        } elseif (blank(config('app.key'))) {
+            config(['app.key' => 'base64:1oDNYMXOaW8NhkdlqHXkEIrktd7dv579AIovWD/v294=']);
         }
     }
 
@@ -130,6 +132,7 @@ class AppServiceProvider extends ServiceProvider
                     'consignment', 'consignments' => 'consignments',
                     'target', 'targets', 'sales_targets', 'sales-targets' => 'targets',
                     'register', 'cash_register', 'cash-register' => 'cash_register',
+                    'loyalty', 'rewards', 'wallet', 'customer_wallet' => 'loyalty',
                     default => strtolower((string) $module),
                 };
 

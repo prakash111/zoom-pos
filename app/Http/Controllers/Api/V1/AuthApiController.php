@@ -159,10 +159,11 @@ class AuthApiController extends Controller
         }
 
         $requestedMode = strtolower(trim((string) $request->input('pos_mode', 'general')));
-        $normalizedMode = $requestedMode === 'general' ? 'retail' : $requestedMode;
-        $enabledModes = ModuleRegistry::enabledRegistrationModes();
+        $moduleService = app(\App\Services\Module\ModuleManagerService::class);
+        $normalizedMode = $moduleService->canonicalKeyForRegistry($requestedMode);
+        $activeKeys = array_column($moduleService->getAvailableBusinessTypes(), 'id');
 
-        if (! in_array($normalizedMode, $enabledModes, true)) {
+        if (! in_array($normalizedMode, $activeKeys, true)) {
             return response()->json([
                 'success' => false,
                 'status' => 'error',
@@ -187,7 +188,7 @@ class AuthApiController extends Controller
                 'language' => $request->filled('language') ? $request->input('language') : ($request->filled('locale') ? $request->input('locale') : null),
                 'default_locale' => $request->filled('default_locale') ? $request->input('default_locale') : null,
                 'timezone' => $request->filled('timezone') ? $request->input('timezone') : null,
-                'pos_mode' => $request->input('pos_mode', 'general'),
+                'pos_mode' => $moduleService->toSystemPosMode($requestedMode),
                 'plan_name' => $request->input('plan_name', 'trial'),
                 'activation_code' => $request->input('activation_code'),
             ];

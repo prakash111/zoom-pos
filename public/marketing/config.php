@@ -877,6 +877,60 @@ if (!function_exists('default_business_types_cards')) {
                     'Conversion Metrics',
                 ],
             ],
+            'hrm' => [
+                'key' => 'hrm',
+                'title' => 'HRM & Staff Attendance',
+                'icon' => '👥',
+                'tag_text' => 'Vertical Module',
+                'tag_class' => 'tag-vertical',
+                'display_mode' => 'image',
+                'image_url' => 'assets/images/retail-pos-mockup.png',
+                'icon_bg' => '#ecfdf5',
+                'icon_color' => '#059669',
+                'badge_label' => 'HRM & Payroll',
+                'badge_sub' => 'Attendance, Leaves & Salary',
+                'btn_text' => 'Buy HRM Module →',
+                'btn_type' => 'checkout',
+                'btn_url' => '',
+                'module_slug' => 'hrm',
+                'features' => [
+                    'Staff Directory',
+                    'PIN Clock-In/Out',
+                    'Leave Approvals',
+                    'Sales Commissions',
+                    'Payroll Payslips',
+                    'Attendance Log',
+                    'Role Permissions',
+                    'Department Heads',
+                ],
+            ],
+            'loyalty' => [
+                'key' => 'loyalty',
+                'title' => 'Customer Loyalty & Wallets',
+                'icon' => '🎁',
+                'tag_text' => 'Vertical Module',
+                'tag_class' => 'tag-vertical',
+                'display_mode' => 'image',
+                'image_url' => 'assets/images/retail-pos-mockup.png',
+                'icon_bg' => '#fffbeb',
+                'icon_color' => '#d97706',
+                'badge_label' => 'Loyalty & Wallet',
+                'badge_sub' => 'Points, VIP Tiers & Wallets',
+                'btn_text' => 'Buy Loyalty Module →',
+                'btn_type' => 'checkout',
+                'btn_url' => '',
+                'module_slug' => 'loyalty',
+                'features' => [
+                    'Points Rules',
+                    'Customer Wallet',
+                    'Prepaid Top-ups',
+                    'VIP Tier System',
+                    'Auto Tier Upgrade',
+                    'Multi-Tender Debit',
+                    'Wallet Receipts',
+                    'Points at Checkout',
+                ],
+            ],
         ];
     }
 }
@@ -942,20 +996,25 @@ if (!function_exists('default_marketing_bundles')) {
             [
                 'slug' => 'all-in-one',
                 'name' => 'All-in-One Enterprise Bundle',
-                'description' => 'Includes Main Core SaaS script plus all business vertical modules: Lead Manager, Pharmacy POS, Salon Management, and Repair Technician.',
-                'price' => 119.00,
+                'description' => 'Includes Main Core SaaS script plus all business vertical modules: Lead Manager, Pharmacy POS, Salon Management, Repair Technician, HRM & Staff Management, Unified Staff Chat & Live Support and Customer Loyalty & Wallet Engine.',
+                'price' => 49.00,
                 'currency' => 'USD',
-                'regular_sum' => 158.00,
-                'savings' => 39.00,
-                'included_modules' => ['core', 'leadmanagement', 'pharmacy', 'salon', 'repairtechnician'],
+                'regular_sum' => 220.00,
+                'savings' => 171.00,
+                'included_modules' => ['core', 'loyalty', 'hrm', 'leadmanagement', 'pharmacy', 'repairtechnician', 'salon', 'chat'],
                 'custom_features' => [
-                    'Full Platform + All 4 Vertical Modules Included',
-                    'Lead Management & CRM Module',
-                    'Pharmacy POS (Batches & Expiry Control)',
-                    'Salon & Spa (Stylists & Appointment Booking)',
-                    'Repair Workbench (Tickets & Diagnosis)',
-                    'Multi-Tenant SaaS Billing & Domain Mapping',
-                    'Priority VIP Business Deployment Support',
+                    'Full Core SaaS Platform + All 7 Vertical Add-On Modules Included',
+                    'Retail POS, Restaurant (Tables & KOT) & Café Built-In',
+                    'Lead Management CRM Module (Visual Kanban & Quotations)',
+                    'Pharmacy POS Module (Drug Batches, Expiry & Prescriptions)',
+                    'Salon & Spa Management (Stylists, Calendar & Appointments)',
+                    'Repair Service Workbench (Job Tickets, Parts & Diagnosis)',
+                    'HRM & Staff Attendance (PIN Clock-in & Automated Payroll)',
+                    'Customer Loyalty, Reward Points & Digital Store Wallet Engine',
+                    'Unified Staff Chat & Live Support Desk Module',
+                    'Cloud App Builder (Google Play AAB, Android APK & Windows EXE)',
+                    'Multi-Tenant SaaS Billing, Stripe/Razorpay & Custom Domains',
+                    'VIP Deployment Assistance & Lifetime Perpetual License',
                 ],
                 'badge' => '⚡ BEST VALUE BUNDLE',
                 'is_featured' => false,
@@ -1026,7 +1085,7 @@ if (!function_exists('get_landing_page_data')) {
             if (empty($cached['faqs'])) {
                 $cached['faqs'] = default_marketing_faqs();
             }
-            return $cached;
+            return clean_entities_deep($cached);
         }
     }
 
@@ -1084,8 +1143,9 @@ if (!function_exists('get_landing_page_data')) {
             if (empty($data['faqs'])) {
                 $data['faqs'] = default_marketing_faqs();
             }
-            @file_put_contents($cacheFile, json_encode($data));
-            return $data;
+            $cleanData = clean_entities_deep($data);
+            @file_put_contents($cacheFile, json_encode($cleanData));
+            return $cleanData;
         }
     }
 
@@ -1102,7 +1162,7 @@ if (!function_exists('get_landing_page_data')) {
             if (empty($cached['faqs'])) {
                 $cached['faqs'] = default_marketing_faqs();
             }
-            return $cached;
+            return clean_entities_deep($cached);
         }
     }
 
@@ -1128,8 +1188,8 @@ if (!function_exists('get_landing_page_data')) {
             'demo_admin' => 'https://saas.zoomnearby.com/login',
             'demo_store' => 'https://saas.zoomnearby.com/store/login',
             'demo_flutter_web' => 'https://saas.zoomnearby.com/pos-web/',
-            'demo_flutter_windows' => 'https://saas.zoomnearby.com/zoom-sales-crm-software-1.0.2.exe',
-            'demo_flutter_android' => 'https://saas.zoomnearby.com/zoom-pos-v1.0.2.apk',
+            'demo_flutter_windows' => 'https://saas.zoomnearby.com/ZooM-POS-Setup-1.0.5.exe',
+            'demo_flutter_android' => 'https://saas.zoomnearby.com/ZooM-POS-v1.0.5.apk',
             'documentation' => 'https://saas.zoomnearby.com/documentation',
             'checkout' => CHECKOUT_URL,
             'verify' => VERIFY_API_URL,
@@ -1149,7 +1209,7 @@ if (!function_exists('get_landing_page_data')) {
                 'key' => 'flutter_windows',
                 'title' => 'Flutter Windows Desktop App',
                 'desc' => 'Native 64-bit Windows desktop installer with ESC/POS thermal receipt printer integration.',
-                'url' => 'https://saas.zoomnearby.com/zoom-sales-crm-software-1.0.2.exe',
+                'url' => 'https://saas.zoomnearby.com/ZooM-POS-Setup-1.0.5.exe',
                 'icon' => '🪟',
                 'badge' => 'Windows .EXE',
                 'btn_text' => 'Download Windows App ⬇',
@@ -1159,7 +1219,7 @@ if (!function_exists('get_landing_page_data')) {
                 'key' => 'flutter_android',
                 'title' => 'Flutter Android POS App',
                 'desc' => 'Native Android APK build optimized for handheld wireless terminals, smartphones, and tablets.',
-                'url' => 'https://saas.zoomnearby.com/zoom-pos-v1.0.2.apk',
+                'url' => 'https://saas.zoomnearby.com/ZooM-POS-v1.0.5.apk',
                 'icon' => '📱',
                 'badge' => 'Android .APK',
                 'btn_text' => 'Download Android APK ⬇',
@@ -1219,6 +1279,8 @@ if (!function_exists('get_landing_page_data')) {
             ['slug' => 'pharmacy', 'name' => 'Pharmacy POS for SaaS', 'description' => 'Drug batch tracking, expiry date monitoring, and prescription intake workflow.', 'price' => 25.00, 'currency' => 'USD', 'badge' => 'Specialized Vertical'],
             ['slug' => 'salon', 'name' => 'Salon Management System', 'description' => 'Stylist bookings, appointments calendar, chair allocation, and commissions.', 'price' => 25.00, 'currency' => 'USD', 'badge' => 'Specialized Vertical'],
             ['slug' => 'repairtechnician', 'name' => 'Repair Service Provider', 'description' => 'Device intake tickets, diagnostic checklists, parts and labor billing.', 'price' => 25.00, 'currency' => 'USD', 'badge' => 'Specialized Vertical'],
+            ['slug' => 'hrm', 'name' => 'Human Resource Management & Payroll', 'description' => 'Comprehensive employee directory, POS PIN clock-in/out attendance, leave tracking, and sales commission payroll.', 'price' => 29.00, 'currency' => 'USD', 'badge' => 'Specialized Vertical'],
+            ['slug' => 'loyalty', 'name' => 'Customer Loyalty, Rewards & Wallet Engine', 'description' => 'Configurable points accrual, VIP customer tiers, and prepaid store wallet accounts with POS checkout deduction.', 'price' => 29.00, 'currency' => 'USD', 'badge' => 'Specialized Vertical'],
         ],
         'bundles' => [
             [
@@ -1245,18 +1307,20 @@ if (!function_exists('get_landing_page_data')) {
             [
                 'slug' => 'all-in-one',
                 'name' => 'All-in-One Enterprise Bundle',
-                'description' => 'Includes Main Core SaaS script plus all business vertical modules: Lead Manager, Pharmacy POS, Salon Management, and Repair Technician.',
+                'description' => 'Includes Main Core SaaS script plus all business vertical modules: Lead Manager, Pharmacy POS, Salon Management, Repair Technician, HRM & Staff Management, and Customer Loyalty & Wallet Engine.',
                 'price' => 119.00,
                 'currency' => 'USD',
-                'regular_sum' => 158.00,
-                'savings' => 39.00,
-                'included_modules' => ['core', 'leadmanagement', 'pharmacy', 'salon', 'repairtechnician'],
+                'regular_sum' => 211.00,
+                'savings' => 92.00,
+                'included_modules' => ['core', 'leadmanagement', 'pharmacy', 'salon', 'repairtechnician', 'hrm', 'loyalty'],
                 'custom_features' => [
-                    'Full Platform + All 4 Vertical Modules Included',
-                    'Lead Management & CRM Module',
+                    'Full Platform + All 6 Vertical Modules Included',
+                    'Lead Management CRM Module (Kanban & Deals)',
                     'Pharmacy POS (Batches & Expiry Control)',
                     'Salon & Spa (Stylists & Appointment Booking)',
                     'Repair Workbench (Tickets & Diagnosis)',
+                    'HRM & Staff Attendance (PIN Clock-in & Payroll)',
+                    'Customer Loyalty & Digital Store Wallet Engine',
                     'Multi-Tenant SaaS Billing & Domain Mapping',
                     'Priority VIP Business Deployment Support',
                 ],
@@ -1331,24 +1395,62 @@ if (!function_exists('get_landing_page_data')) {
     }
 }
 
+if (!function_exists('clean_decoded_str')) {
+    function clean_decoded_str(?string $str): string
+    {
+        if ($str === null || $str === '') {
+            return '';
+        }
+        $prev = (string) $str;
+        while (true) {
+            $decoded = html_entity_decode($prev, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($decoded === $prev) {
+                break;
+            }
+            $prev = $decoded;
+        }
+        return $prev;
+    }
+}
+
+if (!function_exists('clean_entities_deep')) {
+    function clean_entities_deep($value)
+    {
+        if (is_string($value)) {
+            return clean_decoded_str($value);
+        }
+        if (is_array($value)) {
+            foreach ($value as $k => $v) {
+                $value[$k] = clean_entities_deep($v);
+            }
+            return $value;
+        }
+        return $value;
+    }
+}
+
 if (!function_exists('e')) {
     function e(?string $str): string
     {
-        return htmlspecialchars((string) $str, ENT_QUOTES, 'UTF-8');
+        if ($str === null || $str === '') {
+            return '';
+        }
+        $clean = clean_decoded_str($str);
+        return htmlspecialchars($clean, ENT_QUOTES, 'UTF-8');
     }
 }
 
 if (!function_exists('e_attr')) {
     function e_attr(?string $str): string
     {
-        return htmlspecialchars((string) $str, ENT_QUOTES, 'UTF-8');
+        return e($str);
     }
 }
 
 if (!function_exists('format_card_feature')) {
     function format_card_feature(?string $text): string
     {
-        $text = trim((string) $text);
+        $text = clean_decoded_str($text);
         if ($text === '') {
             return '';
         }

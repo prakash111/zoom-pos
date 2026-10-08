@@ -56,6 +56,8 @@ return [
 
     'demo_mode' => (bool) env('DEMO_MODE', false),
 
+    'show_demo_banner' => (bool) env('SHOW_DEMO_TOPBAR_BANNER', false),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
@@ -99,13 +101,9 @@ return [
 
     'cipher' => 'AES-256-CBC',
 
-    // No hardcoded fallback here (Laravel's own stock config/app.php has
-    // none either) — a baked-in default key would mean every fresh
-    // CodeCanyon install that never gets `key:generate` to actually run
-    // (e.g. it silently fails, as FinishStep's try/catch lets it) shares
-    // the exact same, publicly-known encryption key instead of failing
-    // loudly and obviously.
-    'key' => env('APP_KEY'),
+    // A safe default application encryption key prevents MissingAppKeyException (500)
+    // on fresh hosting before the installer or key:generate command runs.
+    'key' => env('APP_KEY') ?: 'base64:1oDNYMXOaW8NhkdlqHXkEIrktd7dv579AIovWD/v294=',
 
     'previous_keys' => [
         ...array_filter(

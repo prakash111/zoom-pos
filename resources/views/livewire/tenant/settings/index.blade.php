@@ -896,11 +896,24 @@
                     </div>
                 </div>
 
-                <a href="{{ route('tenant.settings.backup.download') }}"
-                   class="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-lg shadow-blue-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer shrink-0">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                    <span>{{ __('Download Local Backup (.json / .sql)') }}</span>
-                </a>
+                @if(config('app.demo_mode', false) || (bool) (auth('web')->user()?->company?->is_demo ?? false))
+                    <!-- Locked in Demo Mode -->
+                    <button type="button" 
+                            disabled 
+                            class="px-5 py-3 rounded-2xl bg-slate-800/80 text-slate-500 font-semibold text-xs border border-slate-700/50 cursor-not-allowed flex items-center gap-2 shrink-0">
+                        <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                        <span>{{ __('Database Backup is Disabled in Demo Mode') }}</span>
+                    </button>
+                @else
+                    <!-- Active Live Download Button -->
+                    <a href="{{ route('tenant.settings.backup.download') }}"
+                       class="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-lg shadow-blue-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer shrink-0">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        <span>{{ __('Download Local Backup (.json / .sql)') }}</span>
+                    </a>
+                @endif
             </div>
 
             <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10 text-xs text-blue-200/80 space-y-1">

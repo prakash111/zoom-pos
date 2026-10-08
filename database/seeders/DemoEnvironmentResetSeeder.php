@@ -52,12 +52,12 @@ class DemoEnvironmentResetSeeder extends Seeder
                 'service_booking', 'stylists', 'repair_technician',
 
                 // Digital and integration extensions.
-                'digital_catalog', 'dispatch_omnichannel', 'api_integrations',
+                'digital_catalog', 'dispatch_omnichannel', 'api_integrations', 'chat',
             ]
         )));
 
         foreach (self::DEMOS as $definition) {
-            $company = $this->createAccount($definition, $definition['email'] === 'demo@zoomnearby.com' ? $all : [$definition['mode'], 'customers', 'inventory', 'sales', 'finance']);
+            $company = $this->createAccount($definition, $definition['email'] === 'demo@zoomnearby.com' ? $all : [$definition['mode'], 'customers', 'inventory', 'sales', 'finance', 'hrm', 'chat']);
 
             // The existing sample services understand the real schema and
             // populate the vertical-specific fixtures (products, bookings,
@@ -77,6 +77,14 @@ class DemoEnvironmentResetSeeder extends Seeder
             (new TenantDemoSeeder)->run($company);
             if ($definition['mode'] === 'restaurant') {
                 (new RestaurantDemoSeeder)->run($company);
+            }
+
+            if (class_exists(\Modules\Hrm\Database\Seeders\HrmDemoSeeder::class)) {
+                (new \Modules\Hrm\Database\Seeders\HrmDemoSeeder)->run((string) $company->id);
+            }
+
+            if (class_exists(\Database\Seeders\DemoChatSeeder::class)) {
+                (new \Database\Seeders\DemoChatSeeder)->run($company);
             }
         }
 
@@ -147,7 +155,37 @@ class DemoEnvironmentResetSeeder extends Seeder
                 ['tenant_id' => $company->id, 'key' => 'store_operating_mode'],
                 ['value' => json_encode(['mode' => $definition['mode']]), 'updated_at' => now()]
             );
+            DB::table('tenant_settings')->updateOrInsert(
+                ['tenant_id' => $company->id, 'key' => 'enable_chat_promotions'],
+                ['value' => '1', 'enable_chat_promotions' => true, 'updated_at' => now()]
+            );
+            DB::table('tenant_settings')->updateOrInsert(
+                ['tenant_id' => $company->id, 'key' => 'enable_ai_reply'],
+                ['value' => '1', 'enable_ai_reply' => true, 'updated_at' => now()]
+            );
         }
+
+        $geminiKey = config('services.gemini.api_key') ?: env('GEMINI_API_KEY', '');
+        \App\Models\Configuration::updateOrCreate(
+            ['company_id' => $company->id, 'key' => 'default_ai_provider'],
+            ['value' => 'gemini']
+        );
+        \App\Models\Configuration::updateOrCreate(
+            ['company_id' => $company->id, 'key' => 'gemini_api_key'],
+            ['value' => $geminiKey]
+        );
+        \App\Models\Configuration::updateOrCreate(
+            ['company_id' => $company->id, 'key' => 'gemini_model'],
+            ['value' => 'gemini-2.5-flash']
+        );
+        \App\Models\Configuration::updateOrCreate(
+            ['company_id' => $company->id, 'key' => 'enable_ai'],
+            ['value' => '1']
+        );
+        \App\Models\Configuration::updateOrCreate(
+            ['company_id' => $company->id, 'key' => 'ai_enabled'],
+            ['value' => '1']
+        );
 
         return $company->fresh();
     }

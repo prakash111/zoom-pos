@@ -145,8 +145,8 @@ For businesses migrating from another system or setting up a large catalog at on
 ### 6.4 Stock Adjustments and Per-Branch Quantities
 Stock is tracked independently per branch. Adjustments — for damage, recounts, transfers, or corrections — can be recorded against a specific branch, with the running balance for that branch updated immediately and reflected consistently across every screen that shows stock.
 
-### 6.5 AI-Generated Product Imagery
-Where an AI image-generation provider is configured, the system can generate a product photo on request — useful for quickly producing presentable catalog images without needing professional photography for every item. Generated images are queued and can be reviewed before being applied to the live product listing.
+### 6.5 Product Image Management
+Store owners can upload high-resolution product photography and gallery images directly from the catalog manager. Images are automatically optimized and served to the POS touch screen and digital catalog.
 
 ### 6.6 Categories, Brands, Units and Suppliers
 Independent, reusable reference lists — categories, brands, units of measure, and suppliers — keep the catalog organized and consistent. These are referenced from products and purchasing records, so the same category or supplier name is used consistently across the whole system rather than being re-typed each time.
@@ -388,7 +388,7 @@ This section explains what is needed to stand up the platform and get it running
 
 Before going live, size your server's CPU, memory, disk, and worker capacity around your expected number of businesses, product volume, peak checkout traffic, and how heavily you use background jobs such as image generation or PDF creation — there is no fixed "one server fits everyone" number.
 
-You'll also need: reliable HTTPS for every client, working DNS and TLS certificates for any tenant domains you plan to support, outbound internet access for the payment, messaging, and AI providers you configure, and local network access from POS devices to any network printers you use.
+You'll also need: reliable HTTPS for every client, working DNS and TLS certificates for any tenant domains you plan to support, outbound internet access for the payment and messaging providers you configure, and local network access from POS devices to any network printers you use.
 
 ### 15.2 Preparing the Server
 
@@ -436,7 +436,7 @@ composer check-platform-reqs --no-dev
    - **Environment setup** — collects your application URL and database connection details if they weren't already set.
    - **Database migration** — creates all required tables automatically.
    - **Administrator account creation** — you set the email and password for your first admin/owner login.
-   - **License activation** — you enter your purchased license/activation key to complete setup.
+   - **Setup verification** — complete final configuration and initialization.
 
    You must finish every step of the installer for the installation to be marked complete — simply having the database migrated is not enough on its own. Once the final step succeeds, the `/install` address will no longer allow re-running setup on a live site.
 6. **Confirm a successful install** by signing in as the administrator you just created and reviewing the platform dashboard.
@@ -504,11 +504,11 @@ The platform relies on two kinds of background work: a **scheduler** that trigge
 Once enabled, this automatically drives:
 - Delivery of scheduled and industry-specific notifications, roughly every minute.
 - Evaluation and delivery of automated customer reminders, every fifteen minutes.
-- A periodic recheck of your license/activation status, once daily.
+- System maintenance and cache cleanup tasks, once daily.
 
 You can confirm what's scheduled at any time by running `php artisan schedule:list`.
 
-**Run queue workers** for background jobs such as product image generation, reminder delivery, and data synchronization. A simple way to keep workers running continuously is with Supervisor:
+Run queue workers for background jobs such as product image generation, reminder delivery, and data synchronization. A simple way to keep workers running continuously is with Supervisor:
 
 ```ini
 [program:your-app-default-queue]
@@ -540,7 +540,7 @@ The point-of-sale and management app used on the shop floor is built with **Flut
 Every device running the app needs to know which backend it should talk to. The very first time the app is opened on any device:
 
 1. **Enter your Server Address** — on the first screen, type your backend's full web address (the same domain you completed installation on), for example `https://your.domain.com`.
-2. **Wait for verification** — the app checks that the address is reachable and that your license/subscription is active. If it can't reach the server, or the address is entered incorrectly, you'll see a clear error before being allowed to continue — resolve any network or domain issue at this point rather than proceeding.
+2. **Wait for verification** — the app checks that the address is reachable and online. If it can't reach the server, or the address is entered incorrectly, you'll see a clear error before being allowed to continue — resolve any network or domain issue at this point rather than proceeding.
 3. **Sign in** — sign in with an existing staff account, register a new business, or use password recovery if needed. Complete email OTP verification if your business requires it.
 4. **Select your store/branch** — if you have more than one branch, choose the one this device will operate from.
 5. **Finish device setup** — configure the receipt printer and app appearance, then run one small test sale and confirm it syncs correctly before using the device for real transactions.

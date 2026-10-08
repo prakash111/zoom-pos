@@ -87,6 +87,9 @@ class UserApiController extends Controller
             'commission_rate' => ['nullable', 'numeric', 'min:0'],
             'commission_type' => ['required', 'in:percentage,fixed,profit_percentage,profit'],
             'send_via_email' => ['nullable', 'boolean'],
+            'pin_code' => ['nullable', 'string', 'size:4'],
+            'basic_salary' => ['nullable', 'numeric', 'min:0'],
+            'custom_fields' => ['nullable', 'array'],
         ]);
 
         if ($validator->fails()) {
@@ -108,19 +111,56 @@ class UserApiController extends Controller
 
         $plaintext = strtoupper(Str::random(8));
 
+        $count = User::withoutGlobalScopes()->count() + 1;
+        $empCode = 'EMP-' . str_pad((string) $count, 3, '0', STR_PAD_LEFT);
+        while (User::withoutGlobalScopes()->where('employee_code', $empCode)->exists()) {
+            $count++;
+            $empCode = 'EMP-' . str_pad((string) $count, 3, '0', STR_PAD_LEFT);
+        }
+
         $user = User::create([
             'company_id' => $company->id,
             'name' => $data['name'],
             'login' => Str::slug($data['email']).'-'.Str::lower(Str::random(4)),
             'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
             'password' => Hash::make(Str::random(32)),
             'role' => $data['role'],
+            'pin_code' => $data['pin_code'] ?? null,
+            'employee_code' => $empCode,
+            'basic_salary' => $data['basic_salary'] ?? 0,
+            'custom_fields' => $data['custom_fields'] ?? [],
             'commission_rate' => $data['commission_rate'] ?? 0,
             'commission_type' => $data['commission_type'],
             'status' => 'convidado',
             'invitation_code_hash' => Hash::make($plaintext),
             'invitation_expires_at' => now()->addDays(7),
         ]);
+
+        // Sync with HrmEmployee if HRM module is installed
+        if (class_exists(\Modules\Hrm\Models\HrmEmployee::class)) {
+            try {
+                \Modules\Hrm\Models\HrmEmployee::updateOrCreate(
+                    ['user_id' => $user->id],
+                    [
+                        'tenant_id'             => $company->id,
+                        'store_id'              => $user->current_store_id ?? 10,
+                        'first_name'            => explode(' ', $user->name)[0] ?? $user->name,
+                        'last_name'             => substr(strstr($user->name, ' '), 1) ?: '',
+                        'email'                 => $user->email,
+                        'phone'                 => $user->phone,
+                        'pin_code'              => $user->pin_code ?? '1234',
+                        'employee_code'         => $empCode,
+                        'basic_salary'          => $user->basic_salary ?? 0,
+                        'sales_commission_rate' => $user->commission_rate ?? 0,
+                        'joining_date'          => now()->toDateString(),
+                        'status'                => 'active',
+                    ]
+                );
+            } catch (\Throwable $e) {
+                // non-fatal
+            }
+        }
 
         AuditLog::record('user.invited', $company->id, $admin?->id, ['invited_user_id' => $user->id, 'role' => $data['role']]);
 

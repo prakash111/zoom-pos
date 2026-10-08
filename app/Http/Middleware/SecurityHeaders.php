@@ -23,11 +23,18 @@ class SecurityHeaders
             "img-src 'self' data: blob: https:",
             "connect-src 'self' https: wss: ws:",
             "frame-src 'self' https://api.razorpay.com",
+            "frame-ancestors 'self' https://license.zoomnearby.com https://*.zoomnearby.com",
         ];
 
         $response->headers->set('Content-Security-Policy', implode('; ', $cspDirectives));
         $response->headers->set('X-Content-Type-Options', 'nosniff');
-        $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
+        
+        $referer = (string)$request->header('Referer', '');
+        if (!str_contains($referer, 'license.zoomnearby.com') && !str_contains($referer, 'zoomnearby.com')) {
+            $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
+        } else {
+            $response->headers->remove('X-Frame-Options');
+        }
         $response->headers->set('X-XSS-Protection', '1; mode=block');
         $origin = $request->header('Origin');
         if ($origin) {

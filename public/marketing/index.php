@@ -40,98 +40,6 @@ $core = $data['core_product'] ?? [
 ];
 $modules = $data['modules'] ?? [];
 $modMap = array_column($modules, null, 'slug');
-$bundles = $data['bundles'] ?? [];
-$features = $data['features'] ?? [];
-$faqs = !empty($data['faqs']) ? $data['faqs'] : (function_exists('default_marketing_faqs') ? default_marketing_faqs() : []);
-$headerSettings = $data['header_settings'] ?? [
-    'show_top_nav' => !isset($data['show_top_nav']) || !empty($data['show_top_nav']),
-    'sticky_top_nav' => !isset($data['sticky_top_nav']) || !empty($data['sticky_top_nav']),
-    'nav_show_brand' => !isset($data['nav_show_brand']) || !empty($data['nav_show_brand']),
-    'nav_show_links' => !isset($data['nav_show_links']) || !empty($data['nav_show_links']),
-    'nav_show_language' => !isset($data['nav_show_language']) || !empty($data['nav_show_language']),
-    'nav_show_themes' => !isset($data['nav_show_themes']) || !empty($data['nav_show_themes']),
-    'nav_show_dark_toggle' => !isset($data['nav_show_dark_toggle']) || !empty($data['nav_show_dark_toggle']),
-    'nav_show_demo_btn' => !isset($data['nav_show_demo_btn']) || !empty($data['nav_show_demo_btn']),
-    'nav_show_buy_btn' => !isset($data['nav_show_buy_btn']) || !empty($data['nav_show_buy_btn']),
-];
-$showTopNav = !isset($headerSettings['show_top_nav']) || !empty($headerSettings['show_top_nav']);
-$stickyTopNav = !isset($headerSettings['sticky_top_nav']) || !empty($headerSettings['sticky_top_nav']);
-$navShowBrand = !isset($headerSettings['nav_show_brand']) || !empty($headerSettings['nav_show_brand']);
-$navShowLinks = !isset($headerSettings['nav_show_links']) || !empty($headerSettings['nav_show_links']);
-$navShowLanguage = !isset($headerSettings['nav_show_language']) || !empty($headerSettings['nav_show_language']);
-$navShowThemes = !isset($headerSettings['nav_show_themes']) || !empty($headerSettings['nav_show_themes']);
-$navShowDarkToggle = !isset($headerSettings['nav_show_dark_toggle']) || !empty($headerSettings['nav_show_dark_toggle']);
-$navShowDemoBtn = !isset($headerSettings['nav_show_demo_btn']) || !empty($headerSettings['nav_show_demo_btn']);
-$navShowBuyBtn = !isset($headerSettings['nav_show_buy_btn']) || !empty($headerSettings['nav_show_buy_btn']);
-
-$appBuilder = !empty($data['app_builder']) ? $data['app_builder'] : (function_exists('default_app_builder_config') ? default_app_builder_config() : []);
-$businessCards = !empty($data['business_types_cards']) ? $data['business_types_cards'] : (function_exists('default_business_types_cards') ? default_business_types_cards() : []);
-$sectionColors = !empty($data['section_colors']) ? $data['section_colors'] : (function_exists('default_section_colors') ? default_section_colors() : []);
-$colorPresets = !empty($data['color_presets']) ? $data['color_presets'] : (function_exists('landing_color_presets') ? landing_color_presets() : []);
-$activePresetKey = !empty($data['active_color_preset']) ? $data['active_color_preset'] : 'midnight_obsidian';
-$defaultThemeMode = !empty($data['default_theme_mode']) ? $data['default_theme_mode'] : 'dark';
-if (!in_array($defaultThemeMode, ['dark', 'light'], true)) {
-    $defaultThemeMode = 'dark';
-}
-$activePreset = $colorPresets[$activePresetKey] ?? ($colorPresets['midnight_obsidian'] ?? null);
-
-$demoLinks = $data['demo_links'] ?? [
-    'flutter_web' => [
-        'key' => 'flutter_web',
-        'title' => 'Flutter Web POS',
-        'desc' => 'Instant browser-based POS terminal with touch UI, barcode scanning & receipt printing.',
-        'url' => $urls['demo_flutter_web'] ?? 'https://saas.zoomnearby.com/pos-web/',
-        'icon' => '🌐',
-        'badge' => 'Flutter Web',
-        'btn_text' => 'Launch Web POS ↗',
-        'type' => 'web',
-    ],
-    'flutter_windows' => [
-        'key' => 'flutter_windows',
-        'title' => 'Flutter Windows Desktop App',
-        'desc' => 'Native 64-bit Windows desktop installer with ESC/POS thermal receipt printer integration.',
-        'url' => $urls['demo_flutter_windows'] ?? 'https://saas.zoomnearby.com/zoom-sales-crm-software-1.0.2.exe',
-        'icon' => '🪟',
-        'badge' => 'Windows .EXE',
-        'btn_text' => 'Download Windows App ⬇',
-        'type' => 'download',
-    ],
-    'flutter_android' => [
-        'key' => 'flutter_android',
-        'title' => 'Flutter Android POS App',
-        'desc' => 'Native Android APK build optimized for handheld wireless terminals, smartphones, and tablets.',
-        'url' => $urls['demo_flutter_android'] ?? 'https://saas.zoomnearby.com/zoom-pos-v1.0.2.apk',
-        'icon' => '📱',
-        'badge' => 'Android .APK',
-        'btn_text' => 'Download Android APK ⬇',
-        'type' => 'download',
-    ],
-    'superadmin' => [
-        'key' => 'superadmin',
-        'title' => 'SuperAdmin SaaS Portal',
-        'desc' => 'Manage SaaS subscription packages, tenant stores, payment gateways, and system settings.',
-        'url' => $urls['demo_admin'] ?? 'https://saas.zoomnearby.com/login',
-        'icon' => '👑',
-        'badge' => 'SaaS Portal',
-        'btn_text' => 'Open SuperAdmin Demo ↗',
-        'type' => 'web',
-    ],
-    'store' => [
-        'key' => 'store',
-        'title' => 'Store & Cashier Backoffice',
-        'desc' => 'Staff and cashier portal for catalog, orders, table floorplans, and billing settlement.',
-        'url' => $urls['demo_store'] ?? 'https://saas.zoomnearby.com/store/login',
-        'icon' => '🏪',
-        'badge' => 'Store Web',
-        'btn_text' => 'Open Store Demo ↗',
-        'type' => 'web',
-    ],
-];
-$otherDemoLinks = $data['other_demo_links'] ?? [];
-
-$currencySym = $branding['currency_symbol'] ?? '$';
-$siteName = $branding['site_name'] ?? 'Zoom POS & Market';
-$tagline = $branding['site_tagline'] ?? 'Smarter Business. Greater Control.';
 
 $moduleMeta = [
     'leadmanagement' => [
@@ -178,7 +86,246 @@ $moduleMeta = [
             'Live repair lifecycle (Diagnosing → Ready)',
         ],
     ],
+    'hrm' => [
+        'icon' => '👥',
+        'color' => 'green',
+        'features' => [
+            'Employee directory & staff profiles with documents',
+            'POS PIN-based clock-in/out shift attendance',
+            'Leave requests with multi-level approval workflows',
+            'Automated payroll calculation with sales commissions',
+            'Department & granular role permission assignments',
+        ],
+    ],
+    'loyalty' => [
+        'icon' => '🎁',
+        'color' => 'purple',
+        'features' => [
+            'Configurable spending-to-points accrual & redemption',
+            'Prepaid customer digital store wallet with recharge',
+            'Automatic VIP tiers (Bronze, Silver, Gold, Platinum)',
+            'Multi-tender POS checkout with instant wallet deduction',
+            'Real-time wallet balance receipts & audit ledger',
+        ],
+    ],
 ];
+
+$bundles = $data['bundles'] ?? [];
+
+// Build lookup map for products and bundles to enrich pricing and modals
+$catalogProducts = [
+    'core' => [
+        'slug' => 'core',
+        'name' => $core['name'] ?? 'Business Starter SaaS Platform (Retail, Restaurant & Café)',
+        'price' => (float)($core['price'] ?? 29),
+        'currency' => $core['currency'] ?? 'USD',
+        'is_core' => true,
+    ],
+];
+foreach ($modules as $m) {
+    $catalogProducts[$m['slug']] = [
+        'slug' => $m['slug'],
+        'name' => $m['name'],
+        'price' => (float)$m['price'],
+        'currency' => $m['currency'] ?? 'USD',
+        'is_core' => false,
+    ];
+}
+
+$bundleDetailsMap = [];
+foreach ($bundles as $b) {
+    $inc = $b['included_modules'] ?? [];
+    $bItems = [];
+    $bSum = 0.0;
+    foreach ($inc as $mSlug) {
+        if (isset($catalogProducts[$mSlug])) {
+            $p = $catalogProducts[$mSlug];
+            $bSum += $p['price'];
+            $bItems[] = $p;
+        }
+    }
+    if (empty($bItems)) {
+        foreach ($catalogProducts as $cp) {
+            $bSum += $cp['price'];
+            $bItems[] = $cp;
+        }
+    }
+    $regSum = !empty($b['regular_sum']) && (float)$b['regular_sum'] >= $bSum ? (float)$b['regular_sum'] : $bSum;
+    $bPrice = (float)$b['price'];
+    $bSavings = max(0.0, $regSum - $bPrice);
+    $bDiscountPct = ($regSum > 0 && $bSavings > 0) ? round(($bSavings / $regSum) * 100) : 0;
+
+    $bundleDetailsMap[$b['slug']] = [
+        'slug' => $b['slug'],
+        'name' => $b['name'],
+        'description' => $b['description'] ?? '',
+        'price' => $bPrice,
+        'currency' => $b['currency'] ?? 'USD',
+        'regular_sum' => $regSum,
+        'savings' => $bSavings,
+        'discount_pct' => $bDiscountPct,
+        'items' => $bItems,
+    ];
+}
+
+$data['bundle_details'] = $bundleDetailsMap;
+$data['catalog_products'] = $catalogProducts;
+
+$features = $data['features'] ?? [];
+$faqs = !empty($data['faqs']) ? $data['faqs'] : (function_exists('default_marketing_faqs') ? default_marketing_faqs() : []);
+$headerSettings = $data['header_settings'] ?? [
+    'show_top_nav' => !isset($data['show_top_nav']) || !empty($data['show_top_nav']),
+    'sticky_top_nav' => !isset($data['sticky_top_nav']) || !empty($data['sticky_top_nav']),
+    'nav_show_brand' => !isset($data['nav_show_brand']) || !empty($data['nav_show_brand']),
+    'nav_show_links' => !isset($data['nav_show_links']) || !empty($data['nav_show_links']),
+    'nav_show_language' => !isset($data['nav_show_language']) || !empty($data['nav_show_language']),
+    'nav_show_themes' => !isset($data['nav_show_themes']) || !empty($data['nav_show_themes']),
+    'nav_show_dark_toggle' => !isset($data['nav_show_dark_toggle']) || !empty($data['nav_show_dark_toggle']),
+    'nav_show_demo_btn' => !isset($data['nav_show_demo_btn']) || !empty($data['nav_show_demo_btn']),
+    'nav_show_buy_btn' => !isset($data['nav_show_buy_btn']) || !empty($data['nav_show_buy_btn']),
+];
+$showTopNav = !isset($headerSettings['show_top_nav']) || !empty($headerSettings['show_top_nav']);
+$stickyTopNav = !isset($headerSettings['sticky_top_nav']) || !empty($headerSettings['sticky_top_nav']);
+$navShowBrand = !isset($headerSettings['nav_show_brand']) || !empty($headerSettings['nav_show_brand']);
+$navShowLinks = !isset($headerSettings['nav_show_links']) || !empty($headerSettings['nav_show_links']);
+$navShowLanguage = !isset($headerSettings['nav_show_language']) || !empty($headerSettings['nav_show_language']);
+$navShowThemes = !isset($headerSettings['nav_show_themes']) || !empty($headerSettings['nav_show_themes']);
+$navShowDarkToggle = !isset($headerSettings['nav_show_dark_toggle']) || !empty($headerSettings['nav_show_dark_toggle']);
+$navShowDemoBtn = !isset($headerSettings['nav_show_demo_btn']) || !empty($headerSettings['nav_show_demo_btn']);
+$navShowBuyBtn = !isset($headerSettings['nav_show_buy_btn']) || !empty($headerSettings['nav_show_buy_btn']);
+
+$rawCards = !empty($data['business_types_cards']) ? $data['business_types_cards'] : (function_exists('default_business_types_cards') ? default_business_types_cards() : []);
+
+// Ensure all active modules returned by the License Server are represented in businessCards
+$businessCards = [];
+if (isset($rawCards['retail'])) $businessCards['retail'] = $rawCards['retail'];
+if (isset($rawCards['restaurant'])) $businessCards['restaurant'] = $rawCards['restaurant'];
+
+foreach ($modules as $m) {
+    $mSlug = $m['slug'] ?? '';
+    if (!$mSlug || $mSlug === 'core') continue;
+    $foundKey = null;
+    foreach ($rawCards as $k => $c) {
+        if (($c['module_slug'] ?? '') === $mSlug || $k === $mSlug) {
+            $foundKey = $k;
+            break;
+        }
+    }
+    if ($foundKey && isset($rawCards[$foundKey])) {
+        $businessCards[$foundKey] = $rawCards[$foundKey];
+    } else {
+        $meta = $moduleMeta[$mSlug] ?? null;
+        $mIcon = $m['icon'] ?? ($meta['icon'] ?? '🧩');
+        $mName = $m['name'];
+        $mDesc = $m['description'] ?: 'Specialized vertical add-on module for business operations.';
+        $mFeats = !empty($m['custom_features']) && is_array($m['custom_features']) ? $m['custom_features'] : [
+            'Dedicated Database Schema',
+            'Full POS Terminal Integration',
+            'Role & Staff Permissions',
+            'Offline SQLite Support',
+            'Automated Receipts & Ledger',
+            '100% Unencrypted Source Code',
+        ];
+        $businessCards[$mSlug] = [
+            'key' => $mSlug,
+            'title' => $mName,
+            'icon' => $mIcon,
+            'tag_text' => $m['badge'] ?? 'Vertical Module',
+            'tag_class' => 'tag-vertical',
+            'display_mode' => 'badge',
+            'icon_bg' => '#eff6ff',
+            'icon_color' => '#2563eb',
+            'badge_label' => $mName,
+            'badge_sub' => mb_strimwidth($mDesc, 0, 45, '...'),
+            'btn_text' => 'Buy ' . $mName . ' →',
+            'btn_type' => 'checkout',
+            'btn_url' => '',
+            'module_slug' => $mSlug,
+            'features' => $mFeats,
+        ];
+    }
+}
+
+// Include any other configured cards in $rawCards (custom verticals, presets, etc.)
+foreach ($rawCards as $k => $c) {
+    if (!isset($businessCards[$k])) {
+        $businessCards[$k] = $c;
+    }
+}
+$sectionColors = !empty($data['section_colors']) ? $data['section_colors'] : (function_exists('default_section_colors') ? default_section_colors() : []);
+$colorPresets = !empty($data['color_presets']) ? $data['color_presets'] : (function_exists('landing_color_presets') ? landing_color_presets() : []);
+$activePresetKey = !empty($data['active_color_preset']) ? $data['active_color_preset'] : 'midnight_obsidian';
+$defaultThemeMode = !empty($data['default_theme_mode']) ? $data['default_theme_mode'] : 'dark';
+if (!in_array($defaultThemeMode, ['dark', 'light'], true)) {
+    $defaultThemeMode = 'dark';
+}
+$activePreset = $colorPresets[$activePresetKey] ?? ($colorPresets['midnight_obsidian'] ?? null);
+
+$demoLinks = $data['demo_links'] ?? [
+    'flutter_web' => [
+        'key' => 'flutter_web',
+        'title' => 'Flutter Web POS',
+        'desc' => 'Instant browser-based POS terminal with touch UI, barcode scanning & receipt printing.',
+        'url' => $urls['demo_flutter_web'] ?? 'https://saas.zoomnearby.com/pos-web/',
+        'icon' => '🌐',
+        'badge' => 'Flutter Web',
+        'btn_text' => 'Launch Web POS ↗',
+        'type' => 'web',
+    ],
+    'flutter_windows' => [
+        'key' => 'flutter_windows',
+        'title' => 'Flutter Windows Desktop App',
+        'desc' => 'Native 64-bit Windows desktop installer with ESC/POS thermal receipt printer integration.',
+        'url' => $urls['demo_flutter_windows'] ?? 'https://saas.zoomnearby.com/ZooM-POS-Setup-1.0.5.exe',
+        'icon' => '🪟',
+        'badge' => 'Windows .EXE',
+        'btn_text' => 'Download Windows App ⬇',
+        'type' => 'download',
+    ],
+    'flutter_android' => [
+        'key' => 'flutter_android',
+        'title' => 'Flutter Android POS App',
+        'desc' => 'Native Android APK build optimized for handheld wireless terminals, smartphones, and tablets.',
+        'url' => $urls['demo_flutter_android'] ?? 'https://saas.zoomnearby.com/ZooM-POS-v1.0.5.apk',
+        'icon' => '📱',
+        'badge' => 'Android .APK',
+        'btn_text' => 'Download Android APK ⬇',
+        'type' => 'download',
+    ],
+    'superadmin' => [
+        'key' => 'superadmin',
+        'title' => 'SuperAdmin SaaS Portal',
+        'desc' => 'Manage SaaS subscription packages, tenant stores, payment gateways, and system settings.',
+        'url' => $urls['demo_admin'] ?? 'https://saas.zoomnearby.com/login',
+        'icon' => '👑',
+        'badge' => 'SaaS Portal',
+        'btn_text' => 'Open SuperAdmin Demo ↗',
+        'type' => 'web',
+    ],
+    'store' => [
+        'key' => 'store',
+        'title' => 'Store & Cashier Backoffice',
+        'desc' => 'Staff and cashier portal for catalog, orders, table floorplans, and billing settlement.',
+        'url' => $urls['demo_store'] ?? 'https://saas.zoomnearby.com/store/login',
+        'icon' => '🏪',
+        'badge' => 'Store Web',
+        'btn_text' => 'Open Store Demo ↗',
+        'type' => 'web',
+    ],
+];
+$otherDemoLinks = $data['other_demo_links'] ?? [];
+
+$currencySym = $branding['currency_symbol'] ?? '$';
+$siteName = $branding['site_name'] ?? 'ZooM-POS';
+$tagline = $branding['site_tagline'] ?? 'Smarter Business. Greater Control.';
+
+$siteNameClean = trim((string)($siteName ?: 'ZooM-POS'));
+if (str_contains($siteNameClean, '-')) {
+    [$bMain, $bSub] = explode('-', $siteNameClean, 2);
+    $brandHtml = e($bMain) . '-<span class="brand-sub">' . e($bSub) . '</span>';
+} else {
+    $brandHtml = e($siteNameClean);
+}
 
 $orderComplete = isset($_GET['order']) && $_GET['order'] === 'complete';
 $errMsg = trim($_GET['err'] ?? '');
@@ -1128,7 +1275,7 @@ $errMsg = trim($_GET['err'] ?? '');
             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
           </svg>
         </span>
-        <span class="brand-name">Zoom POS <span class="brand-sub">&amp; Market</span></span>
+        <span class="brand-name"><?= $brandHtml ?></span>
       </a>
       <?php endif; ?>
 
@@ -1257,9 +1404,14 @@ $errMsg = trim($_GET['err'] ?? '');
           <?= e_attr($hero['badge'] ?? 'Complete Business Management Platform') ?>
         </div>
 
+        <?php
+        $heroTitleRaw = !empty($hero['title']) ? $hero['title'] : "Run Your Entire Business<br>From <span>One Powerful POS</span>";
+        $heroTitleClean = clean_decoded_str($heroTitleRaw);
+        $heroTitleClean = preg_replace('/<span(?:\s+class="[^"]*")?>/i', '<span class="hero-title-highlight">', $heroTitleClean);
+        $heroTitleSafe = strip_tags($heroTitleClean, '<br><span><strong><b><em>');
+        ?>
         <h1 class="hero-title">
-          Run Your Entire Business<br>
-          From <span class="hero-title-highlight">One Powerful POS</span>
+          <?= $heroTitleSafe ?>
         </h1>
 
         <p class="hero-subtitle">
@@ -1267,8 +1419,8 @@ $errMsg = trim($_GET['err'] ?? '');
         </p>
 
         <div class="hero-btn-group">
-          <a href="#pricing" class="btn btn-hero-buy">Buy Now</a>
-          <a href="#live-demos" class="btn btn-hero-demo open-demo-hub-btn">Live Demos &amp; Apps</a>
+          <a href="#pricing" class="btn btn-hero-buy"><?= __t('Buy Now') ?></a>
+          <a href="#live-demos" class="btn btn-hero-demo open-demo-hub-btn"><?= __t('Live Demos & Apps') ?></a>
         </div>
 
         <div class="hero-trust-row">
@@ -1295,65 +1447,92 @@ $errMsg = trim($_GET['err'] ?? '');
       </div>
 
       <div class="category-strip-grid">
-        <div class="cat-pill-card">
-          <div class="cat-icon-box cat-icon-retail">
-            🛒
-          </div>
-          <div class="cat-info">
-            <div class="cat-title">Retail</div>
-            <div class="cat-desc">POS &amp; Billing</div>
-          </div>
-        </div>
+        <?php
+        $stripItems = [
+            [
+                'slug' => 'retail',
+                'title' => 'Retail POS',
+                'desc' => 'POS & Billing',
+                'icon' => '🛒',
+                'icon_class' => 'cat-icon-retail',
+                'target' => '#business-types',
+            ],
+            [
+                'slug' => 'restaurant',
+                'title' => 'Restaurant',
+                'desc' => 'Tables & KOT',
+                'icon' => '🍽️',
+                'icon_class' => 'cat-icon-restaurant',
+                'target' => '#business-types',
+            ],
+        ];
 
-        <div class="cat-pill-card">
-          <div class="cat-icon-box cat-icon-restaurant">
-            🍽️
-          </div>
-          <div class="cat-info">
-            <div class="cat-title">Restaurant</div>
-            <div class="cat-desc">Tables &amp; KOT</div>
-          </div>
-        </div>
+        foreach ($modules as $m) {
+            $mSlug = $m['slug'] ?? '';
+            if (!$mSlug || $mSlug === 'core') continue;
+            $meta = $moduleMeta[$mSlug] ?? null;
+            $mIcon = $m['icon'] ?? ($meta['icon'] ?? '🧩');
+            
+            $mTitle = clean_decoded_str($m['name']);
+            $mDesc = 'Module Add-On';
+            $mClass = 'cat-icon-custom';
 
-        <div class="cat-pill-card">
-          <div class="cat-icon-box cat-icon-pharmacy">
-            💊
-          </div>
-          <div class="cat-info">
-            <div class="cat-title">Pharmacy</div>
-            <div class="cat-desc">Batch &amp; Expiry</div>
-          </div>
-        </div>
+            if ($mSlug === 'leadmanagement') {
+                $mTitle = 'CRM & Leads';
+                $mDesc = 'Pipeline & Deals';
+                $mClass = 'cat-icon-crm';
+            } elseif ($mSlug === 'pharmacy') {
+                $mTitle = 'Pharmacy';
+                $mDesc = 'Batch & Expiry';
+                $mClass = 'cat-icon-pharmacy';
+            } elseif ($mSlug === 'salon') {
+                $mTitle = 'Salon & Spa';
+                $mDesc = 'Appointments & Staff';
+                $mClass = 'cat-icon-salon';
+            } elseif ($mSlug === 'repairtechnician') {
+                $mTitle = 'Repair Service';
+                $mDesc = 'Tickets & Parts';
+                $mClass = 'cat-icon-repair';
+            } elseif ($mSlug === 'hrm') {
+                $mTitle = 'HRM & Staff';
+                $mDesc = 'Attendance & Payroll';
+                $mClass = 'cat-icon-hrm';
+            } elseif ($mSlug === 'loyalty') {
+                $mTitle = 'Loyalty & Wallet';
+                $mDesc = 'VIP Tiers & Top-ups';
+                $mClass = 'cat-icon-loyalty';
+            } else {
+                $clean = preg_replace('/(Module|System|POS|for SaaS|Engine)/i', '', $mTitle);
+                $mTitle = trim($clean) ?: $mTitle;
+                if (!empty($m['custom_features'][0])) {
+                    $mDesc = mb_strimwidth(clean_decoded_str($m['custom_features'][0]), 0, 24, '...');
+                } else {
+                    $mDesc = $currencySym . number_format((float)$m['price'], 0) . ' One-Time';
+                }
+            }
 
-        <div class="cat-pill-card">
-          <div class="cat-icon-box cat-icon-salon">
-            ✂️
-          </div>
-          <div class="cat-info">
-            <div class="cat-title">Salon &amp; Spa</div>
-            <div class="cat-desc">Appointments &amp; Staff</div>
-          </div>
-        </div>
+            $stripItems[] = [
+                'slug' => $mSlug,
+                'title' => $mTitle,
+                'desc' => $mDesc,
+                'icon' => $mIcon,
+                'icon_class' => $mClass,
+                'target' => '#business-types',
+            ];
+        }
+        ?>
 
-        <div class="cat-pill-card">
-          <div class="cat-icon-box cat-icon-repair">
-            🔧
-          </div>
-          <div class="cat-info">
-            <div class="cat-title">Repair Service</div>
-            <div class="cat-desc">Job Tickets &amp; Parts</div>
-          </div>
-        </div>
-
-        <div class="cat-pill-card">
-          <div class="cat-icon-box cat-icon-crm">
-            📊
-          </div>
-          <div class="cat-info">
-            <div class="cat-title">CRM &amp; Leads</div>
-            <div class="cat-desc">Pipeline &amp; Deals</div>
-          </div>
-        </div>
+        <?php foreach ($stripItems as $item): ?>
+          <a href="<?= e_attr($item['target']) ?>" class="cat-pill-card" title="<?= e_attr($item['title']) ?> — <?= e_attr($item['desc']) ?>">
+            <div class="cat-icon-box <?= e_attr($item['icon_class']) ?>">
+              <?= $item['icon'] ?>
+            </div>
+            <div class="cat-info">
+              <div class="cat-title"><?= e($item['title']) ?></div>
+              <div class="cat-desc"><?= e($item['desc']) ?></div>
+            </div>
+          </a>
+        <?php endforeach; ?>
       </div>
     </div>
   </section>
@@ -1453,46 +1632,59 @@ $errMsg = trim($_GET['err'] ?? '');
           $col1 = array_slice($features, 0, $half);
           $col2 = array_slice($features, $half);
         ?>
-        <div class="biz-split-card" data-key="<?= htmlspecialchars($cKey) ?>">
+        <div class="biz-split-card" data-key="<?= e_attr($cKey) ?>">
           <div class="biz-split-content">
             <div>
               <?php if (!empty($tagText)): ?>
-                <span class="biz-card-tag <?= htmlspecialchars($tagClass) ?>"><?= htmlspecialchars($tagText) ?></span>
+                <span class="biz-card-tag <?= e_attr($tagClass) ?>"><?= e($tagText) ?></span>
               <?php endif; ?>
               <div class="biz-card-hdr">
-                <span class="biz-hdr-icon"><?= htmlspecialchars($icon) ?></span>
-                <h3 class="biz-hdr-title"><?= htmlspecialchars($title) ?></h3>
+                <span class="biz-hdr-icon"><?= e($icon) ?></span>
+                <h3 class="biz-hdr-title"><?= e($title) ?></h3>
               </div>
               
               <div class="biz-checklist-2col">
                 <div class="biz-check-col">
                   <?php foreach ($col1 as $item): ?>
-                    <div class="biz-check-item"><span>✔</span> <?= htmlspecialchars($item) ?></div>
+                    <div class="biz-check-item"><span>✔</span> <?= e($item) ?></div>
                   <?php endforeach; ?>
                 </div>
                 <div class="biz-check-col">
                   <?php foreach ($col2 as $item): ?>
-                    <div class="biz-check-item"><span>✔</span> <?= htmlspecialchars($item) ?></div>
+                    <div class="biz-check-item"><span>✔</span> <?= e($item) ?></div>
                   <?php endforeach; ?>
                 </div>
               </div>
             </div>
 
             <?php if ($btnType === 'checkout' && $moduleSlug): ?>
-              <button type="button" class="btn btn-biz-explore open-checkout-btn" data-type="product" data-slug="<?= htmlspecialchars($moduleSlug) ?>" data-title="<?= htmlspecialchars($checkoutTitle) ?>" data-price="<?= $modPrice ?>" data-items="<?= htmlspecialchars($checkoutTitle) ?>"><?= htmlspecialchars($btnText) ?></button>
+              <button type="button" class="btn btn-biz-explore open-checkout-btn" data-type="product" data-slug="<?= e_attr($moduleSlug) ?>" data-title="<?= e_attr($checkoutTitle) ?>" data-price="<?= $modPrice ?>" data-items="<?= e_attr($checkoutTitle) ?>"><?= e($btnText) ?></button>
             <?php else: ?>
-              <a href="<?= htmlspecialchars($btnUrl ?: '#pricing') ?>" class="btn btn-biz-explore"><?= htmlspecialchars($btnText) ?></a>
+              <a href="<?= e_attr($btnUrl ?: '#pricing') ?>" class="btn btn-biz-explore"><?= e($btnText) ?></a>
             <?php endif; ?>
           </div>
 
-          <?php if ($dispMode === 'image' && !empty($card['image_url'])): 
-            $imgSrc = $card['image_url'];
-            if (!preg_match('#^(https?://|/)#i', $imgSrc)) {
-                $imgSrc = marketing_asset(preg_replace('#^assets/#', '', $imgSrc));
-            }
+          <?php 
+          $hasValidImage = false;
+          $imgSrc = '';
+          if ($dispMode === 'image' && !empty($card['image_url'])) {
+              $rawImg = $card['image_url'];
+              if (preg_match('#^https?://#i', $rawImg)) {
+                  $imgSrc = $rawImg;
+                  $hasValidImage = true;
+              } else {
+                  $localRel = preg_replace('#^assets/#', '', $rawImg);
+                  $localFile = __DIR__ . '/assets/' . ltrim($localRel, '/');
+                  if (file_exists($localFile)) {
+                      $imgSrc = marketing_asset($localRel);
+                      $hasValidImage = true;
+                  }
+              }
+          }
           ?>
+          <?php if ($hasValidImage): ?>
             <div class="biz-split-img">
-              <img src="<?= htmlspecialchars($imgSrc) ?>" alt="<?= htmlspecialchars($title) ?>" width="300" height="250" loading="lazy">
+              <img src="<?= e_attr($imgSrc) ?>" alt="<?= e_attr($title) ?>" width="300" height="250" loading="lazy">
             </div>
           <?php else: 
             $iconBg = !empty($card['icon_bg']) ? $card['icon_bg'] : '#f8fafc';
@@ -1501,12 +1693,12 @@ $errMsg = trim($_GET['err'] ?? '');
             $badgeSub = $card['badge_sub'] ?? '';
           ?>
             <div class="biz-badge-box">
-              <div class="biz-badge-icon" style="background:<?= htmlspecialchars($iconBg) ?> !important;color:<?= htmlspecialchars($iconColor) ?> !important;">
-                <?= htmlspecialchars($icon) ?>
+              <div class="biz-badge-icon" style="background:<?= e_attr($iconBg) ?> !important;color:<?= e_attr($iconColor) ?> !important;">
+                <?= e($icon) ?>
               </div>
-              <div class="biz-badge-label"><?= htmlspecialchars($badgeLabel) ?></div>
+              <div class="biz-badge-label"><?= e($badgeLabel) ?></div>
               <?php if (!empty($badgeSub)): ?>
-                <div class="biz-badge-sub"><?= htmlspecialchars($badgeSub) ?></div>
+                <div class="biz-badge-sub"><?= e($badgeSub) ?></div>
               <?php endif; ?>
             </div>
           <?php endif; ?>
@@ -1528,24 +1720,24 @@ $errMsg = trim($_GET['err'] ?? '');
         <div class="industry-chip">
           <div class="industry-chip-icon">🏪</div>
           <div>
-            <div class="industry-chip-title">Supermarkets &amp; Groceries</div>
-            <div class="industry-chip-sub">Barcodes &amp; weigh scales</div>
+            <div class="industry-chip-title">Supermarkets & Groceries</div>
+            <div class="industry-chip-sub">Barcodes & weigh scales</div>
           </div>
         </div>
 
         <div class="industry-chip">
           <div class="industry-chip-icon">👗</div>
           <div>
-            <div class="industry-chip-title">Fashion &amp; Boutiques</div>
-            <div class="industry-chip-sub">Sizes, colors &amp; variants</div>
+            <div class="industry-chip-title">Fashion & Boutiques</div>
+            <div class="industry-chip-sub">Sizes, colors & variants</div>
           </div>
         </div>
 
         <div class="industry-chip">
           <div class="industry-chip-icon">📱</div>
           <div>
-            <div class="industry-chip-title">Electronics &amp; Hardware</div>
-            <div class="industry-chip-sub">Serial numbers &amp; warranty</div>
+            <div class="industry-chip-title">Electronics & Hardware</div>
+            <div class="industry-chip-sub">Serial numbers & warranty</div>
           </div>
         </div>
 
@@ -1553,31 +1745,31 @@ $errMsg = trim($_GET['err'] ?? '');
           <div class="industry-chip-icon">🍽️</div>
           <div>
             <div class="industry-chip-title">Dine-in Restaurants</div>
-            <div class="industry-chip-sub">Tables, KOT &amp; courses</div>
+            <div class="industry-chip-sub">Tables, KOT & courses</div>
           </div>
         </div>
 
         <div class="industry-chip">
           <div class="industry-chip-icon">☕</div>
           <div>
-            <div class="industry-chip-title">Cafés, Bakeries &amp; QSR</div>
-            <div class="industry-chip-sub">Quick orders &amp; modifiers</div>
+            <div class="industry-chip-title">Cafés, Bakeries & QSR</div>
+            <div class="industry-chip-sub">Quick orders & modifiers</div>
           </div>
         </div>
 
         <div class="industry-chip">
           <div class="industry-chip-icon">💊</div>
           <div>
-            <div class="industry-chip-title">Pharmacies &amp; Chemists</div>
-            <div class="industry-chip-sub">Batches &amp; expiry alerts</div>
+            <div class="industry-chip-title">Pharmacies & Chemists</div>
+            <div class="industry-chip-sub">Batches & expiry alerts</div>
           </div>
         </div>
 
         <div class="industry-chip">
           <div class="industry-chip-icon">✂️</div>
           <div>
-            <div class="industry-chip-title">Salons, Spas &amp; Barbers</div>
-            <div class="industry-chip-sub">Stylists &amp; appointments</div>
+            <div class="industry-chip-title">Salons, Spas & Barbers</div>
+            <div class="industry-chip-sub">Stylists & appointments</div>
           </div>
         </div>
 
@@ -1585,14 +1777,14 @@ $errMsg = trim($_GET['err'] ?? '');
           <div class="industry-chip-icon">🔧</div>
           <div>
             <div class="industry-chip-title">Device Repair Centers</div>
-            <div class="industry-chip-sub">Intake tickets &amp; diagnostics</div>
+            <div class="industry-chip-sub">Intake tickets & diagnostics</div>
           </div>
         </div>
 
         <div class="industry-chip">
           <div class="industry-chip-icon">📦</div>
           <div>
-            <div class="industry-chip-title">Warehouses &amp; Depots</div>
+            <div class="industry-chip-title">Warehouses & Depots</div>
             <div class="industry-chip-sub">Inter-branch transfers</div>
           </div>
         </div>
@@ -1600,8 +1792,8 @@ $errMsg = trim($_GET['err'] ?? '');
         <div class="industry-chip">
           <div class="industry-chip-icon">🏢</div>
           <div>
-            <div class="industry-chip-title">B2B &amp; Service Sales</div>
-            <div class="industry-chip-sub">Leads &amp; quotation billing</div>
+            <div class="industry-chip-title">B2B & Service Sales</div>
+            <div class="industry-chip-sub">Leads & quotation billing</div>
           </div>
         </div>
       </div>
@@ -1616,7 +1808,7 @@ $errMsg = trim($_GET['err'] ?? '');
           <h2 class="sec-title-dark">Extend Your POS With Powerful Modules</h2>
           <p class="sec-subtitle-dark">Start with the core platform. Add only what your business needs.</p>
         </div>
-        <a href="#pricing" class="browse-all-link">Browse Pricing &amp; Bundles &rarr;</a>
+        <a href="#pricing" class="browse-all-link">Browse Pricing & Bundles &rarr;</a>
       </div>
 
       <div class="modules-cards-grid">
@@ -1627,17 +1819,22 @@ $errMsg = trim($_GET['err'] ?? '');
           $mPrice = (float) $mod['price'];
           $mName = $mod['name'];
           $mDesc = $mod['description'] ?: 'Specialized vertical add-on module for POS & Business management.';
-          $meta = $moduleMeta[$mSlug] ?? [
-              'icon' => '📦',
-              'color' => 'blue',
-              'features' => [
-                  'Modular plug-and-play architecture',
-                  'Dedicated database schema & routes',
-                  'Seamless SuperAdmin module activation',
-                  'Instant license key delivery via email',
-                  'Full unencrypted PHP source code',
-              ],
-          ];
+          $meta = $moduleMeta[$mSlug] ?? null;
+          if (!$meta) {
+              $palette = ['purple', 'emerald', 'blue', 'orange', 'amber', 'rose', 'indigo', 'teal'];
+              $pColor = $palette[abs(crc32($mSlug)) % count($palette)];
+              $meta = [
+                  'icon' => $mod['icon'] ?? '🧩',
+                  'color' => $pColor,
+                  'features' => !empty($mod['custom_features']) ? $mod['custom_features'] : [
+                      'Modular plug-and-play architecture',
+                      'Dedicated database schema & routes',
+                      'Seamless SuperAdmin module activation',
+                      'Instant license key delivery via email',
+                      'Full unencrypted PHP source code',
+                  ],
+              ];
+          }
           ?>
           <div class="mod-showcase-card">
             <div>
@@ -1671,11 +1868,11 @@ $errMsg = trim($_GET['err'] ?? '');
         <div class="mod-showcase-card">
           <div>
             <div class="mod-icon-badge mod-bg-green">🍽️</div>
-            <h3 class="mod-card-title">Restaurant &amp; Dine-In Mode</h3>
+            <h3 class="mod-card-title">Restaurant & Dine-In Mode</h3>
             <p class="mod-card-desc">Complete restaurant workflow with floor tables, kitchen order tickets (KOT), and waiter ordering.</p>
             <ul class="mod-feature-bullets">
-              <li><span>✓</span> Visual floor table management &amp; occupancy</li>
-              <li><span>✓</span> Thermal KOT printing &amp; Kitchen Display (KDS)</li>
+              <li><span>✓</span> Visual floor table management & occupancy</li>
+              <li><span>✓</span> Thermal KOT printing & Kitchen Display (KDS)</li>
               <li><span>✓</span> Mobile / tablet waiter ordering interface</li>
               <li><span>✓</span> Recipe raw material stock auto-depletion</li>
               <li><span>✓</span> Split bill by seat or custom payment splits</li>
@@ -1693,14 +1890,14 @@ $errMsg = trim($_GET['err'] ?? '');
         <div class="mod-showcase-card">
           <div>
             <div class="mod-icon-badge mod-bg-purple">🛒</div>
-            <h3 class="mod-card-title">Retail POS &amp; Inventory Engine</h3>
+            <h3 class="mod-card-title">Retail POS & Inventory Engine</h3>
             <p class="mod-card-desc">High-speed barcode scanner checkout, variant inventory, customer accounts, and thermal printing.</p>
             <ul class="mod-feature-bullets">
-              <li><span>✓</span> Barcode scanning &amp; quick item search</li>
-              <li><span>✓</span> Multi-store warehousing &amp; stock transfers</li>
-              <li><span>✓</span> Customer credit ledgers &amp; payment accounts</li>
-              <li><span>✓</span> ESC/POS 80mm &amp; 58mm thermal receipt printing</li>
-              <li><span>✓</span> Barcode sticker generation &amp; price labels</li>
+              <li><span>✓</span> Barcode scanning & quick item search</li>
+              <li><span>✓</span> Multi-store warehousing & stock transfers</li>
+              <li><span>✓</span> Customer credit ledgers & payment accounts</li>
+              <li><span>✓</span> ESC/POS 80mm & 58mm thermal receipt printing</li>
+              <li><span>✓</span> Barcode sticker generation & price labels</li>
             </ul>
           </div>
           <div class="mod-price-row">
@@ -1818,8 +2015,8 @@ $errMsg = trim($_GET['err'] ?? '');
           </ul>
 
           <button type="button" class="btn btn-tier-action open-checkout-btn"
-            data-type="product" data-slug="core" data-title="Core SaaS Platform (Retail, Restaurant &amp; Café)"
-            data-price="<?= (float)$core['price'] ?>" data-items="Core SaaS Platform (Retail, Restaurant &amp; Café)">
+            data-type="product" data-slug="core" data-title="Core SaaS Platform (Retail, Restaurant & Café)"
+            data-price="<?= (float)$core['price'] ?>" data-items="Core SaaS Platform (Retail, Restaurant & Café)">
             Buy Core (<?= $currencySym . number_format((float)$core['price'], 0) ?>)
           </button>
         </div>
@@ -1848,13 +2045,25 @@ $errMsg = trim($_GET['err'] ?? '');
               <?php if ($isFeatured): ?>
                 <div class="popular-ribbon">Most Popular</div>
               <?php endif; ?>
+              <?php
+              $bInfo = $bundleDetailsMap[$bSlug] ?? null;
+              $bRegSum = $bInfo['regular_sum'] ?? $bPrice;
+              $bSavings = $bInfo['savings'] ?? 0;
+              $bDiscountPct = $bInfo['discount_pct'] ?? 0;
+              ?>
               <div class="price-tier-hdr">
                 <span class="price-badge-pill <?= $pillClass ?>"><?= e($badgeLabel) ?></span>
                 <div class="price-val-wrap">
                   <span class="price-currency"><?= $currencySym ?></span>
                   <span class="price-number"><?= number_format($bPrice, 0) ?></span>
                 </div>
-                <span class="price-freq">One-time</span>
+                <span class="price-freq">One-time payment</span>
+                <?php if ($bSavings > 0): ?>
+                  <div class="bundle-calc-ribbon">
+                    <span class="bundle-reg-strike"><?= $currencySym . number_format($bRegSum, 0) ?></span>
+                    <span class="bundle-save-pill">Save <?= $currencySym . number_format($bSavings, 0) ?> (<?= $bDiscountPct ?>% OFF)</span>
+                  </div>
+                <?php endif; ?>
               </div>
 
               <ul class="price-tier-features">
@@ -1875,9 +2084,36 @@ $errMsg = trim($_GET['err'] ?? '');
                     if (in_array('repairtechnician', $incMods, true)) {
                         $bundleFeats[] = 'Repair Service Workbench Included (Job Tickets)';
                     }
+                    if (in_array('hrm', $incMods, true)) {
+                        $bundleFeats[] = 'HRM & Staff Attendance Module (PIN Clock-in & Payroll)';
+                    }
+                    if (in_array('loyalty', $incMods, true)) {
+                        $bundleFeats[] = 'Customer Loyalty & Digital Store Wallet Engine';
+                    }
+                    if (in_array('chat', $incMods, true)) {
+                        $bundleFeats[] = 'Unified Staff Chat & Live Support Desk Module';
+                    }
                     $bundleFeats[] = 'Multi-Tenant SaaS Billing & Domain Mapping';
                     $bundleFeats[] = 'Separate License Keys Emailed Instantly';
                     $bundleFeats[] = 'Zero Monthly or Annual Platform Fees';
+                } else {
+                    $hasChat = false;
+                    foreach ($bundleFeats as $bf) {
+                        if (stripos($bf, 'chat') !== false) { $hasChat = true; break; }
+                    }
+                    if (!$hasChat && in_array('chat', $incMods, true)) {
+                        $newFeats = [];
+                        $inserted = false;
+                        foreach ($bundleFeats as $bf) {
+                            $newFeats[] = $bf;
+                            if (stripos($bf, 'Loyalty') !== false && !$inserted) {
+                                $newFeats[] = '✦ **Unified Staff Chat & Live Support:** Real-time team messaging & support desk';
+                                $inserted = true;
+                            }
+                        }
+                        if (!$inserted) $newFeats[] = '✦ **Unified Staff Chat & Live Support:** Real-time team messaging & support desk';
+                        $bundleFeats = $newFeats;
+                    }
                 }
                 foreach ($bundleFeats as $bf):
                 ?>
@@ -1887,7 +2123,7 @@ $errMsg = trim($_GET['err'] ?? '');
 
               <button type="button" class="btn btn-tier-action <?= $btnClass ?> open-checkout-btn"
                 data-type="bundle" data-slug="<?= e_attr($bSlug) ?>" data-title="<?= e_attr($bName) ?>"
-                data-price="<?= $bPrice ?>" data-items="<?= e_attr($bDesc) ?>">
+                data-price="<?= $bPrice ?>">
                 Get <?= e($bName) ?> (<?= $currencySym . number_format($bPrice, 0) ?>)
               </button>
             </div>
@@ -2332,54 +2568,54 @@ $errMsg = trim($_GET['err'] ?? '');
         </button>
       </div>
 
-      <div id="custom-builder-wrapper" class="custom-builder-wrapper" style="display:none;margin-top:30px;background:#0c1229;border:1px solid var(--dark-border);border-radius:20px;color:#fff;">
-        <div style="margin-bottom:24px;">
-          <h3 style="font-size:22px;font-weight:800;margin-bottom:6px;">🛠️ Interactive Custom Bundle Builder</h3>
-          <p style="font-size:13px;color:var(--dark-muted);">
+      <div id="custom-builder-wrapper" class="custom-builder-wrapper" style="display:none;">
+        <div class="custom-builder-hdr">
+          <h3 class="custom-builder-title">🛠️ Interactive Custom Bundle Builder</h3>
+          <p class="custom-builder-desc">
             Select your desired modules. Bundle discounts (10% to 20% off) automatically apply as you add modules!
           </p>
         </div>
 
         <div class="custom-builder-grid">
           <div>
-            <div style="background:#131c3f;border:1px solid rgba(99,102,241,0.3);border-radius:12px;padding:14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-              <label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;cursor:default;">
-                <input type="checkbox" class="calc-module-checkbox" data-slug="core" data-name="Core Platform (Retail, Restaurant & Café)" data-price="<?= (float)$core['price'] ?>" checked disabled style="width:18px;height:18px;">
-                ★ Core Platform (Retail, Restaurant &amp; Café Included)
+            <div class="calc-core-box">
+              <label class="calc-box-label">
+                <input type="checkbox" class="calc-module-checkbox" data-slug="core" data-name="Core Platform (Retail, Restaurant & Café)" data-price="<?= (float)$core['price'] ?>" checked disabled>
+                <span>★ Core Platform (Retail, Restaurant & Café Included)</span>
               </label>
-              <span style="font-weight:800;color:#818cf8;"><?= $currencySym ?><?= number_format((float)$core['price'], 2) ?></span>
+              <span class="calc-price-val core-price"><?= $currencySym ?><?= number_format((float)$core['price'], 2) ?></span>
             </div>
 
             <?php foreach ($modules as $idx => $m): ?>
-              <div style="background:#0f1738;border:1px solid var(--dark-border);border-radius:12px;padding:14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;cursor:pointer;">
-                  <input type="checkbox" class="calc-module-checkbox" data-slug="<?= e_attr($m['slug']) ?>" data-name="<?= e_attr($m['name']) ?>" data-price="<?= (float)$m['price'] ?>" <?= ($idx === 0) ? 'checked' : '' ?> style="width:18px;height:18px;">
-                  ＋ <?= e_attr($m['name']) ?>
+              <div class="calc-module-row <?= ($idx === 0) ? 'selected' : '' ?>">
+                <label class="calc-box-label">
+                  <input type="checkbox" class="calc-module-checkbox" data-slug="<?= e_attr($m['slug']) ?>" data-name="<?= e_attr($m['name']) ?>" data-price="<?= (float)$m['price'] ?>" <?= ($idx === 0) ? 'checked' : '' ?>>
+                  <span>＋ <?= e_attr($m['name']) ?></span>
                 </label>
-                <span style="font-weight:700;color:#38bdf8;">+<?= $currencySym ?><?= number_format((float)$m['price'], 2) ?></span>
+                <span class="calc-price-val mod-price">+<?= $currencySym ?><?= number_format((float)$m['price'], 2) ?></span>
               </div>
             <?php endforeach; ?>
           </div>
 
-          <div style="background:#080d21;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:22px;display:flex;flex-direction:column;justify-content:space-between;">
+          <div class="calc-summary-panel">
             <div>
-              <div style="font-size:15px;font-weight:800;margin-bottom:14px;">Bundle Summary</div>
-              <ul id="calc-selected-items" style="list-style:none;margin-bottom:18px;min-height:50px;"></ul>
+              <div class="calc-summary-title">Bundle Summary</div>
+              <ul id="calc-selected-items" class="calc-selected-items"></ul>
               
-              <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--dark-muted);margin-bottom:6px;">
+              <div class="calc-breakdown-row">
                 <span>Regular Subtotal:</span>
                 <span id="calc-subtotal-val"><?= $currencySym ?>0.00</span>
               </div>
-              <div style="display:none;justify-content:space-between;font-size:13px;color:#34d399;margin-bottom:6px;" id="calc-discount-row">
+              <div class="calc-breakdown-row calc-discount-row" id="calc-discount-row" style="display:none;">
                 <span>Bundle Discount:</span>
                 <span id="calc-discount-val">-<?= $currencySym ?>0.00</span>
               </div>
             </div>
 
             <div>
-              <div style="display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid rgba(255,255,255,0.1);margin-bottom:14px;">
-                <span style="font-size:15px;font-weight:700;">Total Amount:</span>
-                <span id="calc-total-val" style="font-size:24px;font-weight:900;color:#38bdf8;"><?= $currencySym ?>0.00</span>
+              <div class="calc-summary-total">
+                <span class="total-label">Total Amount:</span>
+                <span id="calc-total-val" class="total-val"><?= $currencySym ?>0.00</span>
               </div>
               <button type="button" class="btn btn-hero-buy open-checkout-btn" id="calc-buy-btn" style="width:100%" data-type="custom" data-title="Custom Module Bundle" data-price="0.00" data-modules="">
                 Buy Custom Bundle &rarr;
@@ -2434,7 +2670,7 @@ $errMsg = trim($_GET['err'] ?? '');
         <div class="why-card">
           <div class="why-icon-box">📈</div>
           <h3 class="why-card-title">Business Ready</h3>
-          <p class="why-card-desc">Complete inventory control, multi-register cash drawers, customer credit ledgers &amp; tax reports.</p>
+          <p class="why-card-desc">Complete inventory control, multi-register cash drawers, customer credit ledgers & tax reports.</p>
         </div>
       </div>
     </div>
@@ -2458,7 +2694,7 @@ $errMsg = trim($_GET['err'] ?? '');
 
           <!-- Restaurant -->
           <div class="eco-node eco-node-restaurant">
-            <div class="eco-node-title">Restaurant &amp; Café</div>
+            <div class="eco-node-title">Restaurant & Café</div>
             <div class="eco-node-tags">Tables • KOT • KDS<br>Recipes • Waiter App</div>
           </div>
 
@@ -2487,7 +2723,7 @@ $errMsg = trim($_GET['err'] ?? '');
 
           <!-- Salon -->
           <div class="eco-node eco-node-salon">
-            <div class="eco-node-title">Salon &amp; Spa</div>
+            <div class="eco-node-title">Salon & Spa</div>
             <div class="eco-node-tags">Appointments • Chairs<br>Stylists • Tips</div>
           </div>
 
@@ -2560,7 +2796,7 @@ $errMsg = trim($_GET['err'] ?? '');
                 <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
               </svg>
             </span>
-            <span class="brand-name">Zoom POS &amp; Market</span>
+            <span class="brand-name"><?= $brandHtml ?></span>
           </div>
           <p class="footer-tagline"><?= e_attr($tagline) ?></p>
         </div>
@@ -2584,7 +2820,7 @@ $errMsg = trim($_GET['err'] ?? '');
       </div>
 
       <div class="footer-bottom">
-        <p>&copy; <?= date('Y') ?> Zoom POS &amp; Market. All rights reserved.</p>
+        <p>&copy; <?= date('Y') ?> <?= e($siteName) ?>. All rights reserved.</p>
         <div class="footer-meta-links">
           <a href="verify-license.php">Verify License Key</a>
           <span>&bull;</span>
@@ -2594,23 +2830,48 @@ $errMsg = trim($_GET['err'] ?? '');
         </div>
       </div>
     </div>
+    <script src="https://buy-magicai.zoomnearby.com/contact-toggle.js" data-telegram="CloudoNext" data-whatsapp="918218647076"></script>
   </footer>
 
   <!-- ================= Checkout Modal ================= -->
   <div class="modal-backdrop" id="checkout-modal">
-    <div class="modal-card">
+    <div class="modal-card modal-checkout-card">
       <button type="button" class="modal-close" id="modal-close-btn">&times;</button>
       
-      <h3 class="modal-title">Complete Your Purchase</h3>
-      <p class="modal-sub">License keys will be dispatched instantly to your registered email address.</p>
-
-      <div class="modal-summary-box">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <strong id="modal-item-title" style="font-size:15px;color:var(--text-dark);">Selected Plan</strong>
-          <strong id="modal-item-price" style="font-size:18px;color:var(--primary-purple);"><?= $currencySym ?>0.00</strong>
+      <div class="modal-header-area">
+        <div class="modal-badge-row">
+          <span class="modal-plan-badge" id="modal-plan-badge">Enterprise Bundle</span>
+          <span class="modal-items-count-badge" id="modal-items-count">8 Products Included</span>
         </div>
-        <div id="modal-item-list" style="font-size:12px;color:var(--text-muted);margin-top:6px;"></div>
+        <h3 class="modal-title" id="modal-item-title">All-in-One Enterprise Bundle</h3>
+        <p class="modal-sub">Separate perpetual license keys dispatched instantly to your registered email address.</p>
       </div>
+
+      <div class="modal-products-section">
+        <div class="modal-products-hdr">
+          <span>Included Products & Modules</span>
+          <span class="modal-products-hdr-note">Lifetime Perpetual</span>
+        </div>
+        <div class="modal-products-scroll" id="modal-item-list"></div>
+      </div>
+
+      <div class="modal-calc-breakdown" id="modal-calc-breakdown">
+        <div class="modal-calc-row modal-calc-regular" id="modal-calc-regular-row">
+          <span class="calc-label">Total Value (Original Price)</span>
+          <span class="calc-val"><del id="modal-calc-original"><?= $currencySym ?>220.00 USD</del></span>
+        </div>
+        <div class="modal-calc-row modal-calc-savings" id="modal-calc-discount-row">
+          <span class="calc-label">Bundle Discount Savings</span>
+          <span class="calc-val discount-badge" id="modal-calc-discount">-<?= $currencySym ?>171.00 (78% OFF)</span>
+        </div>
+        <div class="modal-calc-row modal-calc-total" id="modal-calc-total-row">
+          <span class="calc-label">Total Payable (Discounted)</span>
+          <span class="calc-val final-price" id="modal-calc-final"><?= $currencySym ?>49.00 USD</span>
+        </div>
+      </div>
+
+      <!-- Hidden hook for backward-compatibility -->
+      <span id="modal-item-price" style="display:none;"><?= $currencySym ?>49.00</span>
 
       <form action="checkout.php" method="post" id="modal-checkout-form">
         <input type="hidden" name="bundle" id="modal-bundle-input" value="">
@@ -2628,9 +2889,13 @@ $errMsg = trim($_GET['err'] ?? '');
           <input type="text" name="domain" id="modal-domain-input" required placeholder="pos.yourcompany.com">
         </div>
 
-        <button type="submit" class="btn btn-hero-buy" style="width:100%;margin-top:8px;">
-          Proceed to Secure Checkout &rarr;
+        <button type="submit" class="btn btn-hero-buy modal-submit-btn" id="modal-submit-btn" style="width:100%;margin-top:8px;">
+          Proceed to Secure Checkout (<span id="modal-btn-price"><?= $currencySym ?>49.00</span>) &rarr;
         </button>
+
+        <div class="modal-guarantee-note">
+          🔒 Secure 256-Bit SSL Checkout • One-Time Payment • Instant License Activation
+        </div>
       </form>
     </div>
   </div>

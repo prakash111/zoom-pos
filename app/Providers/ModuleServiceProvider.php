@@ -51,9 +51,13 @@ class ModuleServiceProvider extends ServiceProvider
                 return;
             }
 
-            // Fallback for case differences in module directory (e.g. LeadManagement vs leadmanagement)
+            // Fallback for case differences or src directory structure
             $parts = explode('/', $relative, 2);
             if (count($parts) === 2) {
+                if (is_file(base_path('modules/'.$parts[0].'/src/'.$parts[1]))) {
+                    require base_path('modules/'.$parts[0].'/src/'.$parts[1]);
+                    return;
+                }
                 $lowerRelative = strtolower($parts[0]).'/'.$parts[1];
                 if (is_file(base_path('modules/'.$lowerRelative))) {
                     require base_path('modules/'.$lowerRelative);
@@ -131,10 +135,18 @@ class ModuleServiceProvider extends ServiceProvider
 
         $key = basename($packagePath);
 
-        // 1. The module's own ServiceProvider, if it ships one.
         $providerClass = 'Modules\\'.$key.'\\Providers\\ModuleProvider';
+        $chatProviderClass = 'Modules\\'.$key.'\\Providers\\ChatServiceProvider';
+        $hrmProviderClass = 'Modules\\'.$key.'\\Providers\\HrmServiceProvider';
+        $loyaltyProviderClass = 'Modules\\'.$key.'\\Providers\\LoyaltyServiceProvider';
         if (is_file($base.'/Providers/ModuleProvider.php') && class_exists($providerClass)) {
             $this->app->register($providerClass);
+        } elseif (is_file($base.'/Providers/ChatServiceProvider.php') && class_exists($chatProviderClass)) {
+            $this->app->register($chatProviderClass);
+        } elseif (is_file($base.'/Providers/HrmServiceProvider.php') && class_exists($hrmProviderClass)) {
+            $this->app->register($hrmProviderClass);
+        } elseif (is_file($base.'/Providers/LoyaltyServiceProvider.php') && class_exists($loyaltyProviderClass)) {
+            $this->app->register($loyaltyProviderClass);
         }
 
         // 2. Routes — the flat file, then split api/web files. Keep a handle

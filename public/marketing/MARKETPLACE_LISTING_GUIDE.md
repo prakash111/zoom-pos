@@ -14,7 +14,7 @@ This guide contains everything you need to list and sell **ZooM Sales CRM & Inve
 2. `ZooM - Multi-Tenant Sales CRM, POS & Inventory Management SaaS Platform with Flutter Mobile App`
 
 ### Short Description / Summary (for marketplace search cards):
-> Complete Multi-Tenant Sales CRM, POS & Inventory SaaS platform with Retail, Restaurant KDS, Pharmacy, Salon, and Repair modules. Includes cross-platform Flutter app for Android & Windows Desktop with 100% offline sync, automated subscription billing, and 1-click web installer.
+> Complete Multi-Tenant Sales CRM, POS & Inventory SaaS platform with Retail POS and Restaurant (KDS & KOT) modules. Includes cross-platform Flutter app for Android & Windows Desktop with 100% offline sync, automated subscription billing, and 1-click web installer.
 
 ---
 
@@ -28,7 +28,7 @@ This guide contains everything you need to list and sell **ZooM Sales CRM & Inve
 
 ### 30 Recommended Search Tags (Comma Separated):
 ```text
-pos saas, point of sale, multi tenant pos, restaurant pos, retail pos, flutter pos, flutter app, android pos, windows pos, offline pos, pharmacy pos, salon booking, repair shop, crm pos, laravel pos, erp saas, barcode scanner, thermal printer, kot pos, kitchen display system, multi store inventory, subscription billing, stripe payment, razorpay, whitelabel saas, cloud pos, billing software, cashier app, weighing scale, inventory management
+pos saas, point of sale, multi tenant pos, restaurant pos, retail pos, flutter pos, flutter app, android pos, windows pos, offline pos, crm pos, laravel pos, erp saas, barcode scanner, thermal printer, kot pos, kitchen display system, multi store inventory, subscription billing, stripe payment, razorpay, whitelabel saas, cloud pos, billing software, cashier app, weighing scale, inventory management, superadmin saas, store management, table ordering
 ```
 
 ---
@@ -81,7 +81,7 @@ All graphics are generated, formatted, and ready in `public/assets/images/`:
 6. In **Main File (.zip)**, upload the full source package including:
    - Laravel Backend & Multi-Tenant core files
    - Flutter App source project (Android, Windows, Web)
-   - Central License Manager script
+   - Clean Database SQL dump
    - Documentation folder
 7. In **Tags**, paste the 30 tags from Section 2.
 8. Enter demo credentials and URLs in the Reviewer Notes field.

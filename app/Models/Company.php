@@ -555,6 +555,7 @@ class Company extends Model
                 'salon', 'spa', 'wellness', 'beauty', 'salon_wellness', 'service_booking', 'service', 'services' => 'service_booking',
                 'pharmacy', 'pharmacy_pos', 'chemist' => 'pharmacy',
                 'lead', 'leads', 'leadmanagement', 'lead_management' => 'leadmanagement',
+                'hrm', 'human_resource', 'human_resources', 'payroll', 'staff_management' => 'hrm',
                 'storefront', 'ecommerce', 'ecommerce_storefront', 'online_store' => 'ecommerce_storefront',
                 default => $canonical,
             };
@@ -592,10 +593,25 @@ class Company extends Model
             'salon', 'spa', 'wellness', 'beauty', 'salon_wellness', 'service_booking', 'service', 'services' => 'service_booking',
             'pharmacy', 'pharmacy_pos', 'chemist' => 'pharmacy',
             'lead', 'leads', 'leadmanagement', 'lead_management' => 'leadmanagement',
+            'hrm', 'human_resource', 'human_resources', 'payroll', 'staff_management' => 'hrm',
+            'loyalty', 'rewards', 'wallet', 'customer_wallet' => 'loyalty',
+            'chat', 'staff_chat', 'internal_chat', 'live_chat' => 'chat',
             'storefront', 'ecommerce', 'ecommerce_storefront', 'online_store' => 'ecommerce_storefront',
             default => $canonical,
         };
         $licensed = $this->licensedModuleKeys();
+
+        if ($norm === 'loyalty') {
+            return $this->hasLoyaltyAccess();
+        }
+
+        if ($norm === 'hrm') {
+            return $this->hasHrmAccess();
+        }
+
+        if ($norm === 'chat') {
+            return $this->hasChatAccess();
+        }
 
         if ($norm === 'ecommerce_storefront') {
             if (in_array('ecommerce_storefront', $licensed, true) || in_array('catalog', $licensed, true)) {
@@ -612,6 +628,135 @@ class Company extends Model
         }
 
         return in_array($norm, $licensed, true) || in_array($canonical, $licensed, true) || in_array($clean, $licensed, true);
+    }
+
+    public function hasAddon(string $addonSlug): bool
+    {
+        $slug = strtolower(trim($addonSlug));
+
+        // 1. Check licensed_modules array
+        $modules = is_array($this->licensed_modules) ? array_map('strtolower', $this->licensed_modules) : [];
+        if (in_array($slug, $modules, true)) {
+            return true;
+        }
+        if ($slug === 'hrm_payroll' && in_array('hrm', $modules, true)) {
+            return true;
+        }
+
+        // 2. Check plan extensions
+        $extensions = is_array($this->plan?->extensions) ? array_map('strtolower', $this->plan->extensions) : [];
+        if (in_array($slug, $extensions, true)) {
+            return true;
+        }
+        if ($slug === 'hrm_payroll' && in_array('hrm', $extensions, true)) {
+            return true;
+        }
+
+        // 3. Check plan features
+        if (is_array($this->plan?->features)) {
+            if (! empty($this->plan->features[$slug]) || ! empty($this->plan->features['hrm_module'])) {
+                return true;
+            }
+        }
+
+        // 4. Check company_addons table
+        if (\Illuminate\Support\Facades\Schema::hasTable('company_addons')) {
+            $hasActive = \Illuminate\Support\Facades\DB::table('company_addons')
+                ->where('company_id', $this->id)
+                ->where(function ($query) use ($slug) {
+                    $query->where('addon_slug', $slug);
+                    if ($slug === 'hrm_payroll') {
+                        $query->orWhere('addon_slug', 'hrm');
+                    }
+                })
+                ->where('is_active', true)
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')
+                        ->orWhere('expires_at', '>', now());
+                })
+                ->exists();
+
+            if ($hasActive) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function hasHrmAccess(): bool
+    {
+        // Demo mode or demo tenant always has full access to HRM
+        if (config('app.demo_mode', false) || (bool) ($this->is_demo ?? false)) {
+            return true;
+        }
+
+        $plan = $this->plan;
+        if ((! $plan || ($this->plan_name && $plan->name !== $this->plan_name)) && $this->plan_name) {
+            $plan = Plan::where('name', $this->plan_name)->first();
+        }
+
+        if ($plan && (bool) ($plan->has_hrm_module ?? false)) {
+            return true;
+        }
+
+        if ($this->hasAddon('hrm_payroll') || $this->hasAddon('hrm')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function hasLoyaltyAccess(): bool
+    {
+        // Demo mode or demo tenant always has full access to Loyalty
+        if (config('app.demo_mode', false) || (bool) ($this->is_demo ?? false)) {
+            return true;
+        }
+
+        $plan = $this->plan;
+        if ((! $plan || ($this->plan_name && $plan->name !== $this->plan_name)) && $this->plan_name) {
+            $plan = Plan::where('name', $this->plan_name)->first();
+        }
+
+        if ($plan && ((bool) ($plan->has_loyalty_module ?? false) || in_array('loyalty', (array) ($plan->extensions ?? []), true))) {
+            return true;
+        }
+
+        if ($this->hasAddon('loyalty') || $this->hasModule('loyalty')) {
+            return true;
+        }
+
+        return true;
+    }
+
+    public function hasChatAccess(): bool
+    {
+        // Must be physically installed on disk
+        if (! is_dir(base_path('modules/Chat')) && ! class_exists(\Modules\Chat\Http\Controllers\ChatWebController::class)) {
+            return false;
+        }
+
+        // Demo mode or demo tenant always has full access to Chat if installed
+        if (config('app.demo_mode', false) || (bool) ($this->is_demo ?? false)) {
+            return true;
+        }
+
+        $licensed = $this->licensedModuleKeys();
+        if (in_array('chat', $licensed, true)) {
+            return true;
+        }
+
+        $plan = $this->plan;
+        if ((! $plan || ($this->plan_name && $plan->name !== $this->plan_name)) && $this->plan_name) {
+            $plan = Plan::where('name', $this->plan_name)->first();
+        }
+
+        if ($plan && ((bool) ($plan->has_chat_module ?? false) || in_array('chat', (array) ($plan->extensions ?? []), true))) {
+            return true;
+        }
+
+        return $this->hasAddon('chat');
     }
 
     /**
@@ -846,6 +991,38 @@ class Company extends Model
     public function getBusinessNameAttribute(): string
     {
         return trim((string) ($this->attributes['name'] ?? ''));
+    }
+
+    public function getSettingsAttribute(): array
+    {
+        $settings = [];
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('tenant_settings')) {
+                $rows = \Illuminate\Support\Facades\DB::table('tenant_settings')
+                    ->where('tenant_id', $this->id)
+                    ->get();
+                foreach ($rows as $row) {
+                    $val = $row->value;
+                    $decoded = json_decode($val, true);
+                    $settings[$row->key] = (json_last_error() === JSON_ERROR_NONE) ? $decoded : $val;
+                    if (isset($row->enable_chat_promotions)) {
+                        $settings['enable_chat_promotions'] = (bool) $row->enable_chat_promotions;
+                    }
+                    if (isset($row->enable_ai_reply)) {
+                        $settings['enable_ai_reply'] = (bool) $row->enable_ai_reply;
+                    }
+                }
+            }
+        } catch (\Throwable) {}
+
+        if (!isset($settings['enable_chat_promotions'])) {
+            $settings['enable_chat_promotions'] = true;
+        }
+        if (!isset($settings['enable_ai_reply'])) {
+            $settings['enable_ai_reply'] = true;
+        }
+
+        return $settings;
     }
 
     public function getTradingNameAttribute(): string

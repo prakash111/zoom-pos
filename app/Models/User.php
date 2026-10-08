@@ -43,11 +43,12 @@ class User extends Authenticatable implements AuthenticatableContract
     public const PRIVILEGED_ROLES = ['administrator', 'administrador', 'admin', 'superadmin', 'owner'];
 
     protected $fillable = [
-        'company_id', 'name', 'login', 'email', 'password', 'role', 'locale', 'status',
+        'company_id', 'name', 'login', 'email', 'phone', 'password', 'role', 'locale', 'status',
         'is_demo', 'shift', 'is_specialist', 'dock_position', 'current_store_id',
+        'pin_code', 'employee_code', 'basic_salary', 'custom_fields',
         'commission_rate', 'commission_type',
         'invitation_code_hash', 'invitation_expires_at', 'email_verified_at',
-        'verification_code', 'verification_code_expires_at',
+        'verification_code', 'verification_code_expires_at', 'last_seen_at',
     ];
 
     protected $hidden = ['password', 'remember_token', 'invitation_code_hash'];
@@ -86,8 +87,11 @@ class User extends Authenticatable implements AuthenticatableContract
             'is_demo' => 'boolean',
             'is_specialist' => 'boolean',
             'commission_rate' => 'decimal:2',
+            'basic_salary' => 'decimal:2',
+            'custom_fields' => 'array',
             'invitation_expires_at' => 'datetime',
             'email_verified_at' => 'datetime',
+            'last_seen_at' => 'datetime',
         ];
     }
 
@@ -111,9 +115,41 @@ class User extends Authenticatable implements AuthenticatableContract
         return $this->belongsTo(Company::class, 'company_id');
     }
 
+    public function roles()
+    {
+        return $this->hasMany(Role::class, 'slug', 'role');
+    }
+
+    public function assignRole(string $role): self
+    {
+        $this->role = strtolower($role);
+        $this->save();
+
+        return $this;
+    }
+
+    public function getIsActiveAttribute(): bool
+    {
+        return in_array(strtolower($this->status ?? ''), ['active', 'approved', 'ativo'], true);
+    }
+
     public function getTenantIdAttribute(): ?string
     {
         return (string) ($this->company_id ?? '');
+    }
+
+    public function getIsOnlineAttribute(): bool
+    {
+        return \Illuminate\Support\Facades\Cache::has('user-is-online-' . $this->id);
+    }
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if (!empty($this->avatar)) {
+            return filter_var($this->avatar, FILTER_VALIDATE_URL) ? $this->avatar : asset('storage/' . $this->avatar);
+        }
+
+        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name ?? 'User') . '&background=10b981&color=fff';
     }
 
     public function permissions()

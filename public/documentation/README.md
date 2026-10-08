@@ -12,7 +12,7 @@ The same content is also included as plain Markdown in **Zoom_Sales_CRM_Feature_
 
 ## What's covered
 
-How the platform works, business & platform administration, user & branch management, product catalog & inventory, point of sale, invoicing & quotations, customer & financial management, the online storefront, automation & notifications, every industry module (restaurant, pharmacy, salon, repair, service orders, lead management), the mobile & desktop app, offline mode, hardware & printing support, **installation & deployment (including the automatic browser-based installer at `/install`)**, a **complete Flutter app build guide for Android and Windows**, and **support & help**.
+How the platform works, business & platform administration, user & branch management, product catalog & inventory, point of sale, invoicing & quotations, customer & financial management, the online storefront, automation & notifications, the core industry modules (retail POS, supermarket, restaurant & cafe POS with KDS/KOT), the mobile & desktop app, offline mode, hardware & printing support, **installation & deployment (including the automatic browser-based installer at `/install`)**, a **complete Flutter app build guide for Android and Windows**, and **support & help**.
 
 ## Quick facts
 

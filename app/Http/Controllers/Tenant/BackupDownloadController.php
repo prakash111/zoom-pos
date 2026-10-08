@@ -22,7 +22,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BackupDownloadController extends Controller
 {
-    public function download(Request $request): StreamedResponse
+    public function download(Request $request): mixed
     {
         $user = auth('web')->user();
         if (! $user || ! PermissionChecker::can($user, 'settings')) {
@@ -30,7 +30,20 @@ class BackupDownloadController extends Controller
         }
 
         $companyId = $user->company_id;
-        $company = Company::find($companyId);
+        $company = $companyId ? Company::find($companyId) : null;
+
+        // Hard block if demo mode is enabled or company is demo
+        if (config('app.demo_mode', false) || (bool) ($company?->is_demo ?? false)) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Database backup and raw data export are disabled in demo mode for security reasons.',
+                ], 403);
+            }
+
+            abort(403, 'Database backup downloads are disabled in demo mode.');
+        }
+
         $companySlug = $company ? $company->slug : 'tenant';
         $filename = 'backup_'.$companySlug.'_'.now()->format('Y-m-d_His').'.json';
 

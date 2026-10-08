@@ -40,6 +40,11 @@ class Index extends Component
 
     public function createSnapshot(BackupService $backups): void
     {
+        if (config('app.demo_mode', false)) {
+            session()->flash('status', 'Creating backup snapshots is disabled in demo mode.');
+            return;
+        }
+
         $filename = $backups->create();
         AuditLog::record('backup.created', null, auth('platform_web')->id(), ['file' => $filename]);
         session()->flash('status', "Snapshot \"{$filename}\" created.");
@@ -47,6 +52,11 @@ class Index extends Component
 
     public function deleteSnapshot(BackupService $backups, string $filename): void
     {
+        if (config('app.demo_mode', false)) {
+            session()->flash('status', 'Deleting backup snapshots is disabled in demo mode.');
+            return;
+        }
+
         $backups->delete($filename);
         AuditLog::record('backup.deleted', null, auth('platform_web')->id(), ['file' => $filename]);
         session()->flash('status', 'Snapshot deleted.');
@@ -54,6 +64,10 @@ class Index extends Component
 
     public function download(BackupService $backups, string $filename)
     {
+        if (config('app.demo_mode', false)) {
+            abort(403, 'Downloading database backup is disabled in demo mode.');
+        }
+
         return response()->streamDownload(
             fn () => print (Storage::disk('local')->get("backups/{$filename}")),
             $filename

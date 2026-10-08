@@ -49,6 +49,122 @@ class NavigationSanitizerService
                 $section['first_item'] = $sanitizedFirst;
             }
 
+            $isChatInstalled = is_dir(base_path('modules/Chat')) || class_exists(\Modules\Chat\Http\Controllers\ChatWebController::class);
+
+            // Clean up Staff Chat & Support group: remove standalone Promotional Announcements, keep Live Staff Chat and Send Staff Notification
+            $secKey = $section['key'] ?? $section['id'] ?? '';
+            $isChatSection = in_array($secKey, ['chat_group', 'staff_chat_group', 'chat'], true)
+                || (str_contains(strtolower($section['title'] ?? ''), 'chat') && !str_contains(strtolower($section['title'] ?? ''), 'whatsapp'));
+
+            if ($isChatSection && ! $isChatInstalled) {
+                continue;
+            }
+
+            if (! $isChatInstalled) {
+                $section['items'] = array_values(array_filter($section['items'], function ($it) {
+                    $key = $it['key'] ?? $it['id'] ?? '';
+                    $route = $it['route'] ?? $it['target_endpoint'] ?? '';
+                    $title = strtolower($it['title'] ?? $it['label'] ?? '');
+                    return !str_contains($route, '/chat/')
+                        && !str_contains($route, 'chat/views')
+                        && !str_contains($key, 'chat_')
+                        && !($key === 'chat' || $key === 'staff_chat')
+                        && !str_contains($key, 'staff_notification');
+                }));
+            }
+
+            if ($isChatSection) {
+                // Filter out any standalone promotional announcements
+                $section['items'] = array_values(array_filter($section['items'], function ($it) {
+                    $key = $it['key'] ?? $it['id'] ?? '';
+                    $route = $it['route'] ?? $it['target_endpoint'] ?? '';
+                    $title = strtolower($it['title'] ?? $it['label'] ?? '');
+                    return $key !== 'chat_broadcasts'
+                        && !str_contains($route, 'chat/views/promotions')
+                        && !str_contains($route, 'promotions')
+                        && !str_contains($title, 'promotional announcement');
+                }));
+
+                $hasSend = false;
+                foreach ($section['items'] as &$it) {
+                    if (($it['key'] ?? $it['id'] ?? '') === 'send_staff_notification') {
+                        $hasSend = true;
+                        $it['route'] = 'api/tenant/chat/views/staff-notifications';
+                        $it['target_endpoint'] = '/api/tenant/chat/views/staff-notifications';
+                        $it['permission'] = 'hrm.employees.create';
+                        break;
+                    }
+                }
+                unset($it);
+                if (!$hasSend) {
+                    $section['items'][] = self::sanitizeItem([
+                        'id'              => 'send_staff_notification',
+                        'key'             => 'send_staff_notification',
+                        'title'           => 'Send Staff Notification',
+                        'label'           => 'Send Staff Notification',
+                        'icon'            => 'send_to_mobile',
+                        'route'           => 'api/tenant/chat/views/staff-notifications',
+                        'target_endpoint' => '/api/tenant/chat/views/staff-notifications',
+                        'permission'      => 'hrm.employees.create',
+                    ]);
+                }
+            }
+
+            foreach ($section['items'] as &$parentItem) {
+                if (!empty($parentItem['children'])) {
+                    if (! $isChatInstalled) {
+                        $parentItem['children'] = array_values(array_filter($parentItem['children'], function ($ch) {
+                            $key = $ch['key'] ?? $ch['id'] ?? '';
+                            $route = $ch['route'] ?? $ch['target_endpoint'] ?? '';
+                            return !str_contains($route, '/chat/')
+                                && !str_contains($route, 'chat/views')
+                                && !str_contains($key, 'chat_')
+                                && !($key === 'chat' || $key === 'staff_chat')
+                                && !str_contains($key, 'staff_notification');
+                        }));
+                    } else {
+                        // Filter out promotional announcements from children
+                        $parentItem['children'] = array_values(array_filter($parentItem['children'], function ($ch) {
+                            $key = $ch['key'] ?? $ch['id'] ?? '';
+                            $route = $ch['route'] ?? $ch['target_endpoint'] ?? '';
+                            $title = strtolower($ch['title'] ?? $ch['label'] ?? '');
+                            return $key !== 'chat_broadcasts'
+                                && !str_contains($route, 'chat/views/promotions')
+                                && !str_contains($route, 'promotions')
+                                && !str_contains($title, 'promotional announcement');
+                        }));
+
+                        $pKey = $parentItem['key'] ?? $parentItem['id'] ?? '';
+                        if (in_array($pKey, ['chat_group', 'staff_chat_group', 'chat'], true) || (str_contains(strtolower($parentItem['title'] ?? ''), 'chat') && !str_contains(strtolower($parentItem['title'] ?? ''), 'whatsapp'))) {
+                            $hasChildSend = false;
+                            foreach ($parentItem['children'] as &$child) {
+                                if (($child['key'] ?? $child['id'] ?? '') === 'send_staff_notification') {
+                                    $hasChildSend = true;
+                                    $child['route'] = 'api/tenant/chat/views/staff-notifications';
+                                    $child['target_endpoint'] = '/api/tenant/chat/views/staff-notifications';
+                                    $child['permission'] = 'hrm.employees.create';
+                                    break;
+                                }
+                            }
+                            unset($child);
+                            if (!$hasChildSend) {
+                                $parentItem['children'][] = self::sanitizeItem([
+                                    'id'              => 'send_staff_notification',
+                                    'key'             => 'send_staff_notification',
+                                    'title'           => 'Send Staff Notification',
+                                    'label'           => 'Send Staff Notification',
+                                    'icon'            => 'send_to_mobile',
+                                    'route'           => 'api/tenant/chat/views/staff-notifications',
+                                    'target_endpoint' => '/api/tenant/chat/views/staff-notifications',
+                                    'permission'      => 'hrm.employees.create',
+                                ]);
+                            }
+                        }
+                    }
+                }
+            }
+            unset($parentItem);
+
             $sanitized[] = $section;
         }
 
@@ -496,6 +612,225 @@ class NavigationSanitizerService
             'config'        => $config,
         ];
     }
+
+    public function hasModule(string $module, $store): bool
+    {
+        if ($store instanceof \App\Models\Company) {
+            return $store->hasModule($module);
+        }
+        if ($store instanceof \App\Models\Store) {
+            return $store->company ? $store->company->hasModule($module) : true;
+        }
+        if (is_object($store) && method_exists($store, 'hasModule')) {
+            return $store->hasModule($module);
+        }
+        if (is_array($store) && isset($store['licensed_modules']) && is_array($store['licensed_modules'])) {
+            return in_array($module, $store['licensed_modules'], true);
+        }
+
+        return true;
+    }
+
+    public function appendHrmNavigation(&$menu, $user, $store): void
+    {
+        $company = ($store instanceof \App\Models\Company) 
+            ? $store 
+            : ($store?->company ?? $user?->company ?? null);
+
+        $hasAccess = false;
+        if ($company && method_exists($company, 'hasHrmAccess')) {
+            $hasAccess = $company->hasHrmAccess();
+        } else {
+            $hasAccess = $this->hasModule('hrm', $store);
+        }
+
+        // If not accessible and user cannot manage subscription/store (i.e. not admin/privileged), skip
+        if (! $hasAccess && ! ($user?->isPrivilegedRole() ?? false) && ! ($user?->can('hrm.module.access') ?? false)) {
+            return;
+        }
+
+        $isLocked = ! $hasAccess;
+        $badge = $isLocked ? 'PRO 🔒' : null;
+
+        // Determine locale from request header or app state
+        $locale = request()->header('X-App-Locale') 
+               ?? request()->header('Accept-Language') 
+               ?? app()->getLocale();
+
+        $isHindi = str_starts_with(strtolower((string) $locale), 'hi');
+
+        $sectionTitle = $isHindi 
+            ? 'कर्मचारी और वेतन (HRM & Staff)' 
+            : 'HRM & Staff Management';
+
+        $hrmGroupTitle = $isHindi
+            ? 'कर्मचारी और वेतन प्रबंधन'
+            : 'Staff & Payroll Management';
+
+        $children = [];
+
+        if ($user?->isPrivilegedRole() || $user?->can('hrm.employees.view') || $isLocked) {
+            $children[] = [
+                'id'              => 'hrm_employees',
+                'title'           => $isHindi ? 'कर्मचारी सूची' : 'Staff Directory',
+                'icon'            => 'badge',
+                'route'           => 'api/tenant/hrm/views/employees',
+                'target_endpoint' => '/api/tenant/hrm/views/employees',
+                'permission'      => 'hrm.employees.view',
+                'badge'           => $badge,
+                'is_locked'       => $isLocked,
+            ];
+        }
+
+        if ($user?->isPrivilegedRole() || $user?->can('hrm.attendance.view') || $isLocked) {
+            $children[] = [
+                'id'              => 'hrm_attendance',
+                'title'           => $isHindi ? 'दैनिक उपस्थिति' : 'Attendance Roster',
+                'icon'            => 'schedule',
+                'route'           => 'api/tenant/hrm/views/attendance',
+                'target_endpoint' => '/api/tenant/hrm/views/attendance',
+                'permission'      => 'hrm.attendance.view',
+                'badge'           => $badge,
+                'is_locked'       => $isLocked,
+            ];
+        }
+
+        if ($user?->isPrivilegedRole() || $user?->can('hrm.leaves.view') || $isLocked) {
+            $children[] = [
+                'id'              => 'hrm_leaves',
+                'title'           => $isHindi ? 'छुट्टियाँ और आवेदन' : 'Leave Requests',
+                'icon'            => 'event_busy',
+                'route'           => 'api/tenant/hrm/views/leaves',
+                'target_endpoint' => '/api/tenant/hrm/views/leaves',
+                'permission'      => 'hrm.leaves.view',
+                'badge'           => $badge,
+                'is_locked'       => $isLocked,
+            ];
+        }
+
+        if ($user?->isPrivilegedRole() || $user?->can('hrm.payroll.view') || $isLocked) {
+            $children[] = [
+                'id'              => 'hrm_payroll',
+                'title'           => $isHindi ? 'वेतन और कमीशन' : 'Payroll & Commissions',
+                'icon'            => 'payments',
+                'route'           => 'api/tenant/hrm/views/payroll',
+                'target_endpoint' => '/api/tenant/hrm/views/payroll',
+                'permission'      => 'hrm.payroll.view',
+                'badge'           => $badge,
+                'is_locked'       => $isLocked,
+            ];
+        }
+
+        if (!empty($children)) {
+            $menu[] = [
+                'title' => $sectionTitle,
+                'badge' => $badge,
+                'items' => [
+                    [
+                        'id'              => 'hrm_group',
+                        'title'           => $hrmGroupTitle,
+                        'icon'            => 'badge',
+                        'route'           => $isLocked ? 'settings/subscription-pricing' : null,
+                        'target_endpoint' => $isLocked ? '/settings/subscription-pricing' : null,
+                        'badge'           => $badge,
+                        'is_locked'       => $isLocked,
+                        'children'        => $children,
+                    ],
+                ],
+            ];
+        }
+    }
+
+    public function appendLoyaltyNavigation(&$menu, $user, $store): void
+    {
+        $company = ($store instanceof \App\Models\Company)
+            ? $store
+            : ($store?->company ?? $user?->company ?? null);
+
+        $hasAccess = false;
+        if ($company && method_exists($company, 'hasLoyaltyAccess')) {
+            $hasAccess = $company->hasLoyaltyAccess();
+        } else {
+            $hasAccess = $this->hasModule('loyalty', $store);
+        }
+
+        if (! $hasAccess && ! ($user?->isPrivilegedRole() ?? false) && ! ($user?->can('loyalty.module.access') ?? false)) {
+            return;
+        }
+
+        $isLocked = ! $hasAccess;
+        $badge = $isLocked ? 'PRO 🔒' : null;
+
+        $locale = request()->header('X-App-Locale')
+               ?? request()->header('Accept-Language')
+               ?? app()->getLocale();
+
+        $isHindi = str_starts_with(strtolower((string) $locale), 'hi');
+
+        $sectionTitle = $isHindi ? 'लॉयल्टी और ग्राहक वॉलेट' : 'Loyalty & Customer Wallet';
+        $groupTitle   = $isHindi ? 'रिवॉर्ड और स्टोर वॉलेट' : 'Rewards & Wallet Engine';
+
+        $children = [];
+
+        if ($user?->isPrivilegedRole() || $user?->can('loyalty.customer.balance_view') || $isLocked) {
+            $children[] = [
+                'id'              => 'loyalty_wallets',
+                'title'           => $isHindi ? 'ग्राहक वॉलेट और टॉप-अप' : 'Customer Balances & Top-up',
+                'icon'            => 'account_balance_wallet',
+                'route'           => 'api/tenant/loyalty/views/wallets',
+                'target_endpoint' => '/api/tenant/loyalty/views/wallets',
+                'permission'      => 'loyalty.customer.balance_view',
+                'badge'           => $badge,
+                'is_locked'       => $isLocked,
+            ];
+        }
+
+        if ($user?->isPrivilegedRole() || $user?->can('loyalty.tiers.manage') || $isLocked) {
+            $children[] = [
+                'id'              => 'loyalty_tiers',
+                'title'           => $isHindi ? 'वीआईपी सदस्यता स्तर' : 'VIP Membership Tiers',
+                'icon'            => 'military_tech',
+                'route'           => 'api/tenant/loyalty/views/tiers',
+                'target_endpoint' => '/api/tenant/loyalty/views/tiers',
+                'permission'      => 'loyalty.tiers.manage',
+                'badge'           => $badge,
+                'is_locked'       => $isLocked,
+            ];
+        }
+
+        if ($user?->isPrivilegedRole() || $user?->can('loyalty.settings.edit') || $isLocked) {
+            $children[] = [
+                'id'              => 'loyalty_settings',
+                'title'           => $isHindi ? 'पॉइंट्स अर्जन नियम' : 'Points Earning Rules',
+                'icon'            => 'tune',
+                'route'           => 'api/tenant/loyalty/views/settings',
+                'target_endpoint' => '/api/tenant/loyalty/views/settings',
+                'permission'      => 'loyalty.settings.edit',
+                'badge'           => $badge,
+                'is_locked'       => $isLocked,
+            ];
+        }
+
+        if (!empty($children)) {
+            $menu[] = [
+                'title' => $sectionTitle,
+                'badge' => $badge,
+                'items' => [
+                    [
+                        'id'              => 'loyalty_group',
+                        'title'           => $groupTitle,
+                        'icon'            => 'wallet',
+                        'route'           => $isLocked ? 'settings/subscription-pricing' : null,
+                        'target_endpoint' => $isLocked ? '/settings/subscription-pricing' : null,
+                        'badge'           => $badge,
+                        'is_locked'       => $isLocked,
+                        'children'        => $children,
+                    ],
+                ],
+            ];
+        }
+    }
 }
+
 
 

@@ -109,4 +109,32 @@ class Role extends Model
     {
         return Str::slug($name, '_') ?: 'role_'.Str::lower(Str::random(6));
     }
+
+    public function givePermissionTo(array|string $permissions): self
+    {
+        $permissions = is_array($permissions) ? $permissions : [$permissions];
+        $current = is_array($this->permissions) ? $this->permissions : [];
+
+        foreach ($permissions as $perm) {
+            if (str_contains($perm, '.')) {
+                [$mod, $act] = explode('.', $perm, 2);
+            } else {
+                $mod = 'hrm';
+                $act = $perm;
+            }
+            if (! isset($current[$mod])) {
+                $current[$mod] = [];
+            }
+            if (! in_array($act, $current[$mod], true)) {
+                $current[$mod][] = $act;
+            }
+        }
+
+        $this->permissions = $current;
+        $this->save();
+        PermissionChecker::flushRoleCache();
+
+        return $this;
+    }
 }
+

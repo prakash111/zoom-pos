@@ -3,7 +3,9 @@
      tabindex="-1"
      aria-hidden="true"
      style="display: none;" 
-     class="hidden fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-sm items-center justify-center p-4">
+     class="hidden fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-sm items-center justify-center p-4"
+     x-data
+     @open-change-password-modal.window="openChangePasswordModal($event)">
     
     <div class="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6"
          onclick="event.stopPropagation();">
@@ -75,7 +77,7 @@
                 @error('current_password', 'updatePassword')
                     <p class="text-xs text-rose-400 mt-1 font-medium">{{ $message }}</p>
                 @enderror
-                @if(!$errors->updatePassword->has('current_password'))
+                @if(!($errors ?? null)?->getBag('updatePassword')->has('current_password'))
                     @error('current_password')
                         <p class="text-xs text-rose-400 mt-1 font-medium">{{ $message }}</p>
                     @enderror
@@ -97,7 +99,7 @@
                 @error('password', 'updatePassword')
                     <p class="text-xs text-rose-400 mt-1 font-medium">{{ $message }}</p>
                 @enderror
-                @if(!$errors->updatePassword->has('password'))
+                @if(!($errors ?? null)?->getBag('updatePassword')->has('password'))
                     @error('password')
                         <p class="text-xs text-rose-400 mt-1 font-medium">{{ $message }}</p>
                     @enderror
@@ -140,6 +142,10 @@
 </div>
 
 <script>
+window.addEventListener('open-change-password-modal', function(event) {
+    openChangePasswordModal(event);
+});
+
 function openChangePasswordModal(event) {
     if (event) {
         event.preventDefault();
@@ -194,7 +200,7 @@ document.getElementById('change_pwd_confirm')?.addEventListener('input', functio
 });
 </script>
 
-@if($errors->updatePassword->any())
+@if(($errors ?? null)?->hasBag('updatePassword') && ($errors ?? null)?->getBag('updatePassword')->any())
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         openChangePasswordModal();

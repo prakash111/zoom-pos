@@ -302,8 +302,8 @@
 
                     <!-- Row 4: Business Operating Mode Selection -->
                     @php
-                        $activeMods = $this->activeRegistrationModules;
-                        $normalizedPosMode = $posMode === 'general' ? 'retail' : $posMode;
+                        $activeMods = $this->businessTypes;
+                        $normalizedPosMode = strtolower(trim($posMode));
                     @endphp
                     <div>
                         <label for="business_type" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -317,10 +317,10 @@
                                        name="posMode"
                                        wire:model="posMode"
                                     class="w-full h-11 pl-10 pr-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs sm:text-sm focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all shadow-2xs cursor-pointer">
-                                @foreach ($activeMods as $mKey => $m)
-                                    @php $modeVal = ($mKey === 'retail') ? 'general' : $mKey; @endphp
-                                    <option value="{{ $modeVal }}" @selected($normalizedPosMode === $mKey)>
-                                        {{ __($m['title']) }}
+                                @foreach ($activeMods as $m)
+                                    @php $mId = $m['id']; @endphp
+                                    <option value="{{ $mId }}" @selected($normalizedPosMode === $mId || ($mId === 'retail' && in_array($normalizedPosMode, ['general', 'retail'])) || ($mId === 'repair' && in_array($normalizedPosMode, ['repair', 'repair_technician'])) || ($mId === 'salon' && in_array($normalizedPosMode, ['salon', 'service_booking'])) )>
+                                        {{ __($m['name'] ?? $m['title'] ?? '') }}
                                     </option>
                                 @endforeach
                             </select>

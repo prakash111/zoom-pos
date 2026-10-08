@@ -2933,6 +2933,7 @@ class PosSyncApiController extends Controller
                         ->orWhere('custom_fields->company_name', 'like', "%{$query}%");
                 });
             })
+            ->with(['tier'])
             ->orderBy('name')
             ->limit(50)
             ->get()
@@ -2945,6 +2946,9 @@ class PosSyncApiController extends Controller
                 if ($companyName && $companyName !== $c->name) {
                     $label .= " - {$companyName}";
                 }
+
+                $pointsBal = (float) ($c->points_balance ?? 0);
+                $walletBal = (float) ($c->wallet_balance ?? 0);
 
                 return [
                     'id' => (string) ($c->external_id ?: $c->id),
@@ -2963,6 +2967,15 @@ class PosSyncApiController extends Controller
                     'badge_due_tx' => '#F87171',
                     'document' => $c->document ?? $c->tax_id ?? '',
                     'balance_due' => (float) ($c->due_balance ?? 0),
+                    'tier' => [
+                        'name' => $c->tier?->name ?? 'Bronze',
+                        'badge_color' => $c->tier?->badge_color ?? '#10B981',
+                        'discount_percentage' => (float) ($c->tier?->discount_percentage ?? 0.0),
+                    ],
+                    'points_balance' => $pointsBal,
+                    'points_value' => $pointsBal,
+                    'wallet_balance' => $walletBal,
+                    'can_redeem_points' => ($pointsBal >= 50),
                     'age' => $c->age,
                     'gender' => $c->gender,
                     'allergies' => $c->allergies,
@@ -3543,10 +3556,20 @@ class PosSyncApiController extends Controller
             ])
             ->values();
 
+        $layoutService = app(\App\Services\Dashboard\DashboardLayoutService::class);
+        $selectedLayout = $request->input('layout')
+            ?? $company->dashboard_layout
+            ?? 'cards_dark';
+        $layoutSchema = $layoutService->getLayoutSchema($selectedLayout);
+
         return response()->json([
             'success' => true,
             'currency_symbol' => $company->currency_symbol ?? '$',
             'server_time' => now()->toIso8601String(),
+            'dashboard_layout' => $layoutSchema['layout_key'],
+            'layout_key' => $layoutSchema['layout_key'],
+            'enabled_widgets' => $layoutSchema['widgets'],
+            'layout_meta' => $layoutSchema,
             'range' => [
                 'key' => $rangeKey,
                 'label' => $rangeLabel,
@@ -3623,8 +3646,10 @@ class PosSyncApiController extends Controller
                 now()->subYears(5)->startOfDay(), now()->endOfDay(), 'all', 'All Time',
             ],
             'custom' => (function () use ($request) {
-                $from = rescue(fn () => \Illuminate\Support\Carbon::parse((string) $request->query('from'))->startOfDay(), null);
-                $to = rescue(fn () => \Illuminate\Support\Carbon::parse((string) $request->query('to'))->endOfDay(), null);
+                $fromVal = $request->query('from') ?? $request->query('startDate') ?? $request->query('start_date');
+                $toVal = $request->query('to') ?? $request->query('endDate') ?? $request->query('end_date');
+                $from = rescue(fn () => \Illuminate\Support\Carbon::parse((string) $fromVal)->startOfDay(), null);
+                $to = rescue(fn () => \Illuminate\Support\Carbon::parse((string) $toVal)->endOfDay(), null);
                 if (! $from || ! $to || $from->gt($to)) {
                     return [now()->startOfMonth(), now()->endOfMonth(), 'month', 'This Month'];
                 }

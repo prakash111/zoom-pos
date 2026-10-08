@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Services\Dashboard\DashboardLayoutService;
 use App\Services\NotificationAlertService;
 use App\Services\Sdui\DashboardSduiService;
 use App\Services\Sdui\SchemaResponse;
@@ -70,10 +71,20 @@ class DashboardController extends Controller
             'text_primary' => 'theme.textPrimary',
         ];
 
+        $layoutService = app(DashboardLayoutService::class);
+        $selectedLayout = $request->input('layout')
+            ?? $company->dashboard_layout
+            ?? 'cards_dark';
+        $layoutSchema = $layoutService->getLayoutSchema($selectedLayout);
+
         return response()->json([
-            'success' => true,
-            'view'    => 'dashboard',
-            'schema'  => $schema,
+            'success'          => true,
+            'view'             => 'dashboard',
+            'dashboard_layout' => $layoutSchema['layout_key'],
+            'layout_key'       => $layoutSchema['layout_key'],
+            'enabled_widgets'  => $layoutSchema['widgets'],
+            'layout_meta'      => $layoutSchema,
+            'schema'           => $schema,
         ]);
     }
 
@@ -82,6 +93,12 @@ class DashboardController extends Controller
         $company = $this->resolveCompany($request);
         $tenantId = $company->id;
         $user = auth('sanctum')->user() ?? auth('web')->user() ?? $request->user();
+
+        $layoutService = app(DashboardLayoutService::class);
+        $selectedLayout = $request->input('layout')
+            ?? $company->dashboard_layout
+            ?? 'cards_dark';
+        $layoutSchema = $layoutService->getLayoutSchema($selectedLayout);
 
         $tz = method_exists($company, 'resolveTimezone') ? $company->resolveTimezone() : ($company->timezone ?: 'UTC');
         $now = Carbon::now($tz);
@@ -194,7 +211,7 @@ class DashboardController extends Controller
             ];
         }
 
-        // Sales Overview Area Chart (Range: last_7_days, this_month, quarter)
+        // Sales Overview Area Chart (Range: last_7_days, this_month, quarter, all_time)
         $overviewRange = $request->input('range', 'last_7_days');
         $overviewSeries = [];
         if ($overviewRange === 'this_month') {
@@ -234,6 +251,39 @@ class DashboardController extends Controller
                 ];
                 $cursor->addWeek();
                 $weekNum++;
+            }
+        } elseif ($overviewRange === 'all_time' || $overviewRange === 'all') {
+            $earliestSale = (clone $salesBase)->min('created_at');
+            $allTimeStart = $earliestSale ? Carbon::parse($earliestSale, $tz)->startOfMonth() : (clone $now)->subMonths(5)->startOfMonth();
+            $allTimeEnd = (clone $now)->endOfMonth();
+
+            if ($allTimeStart->diffInMonths($allTimeEnd) < 2) {
+                $allTimeStart = (clone $allTimeEnd)->subMonths(2)->startOfMonth();
+            }
+
+            $monthlySales = (clone $salesBase)
+                ->whereBetween('created_at', [$allTimeStart, $allTimeEnd])
+                ->select(
+                    DB::raw("DATE_FORMAT(created_at, '%Y-%m') as ym"),
+                    DB::raw('SUM(total) as t'),
+                    DB::raw('COUNT(*) as c')
+                )
+                ->groupBy('ym')
+                ->get()
+                ->keyBy('ym');
+
+            $cursor = (clone $allTimeStart);
+            while ($cursor->lte($allTimeEnd)) {
+                $ym = $cursor->format('Y-m');
+                $row = $monthlySales->get($ym);
+                $amt = $row ? (float) $row->t : 0.0;
+                $overviewSeries[] = [
+                    'date' => $cursor->format('Y-m-01'),
+                    'label' => $cursor->format('M y'),
+                    'day' => $cursor->format('M'),
+                    'amount' => round($amt, 2),
+                ];
+                $cursor->addMonth();
             }
         } else {
             for ($i = 6; $i >= 0; $i--) {
@@ -367,7 +417,7 @@ class DashboardController extends Controller
                 ],
             ],
             'sales_overview' => [
-                'ranges' => ['last_7_days', 'this_month', 'quarter'],
+                'ranges' => ['last_7_days', 'this_month', 'quarter', 'all_time', 'custom'],
                 'current_range' => $overviewRange,
                 'series' => $overviewSeries,
             ],
@@ -423,6 +473,10 @@ class DashboardController extends Controller
             ),
             'quick_actions' => $quickActions,
             'recent_transactions' => $recentTransactions,
+            'layout_key' => $layoutSchema['layout_key'],
+            'dashboard_layout' => $layoutSchema['layout_key'],
+            'enabled_widgets' => $layoutSchema['widgets'],
+            'layout_meta' => $layoutSchema,
         ]);
     }
 
@@ -434,13 +488,13 @@ class DashboardController extends Controller
         $tz = method_exists($company, 'resolveTimezone') ? $company->resolveTimezone() : ($company->timezone ?: 'UTC');
         $now = Carbon::now($tz);
 
-        $startDateInput = $request->input('startDate') ?? $request->input('start_date');
-        $endDateInput = $request->input('endDate') ?? $request->input('end_date');
+        $startDateInput = $request->input('startDate') ?? $request->input('start_date') ?? $request->input('from');
+        $endDateInput = $request->input('endDate') ?? $request->input('end_date') ?? $request->input('to');
 
         $period = (string) ($request->input('period') ?? $request->input('range') ?? 'last_7_days');
         if ($startDateInput && $endDateInput) {
             $period = 'custom';
-        } elseif (! in_array($period, ['last_7_days', 'this_month', 'quarter', 'custom'], true)) {
+        } elseif (! in_array($period, ['last_7_days', 'this_month', 'quarter', 'all_time', 'all', 'custom'], true)) {
             $period = 'last_7_days';
         }
 
@@ -471,31 +525,136 @@ class DashboardController extends Controller
                 $customEnd = $temp;
             }
 
-            $customSalesGrouped = (clone $salesBase)
-                ->whereBetween('created_at', [$customStart, $customEnd])
-                ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'), DB::raw('COUNT(*) as c'))
-                ->groupBy('d')
-                ->get()
-                ->keyBy('d');
+            $diffDays = $customStart->diffInDays($customEnd);
 
-            $cursor = (clone $customStart);
-            while ($cursor->lte($customEnd)) {
-                $d = $cursor->format('Y-m-d');
-                $row = $customSalesGrouped->get($d);
+            if ($diffDays <= 31) {
+                $customSalesGrouped = (clone $salesBase)
+                    ->whereBetween('created_at', [$customStart, $customEnd])
+                    ->select(DB::raw('DATE(created_at) as d'), DB::raw('SUM(total) as t'), DB::raw('COUNT(*) as c'))
+                    ->groupBy('d')
+                    ->get()
+                    ->keyBy('d');
+
+                $cursor = (clone $customStart);
+                while ($cursor->lte($customEnd)) {
+                    $d = $cursor->format('Y-m-d');
+                    $row = $customSalesGrouped->get($d);
+                    $amt = $row ? (float) $row->t : 0.0;
+                    $cnt = $row ? (int) $row->c : 0;
+                    $totalSales += $amt;
+                    $totalOrders += $cnt;
+
+                    $overviewSeries[] = [
+                        'date' => $d,
+                        'label' => $cursor->format('j M'),
+                        'day' => $cursor->format('D'),
+                        'amount' => round($amt, 2),
+                        'orders' => $cnt,
+                    ];
+                    $cursor->addDay();
+                }
+            } elseif ($diffDays <= 120) {
+                // Group by weekly intervals so chart remains clean and responsive
+                $cursor = (clone $customStart);
+                $weekNum = 1;
+                while ($cursor->lte($customEnd)) {
+                    $weekEnd = (clone $cursor)->addDays(6)->endOfDay();
+                    if ($weekEnd->gt($customEnd)) {
+                        $weekEnd = (clone $customEnd);
+                    }
+
+                    $row = (clone $salesBase)
+                        ->whereBetween('created_at', [$cursor->startOfDay(), $weekEnd])
+                        ->select(DB::raw('SUM(total) as t'), DB::raw('COUNT(*) as c'))
+                        ->first();
+
+                    $amt = $row ? (float) $row->t : 0.0;
+                    $cnt = $row ? (int) $row->c : 0;
+                    $totalSales += $amt;
+                    $totalOrders += $cnt;
+
+                    $overviewSeries[] = [
+                        'date' => $cursor->format('Y-m-d'),
+                        'label' => $cursor->format('j M'),
+                        'day' => $cursor->format('j M') . ' – ' . $weekEnd->format('j M'),
+                        'amount' => round($amt, 2),
+                        'orders' => $cnt,
+                    ];
+                    $cursor = (clone $weekEnd)->addDay()->startOfDay();
+                    $weekNum++;
+                }
+            } else {
+                // Group by month for long ranges
+                $cursor = (clone $customStart)->startOfMonth();
+                while ($cursor->lte($customEnd)) {
+                    $mStart = $cursor->lt($customStart) ? (clone $customStart) : (clone $cursor);
+                    $mEnd = (clone $cursor)->endOfMonth();
+                    if ($mEnd->gt($customEnd)) {
+                        $mEnd = (clone $customEnd);
+                    }
+
+                    $row = (clone $salesBase)
+                        ->whereBetween('created_at', [$mStart, $mEnd])
+                        ->select(DB::raw('SUM(total) as t'), DB::raw('COUNT(*) as c'))
+                        ->first();
+
+                    $amt = $row ? (float) $row->t : 0.0;
+                    $cnt = $row ? (int) $row->c : 0;
+                    $totalSales += $amt;
+                    $totalOrders += $cnt;
+
+                    $overviewSeries[] = [
+                        'date' => $cursor->format('Y-m-01'),
+                        'label' => $cursor->format('M Y'),
+                        'day' => $cursor->format('M'),
+                        'amount' => round($amt, 2),
+                        'orders' => $cnt,
+                    ];
+                    $cursor->addMonth()->startOfMonth();
+                }
+            }
+        } elseif ($period === 'all_time' || $period === 'all') {
+            $earliestSale = (clone $salesBase)->min('created_at');
+            $allTimeStart = $earliestSale ? Carbon::parse($earliestSale, $tz)->startOfMonth() : (clone $now)->subMonths(5)->startOfMonth();
+            $allTimeEnd = (clone $now)->endOfMonth();
+
+            if ($allTimeStart->diffInMonths($allTimeEnd) < 2) {
+                $allTimeStart = (clone $allTimeEnd)->subMonths(2)->startOfMonth();
+            }
+
+            $monthlySales = (clone $salesBase)
+                ->whereBetween('created_at', [$allTimeStart, $allTimeEnd])
+                ->select(
+                    DB::raw("DATE_FORMAT(created_at, '%Y-%m') as ym"),
+                    DB::raw('SUM(total) as t'),
+                    DB::raw('COUNT(*) as c')
+                )
+                ->groupBy('ym')
+                ->get()
+                ->keyBy('ym');
+
+            $cursor = (clone $allTimeStart);
+            while ($cursor->lte($allTimeEnd)) {
+                $ym = $cursor->format('Y-m');
+                $row = $monthlySales->get($ym);
                 $amt = $row ? (float) $row->t : 0.0;
                 $cnt = $row ? (int) $row->c : 0;
                 $totalSales += $amt;
                 $totalOrders += $cnt;
 
                 $overviewSeries[] = [
-                    'date' => $d,
-                    'label' => $cursor->format('j M'),
-                    'day' => $cursor->format('D'),
+                    'date' => $cursor->format('Y-m-01'),
+                    'label' => $cursor->format('M Y'),
+                    'day' => $cursor->format('M'),
                     'amount' => round($amt, 2),
                     'orders' => $cnt,
                 ];
-                $cursor->addDay();
+                $cursor->addMonth();
             }
+
+            // Ensure exact totals across all time
+            $totalSales = (float) (clone $salesBase)->sum('total');
+            $totalOrders = (int) (clone $salesBase)->count();
         } elseif ($period === 'this_month') {
             // this_month: startOfMonth() to endOfMonth()
             $monthStart = (clone $now)->startOfMonth();
@@ -592,6 +751,8 @@ class DashboardController extends Controller
             }
         }
 
+        $currency = $company->currency_symbol ?: ($company->currency ?: '$');
+
         return response()->json([
             'success' => true,
             'period' => $period,
@@ -600,13 +761,134 @@ class DashboardController extends Controller
             'store_id' => $storeId,
             'series' => $overviewSeries,
             'total_sales' => round($totalSales, 2),
+            'formatted_total_sales' => $currency . number_format($totalSales, 2),
             'total_orders' => $totalOrders,
-            'currency' => $company->currency_symbol ?: ($company->currency ?: '$'),
+            'formatted_total_orders' => number_format($totalOrders),
+            'currency' => $currency,
         ]);
     }
 
     private function getUnreadNotificationsCount(mixed $tenantId): int
     {
         return $this->alerts->unreadCount($tenantId);
+    }
+
+    /**
+     * Dual-Mode / SDUI Dashboard Initialization Endpoint.
+     *
+     * Serves the dynamic dashboard schema, visible widgets orchestration,
+     * and current store metrics. Completely excludes total balance cards.
+     */
+    public function getDashboardInit(Request $request, DashboardLayoutService $layoutService): JsonResponse
+    {
+        $company = $this->resolveCompany($request);
+        $storeId = $request->input('store_id')
+            ?? $request->header('X-Store-Id')
+            ?? (app()->bound('tenant.store_id') ? app('tenant.store_id') : null)
+            ?? $request->user()?->current_store_id;
+
+        $selectedLayout = $request->input('layout')
+            ?? $company->dashboard_layout
+            ?? 'cards_dark';
+
+        $schema = $layoutService->getLayoutSchema($selectedLayout);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'layout_key'        => $schema['layout_key'],
+                'enabled_widgets'   => $schema['widgets'],
+                'layout_meta'       => $schema,
+                'available_layouts' => $layoutService->getAvailableLayouts(),
+                'metrics'           => $this->getMetricsData($company, $storeId),
+            ],
+        ]);
+    }
+
+    /**
+     * Unauthenticated / Public Layout Schema Query.
+     */
+    public function publicLayout(Request $request, DashboardLayoutService $layoutService): JsonResponse
+    {
+        $selectedLayout = $request->input('layout') ?? 'cards_dark';
+        $schema = $layoutService->getLayoutSchema($selectedLayout);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'layout_key'        => $schema['layout_key'],
+                'enabled_widgets'   => $schema['widgets'],
+                'layout_meta'       => $schema,
+                'available_layouts' => $layoutService->getAvailableLayouts(),
+            ],
+        ]);
+    }
+
+    /**
+     * Compute current tenant metrics for the dynamic dashboard widgets.
+     */
+    public function getMetricsData($company, mixed $storeId = null): array
+    {
+        $tz = method_exists($company, 'resolveTimezone') ? $company->resolveTimezone() : ($company->timezone ?: 'UTC');
+        $now = Carbon::now($tz);
+
+        $salesBase = Sale::withoutGlobalScopes(['company', \App\Scopes\StoreScope::class, 'store'])
+            ->where('company_id', $company->id)
+            ->where('status', '!=', 'cancelled');
+
+        if ($storeId) {
+            $salesBase->where('store_id', $storeId);
+        }
+
+        $curr30Start = (clone $now)->subDays(29)->startOfDay();
+        $prev30Start = (clone $curr30Start)->subDays(30);
+        $prev30End = (clone $curr30Start)->subSecond();
+
+        $curr30Sales = (float) (clone $salesBase)->whereBetween('created_at', [$curr30Start, $now])->sum('total');
+        $prev30Sales = (float) (clone $salesBase)->whereBetween('created_at', [$prev30Start, $prev30End])->sum('total');
+        $salesDeltaPct = $prev30Sales > 0 ? round((($curr30Sales - $prev30Sales) / $prev30Sales) * 100, 1) : ($curr30Sales > 0 ? 100.0 : 0.0);
+
+        $curr30Orders = (int) (clone $salesBase)->whereBetween('created_at', [$curr30Start, $now])->count();
+        $prev30Orders = (int) (clone $salesBase)->whereBetween('created_at', [$prev30Start, $prev30End])->count();
+        $ordersDeltaPct = $prev30Orders > 0 ? round((($curr30Orders - $prev30Orders) / $prev30Orders) * 100, 1) : ($curr30Orders > 0 ? 100.0 : 0.0);
+
+        $customerCount = (int) Customer::withoutGlobalScope('company')->where('company_id', $company->id)->count();
+        $productCount = (int) Product::withoutGlobalScope('company')->where('company_id', $company->id)->count();
+        $currency = $company->currency_symbol ?: ($company->currency ?: '$');
+        $totalReceivables = (float) (clone $salesBase)->sum('due_amount');
+
+        return [
+            'total_sales' => [
+                'value' => round($curr30Sales, 2),
+                'formatted' => $currency . number_format($curr30Sales, 2),
+                'trend' => ($salesDeltaPct >= 0 ? '+' : '') . $salesDeltaPct . '%',
+                'is_positive' => $salesDeltaPct >= 0,
+            ],
+            'total_orders' => [
+                'value' => $curr30Orders,
+                'formatted' => number_format($curr30Orders),
+                'trend' => ($ordersDeltaPct >= 0 ? '+' : '') . $ordersDeltaPct . '%',
+                'is_positive' => $ordersDeltaPct >= 0,
+            ],
+            'total_customers' => [
+                'value' => $customerCount,
+                'formatted' => number_format($customerCount),
+            ],
+            'total_products' => [
+                'value' => $productCount,
+                'formatted' => number_format($productCount),
+            ],
+            'receivables' => [
+                'total_amount' => round($totalReceivables, 2),
+                'formatted' => $currency . number_format($totalReceivables, 2),
+            ],
+            'statistics' => [
+                'range_revenue' => round($curr30Sales, 2),
+                'formatted_range_revenue' => $currency . number_format($curr30Sales, 2),
+                'range_orders' => $curr30Orders,
+                'catalogue_count' => $productCount,
+                'customer_count' => $customerCount,
+            ],
+        ];
     }
 }

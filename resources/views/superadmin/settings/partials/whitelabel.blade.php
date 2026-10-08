@@ -607,9 +607,9 @@
                     <div class="flex items-center justify-between">
                         <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Platform Logo') }}</label>
                         @if ($logoImage)
-                            <span class="text-[10px] font-black text-amber-500">{{ __('Staged') }}</span>
+                            <button type="button" wire:click="$set('logoImage', null)" class="text-[10px] text-amber-500 font-bold hover:underline cursor-pointer">✕ {{ __('Cancel Staged') }}</button>
                         @elseif ($logoUrl)
-                            <button type="button" wire:click="removeLogo" class="text-[10px] text-rose-500 font-bold hover:underline">✕ {{ __('Remove') }}</button>
+                            <button type="button" wire:click="removeLogo" class="text-[10px] text-rose-500 font-bold hover:underline cursor-pointer">✕ {{ __('Remove') }}</button>
                         @endif
                     </div>
                     <input type="text" wire:model="logoUrl" placeholder="https://example.com/logo.png" class="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium">
@@ -617,7 +617,12 @@
                 </div>
 
                 <div class="space-y-1.5">
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Favicon URL') }}</label>
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ __('Favicon URL') }}</label>
+                        @if ($faviconUrl)
+                            <button type="button" wire:click="removeFavicon" class="text-[10px] text-rose-500 font-bold hover:underline cursor-pointer">✕ {{ __('Remove') }}</button>
+                        @endif
+                    </div>
                     <input type="text" wire:model="faviconUrl" placeholder="https://example.com/favicon.ico" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs">
                 </div>
             </div>

@@ -372,6 +372,12 @@
                             <x-ui.icon name="users" class="w-5 h-5 group-hover:scale-110 transition-transform" />
                         </x-nav.rail-item>
                     @endif
+
+                    @if (!empty($canLoyalty))
+                        <x-nav.rail-item :route="route('tenant.loyalty.wallets.index')" :active="!empty($isLoyalty)" item-key="loyalty" title="{{ __('Loyalty & Customer Wallet') }}" label="{{ __('Loyalty') }}">
+                            <span class="text-xl group-hover:scale-110 transition-transform shrink-0">🎁</span>
+                        </x-nav.rail-item>
+                    @endif
                 @endif
 
                 @if ($canCashRegister)
@@ -410,6 +416,18 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
+                    </x-nav.rail-item>
+                @endif
+
+                @if (!empty($canHrm))
+                    <x-nav.rail-item :route="route('tenant.hrm.employees.index')" :active="!empty($isHrm)" item-key="hrm" title="{{ __('HRM & Staff Directory') }}" label="{{ __('HRM') }}">
+                        <span class="text-xl group-hover:scale-110 transition-transform shrink-0">👥</span>
+                    </x-nav.rail-item>
+                @endif
+
+                @if (!empty($canChat))
+                    <x-nav.rail-item :route="route('tenant.chat.index')" :active="!empty($isChat)" item-key="chat" title="{{ __('Live Staff Chat & Support') }}" label="{{ __('Chat') }}">
+                        <span class="text-xl group-hover:scale-110 transition-transform shrink-0">💬</span>
                     </x-nav.rail-item>
                 @endif
 
@@ -478,6 +496,11 @@
                         @if ($canCustomers)
                             <x-nav.expanded-item :route="route('tenant.customers.index')" :active="$isCustomers" item-key="customers" title="{{ __('Customers & CRM') }}" subtitle="{{ __('Profiles, history & loyalty') }}">
                                 <span class="text-base shrink-0">👥</span>
+                            </x-nav.expanded-item>
+                        @endif
+                        @if (!empty($canLoyalty))
+                            <x-nav.expanded-item :route="route('tenant.loyalty.wallets.index')" :active="!empty($isLoyalty)" item-key="loyalty" title="{{ __('Loyalty & Wallet') }}" subtitle="{{ __('Balances, tiers & rewards') }}">
+                                <span class="text-base shrink-0">🎁</span>
                             </x-nav.expanded-item>
                         @endif
                     @endif
@@ -604,6 +627,21 @@
                             <span class="text-base shrink-0">🛡️</span>
                         </x-nav.expanded-item>
                     @endif
+                    @if (!empty($canHrm))
+                        <x-nav.expanded-item :route="route('tenant.hrm.employees.index')" :active="!empty($isHrm)" title="{{ __('HRM & Staff') }}" subtitle="{{ __('Employees, attendance & payroll') }}">
+                            <span class="text-base shrink-0">👥</span>
+                        </x-nav.expanded-item>
+                    @endif
+                    @if (!empty($canLoyalty))
+                        <x-nav.expanded-item :route="route('tenant.loyalty.wallets.index')" :active="!empty($isLoyalty)" title="{{ __('Loyalty & Wallet') }}" subtitle="{{ __('Balances, tiers & rewards') }}">
+                            <span class="text-base shrink-0">🎁</span>
+                        </x-nav.expanded-item>
+                    @endif
+                    @if (!empty($canChat))
+                        <x-nav.expanded-item :route="route('tenant.chat.index')" :active="!empty($isChat)" title="{{ __('Staff Chat & Support') }}" subtitle="{{ __('Team messaging, AI & announcements') }}">
+                            <span class="text-base shrink-0">💬</span>
+                        </x-nav.expanded-item>
+                    @endif
                 </div>
 
             </div>
@@ -696,6 +734,18 @@
                 <x-nav.pill-item :route="route('tenant.reports.index')" :active="$isReports" item-key="reports" title="{{ __('Reports & Analytics') }}">📊</x-nav.pill-item>
             @endif
 
+            @if (!empty($canLoyalty))
+                <x-nav.pill-item :route="route('tenant.loyalty.wallets.index')" :active="!empty($isLoyalty)" item-key="loyalty" title="{{ __('Loyalty & Wallet') }}">🎁</x-nav.pill-item>
+            @endif
+
+            @if (!empty($canHrm))
+                <x-nav.pill-item :route="route('tenant.hrm.employees.index')" :active="!empty($isHrm)" item-key="hrm" title="{{ __('HRM & Staff') }}">👥</x-nav.pill-item>
+            @endif
+
+            @if (!empty($canChat))
+                <x-nav.pill-item :route="route('tenant.chat.index')" :active="!empty($isChat)" item-key="chat" title="{{ __('Live Staff Chat') }}">💬</x-nav.pill-item>
+            @endif
+
             <!-- 8. Settings -->
             @if ($canStores)
                 <x-nav.pill-item :route="route('tenant.settings.stores')" :active="request()->routeIs('tenant.settings.stores')" item-key="nav_stores" title="{{ __('Stores & Branches') }}">🏬</x-nav.pill-item>
@@ -775,6 +825,18 @@
 
                 @if ($canReports)
                     <x-nav.speed-dial-item :route="route('tenant.reports.index')" item-key="reports" label="{{ __('Reports') }}">📊</x-nav.speed-dial-item>
+                @endif
+
+                @if (!empty($canLoyalty))
+                    <x-nav.speed-dial-item :route="route('tenant.loyalty.wallets.index')" item-key="loyalty" label="{{ __('Loyalty & Wallet') }}">🎁</x-nav.speed-dial-item>
+                @endif
+
+                @if (!empty($canHrm))
+                    <x-nav.speed-dial-item :route="route('tenant.hrm.employees.index')" item-key="hrm" label="{{ __('HRM & Staff') }}">👥</x-nav.speed-dial-item>
+                @endif
+
+                @if (!empty($canChat))
+                    <x-nav.speed-dial-item :route="route('tenant.chat.index')" item-key="chat" label="{{ __('Live Staff Chat') }}">💬</x-nav.speed-dial-item>
                 @endif
 
                 @if ($canStores)
@@ -1039,6 +1101,123 @@
 
                     @include('layouts.partials.vertical-nav-drawer')
 
+                    {{-- ================================================================= --}}
+                    {{-- 1. HRM & STAFF MANAGEMENT                                         --}}
+                    {{-- ================================================================= --}}
+                    @if (!empty($canHrm))
+                    @canany(['hrm.module.access', 'hrm.employees.view', 'hrm.attendance.view', 'hrm.leaves.view', 'hrm.payroll.view'])
+                    <div data-section-key="hrm_section">
+                        <div class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 px-3">
+                            {{ __('HRM & Staff Management') }}
+                        </div>
+                        <div class="space-y-1">
+                            @can('hrm.employees.view')
+                            <x-nav.drawer-item item-key="hrm_employees" :route="route('tenant.hrm.employees.index')" title="{{ __('Staff Directory') }}" subtitle="{{ __('Employee roster & profiles') }}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/>
+                                </svg>
+                            </x-nav.drawer-item>
+                            @endcan
+
+                            @can('hrm.attendance.view')
+                            <x-nav.drawer-item item-key="hrm_attendance" :route="route('tenant.hrm.attendance.index')" title="{{ __('Attendance Roster') }}" subtitle="{{ __('Clock-in, logs & timesheets') }}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </x-nav.drawer-item>
+                            @endcan
+
+                            @can('hrm.leaves.view')
+                            <x-nav.drawer-item item-key="hrm_leaves" :route="route('tenant.hrm.leaves.index')" title="{{ __('Leave Requests') }}" subtitle="{{ __('Approve or review leaves') }}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                            </x-nav.drawer-item>
+                            @endcan
+
+                            @can('hrm.payroll.view')
+                            <x-nav.drawer-item item-key="hrm_payroll" :route="route('tenant.hrm.payroll.index')" title="{{ __('Payroll & Commissions') }}" subtitle="{{ __('Salary slips & commissions') }}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                </svg>
+                            </x-nav.drawer-item>
+                            @endcan
+                        </div>
+                    </div>
+                    @endcanany
+                    @endif
+
+                    {{-- ================================================================= --}}
+                    {{-- 2. LOYALTY & CUSTOMER WALLET                                      --}}
+                    {{-- ================================================================= --}}
+                    @if (!empty($canLoyalty))
+                    @canany(['loyalty.module.access', 'loyalty.customer.balance_view', 'loyalty.tiers.manage', 'loyalty.settings.edit'])
+                    <div data-section-key="loyalty_section">
+                        <div class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 px-3">
+                            {{ __('Loyalty & Customer Wallet') }}
+                        </div>
+                        <div class="space-y-1">
+                            @can('loyalty.customer.balance_view')
+                            <x-nav.drawer-item item-key="loyalty_wallets" :route="route('tenant.loyalty.wallets.index')" title="{{ __('Customer Balances & Top-up') }}" subtitle="{{ __('Prepaid store wallet balances') }}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                                </svg>
+                            </x-nav.drawer-item>
+                            @endcan
+
+                            @can('loyalty.tiers.manage')
+                            <x-nav.drawer-item item-key="loyalty_tiers" :route="route('tenant.loyalty.tiers.index')" title="{{ __('VIP Membership Tiers') }}" subtitle="{{ __('Bronze, Silver, Gold VIP levels') }}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                                </svg>
+                            </x-nav.drawer-item>
+                            @endcan
+
+                            @can('loyalty.settings.edit')
+                            <x-nav.drawer-item item-key="loyalty_settings" :route="route('tenant.loyalty.settings.index')" title="{{ __('Points Earning Rules') }}" subtitle="{{ __('Points rate & redemption values') }}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                                </svg>
+                            </x-nav.drawer-item>
+                            @endcan
+                        </div>
+                    </div>
+                    @endcanany
+                    @endif
+
+                    {{-- ================================================================= --}}
+                    {{-- 3. UNIFIED STAFF CHAT & LIVE SUPPORT                              --}}
+                    {{-- ================================================================= --}}
+                    @if (!empty($canChat))
+                    <div data-section-key="chat_section">
+                        <div class="text-[10px] font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400 mb-2 px-3">
+                            {{ __('Team Messaging & Support') }}
+                        </div>
+                        <div class="space-y-1">
+                            <x-nav.drawer-item item-key="chat_messages" :route="route('tenant.chat.index')" title="{{ __('Live Staff Chat') }}" subtitle="{{ __('1-on-1 team messaging & broadcasts') }}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                                </svg>
+                            </x-nav.drawer-item>
+
+                            <x-nav.drawer-item item-key="send_staff_notification" :route="route('tenant.notifications.index')" title="{{ __('Staff Notifications & Bulletins') }}" subtitle="{{ __('Dispatch alerts & shift notices to POS') }}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                                </svg>
+                            </x-nav.drawer-item>
+
+                            @if (!empty($canChat) && $canSettings && \Illuminate\Support\Facades\Route::has('tenant.settings.chat'))
+                            <x-nav.drawer-item item-key="chat_settings" :route="route('tenant.settings.chat')" title="{{ __('Chat Settings') }}" subtitle="{{ __('AI replies & broadcast banners') }}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                            </x-nav.drawer-item>
+                            @endif
+                        </div>
+                    </div>
+                    @endif
+
                     <!-- Administration & Settings -->
                     <div data-section-key="administration">
                         <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">{{ __('Administration & Settings') }}</div>
@@ -1059,6 +1238,9 @@
                                     <x-nav.drawer-link item-key="settings_taxes" :route="route('tenant.settings.taxes')" :title="__('Taxes & Compliance')" />
                                     <x-nav.drawer-link item-key="settings_api" :route="route('tenant.settings.integrations')" :title="__('API & Integrations')" />
                                     <x-nav.drawer-link item-key="settings_navigation" :route="route('tenant.settings.navigation')" :title="__('Navigation Menu')" />
+                                    @if (!empty($canChat) && \Illuminate\Support\Facades\Route::has('tenant.settings.chat'))
+                                    <x-nav.drawer-link item-key="settings_chat" :route="route('tenant.settings.chat')" :title="__('Chat & AI Settings')" />
+                                    @endif
                                     @if (! $canStorefront)
                                     <x-nav.drawer-link item-key="settings_coupons" :route="route('tenant.settings.coupons')" :title="__('Coupons & Discounts')" />
                                     <x-nav.drawer-link item-key="settings_faqs" :route="route('tenant.settings.faqs')" :title="__('Store FAQs')" />
@@ -1370,7 +1552,7 @@
                  'flex-1': position === 'left' || position === 'right'
              }">
 
-            @if (config('app.demo_mode') && (auth('web')->user()?->company?->is_demo ?? false))
+            @if (config('app.show_demo_banner', false) && config('app.demo_mode') && (auth('web')->user()?->company?->is_demo ?? false))
                 <!-- Demo Mode Notice & Flutter Web Version CTA -->
                 <div class="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm font-medium shadow-sm shrink-0 z-40">
                     <div class="flex items-center gap-2">
@@ -1532,21 +1714,89 @@
                         </span>
                     </button>
 
-                    <!-- User identity & Change Password Trigger -->
-                    <div class="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
-                        <!-- ONLY the profile avatar/button carries this onclick -->
-                        <button type="button" 
-                                onclick="openChangePasswordModal(event)"
-                                class="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-emerald-500/40 transition focus:outline-none cursor-pointer"
-                                title="{{ __('Change Password') }}"
-                                aria-label="{{ __('Change Password') }}">
-                            <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs uppercase shadow">
-                                {{ substr(auth()->user()?->name ?? 'Z', 0, 1) }}
+                    <!-- User Profile Dropdown -->
+                    <div class="relative pl-2 border-l border-slate-200 dark:border-slate-800" 
+                         x-data="{ open: false }" 
+                         @click.outside="open = false" 
+                         @click.away="open = false" 
+                         @close.stop="open = false">
+                        <!-- Trigger Avatar Button -->
+                        <button @click="open = !open" 
+                                type="button" 
+                                class="flex items-center gap-2 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/60 transition focus:outline-none cursor-pointer"
+                                title="{{ __('User Profile Menu') }}"
+                                aria-label="{{ __('User Profile Menu') }}"
+                                :aria-expanded="open.toString()">
+                            <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs uppercase shadow hover:bg-blue-500 transition shrink-0">
+                                {{ strtoupper(substr(auth()->user()?->name ?? 'M', 0, 1)) }}
                             </div>
+                            <div class="hidden sm:block text-left">
+                                <div class="text-xs font-bold text-slate-800 dark:text-slate-200 leading-none truncate max-w-[120px]">{{ auth()->user()?->name ?? 'Store Admin' }}</div>
+                                <div class="text-[10px] text-slate-400 capitalize mt-0.5">{{ auth()->user()?->role ?? 'Administrator' }}</div>
+                            </div>
+                            <svg class="w-3.5 h-3.5 text-slate-400 hidden sm:block transition-transform duration-150" :class="{ 'rotate-180': open }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
                         </button>
-                        <div class="hidden sm:block text-left">
-                            <div class="text-xs font-bold text-slate-800 dark:text-slate-200 leading-none">{{ auth()->user()?->name }}</div>
-                            <div class="text-[10px] text-slate-400 capitalize mt-0.5">{{ auth()->user()?->role }}</div>
+
+                        <!-- Dropdown Menu -->
+                        <div x-show="open" 
+                             x-cloak
+                             x-transition:enter="transition ease-out duration-100"
+                             x-transition:enter-start="transform opacity-0 scale-95"
+                             x-transition:enter-end="transform opacity-100 scale-100"
+                             x-transition:leave="transition ease-in duration-75"
+                             x-transition:leave-start="transform opacity-100 scale-100"
+                             x-transition:leave-end="transform opacity-0 scale-95"
+                             class="absolute right-0 mt-2 w-60 rounded-2xl shadow-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-2 z-50 text-sm overflow-hidden"
+                             style="display: none;">
+
+                            <!-- User Information Header -->
+                            <div class="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
+                                <p class="text-[11px] text-slate-400 font-medium">{{ __('Signed in as') }}</p>
+                                <p class="text-sm font-bold text-slate-800 dark:text-white truncate">{{ auth()->user()?->name ?? 'Store Admin' }}</p>
+                                <p class="text-xs text-slate-400 truncate">{{ auth()->user()?->email ?? '' }}</p>
+                                <span class="inline-block mt-1.5 px-2 py-0.5 text-[10px] font-bold tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 rounded border border-emerald-200 dark:border-emerald-800/50 uppercase">
+                                    {{ auth()->user()?->role ?? 'Administrator' }}
+                                </span>
+                            </div>
+
+                            <!-- Menu Actions -->
+                            <div class="py-1">
+                                <!-- Account / Store Settings -->
+                                <a href="{{ route('tenant.settings.profile') }}" 
+                                   class="flex items-center px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition font-medium text-xs">
+                                    <svg class="w-4 h-4 mr-2.5 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                    {{ __('Account Settings') }}
+                                </a>
+
+                                <!-- Change Password (Triggers Existing Modal) -->
+                                <button type="button" 
+                                        @click="open = false; $dispatch('open-change-password-modal'); openChangePasswordModal($event)" 
+                                        class="w-full text-left flex items-center px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition font-medium text-xs cursor-pointer">
+                                    <svg class="w-4 h-4 mr-2.5 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                                    </svg>
+                                    {{ __('Change Password') }}
+                                </button>
+                            </div>
+
+                            <!-- Log Out Section -->
+                            <div class="border-t border-slate-150 dark:border-slate-800 py-1">
+                                <form method="POST" action="{{ route('tenant.logout') }}">
+                                    @csrf
+                                    <button type="submit" 
+                                            class="w-full text-left flex items-center px-4 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-700 dark:hover:text-rose-300 transition font-medium text-xs cursor-pointer">
+                                        <svg class="w-4 h-4 mr-2.5 text-rose-500 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                        </svg>
+                                        {{ __('Log Out') }}
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1670,6 +1920,38 @@
         <script src="{{ asset('assets/libs/tinymce/tinymce.min.js') }}"></script>
         <script src="{{ asset('assets/libs/tinymce/tinymce-theme-handler.js') }}"></script>
     @endif
+    @auth('web')
+    @if (!empty($canChat))
+    <script>
+        (function() {
+            let lastAlertTime = new Date().toISOString();
+            const alertAudio = new Audio('/sounds/notification_alert.mp3');
+            function checkChatAlerts() {
+                if (window.location.pathname.startsWith('/tenant/chat')) return;
+                fetch('/tenant/api/chat/alerts?since=' + encodeURIComponent(lastAlertTime))
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.alerts && data.alerts.length > 0) {
+                            lastAlertTime = data.now || new Date().toISOString();
+                            alertAudio.play().catch(() => {});
+                            data.alerts.forEach(msg => {
+                                const sender = msg.sender?.name || 'Team Member';
+                                window.dispatchEvent(new CustomEvent('notify', {
+                                    detail: {
+                                        type: 'info',
+                                        message: '💬 ' + sender + ': ' + (msg.message || 'Sent an attachment')
+                                    }
+                                }));
+                            });
+                        }
+                    })
+                    .catch(() => {});
+            }
+            setInterval(checkChatAlerts, 6000);
+        })();
+    </script>
+    @endif
+    @endauth
     @livewireScripts
     @stack('scripts')
 </body>

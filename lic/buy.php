@@ -505,15 +505,21 @@ if ($gateway === 'razorpay') {
  * Render Hosted Checkout Form
  * ------------------------------------------------------------- */
 $itemRowsHtml = '';
+$regularTotal = 0.00;
 foreach ($productsList as $p) {
+    $pPrice = (float) $p['price'];
+    $regularTotal += $pPrice;
     $isCore = ($p['slug'] === 'core');
     $tag = $isCore ? '<span class="tag-core">Core</span>' : '<span class="tag-mod">Module</span>';
     $itemRowsHtml .= '
     <div class="item-row">
         <span>'.$tag.' <strong>'.e($p['name']).'</strong></span>
-        <span style="color:#64748b;font-size:12px">'.e(number_format((float)$p['price'], 2)).' '.e($p['currency']).'</span>
+        <span style="color:#64748b;font-size:12px">'.e(number_format($pPrice, 2)).' '.e($p['currency'] ?: $currency).'</span>
     </div>';
 }
+
+$discountAmount = max(0.0, $regularTotal - $price);
+$discountPercent = ($regularTotal > 0 && $discountAmount > 0) ? round(($discountAmount / $regularTotal) * 100) : 0;
 
 $errHtml = !empty($validationErr) ? '<div class="err">'.e($validationErr).'</div>' : '';
 
@@ -529,9 +535,21 @@ $formHtml = '
 <div class="item-list">
     <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Included Products ('.count($productsList).')</div>
     '.$itemRowsHtml.'
-    <div class="item-total">
-        <span>Total Payable</span>
-        <span style="color:#4f46e5;font-size:18px">'.e(number_format($price, 2)).' '.e($currency).'</span>
+    '.($discountAmount > 0 ? '
+    <div style="margin-top:12px;padding-top:10px;border-top:1px dashed #cbd5e1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#64748b;margin-bottom:6px;">
+            <span>Total Value (Original Price)</span>
+            <span style="text-decoration:line-through;font-weight:600;">'.e(number_format($regularTotal, 2)).' '.e($currency).'</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#059669;font-weight:700;margin-bottom:6px;">
+            <span>Bundle Discount ('.$discountPercent.'% OFF)</span>
+            <span>-'.e(number_format($discountAmount, 2)).' '.e($currency).'</span>
+        </div>
+    </div>
+    ' : '').'
+    <div class="item-total" style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;margin-top:6px;border-top:2px solid #cbd5e1;font-weight:800;font-size:15px;color:#0f172a;">
+        <span>Total Payable (Discounted)</span>
+        <span style="color:#4f46e5;font-size:20px;font-weight:900;">'.e(number_format($price, 2)).' '.e($currency).'</span>
     </div>
 </div>
 

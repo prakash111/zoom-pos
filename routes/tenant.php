@@ -83,6 +83,10 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
         ->middleware('guest:web')
         ->name('register');
 
+    Route::post('/register', [\App\Http\Controllers\Auth\TenantRegisterController::class, 'register'])
+        ->middleware('guest:web')
+        ->name('register.submit');
+
     Route::middleware('guest:web')->group(function () {
         Route::get('/forgot-password', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
         Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink'])->name('password.email');
@@ -105,6 +109,8 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
 
         // Billing, Invoicing & Activation (Always reachable by tenant admin even if expired)
         Route::get('/billing', Billing\Index::class)->name('billing.index');
+        Route::get('/billing/pricing', Billing\Index::class)->name('billing.pricing');
+        Route::get('/settings/subscription-pricing', Billing\Index::class)->name('settings.subscription-pricing');
         Route::get('/activate', Billing\Index::class)->name('activate');
         Route::get('/billing/invoices/{invoice}/pdf', [SubscriptionInvoiceController::class, 'pdf'])->name('billing.invoices.pdf');
 
@@ -341,6 +347,19 @@ Route::prefix('tenant')->name('tenant.')->middleware(CheckMaintenanceMode::class
             Route::get('/users/{user}/permissions', Users\Permissions::class)->middleware('tenant.permission:users,view')->name('users.user-permissions');
 
             Route::get('/devices', Devices\Index::class)->middleware('tenant.permission:settings,view')->name('devices.index');
+
+            // Staff Notifications & Bulletins
+            if (class_exists(\Modules\Chat\Http\Controllers\Web\TenantNotificationWebController::class)) {
+                Route::get('/staff-notifications', [\Modules\Chat\Http\Controllers\Web\TenantNotificationWebController::class, 'index'])->name('notifications.index');
+                Route::get('/staff-notifications/create', [\Modules\Chat\Http\Controllers\Web\TenantNotificationWebController::class, 'create'])->name('notifications.create');
+                Route::post('/staff-notifications', [\Modules\Chat\Http\Controllers\Web\TenantNotificationWebController::class, 'store'])->name('notifications.store');
+                Route::delete('/staff-notifications/{id}', [\Modules\Chat\Http\Controllers\Web\TenantNotificationWebController::class, 'destroy'])->name('notifications.destroy');
+            }
+
+            // Staff Chat Web Portal
+            if (class_exists(\Modules\Chat\Http\Controllers\ChatWebController::class)) {
+                Route::get('/chat', [\Modules\Chat\Http\Controllers\ChatWebController::class, 'index'])->name('chat.index');
+            }
 
             Route::post('/impersonate/{user}', [ImpersonationController::class, 'start'])->name('impersonate.start');
             Route::post('/impersonate', [ImpersonationController::class, 'stop'])->name('impersonate.stop');

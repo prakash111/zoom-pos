@@ -43,7 +43,7 @@ class TenantSampleDataService
             match ($normalizedMode) {
                 'restaurant' => $this->seedRestaurant($company, $admin),
                 'pharmacy' => $this->seedPharmacy($company, $admin),
-                'service_booking' => $this->seedServiceBooking($company, $admin),
+                'service_booking', 'salon' => $this->seedServiceBooking($company, $admin),
                 'repair', 'repair_technician' => $this->seedRepairTechnician($company, $admin),
                 default => $this->seedRetail($company, $admin),
             };
@@ -58,6 +58,14 @@ class TenantSampleDataService
             // top products & cash flow), a few on-credit invoices (receivables
             // + customer ledger, via SaleObserver) and open quotations.
             $this->seedShared($company, $admin, $normalizedMode);
+
+            if ($company->hasModule('hrm') && class_exists(\Modules\Hrm\Database\Seeders\HrmDemoSeeder::class)) {
+                try {
+                    (new \Modules\Hrm\Database\Seeders\HrmDemoSeeder)->seedCompanyHrm($company);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed seeding HRM demo data: ' . $e->getMessage());
+                }
+            }
 
             $company->update(['is_seeding_complete' => true]);
         });
@@ -173,7 +181,7 @@ class TenantSampleDataService
                 'The store is not responsible for data loss — please back up your device before handing it over.',
                 'Devices not collected within 30 days of the completion notice may attract storage charges.',
             ]);
-        } elseif ($mode === 'service_booking') {
+        } elseif ($mode === 'service_booking' || $mode === 'salon') {
             $fillIfBlank['salon_policy_terms'] = implode("\n", [
                 'Please arrive 10 minutes before your scheduled appointment.',
                 'Cancellations within 4 hours of the appointment, and no-shows, are charged 50% of the service value.',

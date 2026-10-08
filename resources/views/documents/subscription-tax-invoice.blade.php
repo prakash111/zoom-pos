@@ -13,6 +13,10 @@
         }
     </style>
 </head>
+@php
+    $currencyCode = strtoupper($invoice->currency ?? config('app.currency', 'INR'));
+    $currencySymbol = $invoice->getCurrencySymbol();
+@endphp
 <body class="bg-slate-100 text-slate-900 min-h-screen p-4 sm:p-8 flex flex-col items-center antialiased font-sans">
 
     @unless(request()->boolean('embed'))
@@ -126,8 +130,8 @@
                             @endif
                         </td>
                         <td class="py-4 font-semibold text-slate-700 capitalize">{{ $invoice->billing_cycle }}</td>
-                        <td class="py-4 text-right font-bold text-slate-900">${{ $invoice->getFormattedSubtotal() }}</td>
-                        <td class="py-4 text-right pr-2 font-black text-slate-900">${{ $invoice->getFormattedSubtotal() }}</td>
+                        <td class="py-4 text-right font-bold text-slate-900">{{ $currencySymbol }}{{ number_format($invoice->subtotal, 2) }}</td>
+                        <td class="py-4 text-right pr-2 font-black text-slate-900">{{ $currencySymbol }}{{ number_format($invoice->subtotal, 2) }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -149,35 +153,35 @@
             <div class="w-full sm:w-80 space-y-2 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
                 <div class="flex justify-between text-slate-600 font-medium">
                     <span>Taxable Base Value</span>
-                    <span class="font-bold text-slate-900">${{ $invoice->getFormattedSubtotal() }}</span>
+                    <span class="font-bold text-slate-900">{{ $currencySymbol }}{{ number_format($invoice->subtotal, 2) }}</span>
                 </div>
 
                 @if (!empty($invoice->tax_breakdown))
-                    @if (!empty($invoice->tax_breakdown['cgst_amount']))
+                    @if ($invoice->cgst > 0 || !empty($invoice->tax_breakdown['cgst_amount']))
                         <div class="flex justify-between text-slate-500 text-[11px]">
-                            <span>CGST ({{ $invoice->tax_breakdown['cgst_rate'] }}%)</span>
-                            <span class="font-bold text-slate-800">${{ number_format($invoice->tax_breakdown['cgst_amount'], 2) }}</span>
+                            <span>CGST ({{ $invoice->cgst_rate }}%)</span>
+                            <span class="font-bold text-slate-800">{{ $currencySymbol }}{{ number_format($invoice->cgst, 2) }}</span>
                         </div>
                         <div class="flex justify-between text-slate-500 text-[11px]">
-                            <span>SGST ({{ $invoice->tax_breakdown['sgst_rate'] }}%)</span>
-                            <span class="font-bold text-slate-800">${{ number_format($invoice->tax_breakdown['sgst_amount'], 2) }}</span>
+                            <span>SGST ({{ $invoice->sgst_rate }}%)</span>
+                            <span class="font-bold text-slate-800">{{ $currencySymbol }}{{ number_format($invoice->sgst, 2) }}</span>
                         </div>
                     @else
                         <div class="flex justify-between text-slate-500 text-[11px]">
                             <span>{{ $invoice->tax_type }} ({{ (float)$invoice->tax_rate }}%)</span>
-                            <span class="font-bold text-slate-800">${{ $invoice->getFormattedTax() }}</span>
+                            <span class="font-bold text-slate-800">{{ $currencySymbol }}{{ $invoice->getFormattedTax() }}</span>
                         </div>
                     @endif
                 @else
                     <div class="flex justify-between text-slate-500 text-[11px]">
                         <span>Tax ({{ (float)$invoice->tax_rate }}%)</span>
-                        <span class="font-bold text-slate-800">${{ $invoice->getFormattedTax() }}</span>
+                        <span class="font-bold text-slate-800">{{ $currencySymbol }}{{ $invoice->getFormattedTax() }}</span>
                     </div>
                 @endif
 
                 <div class="flex justify-between items-baseline pt-2 border-t-2 border-slate-900 text-sm font-black text-slate-900">
                     <span>Total Amount Paid</span>
-                    <span class="text-lg text-blue-600">${{ $invoice->getFormattedTotal() }} {{ $invoice->currency }}</span>
+                    <span class="text-lg text-emerald-600 font-black">{{ $currencySymbol }}{{ number_format($invoice->total_amount, 2) }}</span>
                 </div>
             </div>
         </div>

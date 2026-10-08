@@ -6,42 +6,36 @@ function builder_documentation_info(): array
     if (!function_exists('get_landing_config')) {
         $helperCandidates = [
             dirname(__DIR__, 2) . '/lib/landing_helper.php',
-            dirname(__DIR__) . '/../lib/landing_helper.php',
-            __DIR__ . '/../../lib/landing_helper.php',
+            dirname(__DIR__, 3) . '/lib/landing_helper.php',
         ];
-        foreach ($helperCandidates as $hc) {
-            if (file_exists($hc)) {
-                require_once $hc;
+        foreach ($helperCandidates as $cand) {
+            if (file_exists($cand)) {
+                require_once $cand;
                 break;
             }
         }
     }
 
     if (function_exists('get_landing_config')) {
-        $cfg = get_landing_config();
-        $url = !empty($cfg['documentation_url']) ? (string)$cfg['documentation_url'] : '';
-        $title = !empty($cfg['documentation_title']) ? (string)$cfg['documentation_title'] : 'Documentation';
-        if (!empty($url)) {
-            return ['url' => $url, 'title' => $title];
-        }
+        try {
+            $landingCfg = get_landing_config();
+            $docUrl = $landingCfg['documentation_url'] ?? '';
+            if (!empty($docUrl)) {
+                return [
+                    'url'   => $docUrl,
+                    'title' => 'Official Software Documentation & Guides',
+                ];
+            }
+        } catch (Throwable $e) {}
     }
 
-    // 2. Direct database landing_page_config JSON inspection
-    $raw = function_exists('lic_setting') ? lic_setting('landing_page_config', '') : (function_exists('setting') ? setting('landing_page_config', '') : '');
-    if (!empty($raw)) {
-        $cfg = json_decode($raw, true);
-        if (is_array($cfg) && !empty($cfg['documentation_url'])) {
-            return [
-                'url' => (string)$cfg['documentation_url'],
-                'title' => !empty($cfg['documentation_title']) ? (string)$cfg['documentation_title'] : 'Documentation',
-            ];
-        }
-    }
+    // 2. Fallback to SaaS portal documentation
+    $host = $_SERVER['HTTP_HOST'] ?? 'saas.zoomnearby.com';
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'https';
 
-    // 3. Fallback to standalone setting or default
     return [
-        'url' => (string)setting('documentation_url', 'https://saas.zoomnearby.com/documentation'),
-        'title' => 'Documentation',
+        'url'   => "{$scheme}://{$host}/documentation/index.html",
+        'title' => 'Comprehensive App Builder & API Guide',
     ];
 }
 
@@ -53,134 +47,118 @@ function builder_header(string $activeTab, string $pageTitle = 'App Builder'): v
     $planName = ucfirst($license['plan'] ?? 'Regular');
 
     $docInfo = builder_documentation_info();
+    $maskedLicense = (strlen($licenseKey) > 10)
+        ? substr($licenseKey, 0, 5) . '-•••••-' . substr($licenseKey, -4)
+        : ($licenseKey ?: 'DEMO-LICENSE');
 
     $tabs = [
-        'dashboard' => ['label' => 'Dashboard', 'icon' => '📊', 'url' => 'index.php'],
-        'new-build' => ['label' => 'New Build', 'icon' => '🚀', 'url' => 'new-build.php'],
-        'builds'    => ['label' => 'Build History', 'icon' => '📜', 'url' => 'builds.php'],
-        'guide'     => ['label' => 'Documentation', 'icon' => '📖', 'url' => $docInfo['url'], 'title' => $docInfo['title'], 'target' => '_blank'],
+        'dashboard' => ['label' => 'Dashboard', 'url' => 'index.php', 'icon' => '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>'],
+        'new-build' => ['label' => 'New build', 'url' => 'new-build.php', 'icon' => '<path d="M12 5v14M5 12h14"/>'],
+        'builds'    => ['label' => 'Build history', 'url' => 'builds.php', 'icon' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+        'guide'     => ['label' => 'Documentation', 'url' => $docInfo['url'], 'target' => '_blank', 'icon' => '<path d="M4 5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2z"/><path d="M8 7h6"/>'],
     ];
 
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8">';
-    echo '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">';
-    echo '<title>' . e($pageTitle) . ' — ZoomNearby Cloud App Builder</title>';
-    $assetVer = '2.2.' . (file_exists(__DIR__ . '/../assets/preview.js') ? filemtime(__DIR__ . '/../assets/preview.js') : time());
-    echo '<link rel="stylesheet" href="assets/app.css?v=' . $assetVer . '">';
-    echo '<link rel="stylesheet" href="assets/preview.css?v=' . $assetVer . '">';
-    echo '<script src="assets/builder.js?v=' . $assetVer . '"></script>';
-    echo '<script src="assets/preview.js?v=' . $assetVer . '"></script>';
+    echo '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">';
+    echo '<meta name="viewport" content="width=device-width, initial-scale=1">';
+    echo '<title>' . e($pageTitle) . ' · App Builder</title>';
+    echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
+    echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
+    echo '<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">';
+    echo '<style>
+:root{--bg:#f6f7fb;--surface:#fff;--ink:#12142a;--muted:#5d6280;--line:#e4e6f0;--brand:#4f46e5;--brand-ink:#3730a3;--brand-soft:#eef0ff;--ok:#0f9d6a;--ok-soft:#e6f6ef;--warn:#b4540a;--warn-soft:#fff3e4;--danger:#dc2626;--danger-soft:#fee2e2;--r:12px;--font:\'Onest\',system-ui,-apple-system,\'Segoe UI\',sans-serif;--mono:ui-monospace,\'SF Mono\',Menlo,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0e1020;--surface:#171a30;--ink:#eef0ff;--muted:#a0a5c6;--line:#2a2e4d;--brand:#7c78ff;--brand-ink:#c9c7ff;--brand-soft:#23265a;--ok:#34d399;--ok-soft:#10382c;--warn:#fbbf6a;--warn-soft:#3a2a12;--danger:#f87171;--danger-soft:#3f1418}}
+:root[data-theme=dark]{--bg:#0e1020;--surface:#171a30;--ink:#eef0ff;--muted:#a0a5c6;--line:#2a2e4d;--brand:#7c78ff;--brand-ink:#c9c7ff;--brand-soft:#23265a;--ok:#34d399;--ok-soft:#10382c;--warn:#fbbf6a;--warn-soft:#3a2a12;--danger:#f87171;--danger-soft:#3f1418}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--font);-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+aside{position:sticky;top:0;height:100vh;background:var(--surface);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:20px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;padding:0 8px;color:var(--ink);text-decoration:none}
+.logo i{width:32px;height:32px;border-radius:9px;background:var(--brand);display:grid;place-items:center}
+.logo svg{width:18px;height:18px;stroke:#fff}
+nav a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;color:var(--muted);text-decoration:none;font-weight:500}
+nav a svg{width:18px;height:18px;flex:none}
+nav a:hover{background:var(--bg)}
+nav a[aria-current]{background:var(--brand-soft);color:var(--brand-ink);font-weight:600}
+.lic{margin-top:auto;border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.lic small{color:var(--muted);display:block}
+.lic b{display:block;font-family:var(--mono);font-size:13px;margin:2px 0 8px}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--ok-soft);color:var(--ok)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.danger{background:var(--danger-soft);color:var(--danger)}
+.tag.brand{background:var(--brand-soft);color:var(--brand)}
+main{min-width:0}
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:12px 28px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.top .sp{flex:1}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px;color:inherit;text-decoration:none}
+.btn:hover{border-color:var(--brand)}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn svg{width:16px;height:16px}
+.wrap{padding:28px;max-width:1320px}
+h1{font-size:28px;line-height:1.2;margin:0 0 6px;letter-spacing:-.02em}
+.lead{color:var(--muted);margin:0 0 24px;max-width:65ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:20px}
+.status-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px}
+.status-pill.completed{background:var(--ok-soft);color:var(--ok)}
+.status-pill.building,.status-pill.preparing{background:var(--brand-soft);color:var(--brand)}
+.status-pill.failed{background:var(--danger-soft);color:var(--danger)}
+.status-pill.queued{background:var(--warn-soft);color:var(--warn)}
+@media (max-width:860px){.app{grid-template-columns:1fr}.app>aside{display:none}.wrap{padding:16px}.top{padding:10px 16px}}
+</style>';
     echo '</head><body>';
-    echo '<div id="spa-loader"></div>';
-    
-    // Backdrop for mobile sidebar drawer
-    echo '<div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleMobileSidebar(false)"></div>';
-
-    echo '<div class="app-shell">';
+    echo '<div class="app">';
 
     // Left Sidebar
-    echo '<aside class="app-sidebar" id="app-sidebar">';
-    echo '<div class="sidebar-header" style="justify-content:space-between;">';
-    echo '<a href="index.php" class="sidebar-logo">';
-    echo '<div class="sidebar-logo-icon" style="background:#4f46e5;color:#fff;display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;font-weight:900;">🔨</div>';
-    echo '<span>App Builder</span>';
-    echo '</a>';
-    echo '<button type="button" class="sidebar-close-btn" onclick="toggleMobileSidebar(false)" aria-label="Close menu">✕</button>';
-    echo '</div>';
-
-    echo '<div class="sidebar-content">';
-    echo '<div class="sidebar-label">Navigation</div>';
-    echo '<nav class="sidebar-nav">';
+    echo '<aside>';
+    echo '<a href="index.php" class="logo"><i><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.7 6.3 3 3M4 20l1-4L16 5a2.1 2.1 0 0 1 3 3L8 19z"/></svg></i>App Builder</a>';
+    echo '<nav aria-label="Main">';
     foreach ($tabs as $key => $tab) {
-        $cls = ($key === $activeTab) ? 'sidebar-link on' : 'sidebar-link';
+        $cur = ($key === $activeTab) ? ' aria-current="page"' : '';
         $target = !empty($tab['target']) ? ' target="' . e($tab['target']) . '"' : '';
-        $titleAttr = !empty($tab['title']) ? ' title="' . e($tab['title']) . '"' : '';
-        echo '<a href="' . e($tab['url']) . '" class="' . $cls . '"' . $target . $titleAttr . '>';
-        echo '<span class="icon">' . $tab['icon'] . '</span>';
-        echo '<span>' . e($tab['label']) . '</span>';
+        echo '<a href="' . e($tab['url']) . '"' . $cur . $target . '>';
+        echo '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' . $tab['icon'] . '</svg>';
+        echo e($tab['label']);
         echo '</a>';
     }
     echo '</nav>';
-
-    // License Badge in Sidebar
-    $account = Auth::account();
-    echo '<div style="margin:24px 16px 12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">';
-    echo '<div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Active License</div>';
-    echo '<div style="font-size:12px;font-weight:700;color:#0f172a;margin-top:2px;font-family:monospace;">' . e(substr($licenseKey, 0, 11)) . '•••••</div>';
-    if (!empty($account['company_name'])) {
-        echo '<div style="margin-top:6px;font-size:11.5px;font-weight:700;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' . e($account['company_name']) . '">🏢 ' . e($account['company_name']) . '</div>';
-    }
-    echo '<div style="margin-top:6px;display:flex;gap:4px;">';
-    echo '<span class="status-pill active" style="font-size:10px;padding:2px 6px;">● ' . e($planName) . ' Plan</span>';
-    echo '</div>';
-    echo '</div>';
-
-    echo '</div>'; // sidebar-content
-
-    echo '<div class="sidebar-footer">';
-    echo '<div class="sidebar-user">';
-    $avatarLetter = !empty($account['company_name']) ? substr($account['company_name'], 0, 1) : substr($clientEmail, 0, 1);
-    echo '<div class="user-avatar" style="background:#6366f1;color:#fff;">' . strtoupper($avatarLetter) . '</div>';
-    echo '<div class="user-meta">';
-    $userDisplayTitle = !empty($account['company_name']) ? $account['company_name'] : $clientEmail;
-    $userSubTitle = !empty($account['company_name']) ? $clientEmail : 'License Holder';
-    echo '<div class="user-name" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' . e($userDisplayTitle) . '">' . e($userDisplayTitle) . '</div>';
-    echo '<div class="user-email" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' . e($userSubTitle) . '">' . e($userSubTitle) . '</div>';
-    echo '</div>';
-    echo '<a href="logout.php" title="Change license" style="color:#ef4444;text-decoration:none;font-size:16px;padding:4px;font-weight:bold;">⇥</a>';
-    echo '</div>';
-    echo '</div>';
+    echo '<div class="lic"><small>Active license</small><b>' . e($maskedLicense) . '</b><span class="tag">' . e($planName) . ' plan</span></div>';
     echo '</aside>';
 
     // Main App Container
-    echo '<div class="app-main-wrapper">';
-    
-    // Top Bar
-    echo '<header class="app-topbar">';
-    echo '<div style="display:flex;align-items:center;gap:10px;min-width:0;">';
-    echo '<button type="button" class="mobile-menu-toggle" onclick="toggleMobileSidebar(true)" aria-label="Toggle menu">☰</button>';
-    echo '<div class="topbar-status-badge" style="color:#10b981;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">';
-    echo '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;flex-shrink:0;"></span>';
-    echo '<span class="engine-badge-text" style="color:#4b5563;">Cloud Build Engine (Online)</span>';
-    echo '</div>';
+    echo '<main>';
+    echo '<div class="top">';
+    echo '<span class="dot"></span><span style="font-weight:500;font-size:14px">Build engine online</span>';
+    echo '<span class="sp"></span>';
+    echo '<button class="btn" id="theme" type="button">Theme</button>';
+    echo '<a href="new-build.php" class="btn pri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New build</a>';
     echo '</div>';
 
-    echo '<div class="topbar-actions" style="display:flex;align-items:center;gap:8px;flex-shrink:0;">';
-    echo '<a href="new-build.php" class="btn topbar-new-btn" style="background:#4f46e5;color:#fff;text-decoration:none;padding:7px 12px;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap;">+ <span class="new-build-text">Start New Build</span></a>';
-    echo '<a href="index.php" class="topbar-btn" title="Refresh">↻</a>';
-    echo '</div>';
-    echo '</header>';
-
-    echo '<main class="app-content">';
+    echo '<div class="wrap">';
 }
 
 function builder_footer(): void
 {
-    echo '</main>'; // app-content
-    echo '</div>';   // app-main-wrapper
-    echo '</div>';   // app-shell
+    echo '</div>'; // .wrap
+    echo '</main>';
+    echo '</div>'; // .app
     echo '<script>
-    function toggleMobileSidebar(open) {
-        var sb = document.getElementById("app-sidebar");
-        var bd = document.getElementById("sidebar-backdrop");
-        if (!sb) return;
-        var isOpen = (typeof open === "boolean") ? open : !sb.classList.contains("open");
-        if (isOpen) {
-            sb.classList.add("open");
-            if (bd) bd.classList.add("active");
-            document.body.style.overflow = "hidden";
-        } else {
-            sb.classList.remove("open");
-            if (bd) bd.classList.remove("active");
-            document.body.style.overflow = "";
-        }
-    }
-    document.addEventListener("DOMContentLoaded", function() {
-        document.querySelectorAll(".sidebar-link").forEach(function(link) {
-            link.addEventListener("click", function() {
-                if (window.innerWidth <= 768) toggleMobileSidebar(false);
-            });
-        });
-    });
-    </script>';
+const themeBtn = document.getElementById("theme");
+if (themeBtn) {
+  themeBtn.onclick = () => {
+    const r = document.documentElement;
+    const isDark = getComputedStyle(r).getPropertyValue("--bg").trim() == "#0e1020";
+    const next = isDark ? "light" : "dark";
+    r.dataset.theme = next;
+    localStorage.setItem("zn_theme", next);
+  };
+}
+const savedTheme = localStorage.getItem("zn_theme");
+if (savedTheme) {
+  document.documentElement.dataset.theme = savedTheme;
+}
+</script>';
     echo '</body></html>';
 }

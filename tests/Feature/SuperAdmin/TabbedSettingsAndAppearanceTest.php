@@ -341,4 +341,29 @@ class TabbedSettingsAndAppearanceTest extends TestCase
             }
         }
     }
+
+    public function test_remove_logo_and_favicon_clears_settings_without_error(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        \App\Models\DynamicSetting::put('platform_logo_url', 'https://example.com/logo.png');
+        \App\Models\DynamicSetting::put('platform_favicon_url', 'https://example.com/favicon.ico');
+        PlatformBranding::current()->update([
+            'logo_url' => 'https://example.com/logo.png',
+            'favicon_url' => 'https://example.com/favicon.ico',
+        ]);
+
+        Livewire::test(SettingsIndex::class)
+            ->set('activeTab', 'whitelabel')
+            ->call('removeLogo')
+            ->assertDispatched('notify')
+            ->call('removeFavicon')
+            ->assertDispatched('notify');
+
+        $this->assertTrue(empty(\App\Models\DynamicSetting::get('platform_logo_url')));
+        $this->assertTrue(empty(\App\Models\DynamicSetting::get('platform_favicon_url')));
+        $this->assertNull(PlatformBranding::current()->logo_url);
+        $this->assertNull(PlatformBranding::current()->favicon_url);
+    }
 }
+

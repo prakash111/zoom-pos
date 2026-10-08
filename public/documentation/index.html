@@ -64,7 +64,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;v
 <a href="#hardware-and-printing-support"><span>15</span>14. Hardware and Printing Support</a>
 <a href="#installation-deployment"><span>16</span>15. Installation &amp; Deployment</a>
 <a href="#flutter-app-complete-setup-build-guide-android-and-windows"><span>17</span>16. Flutter App — Complete Setup &amp; Build Guide (Android and Windows)</a>
-<a href="#app-builder-guide-and-eligibility"><span>18</span>17. Cloud App Builder — Build Guide &amp; Eligibility</a>
+<a href="#flutter-pos-compilation-and-white-labeling-guide"><span>18</span>17. Flutter POS Client — Compilation &amp; White-Labeling Guide</a>
 <a href="#notification-channels-and-whatsapp-api-guide"><span>19</span>18. WhatsApp API &amp; Multi-Channel Notifications Guide</a>
 <a href="#support-help"><span>20</span>19. Support &amp; Help</a>
 <a href="#summary"><span>21</span>20. Summary</a>
@@ -76,7 +76,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;v
 <header class="hero">
 <span class="eyebrow">HOW THE SYSTEM WORKS</span>
 <h1>Every feature.<br>Explained in full.</h1>
-<p>A complete, plain-language guide to the dashboard, the mobile &amp; desktop app, the online storefront, every industry-specific workflow, the automatic browser-based installer, the Cloud App Builder with license eligibility rules, the complete WhatsApp API &amp; multi-channel notification guide (WhatsApp, SMS, Email, Webhooks), the Flutter manual build guide, and support — what each feature does, how to use it, and what it gives your business.</p>
+<p>A complete, plain-language guide to the dashboard, the mobile &amp; desktop app, the online storefront, every industry-specific workflow, the automatic browser-based installer, the Cross-Platform Client Compilation &amp; Customization Guide, the complete WhatsApp API &amp; multi-channel notification guide (WhatsApp, SMS, Email, Webhooks), and support — what each feature does, how to use it, and what it gives your business.</p>
 </header>
 <p class="status" id="results" role="status" aria-live="polite">All sections shown.</p>
 <div class="no-results" id="no-results" hidden>No matching sections. Try a different word.</div>
@@ -195,8 +195,8 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;v
 <p>For businesses migrating from another system or setting up a large catalog at once, a downloadable spreadsheet template (with the option of sample demo data) can be filled in and re-uploaded. The system processes the file, reports any errors row by row, and adds the successfully validated products directly into the catalog — dramatically cutting down manual data entry.</p>
 <h3 id="stock-adjustments-and-per-branch-quantities">6.4 Stock Adjustments and Per-Branch Quantities</h3>
 <p>Stock is tracked independently per branch. Adjustments — for damage, recounts, transfers, or corrections — can be recorded against a specific branch, with the running balance for that branch updated immediately and reflected consistently across every screen that shows stock.</p>
-<h3 id="ai-generated-product-imagery">6.5 AI-Generated Product Imagery</h3>
-<p>Where an AI image-generation provider is configured, the system can generate a product photo on request — useful for quickly producing presentable catalog images without needing professional photography for every item. Generated images are queued and can be reviewed before being applied to the live product listing.</p>
+<h3 id="product-image-management">6.5 Product Image Management</h3>
+<p>Store owners can upload high-resolution product photography and gallery images directly from the catalog manager. Images are automatically optimized and served to the POS touch screen and digital catalog.</p>
 <h3 id="categories-brands-units-and-suppliers">6.6 Categories, Brands, Units and Suppliers</h3>
 <p>Independent, reusable reference lists — categories, brands, units of measure, and suppliers — keep the catalog organized and consistent. These are referenced from products and purchasing records, so the same category or supplier name is used consistently across the whole system rather than being re-typed each time.</p>
 <hr /></div></section>
@@ -464,7 +464,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;v
 </tbody>
 </table>
 <p>Before going live, size your server’s CPU, memory, disk, and worker capacity around your expected number of businesses, product volume, peak checkout traffic, and how heavily you use background jobs such as image generation or PDF creation — there is no fixed “one server fits everyone” number.</p>
-<p>You’ll also need: reliable HTTPS for every client, working DNS and TLS certificates for any tenant domains you plan to support, outbound internet access for the payment, messaging, and AI providers you configure, and local network access from POS devices to any network printers you use.</p>
+<p>You’ll also need: reliable HTTPS for every client, working DNS and TLS certificates for any tenant domains you plan to support, outbound internet access for the payment and messaging providers you configure, and local network access from POS devices to any network printers you use.</p>
 <h3 id="preparing-the-server">15.2 Preparing the Server</h3>
 <ol type="1">
 <li>Provision your server and install the required PHP version along with the extensions the application needs (common ones include BCMath, cURL, DOM/XML, GD, Intl, Mbstring, OpenSSL, the PDO driver for your database, and Zip). Some of these ship with PHP by default rather than as separate packages.</li>
@@ -497,7 +497,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;v
 <li><strong>Environment setup</strong> — collects your application URL and database connection details if they weren’t already set.</li>
 <li><strong>Database migration</strong> — creates all required tables automatically.</li>
 <li><strong>Administrator account creation</strong> — you set the email and password for your first admin/owner login.</li>
-<li><strong>License activation</strong> — you enter your purchased license/activation key to complete setup.</li>
+<li><strong>System Setup &amp; Configuration</strong> — verify configuration settings and complete setup.</li>
 </ul>
 <p>You must finish every step of the installer for the installation to be marked complete — simply having the database migrated is not enough on its own. Once the final step succeeds, the <code>/install</code> address will no longer allow re-running setup on a live site.</p></li>
 <li><p><strong>Confirm a successful install</strong> by signing in as the administrator you just created and reviewing the platform dashboard.</p></li>
@@ -544,7 +544,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;v
 <p>The platform relies on two kinds of background work: a <strong>scheduler</strong> that triggers time-based jobs (like sending reminders), and <strong>queue workers</strong> that process tasks in the background (like generating an image or a PDF) so they don’t slow down what a user is doing.</p>
 <p><strong>Enable the scheduler</strong> by adding a single cron entry that runs once a minute under your application’s service account:</p>
 <pre class="cron"><code>* * * * * cd /var/www/your-app &amp;&amp; /usr/bin/php artisan schedule:run &gt;&gt; /dev/null 2&gt;&amp;1</code></pre>
-<p>Once enabled, this automatically drives: - Delivery of scheduled and industry-specific notifications, roughly every minute. - Evaluation and delivery of automated customer reminders, every fifteen minutes. - A periodic recheck of your license/activation status, once daily.</p>
+<p>Once enabled, this automatically drives: - Delivery of scheduled and industry-specific notifications, roughly every minute. - Evaluation and delivery of automated customer reminders, every fifteen minutes. - System maintenance and cache cleanup tasks, once daily.</p>
 <p>You can confirm what’s scheduled at any time by running <code>php artisan schedule:list</code>.</p>
 <p><strong>Run queue workers</strong> for background jobs such as product image generation, reminder delivery, and data synchronization. A simple way to keep workers running continuously is with Supervisor:</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode ini"><code class="sourceCode ini"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">[program:your-app-default-queue]</span></span>
@@ -567,7 +567,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;v
 <p>Every device running the app needs to know which backend it should talk to. The very first time the app is opened on any device:</p>
 <ol type="1">
 <li><strong>Enter your Server Address</strong> — on the first screen, type your backend’s full web address (the same domain you completed installation on), for example <code>https://your.domain.com</code>.</li>
-<li><strong>Wait for verification</strong> — the app checks that the address is reachable and that your license/subscription is active. If it can’t reach the server, or the address is entered incorrectly, you’ll see a clear error before being allowed to continue — resolve any network or domain issue at this point rather than proceeding.</li>
+<li><strong>Wait for verification</strong> — the app checks that the address is reachable and online. If it can’t reach the server, or the address is entered incorrectly, you’ll see a clear error before being allowed to continue — resolve any network or domain issue at this point rather than proceeding.</li>
 <li><strong>Sign in</strong> — sign in with an existing staff account, register a new business, or use password recovery if needed. Complete email OTP verification if your business requires it.</li>
 <li><strong>Select your store/branch</strong> — if you have more than one branch, choose the one this device will operate from.</li>
 <li><strong>Finish device setup</strong> — configure the receipt printer and app appearance, then run one small test sale and confirm it syncs correctly before using the device for real transactions.</li>
@@ -611,139 +611,95 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;v
 <h3 id="verifying-a-new-build-before-rolling-it-out">16.5 Verifying a New Build Before Rolling It Out</h3>
 <p>Whichever platform you’ve built for, verify the following on the actual build before distributing it to your team: the server-address and sign-in flow, staff permission behavior (test with both an owner account and a restricted staff account), checkout and invoice delivery, one offline sale and its subsequent sync, push notification delivery, and printing to your actual target printer. Building the app is only the first half — confirming it behaves correctly on real hardware is what makes a release safe to distribute.</p>
 <hr /></div></section>
-<section class="chapter" id="app-builder-guide-and-eligibility" data-title="17. Cloud App Builder — Build Guide &amp; Eligibility"><header class="chapter-heading"><span class="eyebrow">SECTION 18</span><h2>17. Cloud App Builder — Build Guide &amp; Eligibility</h2></header><div class="topic">
-<p>The <strong>Zoom POS Cloud App Builder</strong> provides a self-service, cloud-compiled build pipeline that enables licensed customers to generate customized, white-labeled client binaries for Android, Windows Desktop, and Web without setting up any local developer SDKs on their own computer.</p>
-<p>Compilation is performed entirely inside isolated <strong>GitHub Actions cloud runners</strong>. Sensitive configuration secrets (such as repository tokens, workflow parameters, and source code credentials) are strictly protected server-side and never exposed to the client browser.</p>
+<section class="chapter" id="flutter-pos-compilation-and-white-labeling-guide" data-title="17. Flutter POS Client — Compilation &amp; White-Labeling Guide"><header class="chapter-heading"><span class="eyebrow">SECTION 18</span><h2>17. Flutter POS Client — Compilation &amp; White-Labeling Guide</h2></header><div class="topic">
+<p>The <strong>Zoom POS</strong> client application is built with <strong>Flutter 3.22+</strong> (Dart 3.4+) and provides native cross-platform support across:</p>
+<ul>
+<li><strong>Android:</strong> Wireless handheld POS terminals, tablets, and smartphones.</li>
+<li><strong>Windows Desktop:</strong> 64-bit native desktop application with direct ESC/POS thermal printer support.</li>
+<li><strong>Web (PWA):</strong> Progressive Web Application running in modern web browsers.</li>
+</ul>
+<p>This guide walks you through configuring your branding, pointing the app to your deployed SaaS backend, and compiling release binaries for Android, Windows, and Web.</p>
 
-<h3 id="who-is-eligible-for-app-builder">17.1 Who is Eligible for the App Builder?</h3>
-<p>To ensure fair cloud runner resource allocation and preserve platform stability, access to the Cloud App Builder and monthly compilation quotas are bound strictly to <strong>Core Platform Licenses</strong>:</p>
-
-<div class="table-wrap">
-<table>
-<thead>
-<tr class="header">
-<th>License / Product Type</th>
-<th>Eligibility Status</th>
-<th>Monthly Quota Allocation</th>
-<th>Details</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><strong>Core SaaS Script (Regular License)</strong></td>
-<td><span style="color:#086c60; font-weight:800;">ELIGIBLE</span></td>
-<td>10 builds / month</td>
-<td>Includes Android APK, Web PWA, and Windows desktop compilation with standard cloud priority.</td>
-</tr>
-<tr class="even">
-<td><strong>Core SaaS Script (Extended / Enterprise)</strong></td>
-<td><span style="color:#086c60; font-weight:800;">ELIGIBLE</span></td>
-<td>Unlimited / 30+ builds / month</td>
-<td>Full white-label branding, unlimited or high-tier compilation, priority cloud runners.</td>
-</tr>
-<tr class="odd">
-<td><strong>SaaS Pricing Plans (Professional / Yearly)</strong></td>
-<td><span style="color:#086c60; font-weight:800;">ELIGIBLE</span></td>
-<td>Included with active subscription</td>
-<td>Built-in access to Cloud App Builder for Android, Web, and Windows desktop apps.</td>
-</tr>
-<tr class="even">
-<td><strong>Bundle Packages containing Core</strong></td>
-<td><span style="color:#086c60; font-weight:800;">ELIGIBLE</span></td>
-<td>Bundle quota allocated to Core</td>
-<td>When purchasing a bundle that includes the Core script alongside modules, the quota is assigned directly to the Core script license.</td>
-</tr>
-<tr class="odd">
-<td><strong>Standalone Modules &amp; Add-on Plugins</strong><br><small>(e.g. Lead Management alone, WhatsApp Gateway alone, WooCommerce Sync alone)</small></td>
-<td><span style="color:#e11d48; font-weight:800;">NOT ELIGIBLE</span></td>
-<td>No standalone build quota (N/A)</td>
-<td>Modules are server-side plugins that extend the core system; they do not have independent app build limits. Standalone module purchases cannot be used alone to access the App Builder.</td>
-</tr>
-</tbody>
-</table>
-</div>
-
-<p><strong>Quota Reset Policy:</strong> Monthly build allocations reset automatically on the <strong>1st of each calendar month</strong> at 00:00 UTC. Unused builds do not roll over. If a customer reaches their quota limit for the current month, they can monitor their reset date directly in the builder dashboard.</p>
-
-<h3 id="how-to-build-app-using-app-builder">17.2 Step-by-Step Instructions: How to Build Your Branded App</h3>
-<p>Building a customized white-label application requires no command line tools, Flutter SDKs, or local compilation setup. Follow these steps:</p>
-
+<h3 id="prerequisites-and-environment-setup">17.1 Prerequisites &amp; Environment Setup</h3>
+<p>Before compiling, install the required development tools for your platform:</p>
+<h4>For All Platforms:</h4>
 <ol>
-<li>
-<p><strong>Access the Cloud App Builder Dashboard:</strong><br>
-Open the App Builder URL in your web browser: <code>https://license.zoomnearby.com/app-builder/</code> (or <code>/app-builder/new-build.php</code> on your hosted license portal).</p>
-</li>
-
-<li>
-<p><strong>Authenticate with Your Core License Key:</strong><br>
-Enter your valid Core SaaS purchase license key and your registered customer email address. Click <strong>Verify License</strong>. The system immediately checks your entitlement, validates your active plan, and displays your remaining build quota for the current month.</p>
-</li>
-
-<li>
-<p><strong>Select the Source Code Base:</strong><br>
-Choose your source package:
+<li><strong>Flutter SDK:</strong> Version 3.22.x or higher (<a href="https://docs.flutter.dev/get-started/install" target="_blank" rel="noopener">docs.flutter.dev</a>).</li>
+<li><strong>Dart SDK:</strong> Version 3.4.x or higher (bundled with Flutter).</li>
+<li>Run <code>flutter doctor</code> in your terminal to verify your development environment is ready.</li>
+</ol>
+<h4>For Android Compilation:</h4>
 <ul>
-<li><strong>Latest Official Cloud Release (Recommended):</strong> Automatically checks out the latest stable branch containing all recent features, bug fixes, and offline sync improvements.</li>
-<li><strong>Upload Custom Flutter ZIP:</strong> If you have made custom UI or logic modifications to the Flutter codebase, upload your custom project ZIP archive. The builder validates the archive with Zip Slip directory traversal protection and checks for a valid <code>pubspec.yaml</code>.</li>
+<li><strong>Android Studio</strong> with Android SDK Platform 34+ and Android Command-line Tools.</li>
+<li><strong>Java Development Kit (JDK 17)</strong> configured in your path.</li>
 </ul>
-</p>
-</li>
-
-<li>
-<p><strong>Configure App Identity &amp; White-Label Branding:</strong><br>
-Customize the client application to match your business brand:
+<h4>For Windows Desktop Compilation:</h4>
 <ul>
-<li><strong>Application Name:</strong> The user-facing app title that appears on device home screens and title bars (e.g. <code>Apex Store POS</code>).</li>
-<li><strong>Package Identifier (Application ID):</strong> Reverse-DNS format identifier (e.g. <code>com.apexstore.pos</code>). This uniquely identifies the app on Android and prevents conflicts with other apps.</li>
-<li><strong>Version Name &amp; Build Number:</strong> Semantic version string (e.g. <code>1.0.0</code>) and numeric build increment (e.g. <code>1</code>).</li>
-<li><strong>Primary &amp; Accent Brand Colors:</strong> Use the interactive color picker or enter hex codes (e.g. <code>#2563EB</code> for primary brand blue, <code>#10B981</code> for accent emerald) to brand buttons, navigation bars, and active accents.</li>
-<li><strong>App Icon:</strong> Upload a square 512x512 PNG icon. The builder automatically generates all Android mipmap densities (mdpi, hdpi, xhdpi, xxhdpi, xxxhdpi) and Windows <code>.ico</code> files.</li>
-<li><strong>Splash Screen:</strong> Upload an optional splash logo centered on a custom background color, shown during app initialization.</li>
-<li><strong>Backend Server API URL:</strong> Specify the URL of your live SaaS server (e.g. <code>https://saas.yourdomain.com</code>). The compiled app will automatically bind to this endpoint, eliminating the need for cashiers or staff to manually type the server address.</li>
+<li><strong>Visual Studio 2022</strong> (Community or higher) with the <strong>"Desktop development with C++"</strong> workload selected.</li>
+<li>Windows 10/11 64-bit OS.</li>
+<li><em>(Optional)</em> <strong>Inno Setup 6</strong> for generating a standalone Windows setup installer (<code>.exe</code>).</li>
 </ul>
-</p>
-</li>
 
-<li>
-<p><strong>Select Target Compilation Platforms:</strong><br>
-Select one or more compilation targets concurrently:
+<h3 id="connecting-to-saas-backend">17.2 Connecting to Your SaaS Backend</h3>
+<p>Open the configuration file located at <code>lib/core/config/app_config.dart</code> in the Flutter project:</p>
+<pre><code class="language-dart">class AppConfig {
+  AppConfig._();
+
+  // Change this to your SaaS platform domain:
+  static const String defaultBaseUrl = 'https://yourdomain.com';
+  static const String apiPrefix = '/api/v1/pos';
+}</code></pre>
+
+<h3 id="white-labeling-and-branding">17.3 White-Labeling &amp; Branding Customization</h3>
+<h4>Changing the App Name:</h4>
 <ul>
-<li><strong>Android Binary (.apk / .aab):</strong> Standalone universal release APK for direct sideloading or Android POS terminals, plus Google Play App Bundle (AAB).</li>
-<li><strong>Windows Desktop Application (.zip / .exe):</strong> Standalone Windows native runtime package containing the <code>.exe</code> and supporting DLLs, ready to unzip and run on Windows 10/11 with offline local caching.</li>
-<li><strong>Progressive Web App (.zip):</strong> Optimized web build ready to drop into any static hosting or Nginx virtual host.</li>
+<li><strong>Android:</strong> Open <code>android/app/src/main/AndroidManifest.xml</code> and update <code>android:label="My Brand POS"</code>.</li>
+<li><strong>Windows:</strong> Open <code>windows/runner/Runner.rc</code> and update the <code>VALUE "ProductName", "My Brand POS"</code> strings.</li>
+<li><strong>Web:</strong> Open <code>web/index.html</code> and update <code>&lt;title&gt;My Brand POS&lt;/title&gt;</code>.</li>
 </ul>
-</p>
-</li>
-
-<li>
-<p><strong>Trigger the Cloud Compilation:</strong><br>
-Review your branding parameters and click <strong>Compile App</strong>. The system records a unique <strong>Build ID</strong>, deducts one compilation from your monthly quota, and securely dispatches the build payload to GitHub Actions cloud runners.</p>
-</li>
-
-<li>
-<p><strong>Monitor Real-Time Build History &amp; Diagnostics:</strong><br>
-Watch the live build lifecycle directly on the dashboard:
-<ul>
-<li><code>queued</code>: Job dispatched and awaiting runner allocation.</li>
-<li><code>preparing</code>: Runner environment booting, checking out dependencies and caching Flutter artifacts.</li>
-<li><code>building</code>: Compiling native machine code, optimizing assets, and packaging release binaries.</li>
-<li><code>completed</code>: Compilation successful, artifacts ingested and validated.</li>
-<li><code>failed</code>: Compilation encountered an error. A detailed error excerpt is recorded in the Build History table for troubleshooting.</li>
-</ul>
-Build records persist across sessions, logouts, and page refreshes, allowing you to audit past builds at any time.
-</p>
-</li>
-
-<li>
-<p><strong>Download Artifacts &amp; Automatic Email Notification:</strong><br>
-As soon as the compilation finishes:
-<ul>
-<li>Click <strong>Download Artifact</strong> directly in the builder dashboard to download your <code>.apk</code>, <code>.exe.zip</code>, or <code>.web.zip</code> file.</li>
-<li>An <strong>Automated Email Notification</strong> is dispatched immediately to your license-registered email address with the Build ID, platform, duration, and direct artifact download link.</li>
-</ul>
-</p>
+<h4>Changing the Package Identifier (Application ID):</h4>
+<p>Open <code>android/app/build.gradle</code> and customize the <code>applicationId</code>:</p>
+<pre><code class="language-groovy">defaultConfig {
+    applicationId "com.mycompany.pos"
+    minSdkVersion 21
+    targetSdkVersion 34
+    versionCode 1
+    versionName "1.0.0"
+}</code></pre>
+<h4>Customizing App Icons:</h4>
+<ol>
+<li>Place your high-resolution logo (<code>1024x1024</code> PNG) at <code>assets/icon/launcher.png</code>.</li>
+<li>Run the launcher icon generator:
+<pre><code class="language-bash">flutter pub run flutter_launcher_icons</code></pre>
 </li>
 </ol>
+
+<h3 id="compilation-commands">17.4 Compilation Commands</h3>
+<p>Open a terminal inside the Flutter mobile project directory and run the following commands:</p>
+<h4>Step 1: Install Dependencies</h4>
+<pre><code class="language-bash">flutter pub get</code></pre>
+<h4>Step 2: Build for Android (Release APK)</h4>
+<pre><code class="language-bash">flutter build apk --release</code></pre>
+<p>The compiled release APK will be located at: <code>build/app/outputs/flutter-apk/app-release.apk</code></p>
+<h4>Step 3: Build for Android (Google Play Store App Bundle)</h4>
+<pre><code class="language-bash">flutter build appbundle --release</code></pre>
+<p>The compiled AAB will be located at: <code>build/app/outputs/bundle/release/app-release.aab</code></p>
+<h4>Step 4: Build for Windows Desktop (64-bit)</h4>
+<pre><code class="language-bash">flutter build windows --release</code></pre>
+<p>The compiled Windows binary and supporting DLLs will be located at: <code>build/windows/x64/runner/Release/</code></p>
+<p>To create a single-file Windows setup installer, open <code>installer.iss</code> in <strong>Inno Setup</strong> and click <strong>Compile</strong>.</p>
+<h4>Step 5: Build for Web POS</h4>
+<pre><code class="language-bash">flutter build web --base-href /pos-web/ --release</code></pre>
+<p>Copy all files from <code>build/web/</code> into your web server's <code>public/pos-web/</code> directory.</p>
+
+<h3 id="hardware-and-peripherals">17.5 Hardware &amp; Peripheral Support</h3>
+<p>The compiled POS client automatically supports standard retail and restaurant hardware:</p>
+<ul>
+<li><strong>Thermal Receipt Printers (58mm / 80mm):</strong> USB direct connection (Windows &amp; Android OTG), LAN/Ethernet IP network printers, and Bluetooth wireless thermal printers.</li>
+<li><strong>Barcode &amp; 2D QR Scanners:</strong> USB HID keyboard emulation and Bluetooth wireless scanners.</li>
+<li><strong>Electronic Cash Drawers:</strong> Standard RJ11 / RJ12 connection through thermal receipt printer kick-out pulse.</li>
+<li><strong>Dual Display / Kitchen Display:</strong> Real-time order dispatch displays on tablets and secondary monitors.</li>
+</ul>
 <hr /></div></section>
 
 <section class="chapter" id="notification-channels-and-whatsapp-api-guide" data-title="18. Notification Channels &amp; WhatsApp API Integration Guide"><header class="chapter-heading"><span class="eyebrow">SECTION 19</span><h2>18. Notification Channels &amp; WhatsApp API Integration Guide</h2></header><div class="topic">

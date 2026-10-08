@@ -414,6 +414,8 @@ class Index extends Component
     {
         $invoice = SubscriptionInvoice::where('company_id', $this->getCompanyId())->findOrFail($invoiceId);
         $company = $this->getCompany();
+        $currencySymbol = $invoice->getCurrencySymbol();
+        $currencyCode = strtoupper($invoice->currency ?? config('app.currency', 'INR'));
 
         $text = "🧾 *SUBSCRIPTION TAX INVOICE*\n"
             .'*Platform:* '.($invoice->seller_details['company_name'] ?? config('app.name'))."\n"
@@ -422,9 +424,9 @@ class Index extends Component
             ."*Plan:* {$invoice->plan_name} ({$invoice->billing_cycle})\n"
             ."*Invoice Date:* {$invoice->invoice_date->format('d M Y')}\n"
             ."----------------------------\n"
-            ."*Base Amount:* \${$invoice->getFormattedSubtotal()}\n"
-            ."*Tax (18% GST):* \${$invoice->getFormattedTax()}\n"
-            ."*Total Amount Paid:* \${$invoice->getFormattedTotal()} {$invoice->currency}\n"
+            ."*Base Amount:* {$currencySymbol}".number_format($invoice->subtotal, 2)."\n"
+            ."*Tax ({$invoice->tax_rate}% {$invoice->tax_type}):* {$currencySymbol}".number_format($invoice->tax_amount, 2)."\n"
+            ."*Total Amount Paid:* {$currencySymbol}".number_format($invoice->total_amount, 2)." ({$currencyCode})\n"
             .'*Status:* '.strtoupper($invoice->status).' (Paid via '.ucfirst(str_replace('_', ' ', $invoice->payment_method)).")\n"
             ."----------------------------\n"
             .'View / Download Official PDF: '.route('tenant.billing.invoices.pdf', $invoice)."\n\n"

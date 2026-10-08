@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - feat/hybrid-license-verification
   workflow_dispatch:
 
 jobs:

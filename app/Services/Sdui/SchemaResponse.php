@@ -1335,11 +1335,18 @@ class SchemaResponse
                 if ($endpoint === '') {
                     continue;
                 }
+                $action = (str_starts_with($endpoint, 'http://') || str_starts_with($endpoint, 'https://'))
+                    ? self::openUrlAction($endpoint)
+                    : self::navigateAction(
+                        str_starts_with($endpoint, '/api/') || preg_match('/^[a-z][a-z0-9_-]*$/', $endpoint) ? $endpoint : '/api' . (str_starts_with($endpoint, '/') ? '' : '/') . $endpoint,
+                        'dynamic_page',
+                        (string) ($item['title'] ?? $item['label'] ?? '')
+                    );
                 $items[] = self::lineItemTile(
                     (string) ($item['title'] ?? $item['label'] ?? $item['key'] ?? ''),
                     '',
                     (string) ($item['icon'] ?? 'widgets'),
-                    self::navigateAction($endpoint, 'dynamic_page', (string) ($item['title'] ?? $item['label'] ?? '')),
+                    $action,
                 );
             }
         }

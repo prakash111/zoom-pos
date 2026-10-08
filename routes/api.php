@@ -96,6 +96,18 @@ Route::get('/auth/check-subdomain', [AuthApiController::class, 'checkSubdomain']
 Route::get('/v1/auth/check-subdomain', [AuthApiController::class, 'checkSubdomain']);
 Route::get('/subscription/plans', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'plans']);
 Route::get('/v1/subscription/plans', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'plans']);
+Route::get('/public/business-types', function (\App\Services\Module\ModuleManagerService $moduleService) {
+    return response()->json([
+        'success' => true,
+        'data'    => $moduleService->getAvailableBusinessTypes(),
+    ]);
+});
+Route::get('/v1/public/business-types', function (\App\Services\Module\ModuleManagerService $moduleService) {
+    return response()->json([
+        'success' => true,
+        'data'    => $moduleService->getAvailableBusinessTypes(),
+    ]);
+});
 Route::post('/public/contact-us', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
 Route::post('/v1/public/contact-us', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
 Route::post('/public/contact', [\App\Http\Controllers\Api\V1\LandingApiController::class, 'submitContact']);
@@ -194,10 +206,14 @@ Route::post('/tenant/profile/change-password', [PasswordResetController::class, 
 Route::get('/app/registration-meta', [PosSyncApiController::class, 'registrationMeta']);
 Route::get('/app/auth-config', [PosSyncApiController::class, 'authConfig']);
 Route::get('/api/app/auth-config', [PosSyncApiController::class, 'authConfig']);
+Route::get('/public/dashboard/layout', [DashboardController::class, 'publicLayout']);
+Route::get('/v1/public/dashboard/layout', [DashboardController::class, 'publicLayout']);
 
 // Authentication, Registration, Email OTP & Social Auth
 Route::post('/auth/register', [AuthApiController::class, 'register']);
 Route::post('/register', [AuthApiController::class, 'register']);
+Route::post('/v1/auth/register', [AuthApiController::class, 'register']);
+Route::post('/v1/register', [AuthApiController::class, 'register']);
 Route::post('/auth/verify-email-otp', [AuthApiController::class, 'verifyEmailOtp']);
 Route::post('/api/auth/verify-email-otp', [AuthApiController::class, 'verifyEmailOtp']);
 Route::post('/app/verify-otp', [AuthApiController::class, 'verifyEmailOtp']);
@@ -263,32 +279,54 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
     Route::get('/tenant/dashboard/summary', [DashboardController::class, 'summary']);
     Route::get('/v1/dashboard/summary', [DashboardController::class, 'summary']);
     Route::get('/v1/tenant/dashboard/summary', [DashboardController::class, 'summary']);
+    Route::get('/dashboard/init', [DashboardController::class, 'getDashboardInit']);
+    Route::get('/tenant/dashboard/init', [DashboardController::class, 'getDashboardInit']);
+    Route::get('/v1/dashboard/init', [DashboardController::class, 'getDashboardInit']);
+    Route::get('/v1/tenant/dashboard/init', [DashboardController::class, 'getDashboardInit']);
+    Route::get('/dashboard/layout', [DashboardController::class, 'getDashboardInit']);
+    Route::get('/v1/dashboard/layout', [DashboardController::class, 'getDashboardInit']);
     Route::get('/dashboard/sales-chart', [DashboardController::class, 'salesChart']);
     Route::get('/tenant/dashboard/sales-chart', [DashboardController::class, 'salesChart']);
     Route::get('/v1/dashboard/sales-chart', [DashboardController::class, 'salesChart']);
     Route::get('/v1/tenant/dashboard/sales-chart', [DashboardController::class, 'salesChart']);
-    Route::get('/tenant/notifications/feed', [NotificationController::class, 'feed']);
-    Route::get('/v1/tenant/notifications/feed', [NotificationController::class, 'feed']);
+    // Unified Notification Feed & Activity Alerts (Promotional Broadcasts + System Alerts)
+    $notifPrefixes = [
+        'v1/pos/notifications',
+        'api/v1/pos/notifications',
+        'v1/pos/api/notifications',
+        'api/v1/pos/api/notifications',
+        'pos/notifications',
+        'notifications',
+    ];
+
+    foreach ($notifPrefixes as $nPref) {
+        Route::prefix($nPref)->group(function () {
+            Route::get('/', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'index']);
+            Route::get('feed', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'index']);
+            Route::post('dismiss', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'dismissItem']);
+            Route::post('clear-all', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'clearAll']);
+            Route::delete('{id}', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'dismissItem']);
+        });
+    }
+
+    Route::get('/tenant/notifications/feed', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'index']);
+    Route::get('/v1/tenant/notifications/feed', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'index']);
     Route::get('/tenant/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::get('/v1/tenant/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
 
-    // Notification dismissal & clear-all endpoints
-    Route::post('/tenant/notifications/clear-all', [NotificationController::class, 'clearAll']);
-    Route::post('/v1/tenant/notifications/clear-all', [NotificationController::class, 'clearAll']);
-    Route::post('/notifications/clear-all', [NotificationController::class, 'clearAll']);
-    Route::post('/tenant/notifications/dismiss', [NotificationController::class, 'dismiss']);
-    Route::post('/v1/tenant/notifications/dismiss', [NotificationController::class, 'dismiss']);
-    Route::post('/notifications/dismiss', [NotificationController::class, 'dismiss']);
-    Route::post('/tenant/notifications/{type}/{id}/dismiss', [NotificationController::class, 'dismiss']);
-    Route::post('/v1/tenant/notifications/{type}/{id}/dismiss', [NotificationController::class, 'dismiss']);
-    Route::post('/notifications/{type}/{id}/dismiss', [NotificationController::class, 'dismiss']);
-    Route::post('/tenant/notifications/{id}/dismiss', [NotificationController::class, 'dismiss']);
-    Route::post('/v1/tenant/notifications/{id}/dismiss', [NotificationController::class, 'dismiss']);
-    Route::post('/notifications/{id}/dismiss', [NotificationController::class, 'dismiss']);
-    Route::delete('/tenant/notifications/{id}', [NotificationController::class, 'dismiss']);
-    Route::delete('/v1/tenant/notifications/{id}', [NotificationController::class, 'dismiss']);
-    Route::delete('/notifications/{id}', [NotificationController::class, 'dismiss']);
+    // Notification dismissal & clear-all aliases
+    Route::post('/tenant/notifications/clear-all', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'clearAll']);
+    Route::post('/v1/tenant/notifications/clear-all', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'clearAll']);
+    Route::post('/tenant/notifications/dismiss', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'dismissItem']);
+    Route::post('/v1/tenant/notifications/dismiss', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'dismissItem']);
+    Route::post('/tenant/notifications/{type}/{id}/dismiss', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'dismissItem']);
+    Route::post('/v1/tenant/notifications/{type}/{id}/dismiss', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'dismissItem']);
+    Route::post('/notifications/{type}/{id}/dismiss', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'dismissItem']);
+    Route::post('/tenant/notifications/{id}/dismiss', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'dismissItem']);
+    Route::post('/v1/tenant/notifications/{id}/dismiss', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'dismissItem']);
+    Route::delete('/tenant/notifications/{id}', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'dismissItem']);
+    Route::delete('/v1/tenant/notifications/{id}', [\App\Http\Controllers\Api\Tenant\NotificationFeedController::class, 'dismissItem']);
 
     // Unified multi-format preview for invoices, sales receipts and quotes.
     Route::get('/tenant/documents/{type}/{id}/preview-modal', [DocumentPreviewController::class, 'previewModal']);
@@ -473,6 +511,124 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
     Route::get('/tenant/leads/followups', [LeadController::class, 'followups'])->middleware('tenant.api.permission:leads,view');
     Route::get('/v1/tenant/leads/followups', [LeadController::class, 'followups'])->middleware('tenant.api.permission:leads,view');
 
+    // HRM & Payroll SDUI Views & Schemas
+    Route::get('/tenant/hrm/views/employees', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'employeesView']);
+    Route::get('/v1/tenant/hrm/views/employees', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'employeesView']);
+    Route::get('/tenant/views/hrm/employees', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'employeesView']);
+    Route::get('/tenant/views/hrm-employees', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'employeesView']);
+
+    Route::get('/tenant/hrm/views/attendance', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'attendanceView']);
+    Route::get('/v1/tenant/hrm/views/attendance', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'attendanceView']);
+    Route::get('/tenant/views/hrm/attendance', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'attendanceView']);
+    Route::get('/tenant/views/hrm-attendance', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'attendanceView']);
+
+    Route::get('/tenant/hrm/views/leaves', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'leavesView']);
+    Route::get('/v1/tenant/hrm/views/leaves', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'leavesView']);
+    Route::get('/tenant/views/hrm/leaves', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'leavesView']);
+    Route::get('/tenant/views/hrm-leaves', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'leavesView']);
+
+    Route::get('/tenant/hrm/views/payroll', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'payrollView']);
+    Route::get('/v1/tenant/hrm/views/payroll', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'payrollView']);
+    Route::get('/tenant/views/hrm/payroll', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'payrollView']);
+    Route::get('/tenant/views/hrm-payroll', [\Modules\Hrm\Http\Controllers\HrmViewController::class, 'payrollView']);
+
+    // HRM & Payroll SDUI Form Schemas
+    Route::get('/tenant/hrm/forms/employee-create', [\Modules\Hrm\Http\Controllers\HrmFormController::class, 'employeeCreateForm']);
+    Route::get('/v1/tenant/hrm/forms/employee-create', [\Modules\Hrm\Http\Controllers\HrmFormController::class, 'employeeCreateForm']);
+    Route::get('/tenant/hrm/forms/staff-create', [\Modules\Hrm\Http\Controllers\HrmFormController::class, 'staffCreateForm']);
+    Route::get('/v1/tenant/hrm/forms/staff-create', [\Modules\Hrm\Http\Controllers\HrmFormController::class, 'staffCreateForm']);
+    Route::get('/tenant/hrm/forms/employee-edit/{id}', [\Modules\Hrm\Http\Controllers\HrmFormController::class, 'employeeEditForm']);
+    Route::get('/v1/tenant/hrm/forms/employee-edit/{id}', [\Modules\Hrm\Http\Controllers\HrmFormController::class, 'employeeEditForm']);
+    Route::get('/tenant/hrm/forms/staff-edit/{id}', [\Modules\Hrm\Http\Controllers\HrmFormController::class, 'staffEditForm']);
+    Route::get('/v1/tenant/hrm/forms/staff-edit/{id}', [\Modules\Hrm\Http\Controllers\HrmFormController::class, 'staffEditForm']);
+    Route::get('/tenant/hrm/forms/leave-apply', [\Modules\Hrm\Http\Controllers\HrmFormController::class, 'leaveApplyForm']);
+    Route::get('/v1/tenant/hrm/forms/leave-apply', [\Modules\Hrm\Http\Controllers\HrmFormController::class, 'leaveApplyForm']);
+    Route::get('/tenant/hrm/forms/payroll-generate', [\Modules\Hrm\Http\Controllers\HrmFormController::class, 'payrollGenerateForm']);
+    Route::get('/v1/tenant/hrm/forms/payroll-generate', [\Modules\Hrm\Http\Controllers\HrmFormController::class, 'payrollGenerateForm']);
+
+    // HRM Staff & Leave Status endpoints
+    Route::post('/tenant/hrm/staff/store', [\Modules\Hrm\Http\Controllers\HrmStaffController::class, 'store']);
+    Route::post('/v1/tenant/hrm/staff/store', [\Modules\Hrm\Http\Controllers\HrmStaffController::class, 'store']);
+    Route::post('/tenant/hrm/staff', [\Modules\Hrm\Http\Controllers\HrmStaffController::class, 'store']);
+    Route::post('/v1/tenant/hrm/staff', [\Modules\Hrm\Http\Controllers\HrmStaffController::class, 'store']);
+    Route::match(['put', 'post'], '/tenant/hrm/staff/{id}', [\Modules\Hrm\Http\Controllers\HrmStaffController::class, 'update']);
+    Route::match(['put', 'post'], '/v1/tenant/hrm/staff/{id}', [\Modules\Hrm\Http\Controllers\HrmStaffController::class, 'update']);
+    Route::delete('/tenant/hrm/staff/{id}', [\Modules\Hrm\Http\Controllers\HrmStaffController::class, 'destroy']);
+    Route::delete('/v1/tenant/hrm/staff/{id}', [\Modules\Hrm\Http\Controllers\HrmStaffController::class, 'destroy']);
+
+    Route::post('/tenant/hrm/leaves/{id}/status', [\Modules\Hrm\Http\Controllers\LeaveController::class, 'updateStatus']);
+    Route::post('/v1/tenant/hrm/leaves/{id}/status', [\Modules\Hrm\Http\Controllers\LeaveController::class, 'updateStatus']);
+
+    // Loyalty, Customer Wallet & Rewards Endpoints
+    Route::get('/tenant/loyalty/views/wallets', [\Modules\Loyalty\Http\Controllers\LoyaltyViewController::class, 'walletsView']);
+    Route::get('/v1/tenant/loyalty/views/wallets', [\Modules\Loyalty\Http\Controllers\LoyaltyViewController::class, 'walletsView']);
+    Route::get('/tenant/loyalty/views/tiers', [\Modules\Loyalty\Http\Controllers\LoyaltyViewController::class, 'tiersView']);
+    Route::get('/v1/tenant/loyalty/views/tiers', [\Modules\Loyalty\Http\Controllers\LoyaltyViewController::class, 'tiersView']);
+    Route::get('/tenant/loyalty/views/settings', [\Modules\Loyalty\Http\Controllers\LoyaltyViewController::class, 'settingsView']);
+    Route::get('/v1/tenant/loyalty/views/settings', [\Modules\Loyalty\Http\Controllers\LoyaltyViewController::class, 'settingsView']);
+
+    // Form Schemas and Fallback Handlers
+    Route::get('/tenant/loyalty/forms/topup/{customerId?}', [\Modules\Loyalty\Http\Controllers\LoyaltyFormController::class, 'topupForm']);
+    Route::get('/v1/tenant/loyalty/forms/topup/{customerId?}', [\Modules\Loyalty\Http\Controllers\LoyaltyFormController::class, 'topupForm']);
+    Route::post('/tenant/loyalty/forms/topup/{customerId?}', [\Modules\Loyalty\Http\Controllers\WalletController::class, 'processTopup']);
+    Route::post('/v1/tenant/loyalty/forms/topup/{customerId?}', [\Modules\Loyalty\Http\Controllers\WalletController::class, 'processTopup']);
+
+    Route::get('/tenant/loyalty/forms/tier-create', [\Modules\Loyalty\Http\Controllers\LoyaltyFormController::class, 'tierCreateForm']);
+    Route::get('/v1/tenant/loyalty/forms/tier-create', [\Modules\Loyalty\Http\Controllers\LoyaltyFormController::class, 'tierCreateForm']);
+    Route::post('/tenant/loyalty/forms/tier-create', [\Modules\Loyalty\Http\Controllers\TierController::class, 'store']);
+    Route::post('/v1/tenant/loyalty/forms/tier-create', [\Modules\Loyalty\Http\Controllers\TierController::class, 'store']);
+
+    Route::get('/tenant/loyalty/forms/tier-edit/{id}', [\Modules\Loyalty\Http\Controllers\LoyaltyFormController::class, 'tierEditForm']);
+    Route::get('/v1/tenant/loyalty/forms/tier-edit/{id}', [\Modules\Loyalty\Http\Controllers\LoyaltyFormController::class, 'tierEditForm']);
+    Route::post('/tenant/loyalty/forms/tier-edit/{id}', [\Modules\Loyalty\Http\Controllers\TierController::class, 'store']);
+    Route::post('/v1/tenant/loyalty/forms/tier-edit/{id}', [\Modules\Loyalty\Http\Controllers\TierController::class, 'store']);
+
+    // Action Endpoints (Singular & Plural)
+    Route::post('/tenant/loyalty/wallets/topup', [\Modules\Loyalty\Http\Controllers\WalletController::class, 'processTopup']);
+    Route::post('/v1/tenant/loyalty/wallets/topup', [\Modules\Loyalty\Http\Controllers\WalletController::class, 'processTopup']);
+    Route::post('/tenant/loyalty/wallet/topup', [\Modules\Loyalty\Http\Controllers\WalletController::class, 'processTopup']);
+    Route::post('/v1/tenant/loyalty/wallet/topup', [\Modules\Loyalty\Http\Controllers\WalletController::class, 'processTopup']);
+
+    // Unified Staff Chat & Support Forms and Announcement Endpoints
+    if (class_exists(\Modules\Chat\Http\Controllers\ChatFormController::class)) {
+        Route::get('/tenant/chat/forms/tenant-broadcast', [\Modules\Chat\Http\Controllers\ChatFormController::class, 'tenantBroadcastForm']);
+        Route::get('/v1/tenant/chat/forms/tenant-broadcast', [\Modules\Chat\Http\Controllers\ChatFormController::class, 'tenantBroadcastForm']);
+        Route::post('/tenant/chat/staff-announcements', [\Modules\Chat\Http\Controllers\ChatApiController::class, 'storeTenantAnnouncement']);
+        Route::post('/v1/tenant/chat/staff-announcements', [\Modules\Chat\Http\Controllers\ChatApiController::class, 'storeTenantAnnouncement']);
+        Route::post('/tenant/chat/promotions/{id}/dismiss', [\Modules\Chat\Http\Controllers\ChatApiController::class, 'dismissBroadcast']);
+        Route::post('/v1/tenant/chat/promotions/{id}/dismiss', [\Modules\Chat\Http\Controllers\ChatApiController::class, 'dismissBroadcast']);
+        Route::get('/tenant/chat/views/staff-notifications', [\Modules\Chat\Http\Controllers\ChatViewController::class, 'staffBroadcastView']);
+        Route::get('/v1/tenant/chat/views/staff-notifications', [\Modules\Chat\Http\Controllers\ChatViewController::class, 'staffBroadcastView']);
+        Route::post('/tenant/chat/announcements/send', [\Modules\Chat\Http\Controllers\ChatApiController::class, 'storeTenantAnnouncement']);
+        Route::post('/v1/tenant/chat/announcements/send', [\Modules\Chat\Http\Controllers\ChatApiController::class, 'storeTenantAnnouncement']);
+        Route::post('/v1/pos/chat/announcements/send', [\Modules\Chat\Http\Controllers\ChatApiController::class, 'storeTenantAnnouncement']);
+    }
+
+    Route::post('/tenant/loyalty/wallets/charge', [\Modules\Loyalty\Http\Controllers\WalletController::class, 'processCharge']);
+    Route::post('/v1/tenant/loyalty/wallets/charge', [\Modules\Loyalty\Http\Controllers\WalletController::class, 'processCharge']);
+    Route::post('/tenant/loyalty/wallet/charge', [\Modules\Loyalty\Http\Controllers\WalletController::class, 'processCharge']);
+    Route::post('/v1/tenant/loyalty/wallet/charge', [\Modules\Loyalty\Http\Controllers\WalletController::class, 'processCharge']);
+
+    Route::post('/tenant/loyalty/tiers', [\Modules\Loyalty\Http\Controllers\TierController::class, 'store']);
+    Route::post('/v1/tenant/loyalty/tiers', [\Modules\Loyalty\Http\Controllers\TierController::class, 'store']);
+    Route::post('/tenant/loyalty/tiers/save', [\Modules\Loyalty\Http\Controllers\TierController::class, 'store']);
+    Route::post('/v1/tenant/loyalty/tiers/save', [\Modules\Loyalty\Http\Controllers\TierController::class, 'store']);
+    Route::delete('/tenant/loyalty/tiers/{id}', [\Modules\Loyalty\Http\Controllers\TierController::class, 'destroy']);
+    Route::delete('/v1/tenant/loyalty/tiers/{id}', [\Modules\Loyalty\Http\Controllers\TierController::class, 'destroy']);
+
+    Route::post('/tenant/loyalty/settings', [\Modules\Loyalty\Http\Controllers\LoyaltySettingsController::class, 'update']);
+    Route::post('/v1/tenant/loyalty/settings', [\Modules\Loyalty\Http\Controllers\LoyaltySettingsController::class, 'update']);
+    Route::post('/tenant/loyalty/settings/save', [\Modules\Loyalty\Http\Controllers\LoyaltySettingsController::class, 'update']);
+    Route::post('/v1/tenant/loyalty/settings/save', [\Modules\Loyalty\Http\Controllers\LoyaltySettingsController::class, 'update']);
+
+    Route::post('/tenant/loyalty/points/redeem', [\Modules\Loyalty\Http\Controllers\LoyaltyActionController::class, 'redeem']);
+    Route::post('/v1/tenant/loyalty/points/redeem', [\Modules\Loyalty\Http\Controllers\LoyaltyActionController::class, 'redeem']);
+
+    Route::get('/tenant/loyalty/customer-lookup', [\Modules\Loyalty\Http\Controllers\LoyaltyActionController::class, 'customerLookup']);
+    Route::get('/v1/tenant/loyalty/customer-lookup', [\Modules\Loyalty\Http\Controllers\LoyaltyActionController::class, 'customerLookup']);
+    Route::get('/tenant/pos/customer-lookup', [\Modules\Loyalty\Http\Controllers\LoyaltyActionController::class, 'customerLookup']);
+    Route::get('/v1/tenant/pos/customer-lookup', [\Modules\Loyalty\Http\Controllers\LoyaltyActionController::class, 'customerLookup']);
+
     // Customer Live Autocomplete & Deep Search
     Route::get('/tenant/customers/search', [CustomerController::class, 'search'])->middleware('tenant.api.permission:customers,view');
     Route::get('/v1/tenant/customers/search', [CustomerController::class, 'search'])->middleware('tenant.api.permission:customers,view');
@@ -518,6 +674,27 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
         if ($trimmed === 'leads' || $trimmed === 'lead-management' || $trimmed === 'leadmanagement' || str_ends_with($trimmed, 'views/leads') || str_ends_with($trimmed, 'lead-management')) {
             return app(LeadController::class)->dashboard($request);
         }
+        if (str_contains($trimmed, 'hrm/employees') || str_contains($trimmed, 'hrm-employees') || str_ends_with($trimmed, 'views/employees')) {
+            return app(\Modules\Hrm\Http\Controllers\HrmViewController::class)->employeesView($request);
+        }
+        if (str_contains($trimmed, 'hrm/attendance') || str_contains($trimmed, 'hrm-attendance') || str_ends_with($trimmed, 'views/attendance')) {
+            return app(\Modules\Hrm\Http\Controllers\HrmViewController::class)->attendanceView($request);
+        }
+        if (str_contains($trimmed, 'hrm/leaves') || str_contains($trimmed, 'hrm-leaves') || str_ends_with($trimmed, 'views/leaves')) {
+            return app(\Modules\Hrm\Http\Controllers\HrmViewController::class)->leavesView($request);
+        }
+        if (str_contains($trimmed, 'hrm/payroll') || str_contains($trimmed, 'hrm-payroll') || str_ends_with($trimmed, 'views/payroll')) {
+            return app(\Modules\Hrm\Http\Controllers\HrmViewController::class)->payrollView($request);
+        }
+        if (str_contains($trimmed, 'loyalty/wallets') || str_contains($trimmed, 'views/wallets')) {
+            return app(\Modules\Loyalty\Http\Controllers\LoyaltyViewController::class)->walletsView($request);
+        }
+        if (str_contains($trimmed, 'loyalty/tiers') || str_contains($trimmed, 'views/tiers')) {
+            return app(\Modules\Loyalty\Http\Controllers\LoyaltyViewController::class)->tiersView($request);
+        }
+        if (str_contains($trimmed, 'loyalty/settings') || str_contains($trimmed, 'views/settings')) {
+            return app(\Modules\Loyalty\Http\Controllers\LoyaltyViewController::class)->settingsView($request);
+        }
 
         return app(SduiViewController::class)->show($request, $trimmed, $permissions);
     })->where('subpath', '.*');
@@ -542,7 +719,7 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
         if (str_contains($trimmed, 'invoices/create') || str_ends_with($trimmed, 'invoices/create')) {
             return app(ApiInvoiceController::class)->createSchema($request);
         }
-        if (preg_match('#(?:^|/)leads/([A-Za-z0-9\-_]+)#', $trimmed, $m)) {
+        if (preg_match('#(?:^|/)leads/([A-Za-z0-9\-_]+)$#', $trimmed, $m)) {
             $request->merge(['id' => $m[1]]);
 
             return app(LeadController::class)->showSchema($request, $m[1]);
@@ -555,6 +732,44 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
         }
         if ($trimmed === 'leads' || $trimmed === 'lead-management' || $trimmed === 'leadmanagement' || str_ends_with($trimmed, 'views/leads') || str_ends_with($trimmed, 'lead-management')) {
             return app(LeadController::class)->dashboard($request);
+        }
+        if (str_contains($trimmed, 'hrm/employees') || str_contains($trimmed, 'hrm-employees') || str_ends_with($trimmed, 'views/employees')) {
+            return app(\Modules\Hrm\Http\Controllers\HrmViewController::class)->employeesView($request);
+        }
+        if (str_contains($trimmed, 'hrm/attendance') || str_contains($trimmed, 'hrm-attendance') || str_ends_with($trimmed, 'views/attendance')) {
+            return app(\Modules\Hrm\Http\Controllers\HrmViewController::class)->attendanceView($request);
+        }
+        if (str_contains($trimmed, 'hrm/leaves') || str_contains($trimmed, 'hrm-leaves') || str_ends_with($trimmed, 'views/leaves')) {
+            return app(\Modules\Hrm\Http\Controllers\HrmViewController::class)->leavesView($request);
+        }
+        if (str_contains($trimmed, 'hrm/payroll') || str_contains($trimmed, 'hrm-payroll') || str_ends_with($trimmed, 'views/payroll')) {
+            return app(\Modules\Hrm\Http\Controllers\HrmViewController::class)->payrollView($request);
+        }
+        if (str_contains($trimmed, 'loyalty/wallets') || str_contains($trimmed, 'views/wallets')) {
+            return app(\Modules\Loyalty\Http\Controllers\LoyaltyViewController::class)->walletsView($request);
+        }
+        if (str_contains($trimmed, 'loyalty/tiers') || str_contains($trimmed, 'views/tiers')) {
+            return app(\Modules\Loyalty\Http\Controllers\LoyaltyViewController::class)->tiersView($request);
+        }
+        if (str_contains($trimmed, 'loyalty/settings') || str_contains($trimmed, 'views/settings')) {
+            return app(\Modules\Loyalty\Http\Controllers\LoyaltyViewController::class)->settingsView($request);
+        }
+        if (class_exists(\Modules\Chat\Http\Controllers\ChatViewController::class)) {
+            if (str_contains($trimmed, 'chat/staff') || str_contains($trimmed, 'views/staff-chat')) {
+                return app(\Modules\Chat\Http\Controllers\ChatViewController::class)->staffChatView($request);
+            }
+            if (str_contains($trimmed, 'chat/promotions') || str_contains($trimmed, 'views/promotions')) {
+                return app(\Modules\Chat\Http\Controllers\ChatViewController::class)->promotionsView($request);
+            }
+            if (str_contains($trimmed, 'chat/forms/tenant-broadcast') || str_contains($trimmed, 'forms/tenant-broadcast')) {
+                return app(\Modules\Chat\Http\Controllers\ChatFormController::class)->tenantBroadcastForm($request);
+            }
+            if (str_contains($trimmed, 'chat/staff-notifications') || str_contains($trimmed, 'views/staff-notifications') || str_contains($trimmed, 'views/tenant-broadcast')) {
+                return app(\Modules\Chat\Http\Controllers\ChatViewController::class)->staffBroadcastView($request);
+            }
+            if (str_contains($trimmed, 'announcements/send') || str_contains($trimmed, 'staff-announcements')) {
+                return app(\Modules\Chat\Http\Controllers\ChatApiController::class)->storeTenantAnnouncement($request);
+            }
         }
 
         return app(SduiViewController::class)->show($request, $trimmed, $permissions);
@@ -659,6 +874,84 @@ Route::middleware([AuthenticateTenantApi::class, ResolveStoreContext::class, Pre
         Route::delete('/{id}', [SettingsApiController::class, 'notificationChannelsDestroy']);
         Route::post('/test', [SettingsApiController::class, 'testNotificationChannel']);
     });
+
+    // Dynamic Custom Fields Engine (for Staff, Customers, etc.)
+    $tenantCustomFieldsHandler = function () {
+        Route::get('/', function (Request $request) {
+            $tenantId = $request->user()?->company_id 
+                ?? $request->user()?->tenant_id 
+                ?? $request->header('X-Tenant-Id') 
+                ?? $request->header('X-Company-Id') 
+                ?? 1;
+            $module = $request->query('module', 'staff');
+
+            $fields = \Illuminate\Support\Facades\DB::table('tenant_custom_fields')
+                ->where('tenant_id', $tenantId)
+                ->where('module', $module)
+                ->orderBy('sort_order', 'asc')
+                ->get();
+
+            return response()->json(['success' => true, 'data' => $fields]);
+        });
+
+        Route::post('/', function (Request $request) {
+            $data = $request->validate([
+                'field_key'   => 'required|alpha_dash|max:50',
+                'label'       => 'required|string|max:100',
+                'field_type'  => 'required|in:text,number,date,select',
+                'is_required' => 'boolean',
+                'options'     => 'nullable|array',
+                'sort_order'  => 'nullable|integer',
+                'module'      => 'nullable|string|max:50',
+            ]);
+
+            $tenantId = $request->user()?->company_id 
+                ?? $request->user()?->tenant_id 
+                ?? $request->header('X-Tenant-Id') 
+                ?? $request->header('X-Company-Id') 
+                ?? 1;
+
+            $module = $data['module'] ?? 'staff';
+            $fieldKey = strtolower($data['field_key']);
+
+            \Illuminate\Support\Facades\DB::table('tenant_custom_fields')->updateOrInsert(
+                [
+                    'tenant_id' => $tenantId,
+                    'module'    => $module,
+                    'field_key' => $fieldKey,
+                ],
+                [
+                    'label'       => $data['label'],
+                    'field_type'  => $data['field_type'],
+                    'options'     => isset($data['options']) ? json_encode($data['options']) : null,
+                    'is_required' => $data['is_required'] ?? false,
+                    'sort_order'  => $data['sort_order'] ?? 0,
+                    'updated_at'  => now(),
+                ]
+            );
+
+            return response()->json(['success' => true, 'message' => 'Custom field added successfully.']);
+        });
+
+        Route::delete('/{id}', function (Request $request, $id) {
+            $tenantId = $request->user()?->company_id 
+                ?? $request->user()?->tenant_id 
+                ?? $request->header('X-Tenant-Id') 
+                ?? $request->header('X-Company-Id') 
+                ?? 1;
+
+            \Illuminate\Support\Facades\DB::table('tenant_custom_fields')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $id)
+                ->delete();
+
+            return response()->json(['success' => true, 'message' => 'Custom field deleted successfully.']);
+        });
+    };
+
+    Route::prefix('tenant/settings/custom-fields')->group($tenantCustomFieldsHandler);
+    Route::prefix('v1/tenant/settings/custom-fields')->group($tenantCustomFieldsHandler);
+    Route::prefix('pos/settings/custom-fields')->group($tenantCustomFieldsHandler);
 
     // Storefront Domain, Banner, Auth & Payment Gateway settings
     Route::get('/tenant/storefront/domain-config', [StorefrontSettingsController::class, 'getDomainConfig']);
@@ -1158,6 +1451,7 @@ Route::prefix('v1/pos')->group(function () {
         Route::get('/analytics', [PosSyncApiController::class, 'analytics'])->middleware('tenant.api.permission:reports,view');
         Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
         Route::get('/dashboard/sales-chart', [DashboardController::class, 'salesChart']);
+        Route::get('/dashboard/init', [DashboardController::class, 'getDashboardInit']);
 
         // Outbound Delivery (WhatsApp / Email)
         Route::post('/send-delivery', [PosSyncApiController::class, 'sendDelivery'])->middleware('tenant.api.permission:pos,create');

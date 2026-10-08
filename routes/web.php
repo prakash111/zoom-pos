@@ -176,6 +176,8 @@ Route::get('/desktop/session/{token}', function (string $token) {
 
 Route::redirect('/admin/settings/general', '/superadmin/settings?tab=general');
 Route::redirect('/admin/settings/regional', '/superadmin/settings?tab=general');
+Route::redirect('/admin/promotions', '/superadmin/promotions');
+Route::redirect('/admin/broadcasts', '/superadmin/broadcasts');
 
 Route::get('/tenant/views/quotations/create', function (\Illuminate\Http\Request $request) {
     return app(\App\Http\Controllers\Api\QuotationController::class)->createSchema($request);

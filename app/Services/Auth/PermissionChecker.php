@@ -42,6 +42,9 @@ class PermissionChecker
         'reviews' => 'Product Ratings & Reviews',
         'storefront' => 'Storefront & Online Sales',
         'gateways' => 'Payment Gateways & Integrations',
+        'hrm' => 'Human Resource Management (HRM)',
+        'loyalty' => 'Loyalty & Customer Wallet',
+        'chat' => 'Unified Internal Staff Chat & Support',
     ];
 
     public const ACTIONS = [
@@ -272,6 +275,40 @@ class PermissionChecker
             'manage' => 'Configure storefront payment gateways & credentials',
             'edit' => 'Update gateway settings',
         ],
+        'hrm' => [
+            'module.access' => 'Access HRM Module',
+            'employees.view' => 'View Staff Directory',
+            'employees.create' => 'Create Employees',
+            'employees.edit' => 'Edit Employees',
+            'employees.delete' => 'Delete Employees',
+            'attendance.view' => 'View Attendance',
+            'attendance.clock_in_out' => 'Clock In / Out',
+            'attendance.edit_manual' => 'Manual Attendance Edit',
+            'leaves.view' => 'View Leaves',
+            'leaves.apply' => 'Apply for Leaves',
+            'leaves.approve_reject' => 'Approve/Reject Leaves',
+            'payroll.view' => 'View Payroll',
+            'payroll.generate' => 'Generate Payroll',
+            'payroll.pay' => 'Process Payroll Payments',
+            'payroll.view_own' => 'View Own Payroll',
+            'settings.manage' => 'Manage HRM Settings',
+        ],
+        'loyalty' => [
+            'module.access' => 'Access Loyalty & Customer Wallet Module',
+            'view' => 'View Customer Balances & Top-up',
+            'customer.balance_view' => 'View Customer Balances & Top-up',
+            'customer_wallet' => 'Manage Customer Store Wallet',
+            'wallet.topup' => 'Recharge / Top-up Customer Wallet',
+            'tiers.manage' => 'Manage VIP Membership Tiers',
+            'settings.edit' => 'Edit Points Earning Rules & Settings',
+            'rules.manage' => 'Manage Loyalty & Points Earning Rules',
+        ],
+        'chat' => [
+            'module.access' => 'Access Chat & Internal Messaging',
+            'messages.view' => 'View Conversations & Staff Messages',
+            'messages.send' => 'Send Messages & Attachments',
+            'broadcasts.manage' => 'Manage Promotional Broadcasts',
+        ],
     ];
 
     public static function canonicalModuleSlug(string $module): string
@@ -287,6 +324,9 @@ class PermissionChecker
             'inventory', 'product' => 'products',
             'lead', 'leadmanagement', 'lead_management' => 'leads',
             'service_order' => 'service_orders',
+            'human_resource', 'human_resources', 'payroll' => 'hrm',
+            'loyalty', 'rewards', 'wallet', 'customer_wallet' => 'loyalty',
+            'chat', 'staff_chat', 'internal_chat', 'live_chat' => 'chat',
             default => $slug,
         };
     }
@@ -329,6 +369,15 @@ class PermissionChecker
         $canonical = self::canonicalModuleSlug($module);
         // Tenant owners and explicit role grants cannot activate an extension.
         if ($canonical === 'leads' && ! $user->company?->hasModule('leadmanagement')) {
+            return false;
+        }
+        if ($canonical === 'hrm' && $user->company && ! $user->company->hasModule('hrm')) {
+            return false;
+        }
+        if ($canonical === 'loyalty' && $user->company && ! $user->company->hasModule('loyalty')) {
+            return false;
+        }
+        if ($canonical === 'chat' && $user->company && ! ($user->company->hasModule('chat') || $user->company->is_demo)) {
             return false;
         }
 
@@ -464,6 +513,25 @@ class PermissionChecker
                     'reviews' => ['view', 'create', 'edit', 'delete'],
                     'storefront' => ['view', 'manage', 'menus.manage', 'menus', 'pages', 'inquiries', 'inquiries.view', 'inquiries.action', 'edit'],
                     'gateways' => ['view', 'manage', 'edit'],
+                    'hrm' => [
+                        'module.access',
+                        'employees.view',
+                        'attendance.view',
+                        'attendance.clock_in_out',
+                        'attendance.edit_manual',
+                        'leaves.view',
+                        'leaves.approve_reject',
+                        'payroll.view',
+                    ],
+                    'loyalty' => [
+                        'module.access',
+                        'customer.balance_view',
+                        'wallet.topup',
+                        'tiers.manage',
+                        'settings.edit',
+                        'rules.manage',
+                    ],
+                    'chat' => ['module.access', 'messages.view', 'messages.send'],
                 ];
 
             case User::ROLE_SALESPERSON:
@@ -486,10 +554,14 @@ class PermissionChecker
                     'pharmacy' => ['view', 'create', 'edit'],
                     'salon' => ['view', 'create', 'edit', 'checkout'],
                     'storefront' => ['view', 'inquiries.view'],
+                    'hrm' => ['attendance.clock_in_out', 'leaves.apply', 'payroll.view_own'],
+                    'loyalty' => ['customer.balance_view', 'wallet.topup'],
+                    'chat' => ['module.access', 'messages.view', 'messages.send'],
                 ];
 
             case User::ROLE_CASHIER:
             case 'operador':
+            case 'cashier':
                 return [
                     'stores' => ['view'],
                     'pos' => ['view', 'create'],
@@ -505,6 +577,13 @@ class PermissionChecker
                     'restaurant' => ['view', 'create', 'settle'],
                     'pharmacy' => ['view', 'create'],
                     'salon' => ['view', 'create', 'checkout'],
+                    'hrm' => [
+                        'attendance.clock_in_out',
+                        'leaves.apply',
+                        'payroll.view_own',
+                    ],
+                    'loyalty' => ['customer.balance_view', 'wallet.topup'],
+                    'chat' => ['module.access', 'messages.view', 'messages.send'],
                 ];
 
             case User::ROLE_TECHNICIAN:
@@ -515,6 +594,7 @@ class PermissionChecker
                     'customers' => ['view'],
                     'pos' => ['view'],
                     'products' => ['view'],
+                    'chat' => ['module.access', 'messages.view', 'messages.send'],
                 ];
 
             case User::ROLE_STOCK_CLERK:
@@ -527,6 +607,7 @@ class PermissionChecker
                     'units' => ['view', 'create', 'edit', 'delete'],
                     'suppliers' => ['view', 'create', 'edit', 'export'],
                     'catalog' => ['view'],
+                    'chat' => ['module.access', 'messages.view', 'messages.send'],
                 ];
 
             case User::ROLE_FINANCE:
@@ -542,6 +623,7 @@ class PermissionChecker
                     'targets' => ['view', 'export'],
                     'customers' => ['view'],
                     'suppliers' => ['view'],
+                    'chat' => ['module.access', 'messages.view', 'messages.send'],
                 ];
 
             default:
@@ -550,6 +632,7 @@ class PermissionChecker
                     'pos' => ['view', 'create'],
                     'sales' => ['view'],
                     'cash_register' => ['view', 'create'],
+                    'chat' => ['module.access', 'messages.view', 'messages.send'],
                 ];
         }
     }

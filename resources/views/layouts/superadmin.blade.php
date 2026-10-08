@@ -273,6 +273,9 @@
             }
         }
     </style>
+    <script>
+        window.hasChatModule = {{ (is_dir(base_path('modules/Chat')) || class_exists(\Modules\Chat\Http\Controllers\PromotionalBroadcastController::class)) ? 'true' : 'false' }};
+    </script>
 </head>
 <body class="bg-[#1a1f37] dark:bg-[#0c101d] text-slate-900 dark:text-slate-100 min-h-screen p-2 sm:p-4 md:p-6 antialiased selection:bg-indigo-500 selection:text-white">
 
@@ -313,15 +316,24 @@
             $isHome = request()->routeIs('superadmin.dashboard');
             $isTenants = request()->routeIs('superadmin.tenants.*');
             $isModules = request()->routeIs('superadmin.modules.*');
+            $isBroadcasts = request()->routeIs('superadmin.broadcasts.*') || request()->routeIs('superadmin.promotions.*');
+            $hasChatModule = (is_dir(base_path('modules/Chat')) || class_exists(\Modules\Chat\Http\Controllers\PromotionalBroadcastController::class)) && Route::has('superadmin.broadcasts.index');
             $isPlans = request()->routeIs('superadmin.plans.*') || request()->routeIs('superadmin.payment-gateways.*');
             $isCodes = request()->routeIs('superadmin.activation-codes.*');
             $isTaxes = request()->routeIs('superadmin.tax.*');
             $isMenus = request()->routeIs('superadmin.menus.*');
             $isPages = request()->routeIs('superadmin.pages.*');
             $isInquiries = request()->routeIs('superadmin.inquiries.*');
+            $isLiveChatSupport = request()->routeIs('superadmin.chat-support.*');
             $isSmtp = request()->routeIs('superadmin.smtp.*');
             $isSettings = request()->routeIs('superadmin.settings.*') || request()->routeIs('superadmin.branding.*') || request()->routeIs('superadmin.backups.*') || request()->routeIs('superadmin.system.*') || request()->routeIs('superadmin.audit.*') || request()->routeIs('superadmin.languages.*');
             $unreadInquiriesCount = \App\Models\ContactInquiry::where('status', 'new')->count();
+            $unreadSupportChatCount = \Modules\Chat\Models\ChatMessage::whereHas('conversation', fn($c) => $c->where('type', 'support'))
+                ->where('sender_type', '!=', 'super_admin')
+                ->where(function ($q) {
+                    $q->whereNull('metadata->read_by_admin')
+                      ->orWhere('metadata->read_by_admin', false);
+                })->count();
         @endphp
         
         <!-- ==========================================
@@ -523,6 +535,31 @@
                     <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold shrink-0 flex-shrink-0'">{{ __('Modules') }}</span>
                 </a>
 
+                @if ($hasChatModule)
+                {{-- 2c. Promotional Broadcasts --}}
+                <a x-show="isItemVisible('broadcasts')"
+                   wire:navigate.hover href="{{ route('superadmin.broadcasts.index') }}"
+                   class="dockable-nav-item shrink-0 flex-shrink-0"
+                   :aria-selected="isCurrentRoute('{{ route('superadmin.broadcasts.index') }}') ? 'true' : 'false'"
+                   aria-selected="{{ $isBroadcasts ? 'true' : 'false' }}"
+                   :class="{
+                       'w-full max-w-[58px] sm:max-w-[66px] py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center shrink-0 flex-shrink-0': position === 'left' || position === 'right',
+                       'px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-2xl flex flex-row items-center gap-1.5 sm:gap-2 shrink-0 flex-shrink-0 whitespace-nowrap': position === 'top' || position === 'bottom',
+                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0 flex-shrink-0': position === 'floating',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.broadcasts.index') }}'),
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium': !isCurrentRoute('{{ route('superadmin.broadcasts.index') }}')
+                   }"
+                   @class([
+                       'transition-all group duration-200 cursor-pointer shrink-0 flex-shrink-0',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active' => $isBroadcasts,
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isBroadcasts,
+                   ])
+                   title="{{ __('Promotional Broadcasts') }}">
+                    <span class="text-base group-hover:scale-110 transition-transform shrink-0 flex-shrink-0">📢</span>
+                    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold shrink-0 flex-shrink-0'">{{ __('Broadcasts') }}</span>
+                </a>
+                @endif
+
                 <!-- 3. SaaS Plans & Pricing -->
                 <a x-show="isItemVisible('plans')"
                    wire:navigate.hover href="{{ route('superadmin.plans.index') }}"
@@ -651,6 +688,36 @@
                         @endif
                     </div>
                     <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold shrink-0 flex-shrink-0'">{{ __('Inquiries') }}</span>
+                </a>
+
+                <!-- 6c. Live Chat Support -->
+                <a x-show="isItemVisible('chat_support')"
+                   wire:navigate.hover href="{{ route('superadmin.chat-support.index') }}"
+                   class="dockable-nav-item relative shrink-0 flex-shrink-0"
+                   :aria-selected="isCurrentRoute('{{ route('superadmin.chat-support.index') }}') ? 'true' : 'false'"
+                   aria-selected="{{ $isLiveChatSupport ? 'true' : 'false' }}"
+                   :class="{
+                       'w-full max-w-[58px] sm:max-w-[66px] py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 text-center shrink-0 flex-shrink-0': position === 'left' || position === 'right',
+                       'px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-2xl flex flex-row items-center gap-1.5 sm:gap-2 shrink-0 flex-shrink-0 whitespace-nowrap': position === 'top' || position === 'bottom',
+                       'p-2.5 rounded-2xl flex flex-col items-center gap-1 shrink-0 flex-shrink-0': position === 'floating',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active': isCurrentRoute('{{ route('superadmin.chat-support.index') }}'),
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium': !isCurrentRoute('{{ route('superadmin.chat-support.index') }}')
+                   }"
+                   @class([
+                       'transition-all group duration-200 cursor-pointer relative shrink-0 flex-shrink-0',
+                       'bg-white text-indigo-900 shadow-xl font-extrabold active' => $isLiveChatSupport,
+                       'text-white/80 hover:text-white hover:bg-white/20 font-medium' => !$isLiveChatSupport,
+                   ])
+                   title="{{ __('Live Chat Support') }}">
+                    <div class="relative shrink-0 flex-shrink-0">
+                        <svg class="w-5 h-5 group-hover:scale-110 transition-transform shrink-0 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        @if ($unreadSupportChatCount > 0)
+                            <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-indigo-900"></span>
+                        @endif
+                    </div>
+                    <span :class="(position === 'left' || position === 'right') ? 'text-[10px] sm:text-[11px] font-bold leading-tight text-center truncate max-w-full px-0.5' : 'text-xs whitespace-nowrap font-bold shrink-0 flex-shrink-0'">{{ __('Live Chat') }}</span>
                 </a>
 
                 <!-- 7. Platform Settings -->
@@ -811,6 +878,32 @@
                     </a>
                 </div>
 
+                @if ($hasChatModule)
+                {{-- Category 2c: Promotional Broadcasts --}}
+                <div x-show="isItemVisible('broadcasts')" :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
+                    <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
+                        {{ __('Promotions & Broadcasts') }}
+                    </div>
+                    <a wire:navigate.hover href="{{ route('superadmin.broadcasts.index') }}"
+                       :class="{
+                           'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
+                           'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
+                           'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
+                       }"
+                       @class([
+                           'bg-white text-indigo-900 shadow-md' => $isBroadcasts,
+                           'text-white/80 hover:text-white hover:bg-white/15' => !$isBroadcasts,
+                       ])
+                       title="{{ __('Promotional Broadcasts') }}">
+                        <span class="text-base shrink-0">📢</span>
+                        <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
+                            <div class="text-xs truncate">{{ __('Promotional Broadcasts') }}</div>
+                            <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Banners & POS notices') }}</div>
+                        </div>
+                    </a>
+                </div>
+                @endif
+
                 <!-- Category 3: Subscriptions & Taxes -->
                 <div x-show="isItemVisible('plans') || isItemVisible('taxes') || isItemVisible('codes')" :class="{ 'space-y-1': position === 'left' || position === 'right', 'flex flex-row items-center gap-1.5 shrink-0': position === 'top' || position === 'bottom', 'space-y-1': position === 'floating' }">
                     <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-black uppercase tracking-wider text-white/50 px-2.5">
@@ -921,6 +1014,36 @@
                                 @endif
                             </div>
                             <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Form leads & builder') }}</div>
+                        </div>
+                    </a>
+
+                    <a x-show="isItemVisible('chat_support')" wire:navigate.hover href="{{ route('superadmin.chat-support.index') }}"
+                       :class="{
+                           'w-full px-3 py-2 rounded-2xl flex items-center gap-3 transition font-bold': position === 'left' || position === 'right',
+                           'px-3 py-1.5 rounded-2xl flex items-center gap-2 shrink-0 transition font-bold text-xs whitespace-nowrap': position === 'top' || position === 'bottom',
+                           'px-3 py-2 rounded-2xl flex items-center gap-2.5 transition font-bold text-xs': position === 'floating'
+                       }"
+                       @class([
+                           'bg-white text-indigo-900 shadow-md' => $isLiveChatSupport,
+                           'text-white/80 hover:text-white hover:bg-white/15' => !$isLiveChatSupport,
+                       ])
+                       title="{{ __('Live Chat Support') }}">
+                        <span class="text-base shrink-0 relative">
+                            🎧
+                            @if ($unreadSupportChatCount > 0)
+                                <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-indigo-900"></span>
+                            @endif
+                        </span>
+                        <div :class="{ 'flex-1 min-w-0': position === 'left' || position === 'right', 'shrink-0': position === 'top' || position === 'bottom' }">
+                            <div class="text-xs truncate flex items-center gap-1.5">
+                                <span>{{ __('Live Chat Support') }}</span>
+                                @if ($unreadSupportChatCount > 0)
+                                    <span class="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-500 text-white font-black">
+                                        {{ $unreadSupportChatCount }}
+                                    </span>
+                                @endif
+                            </div>
+                            <div x-show="position === 'left' || position === 'right'" class="text-[10px] font-normal opacity-70 truncate">{{ __('Live Desk & support') }}</div>
                         </div>
                     </a>
 
@@ -1077,6 +1200,23 @@
                 </div>
             </a>
 
+            @if ($hasChatModule)
+            {{-- 2c. Promotional Broadcasts --}}
+            <a x-show="isItemVisible('broadcasts')" wire:navigate.hover href="{{ route('superadmin.broadcasts.index') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               :aria-selected="isCurrentRoute('{{ route('superadmin.broadcasts.index') }}') ? 'true' : 'false'"
+               aria-selected="{{ $isBroadcasts ? 'true' : 'false' }}"
+               title="{{ __('Promotional Broadcasts') }}">
+                <div @class([
+                    'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition',
+                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' => $isBroadcasts,
+                    'bg-white/15 text-white hover:bg-white/30' => !$isBroadcasts,
+                ]) :class="isCurrentRoute('{{ route('superadmin.broadcasts.index') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
+                    📢
+                </div>
+            </a>
+            @endif
+
             <!-- 3. SaaS Plans & Pricing -->
             <a x-show="isItemVisible('plans')" wire:navigate.hover href="{{ route('superadmin.plans.index') }}"
                class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
@@ -1150,6 +1290,24 @@
                 ]) :class="isCurrentRoute('{{ route('superadmin.inquiries.index') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
                     📬
                     @if ($unreadInquiriesCount > 0)
+                        <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-indigo-900"></span>
+                    @endif
+                </div>
+            </a>
+
+            <!-- 6c. Live Chat Support -->
+            <a x-show="isItemVisible('chat_support')" wire:navigate.hover href="{{ route('superadmin.chat-support.index') }}"
+               class="dockable-nav-item group relative flex flex-col items-center hover:scale-125 transition-transform duration-200 origin-bottom shrink-0 cursor-pointer"
+               :aria-selected="isCurrentRoute('{{ route('superadmin.chat-support.index') }}') ? 'true' : 'false'"
+               aria-selected="{{ $isLiveChatSupport ? 'true' : 'false' }}"
+               title="{{ __('Live Chat Support') }}">
+                <div @class([
+                    'w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-md transition relative',
+                    'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' => $isLiveChatSupport,
+                    'bg-white/15 text-white hover:bg-white/30' => !$isLiveChatSupport,
+                ]) :class="isCurrentRoute('{{ route('superadmin.chat-support.index') }}') ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400 active' : 'bg-white/15 text-white hover:bg-white/30'">
+                    🎧
+                    @if ($unreadSupportChatCount > 0)
                         <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-indigo-900"></span>
                     @endif
                 </div>
@@ -1255,6 +1413,13 @@
                     <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">🧩</span>
                 </a>
 
+                @if ($hasChatModule)
+                <a x-show="isItemVisible('broadcasts')" wire:navigate.hover href="{{ route('superadmin.broadcasts.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                    <span>{{ __('Broadcasts') }}</span>
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">📢</span>
+                </a>
+                @endif
+
                 <a x-show="isItemVisible('plans')" wire:navigate.hover href="{{ route('superadmin.plans.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
                     <span>{{ __('Plans') }}</span>
                     <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">👑</span>
@@ -1280,6 +1445,16 @@
                     <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center relative">
                         📬
                         @if ($unreadInquiriesCount > 0)
+                            <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-indigo-900"></span>
+                        @endif
+                    </span>
+                </a>
+
+                <a x-show="isItemVisible('chat_support')" wire:navigate.hover href="{{ route('superadmin.chat-support.index') }}" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/20 transition">
+                    <span>{{ __('Live Chat') }}</span>
+                    <span class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center relative">
+                        🎧
+                        @if ($unreadSupportChatCount > 0)
                             <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-indigo-900"></span>
                         @endif
                     </span>
@@ -1475,6 +1650,26 @@
                                 </div>
                             </a>
 
+                            <a wire:navigate.hover href="{{ route('superadmin.chat-support.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                                <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition relative">
+                                    🎧
+                                    @if ($unreadSupportChatCount > 0)
+                                        <span class="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full"></span>
+                                    @endif
+                                </span>
+                                <div class="flex-1">
+                                    <div class="font-bold flex items-center justify-between">
+                                        <span>{{ __('Live Chat Support') }}</span>
+                                        @if ($unreadSupportChatCount > 0)
+                                            <span class="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-500 text-white font-black">
+                                                {{ $unreadSupportChatCount }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="text-[10px] text-slate-400 font-normal">{{ __('Real-time help desk & tenant inquiries') }}</div>
+                                </div>
+                            </a>
+
                             <a wire:navigate.hover href="{{ route('superadmin.menus.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
                                     🧭
@@ -1524,6 +1719,18 @@
                                     <div class="text-[10px] text-slate-400 font-normal">{{ __('Install ZIP-packaged business modules') }}</div>
                                 </div>
                             </a>
+
+                            @if ($hasChatModule)
+                            <a wire:navigate.hover href="{{ route('superadmin.broadcasts.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
+                                <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
+                                    📢
+                                </span>
+                                <div>
+                                    <div class="font-bold">{{ __('Promotional Broadcasts') }}</div>
+                                    <div class="text-[10px] text-slate-400 font-normal">{{ __('Banners, announcements & notices to POS') }}</div>
+                                </div>
+                            </a>
+                            @endif
 
                             <a wire:navigate.hover href="{{ route('superadmin.system.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition group">
                                 <span class="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
@@ -1598,6 +1805,11 @@
                             <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 shrink-0">
                                 🛡️ Platform Admin
                             </span>
+                            @if (config('app.demo_mode'))
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/80 dark:border-amber-700/50 shrink-0">
+                                    🔒 {{ __('Demo Mode') }}
+                                </span>
+                            @endif
                         </div>
                         <p class="hidden sm:block text-[11px] text-slate-400 font-medium truncate">
                             Multi-Tenant Control Center & System Administration
@@ -1747,17 +1959,52 @@
                 </div>
             </header>
 
-            <!-- Main Dynamic View Container with Smooth Transition -->
-            <main class="flex-1 p-3 sm:p-6 md:p-8 w-full max-w-none" id="main-app-content">
-                <div class="w-full max-w-none">
-                    @if (config('app.demo_mode'))
-                        <div class="mb-5 flex items-center gap-3 rounded-xl border border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-amber-900 dark:text-amber-200 shadow-sm">
-                            <span class="text-lg leading-none">🔒</span>
-                            <p class="text-sm font-semibold">
+            @if (config('app.demo_mode'))
+                <!-- Sleek Dismissible Demo Mode Top Alert Bar -->
+                <div x-data="{
+                        dismissed: false,
+                        init() {
+                            try {
+                                this.dismissed = sessionStorage.getItem('sa_demo_banner_dismissed') === '1';
+                            } catch (_) {}
+                        },
+                        dismiss() {
+                            this.dismissed = true;
+                            try {
+                                sessionStorage.setItem('sa_demo_banner_dismissed', '1');
+                            } catch (_) {}
+                        }
+                     }"
+                     x-show="!dismissed"
+                     x-transition:leave="transition ease-in duration-150"
+                     x-transition:leave-start="opacity-100 max-h-16"
+                     x-transition:leave-end="opacity-0 max-h-0"
+                     class="shrink-0 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-amber-500/15 dark:from-amber-500/20 dark:via-amber-500/10 dark:to-amber-500/20 border-b border-amber-300/80 dark:border-amber-500/30 px-3 sm:px-8 py-2 text-amber-900 dark:text-amber-200 shadow-2xs z-20">
+                    <div class="w-full max-w-none flex items-center justify-between gap-3 text-xs sm:text-sm">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 shrink-0">
+                                🔒 {{ __('Demo Mode') }}
+                            </span>
+                            <p class="font-semibold text-amber-900 dark:text-amber-200 truncate">
                                 {{ __('Demo Mode Active: Super Admin controls are read-only. Settings cannot be edited or saved.') }}
                             </p>
                         </div>
-                    @endif
+                        <button type="button"
+                                @click="dismiss()"
+                                class="p-1 rounded-lg text-amber-800/70 dark:text-amber-300/70 hover:text-amber-900 dark:hover:text-amber-100 hover:bg-amber-500/20 transition cursor-pointer shrink-0"
+                                title="{{ __('Dismiss notice') }}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+            @endif
+
+            <!-- Main Dynamic View Container with Smooth Transition -->
+            @php
+                $isFullHeightApp = request()->routeIs('superadmin.chat-support.index');
+            @endphp
+            <main class="flex-1 {{ $isFullHeightApp ? 'p-0 flex flex-col min-h-0 overflow-hidden' : 'p-3 sm:p-6 md:p-8' }} w-full max-w-none" id="main-app-content">
+                <div class="w-full max-w-none {{ $isFullHeightApp ? 'flex-1 flex flex-col min-h-0 h-full' : '' }}">
                     {{ $slot ?? '' }}
                     @yield('content')
                 </div>

@@ -19,6 +19,7 @@ class Customer extends Model
         'date_of_birth', 'avatar_url',
         'custom_fields',
         'is_verified', 'verification_code', 'verification_code_expires_at', 'verified_at',
+        'loyalty_tier_id', 'points_balance', 'wallet_balance', 'total_lifetime_spend',
     ];
 
     protected $hidden = [
@@ -32,6 +33,10 @@ class Customer extends Model
         'is_demo' => 'boolean',
         'is_verified' => 'boolean',
         'due_balance' => 'decimal:2',
+        'points_balance' => 'decimal:2',
+        'wallet_balance' => 'decimal:2',
+        'total_lifetime_spend' => 'decimal:2',
+        'loyalty_tier_id' => 'integer',
         'age' => 'integer',
         'date_of_birth' => 'date',
         'verification_code_expires_at' => 'datetime',
@@ -101,5 +106,25 @@ class Customer extends Model
         return $this->custom_fields['company_name']
             ?? $this->custom_fields['company']
             ?? ($this->person_type === 'company' ? $this->name : null);
+    }
+
+    public function getTenantIdAttribute(): ?string
+    {
+        return (string) ($this->company_id ?? null);
+    }
+
+    public function tier()
+    {
+        return $this->belongsTo(\Modules\Loyalty\Models\LoyaltyTier::class, 'loyalty_tier_id');
+    }
+
+    public function pointsTransactions()
+    {
+        return $this->hasMany(\Modules\Loyalty\Models\LoyaltyPointsTransaction::class, 'customer_id')->orderByDesc('id');
+    }
+
+    public function walletTransactions()
+    {
+        return $this->hasMany(\Modules\Loyalty\Models\CustomerWalletTransaction::class, 'customer_id')->orderByDesc('id');
     }
 }

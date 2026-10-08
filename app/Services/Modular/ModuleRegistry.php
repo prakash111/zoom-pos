@@ -119,6 +119,87 @@ class ModuleRegistry
                 ],
                 'cart_configuration' => $cart,
             ],
+            'hrm' => [
+                'id' => 'hrm',
+                'type' => SduiModule::TYPE_EXTENSION,
+                'title' => 'Human Resource Management & Payroll',
+                'subtitle' => 'Employees, attendance, leave tracking, POS clock-in & payroll',
+                'description' => 'Comprehensive employee directory, POS PIN clock-in/out attendance, leave tracking, and sales commission payroll.',
+                'layout_type' => 'standard_grid',
+                'icon' => 'groups',
+                'features' => [
+                    'has_tables' => false, 'has_kot' => false, 'has_barcode_scanner' => false,
+                    'has_employees' => true, 'has_attendance' => true, 'has_leaves' => true,
+                    'has_payroll' => true, 'has_pos_clock_in' => true, 'has_sales_commissions' => true,
+                ],
+                'navigation' => [
+                    [
+                        'key' => 'hrm_group',
+                        'title' => str_starts_with(strtolower((string) (request()->header('X-App-Locale') ?? request()->header('Accept-Language') ?? app()->getLocale())), 'hi') ? 'कर्मचारी और वेतन (HRM & Staff)' : 'HRM & Staff Management',
+                        'icon' => 'groups',
+                        'items' => [
+                            ['key' => 'hrm_employees', 'title' => 'Staff Directory', 'icon' => 'badge', 'target_endpoint' => '/api/tenant/hrm/views/employees'],
+                            ['key' => 'hrm_attendance', 'title' => 'Attendance Roster', 'icon' => 'schedule', 'target_endpoint' => '/api/tenant/hrm/views/attendance'],
+                            ['key' => 'hrm_leaves', 'title' => 'Leave Requests', 'icon' => 'event_busy', 'target_endpoint' => '/api/tenant/hrm/views/leaves'],
+                            ['key' => 'hrm_payroll', 'title' => 'Payroll & Commissions', 'icon' => 'payments', 'target_endpoint' => '/api/tenant/hrm/views/payroll'],
+                        ],
+                    ],
+                ],
+                'cart_configuration' => $cart,
+            ],
+            'loyalty' => [
+                'id' => 'loyalty',
+                'type' => SduiModule::TYPE_EXTENSION,
+                'title' => 'Customer Loyalty, Rewards & Wallet Engine',
+                'subtitle' => 'Points accrual, VIP customer tiers, and prepaid store wallet accounts',
+                'description' => 'Configurable points accrual, VIP customer tiers, and prepaid store wallet accounts with POS checkout deduction.',
+                'layout_type' => 'standard_grid',
+                'icon' => 'wallet',
+                'features' => [
+                    'has_tables' => false, 'has_kot' => false, 'has_barcode_scanner' => false,
+                    'has_loyalty' => true, 'has_points' => true, 'has_wallet' => true,
+                    'has_vip_tiers' => true, 'has_redemption' => true,
+                ],
+                'navigation' => [
+                    [
+                        'key' => 'loyalty_group',
+                        'title' => str_starts_with(strtolower((string) (request()->header('X-App-Locale') ?? request()->header('Accept-Language') ?? app()->getLocale())), 'hi') ? 'लॉयल्टी और ग्राहक वॉलेट' : 'Loyalty & Customer Wallet',
+                        'icon' => 'wallet',
+                        'items' => [
+                            ['key' => 'loyalty_wallets', 'title' => 'Customer Balances & Top-up', 'icon' => 'account_balance_wallet', 'target_endpoint' => '/api/tenant/loyalty/views/wallets'],
+                            ['key' => 'loyalty_tiers', 'title' => 'VIP Membership Tiers', 'icon' => 'military_tech', 'target_endpoint' => '/api/tenant/loyalty/views/tiers'],
+                            ['key' => 'loyalty_settings', 'title' => 'Points Earning Rules', 'icon' => 'tune', 'target_endpoint' => '/api/tenant/loyalty/views/settings'],
+                        ],
+                    ],
+                ],
+                'cart_configuration' => $cart,
+            ],
+            'chat' => [
+                'id' => 'chat',
+                'type' => SduiModule::TYPE_EXTENSION,
+                'title' => 'Unified Internal Staff Chat & Live Support',
+                'subtitle' => 'Team messaging, broadcasts & help desk',
+                'description' => 'Real-time internal staff messaging, presence indicators, super admin promotional announcements, and live chat support.',
+                'layout_type' => 'standard_grid',
+                'icon' => 'chat',
+                'features' => [
+                    'has_tables' => false, 'has_kot' => false, 'has_barcode_scanner' => false,
+                    'has_internal_chat' => true,
+                    'has_broadcasts' => true, 'has_presence' => true,
+                ],
+                'navigation' => [
+                    [
+                        'key' => 'chat_group',
+                        'title' => str_starts_with(strtolower((string) (request()->header('X-App-Locale') ?? request()->header('Accept-Language') ?? app()->getLocale())), 'hi') ? 'आंतरिक संदेश और सहायता' : 'Staff Chat & Live Support',
+                        'icon' => 'chat',
+                        'items' => [
+                            ['key' => 'chat_messages', 'title' => 'Live Staff Chat', 'icon' => 'forum', 'target_endpoint' => '/api/tenant/chat/views/staff-chat'],
+                            ['key' => 'send_staff_notification', 'title' => 'Send Staff Notification', 'icon' => 'send_to_mobile', 'target_endpoint' => '/api/tenant/chat/views/staff-notifications'],
+                        ],
+                    ],
+                ],
+                'cart_configuration' => $cart,
+            ],
         ];
     }
 
@@ -146,6 +227,14 @@ class ModuleRegistry
 
         if (in_array($key, ['lead', 'leads', 'lead_management', 'lead-management'], true)) {
             return 'leadmanagement';
+        }
+
+        if (in_array($key, ['repair', 'repairs', 'repairtechnician', 'repair_technician'], true)) {
+            return 'repair_technician';
+        }
+
+        if (in_array($key, ['salon', 'salons', 'service_booking'], true)) {
+            return 'service_booking';
         }
 
         return self::packageAliases()[$key] ?? $key;

@@ -90,6 +90,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && $key !== '' && $domain !== 
             <option value="pharmacy" <?= $product === 'pharmacy' ? 'selected' : '' ?>>Pharmacy POS</option>
             <option value="salon" <?= $product === 'salon' ? 'selected' : '' ?>>Salon Management</option>
             <option value="repairtechnician" <?= $product === 'repairtechnician' ? 'selected' : '' ?>>Repair Service Provider</option>
+            <option value="hrm" <?= $product === 'hrm' ? 'selected' : '' ?>>Human Resource Management &amp; Payroll</option>
+            <option value="loyalty" <?= $product === 'loyalty' ? 'selected' : '' ?>>Customer Loyalty &amp; Wallet Engine</option>
           </select>
         </div>
 

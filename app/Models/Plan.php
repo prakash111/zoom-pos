@@ -16,6 +16,7 @@ class Plan extends Model
         'name', 'display_name', 'billing_cycle', 'duration_days',
         'price', 'currency', 'features', 'limits', 'active', 'is_active',
         'invoice_limit', 'products_limit', 'device_limit', 'staff_limit', 'store_limit', 'extensions',
+        'has_hrm_module', 'max_staff_limit',
     ];
 
     protected function casts(): array
@@ -29,6 +30,8 @@ class Plan extends Model
             'device_limit' => 'integer',
             'staff_limit' => 'integer',
             'store_limit' => 'integer',
+            'has_hrm_module' => 'boolean',
+            'max_staff_limit' => 'integer',
             'active' => 'boolean',
             'is_active' => 'boolean',
             'price' => 'decimal:2',

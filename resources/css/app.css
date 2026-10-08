@@ -5,6 +5,8 @@
 @source '../../storage/framework/views/*.php';
 @source '../../app/Livewire/**/*.php';
 @source '../views/**/*.blade.php';
+@source '../../modules/**/*.blade.php';
+@source '../../modules/**/*.php';
 
 /* Class-based dark mode (toggled via localStorage + <html class="dark">). */
 @custom-variant dark (&:where(.dark, .dark *));

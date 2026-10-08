@@ -46,7 +46,7 @@
                 </tr>
                 <tr style="border-top: 1px solid #e2e8f0;">
                     <td style="padding: 10px 0 4px 0; color: #0f172a; font-weight: bold; font-size: 15px;">Total Paid:</td>
-                    <td style="padding: 10px 0 4px 0; font-weight: 800; text-align: right; color: #2563eb; font-size: 16px;">${{ $invoice->getFormattedTotal() }} {{ $invoice->currency }}</td>
+                    <td style="padding: 10px 0 4px 0; font-weight: 800; text-align: right; color: #2563eb; font-size: 16px;">{{ $invoice->getCurrencySymbol() }}{{ number_format($invoice->total_amount, 2) }} ({{ strtoupper($invoice->currency ?? 'INR') }})</td>
                 </tr>
             </table>
         </div>

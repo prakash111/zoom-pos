@@ -98,6 +98,11 @@ class DemoAccountsSeeder extends Seeder
                 /** @var User $user */
                 $user = $result['user'];
 
+                $licensed = is_array($company->licensed_modules) ? $company->licensed_modules : [];
+                if (! in_array('chat', $licensed, true)) {
+                    $licensed[] = 'chat';
+                }
+
                 $company->forceFill([
                     'is_demo' => true,
                     'is_seeding_complete' => true,
@@ -111,6 +116,7 @@ class DemoAccountsSeeder extends Seeder
                     // dashboard's "today" hourly chart and KOT/alarm timers
                     // line up with when people actually try the demo.
                     'timezone' => 'Asia/Kolkata',
+                    'licensed_modules' => array_values(array_unique($licensed)),
                 ])->save();
 
                 $user->forceFill([
@@ -119,6 +125,12 @@ class DemoAccountsSeeder extends Seeder
                     'email_verified_at' => now(),
                     'status' => 'active',
                 ])->save();
+
+                if (class_exists(DemoChatSeeder::class)) {
+                    (new DemoChatSeeder)->run($company);
+                }
+
+                $this->applyAiConfigurations($company);
 
                 $this->command?->info("Created demo account {$meta['email']} ({$storeType})");
             } catch (\Throwable $e) {
@@ -143,18 +155,55 @@ class DemoAccountsSeeder extends Seeder
             return;
         }
 
+        $licensed = is_array($company->licensed_modules) ? $company->licensed_modules : [];
+        if (! in_array('chat', $licensed, true)) {
+            $licensed[] = 'chat';
+        }
+
         $company->forceFill([
             'is_demo' => true,
             'pos_mode' => $posMode,
             // Show the Cafe & Restaurant nav only for the restaurant demo.
             'restaurant_mode_locked' => $posMode !== 'restaurant',
             'timezone' => 'Asia/Kolkata',
+            'licensed_modules' => array_values(array_unique($licensed)),
         ])->save();
+
+        if (class_exists(DemoChatSeeder::class)) {
+            (new DemoChatSeeder)->run($company);
+        }
 
         // Re-apply the store profile, T&C / bank details and placeholder logo
         // for an already-provisioned demo tenant (a plain refresh otherwise
         // only touches auth/flags).
         app(TenantSampleDataService::class)
             ->seedBusinessProfile($company, $posMode);
+
+        $this->applyAiConfigurations($company);
+    }
+
+    private function applyAiConfigurations(Company $company): void
+    {
+        $geminiKey = config('services.gemini.api_key') ?: env('GEMINI_API_KEY', '');
+        \App\Models\Configuration::updateOrCreate(
+            ['company_id' => $company->id, 'key' => 'default_ai_provider'],
+            ['value' => 'gemini']
+        );
+        \App\Models\Configuration::updateOrCreate(
+            ['company_id' => $company->id, 'key' => 'gemini_api_key'],
+            ['value' => $geminiKey]
+        );
+        \App\Models\Configuration::updateOrCreate(
+            ['company_id' => $company->id, 'key' => 'gemini_model'],
+            ['value' => 'gemini-2.5-flash']
+        );
+        \App\Models\Configuration::updateOrCreate(
+            ['company_id' => $company->id, 'key' => 'enable_ai'],
+            ['value' => '1']
+        );
+        \App\Models\Configuration::updateOrCreate(
+            ['company_id' => $company->id, 'key' => 'ai_enabled'],
+            ['value' => '1']
+        );
     }
 }
