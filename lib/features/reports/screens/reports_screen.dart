@@ -97,7 +97,7 @@ class _ReportsScreenBodyState extends State<_ReportsScreenBody> with SingleTicke
           : null,
     );
     if (picked == null) return;
-    reports.setDateRange(picked.start, picked.end);
+    reports.setDateRange(picked.start, picked.end, activeTabIndex: _tabController.index);
   }
 
   /// Saves or downloads the report as a `.csv` file via FileDownloadHelper,

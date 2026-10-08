@@ -417,7 +417,7 @@ class DashboardSummaryModel {
         ),
       ),
       salesOverview: SalesOverviewData(
-        ranges: const ['last_7_days', 'this_month', 'quarter'],
+        ranges: const ['last_7_days', 'this_month', 'quarter', 'all_time', 'custom'],
         currentRange: 'last_7_days',
         series: overviewSeries,
       ),

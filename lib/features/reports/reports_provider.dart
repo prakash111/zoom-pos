@@ -33,10 +33,27 @@ class ReportsProvider extends ChangeNotifier {
   List<CommissionStat> commissions = [];
   AgingReport? aging;
 
-  void setDateRange(DateTime? start, DateTime? end) {
+  void setDateRange(DateTime? start, DateTime? end, {int activeTabIndex = 0}) {
     startDate = start;
     endDate = end;
     loadSummary();
+    switch (activeTabIndex) {
+      case 1:
+        loadProfitLoss();
+        break;
+      case 2:
+        loadPaymentMethods();
+        break;
+      case 3:
+        loadTillClosings();
+        break;
+      case 4:
+        loadCommissions();
+        break;
+      case 5:
+        loadAging();
+        break;
+    }
   }
 
   Future<void> loadSummary() async {

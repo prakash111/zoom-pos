@@ -2890,6 +2890,7 @@ class _DashboardAnalytics extends StatelessWidget {
           onOpenTransactions: () => open('sales'),
           onOpenNotifications: onOpenNotifications,
           onRangeChanged: (range) {
+            if (range == 'custom') return;
             final storeId = context.read<StoreProvider?>()?.current?.id;
             context.read<DashboardProvider>().fetchSalesOverview(period: range, storeId: storeId);
           },

@@ -47,6 +47,7 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
     {'label': 'Last 7 Days', 'key': 'last_7_days'},
     {'label': 'This Month', 'key': 'this_month'},
     {'label': 'Quarter', 'key': 'quarter'},
+    {'label': 'All-Time', 'key': 'all_time'},
   ];
 
   @override
@@ -86,8 +87,8 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
     final picked = await showPosDateRangePicker(
       context: targetContext,
       initialDateRange: initialRange,
-      firstDate: DateTime(now.year - 2),
-      lastDate: now,
+      firstDate: DateTime(now.year - 5),
+      lastDate: DateTime(now.year + 2),
     );
 
     if (picked != null) {
@@ -109,13 +110,29 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
               endDate: endDateStr,
             );
       } catch (_) {}
-
-      widget.onPeriodChanged?.call('custom');
     }
   }
 
   void _handlePeriodSelected(String periodKey) {
     if (periodKey == 'custom') {
+      if (_customDateRange != null && _selectedPeriod != 'custom') {
+        setState(() {
+          _selectedPeriod = 'custom';
+        });
+        final currentStoreId = widget.storeId ??
+            context.read<StoreProvider?>()?.current?.id;
+        final startDateStr = _customDateRange!.start.toIso8601String().split('T').first;
+        final endDateStr = _customDateRange!.end.toIso8601String().split('T').first;
+        try {
+          context.read<DashboardProvider?>()?.fetchSalesOverview(
+                period: 'custom',
+                storeId: currentStoreId,
+                startDate: startDateStr,
+                endDate: endDateStr,
+              );
+        } catch (_) {}
+        return;
+      }
       _openSalesOverviewDatePicker(context);
       return;
     }
@@ -141,11 +158,13 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dashboardProvider = context.watch<DashboardProvider?>();
 
-    final overview = (dashboardProvider?.salesOverview != null &&
-            (dashboardProvider?.currentPeriod.isEmpty == true ||
-             dashboardProvider?.currentPeriod == _selectedPeriod))
-        ? dashboardProvider!.salesOverview!
-        : (widget.initialData ?? dashboardProvider?.salesOverview);
+    if (dashboardProvider != null &&
+        dashboardProvider.currentPeriod.isNotEmpty &&
+        _selectedPeriod != dashboardProvider.currentPeriod) {
+      _selectedPeriod = dashboardProvider.currentPeriod;
+    }
+
+    final overview = dashboardProvider?.salesOverview ?? widget.initialData;
     final activeRange = (dashboardProvider?.currentPeriod.isNotEmpty == true)
         ? dashboardProvider!.currentPeriod
         : _selectedPeriod;
@@ -247,6 +266,7 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
                         isSelected: activeRange == 'custom',
                         isDark: isDark,
                         icon: Icons.calendar_today_outlined,
+                        onIconTap: () => _openSalesOverviewDatePicker(context),
                       ),
                     ],
                   ),
@@ -312,10 +332,9 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
                               if (idx < 0 || idx >= series.length) {
                                 return const SizedBox.shrink();
                               }
-                              // Sample intervals if series is large
-                              if (series.length > 8 &&
-                                  idx % 3 != 0 &&
-                                  idx != series.length - 1) {
+                              // Sample intervals smoothly if series is large
+                              final step = (series.length > 7) ? (series.length / 6).ceil() : 1;
+                              if (step > 1 && idx % step != 0 && idx != series.length - 1) {
                                 return const SizedBox.shrink();
                               }
                               return Text(
@@ -426,6 +445,7 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
     required bool isSelected,
     required bool isDark,
     IconData? icon,
+    VoidCallback? onIconTap,
   }) {
     return InkWell(
       onTap: () => _handlePeriodSelected(periodKey),
@@ -452,14 +472,20 @@ class _SalesOverviewChartState extends State<SalesOverviewChart> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(
-                icon,
-                size: 13,
-                color: isSelected
-                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
-                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onIconTap ?? () => _handlePeriodSelected(periodKey),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(
+                    icon,
+                    size: 13,
+                    color: isSelected
+                        ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                  ),
+                ),
               ),
-              const SizedBox(width: 4),
             ],
             Text(
               label,

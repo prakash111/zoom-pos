@@ -13,6 +13,8 @@ class DashboardProvider extends ChangeNotifier {
   SalesOverviewData? salesOverview;
   String currentPeriod = 'last_7_days';
   int? currentStoreId;
+  String? currentStartDate;
+  String? currentEndDate;
 
   double totalSales = 0.0;
   String formattedTotalSales = '';
@@ -25,7 +27,7 @@ class DashboardProvider extends ChangeNotifier {
   /// Fetches sales overview series and metrics filtered by [period], [storeId],
   /// and optional [startDate] and [endDate] for custom date ranges.
   ///
-  /// Valid periods: 'last_7_days', 'this_month', 'quarter', 'custom'.
+  /// Valid periods: 'last_7_days', 'this_month', 'quarter', 'all_time', 'custom'.
   Future<void> fetchSalesOverview({
     required String period,
     int? storeId,
@@ -34,6 +36,16 @@ class DashboardProvider extends ChangeNotifier {
   }) async {
     currentPeriod = period;
     currentStoreId = storeId;
+    if (startDate != null && startDate.isNotEmpty) {
+      currentStartDate = startDate;
+    }
+    if (endDate != null && endDate.isNotEmpty) {
+      currentEndDate = endDate;
+    }
+
+    final effectiveStart = (period == 'custom') ? (startDate ?? currentStartDate) : null;
+    final effectiveEnd = (period == 'custom') ? (endDate ?? currentEndDate) : null;
+
     isLoading = true;
     error = null;
     notifyListeners();
@@ -45,13 +57,13 @@ class DashboardProvider extends ChangeNotifier {
       if (storeId != null) {
         queryParams['store_id'] = storeId.toString();
       }
-      if (startDate != null && startDate.isNotEmpty) {
-        queryParams['startDate'] = startDate;
-        queryParams['start_date'] = startDate;
+      if (effectiveStart != null && effectiveStart.isNotEmpty) {
+        queryParams['startDate'] = effectiveStart;
+        queryParams['start_date'] = effectiveStart;
       }
-      if (endDate != null && endDate.isNotEmpty) {
-        queryParams['endDate'] = endDate;
-        queryParams['end_date'] = endDate;
+      if (effectiveEnd != null && effectiveEnd.isNotEmpty) {
+        queryParams['endDate'] = effectiveEnd;
+        queryParams['end_date'] = effectiveEnd;
       }
 
       final response = await _api.getAbsolute(
@@ -66,7 +78,7 @@ class DashboardProvider extends ChangeNotifier {
             .toList();
 
         salesOverview = SalesOverviewData(
-          ranges: const ['last_7_days', 'this_month', 'quarter', 'custom'],
+          ranges: const ['last_7_days', 'this_month', 'quarter', 'all_time', 'custom'],
           currentRange: period,
           series: rawSeries,
         );
