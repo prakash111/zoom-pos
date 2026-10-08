@@ -3639,6 +3639,9 @@ class PosSyncApiController extends Controller
                 'last_month',
                 'Last Month',
             ],
+            'quarter', 'this_quarter' => [
+                now()->startOfQuarter(), now()->endOfQuarter(), 'quarter', 'This Quarter',
+            ],
             'year', 'this_year' => [
                 now()->startOfYear(), now()->endOfYear(), 'year', 'This Year',
             ],

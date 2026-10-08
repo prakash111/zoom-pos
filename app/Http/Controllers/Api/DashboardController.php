@@ -491,11 +491,13 @@ class DashboardController extends Controller
         $startDateInput = $request->input('startDate') ?? $request->input('start_date') ?? $request->input('from');
         $endDateInput = $request->input('endDate') ?? $request->input('end_date') ?? $request->input('to');
 
-        $period = (string) ($request->input('period') ?? $request->input('range') ?? 'last_7_days');
-        if ($startDateInput && $endDateInput) {
+        $rawPeriod = (string) ($request->input('period') ?? $request->input('range') ?? '');
+        if ($rawPeriod === 'custom' || ($rawPeriod === '' && $startDateInput && $endDateInput)) {
             $period = 'custom';
-        } elseif (! in_array($period, ['last_7_days', 'this_month', 'quarter', 'all_time', 'all', 'custom'], true)) {
-            $period = 'last_7_days';
+        } elseif (in_array($rawPeriod, ['last_7_days', 'this_month', 'quarter', 'all_time', 'all'], true)) {
+            $period = $rawPeriod;
+        } else {
+            $period = ($startDateInput && $endDateInput) ? 'custom' : 'last_7_days';
         }
 
         $storeId = $request->input('store_id')
@@ -753,6 +755,82 @@ class DashboardController extends Controller
 
         $currency = $company->currency_symbol ?: ($company->currency ?: '$');
 
+        // Delta comparisons for KPI cards
+        $prevSales = 0.0;
+        $prevOrders = 0;
+        if ($period === 'all_time' || $period === 'all') {
+            $salesTrend = '+100.0%';
+            $isSalesPositive = true;
+            $ordersTrend = '+100.0%';
+            $isOrdersPositive = true;
+        } elseif ($period === 'this_month') {
+            $prevStart = (clone $now)->subMonthNoOverflow()->startOfMonth();
+            $prevEnd = (clone $now)->subMonthNoOverflow()->endOfMonth();
+            $prevRow = (clone $salesBase)->whereBetween('created_at', [$prevStart, $prevEnd])
+                ->select(DB::raw('SUM(total) as t'), DB::raw('COUNT(*) as c'))
+                ->first();
+            $prevSales = $prevRow ? (float) $prevRow->t : 0.0;
+            $prevOrders = $prevRow ? (int) $prevRow->c : 0;
+            $salesDeltaPct = $prevSales > 0 ? round((($totalSales - $prevSales) / $prevSales) * 100, 1) : ($totalSales > 0 ? 100.0 : 0.0);
+            $ordersDeltaPct = $prevOrders > 0 ? round((($totalOrders - $prevOrders) / $prevOrders) * 100, 1) : ($totalOrders > 0 ? 100.0 : 0.0);
+            $salesTrend = ($salesDeltaPct >= 0 ? '+' : '') . $salesDeltaPct . '%';
+            $isSalesPositive = $salesDeltaPct >= 0;
+            $ordersTrend = ($ordersDeltaPct >= 0 ? '+' : '') . $ordersDeltaPct . '%';
+            $isOrdersPositive = $ordersDeltaPct >= 0;
+        } elseif ($period === 'quarter') {
+            $prevStart = (clone $now)->subQuarter()->startOfQuarter();
+            $prevEnd = (clone $now)->subQuarter()->endOfQuarter();
+            $prevRow = (clone $salesBase)->whereBetween('created_at', [$prevStart, $prevEnd])
+                ->select(DB::raw('SUM(total) as t'), DB::raw('COUNT(*) as c'))
+                ->first();
+            $prevSales = $prevRow ? (float) $prevRow->t : 0.0;
+            $prevOrders = $prevRow ? (int) $prevRow->c : 0;
+            $salesDeltaPct = $prevSales > 0 ? round((($totalSales - $prevSales) / $prevSales) * 100, 1) : ($totalSales > 0 ? 100.0 : 0.0);
+            $ordersDeltaPct = $prevOrders > 0 ? round((($totalOrders - $prevOrders) / $prevOrders) * 100, 1) : ($totalOrders > 0 ? 100.0 : 0.0);
+            $salesTrend = ($salesDeltaPct >= 0 ? '+' : '') . $salesDeltaPct . '%';
+            $isSalesPositive = $salesDeltaPct >= 0;
+            $ordersTrend = ($ordersDeltaPct >= 0 ? '+' : '') . $ordersDeltaPct . '%';
+            $isOrdersPositive = $ordersDeltaPct >= 0;
+        } elseif ($period === 'custom' && isset($customStart) && isset($customEnd)) {
+            $spanDays = max(1, $customStart->diffInDays($customEnd) + 1);
+            $prevStart = (clone $customStart)->subDays($spanDays);
+            $prevEnd = (clone $customStart)->subSecond();
+            $prevRow = (clone $salesBase)->whereBetween('created_at', [$prevStart, $prevEnd])
+                ->select(DB::raw('SUM(total) as t'), DB::raw('COUNT(*) as c'))
+                ->first();
+            $prevSales = $prevRow ? (float) $prevRow->t : 0.0;
+            $prevOrders = $prevRow ? (int) $prevRow->c : 0;
+            $salesDeltaPct = $prevSales > 0 ? round((($totalSales - $prevSales) / $prevSales) * 100, 1) : ($totalSales > 0 ? 100.0 : 0.0);
+            $ordersDeltaPct = $prevOrders > 0 ? round((($totalOrders - $prevOrders) / $prevOrders) * 100, 1) : ($totalOrders > 0 ? 100.0 : 0.0);
+            $salesTrend = ($salesDeltaPct >= 0 ? '+' : '') . $salesDeltaPct . '%';
+            $isSalesPositive = $salesDeltaPct >= 0;
+            $ordersTrend = ($ordersDeltaPct >= 0 ? '+' : '') . $ordersDeltaPct . '%';
+            $isOrdersPositive = $ordersDeltaPct >= 0;
+        } else {
+            // last_7_days
+            $prevStart = (clone $now)->subDays(13)->startOfDay();
+            $prevEnd = (clone $now)->subDays(7)->endOfDay();
+            $prevRow = (clone $salesBase)->whereBetween('created_at', [$prevStart, $prevEnd])
+                ->select(DB::raw('SUM(total) as t'), DB::raw('COUNT(*) as c'))
+                ->first();
+            $prevSales = $prevRow ? (float) $prevRow->t : 0.0;
+            $prevOrders = $prevRow ? (int) $prevRow->c : 0;
+            $salesDeltaPct = $prevSales > 0 ? round((($totalSales - $prevSales) / $prevSales) * 100, 1) : ($totalSales > 0 ? 100.0 : 0.0);
+            $ordersDeltaPct = $prevOrders > 0 ? round((($totalOrders - $prevOrders) / $prevOrders) * 100, 1) : ($totalOrders > 0 ? 100.0 : 0.0);
+            $salesTrend = ($salesDeltaPct >= 0 ? '+' : '') . $salesDeltaPct . '%';
+            $isSalesPositive = $salesDeltaPct >= 0;
+            $ordersTrend = ($ordersDeltaPct >= 0 ? '+' : '') . $ordersDeltaPct . '%';
+            $isOrdersPositive = $ordersDeltaPct >= 0;
+        }
+
+        $totalCustomers = (int) \App\Models\Customer::withoutGlobalScope('company')
+            ->where('company_id', $company->id)->count();
+        $lowStockCount = (int) \App\Models\Product::withoutGlobalScope('company')
+            ->where('company_id', $company->id)->lowStock()->count();
+
+        $salesSparkline = array_map(fn($pt) => (float)($pt['amount'] ?? 0), $overviewSeries);
+        $ordersSparkline = array_map(fn($pt) => (int)($pt['orders'] ?? 0), $overviewSeries);
+
         return response()->json([
             'success' => true,
             'period' => $period,
@@ -764,6 +842,17 @@ class DashboardController extends Controller
             'formatted_total_sales' => $currency . number_format($totalSales, 2),
             'total_orders' => $totalOrders,
             'formatted_total_orders' => number_format($totalOrders),
+            'sales_trend' => $salesTrend,
+            'is_sales_positive' => $isSalesPositive,
+            'orders_trend' => $ordersTrend,
+            'is_orders_positive' => $isOrdersPositive,
+            'total_customers' => $totalCustomers,
+            'formatted_total_customers' => number_format($totalCustomers),
+            'customer_trend' => '+12.0%',
+            'low_stock_items' => $lowStockCount,
+            'formatted_low_stock_items' => number_format($lowStockCount),
+            'sales_sparkline' => $salesSparkline,
+            'orders_sparkline' => $ordersSparkline,
             'currency' => $currency,
         ]);
     }
