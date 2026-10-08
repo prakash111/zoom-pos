@@ -1,8 +1,10 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/models/dashboard_summary_model.dart';
+import '../../../core/providers/dashboard_provider.dart';
 import '../../../core/services/dynamic_string_service.dart';
 import '../../../screens/dashboard/widgets/sales_overview_chart.dart';
 
@@ -319,36 +321,84 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
 
   Widget _buildStatMetricCards(BuildContext context, bool isDark, bool isWide) {
     final m = widget.summary.metrics;
+    final dashboardProvider = context.watch<DashboardProvider?>();
+
+    final hasProviderData = dashboardProvider != null &&
+        (dashboardProvider.formattedTotalSales.isNotEmpty || dashboardProvider.salesOverview != null);
+
+    final totalSalesFormatted = (hasProviderData && dashboardProvider.formattedTotalSales.isNotEmpty)
+        ? dashboardProvider.formattedTotalSales
+        : m.totalSales.formatted;
+
+    final totalOrdersFormatted = (hasProviderData && dashboardProvider.formattedTotalOrders.isNotEmpty)
+        ? dashboardProvider.formattedTotalOrders
+        : m.totalOrders.formatted;
+
+    final salesTrend = (hasProviderData && dashboardProvider.salesTrend.isNotEmpty)
+        ? dashboardProvider.salesTrend
+        : m.totalSales.trend;
+
+    final isSalesPositive = hasProviderData
+        ? dashboardProvider.isSalesPositive
+        : m.totalSales.isPositive;
+
+    final ordersTrend = (hasProviderData && dashboardProvider.ordersTrend.isNotEmpty)
+        ? dashboardProvider.ordersTrend
+        : m.totalOrders.trend;
+
+    final isOrdersPositive = hasProviderData
+        ? dashboardProvider.isOrdersPositive
+        : m.totalOrders.isPositive;
+
+    final salesSparkline = (hasProviderData && dashboardProvider.salesSparkline.isNotEmpty)
+        ? dashboardProvider.salesSparkline
+        : m.totalSales.sparkline;
+
+    final ordersSparkline = (hasProviderData && dashboardProvider.ordersSparkline.isNotEmpty)
+        ? dashboardProvider.ordersSparkline
+        : m.totalOrders.sparkline;
+
+    final totalCustomersFormatted = (hasProviderData && dashboardProvider.formattedCustomerCount.isNotEmpty)
+        ? dashboardProvider.formattedCustomerCount
+        : m.totalCustomers.formatted;
+
+    final customerTrend = (hasProviderData && dashboardProvider.customerTrend.isNotEmpty)
+        ? dashboardProvider.customerTrend
+        : m.totalCustomers.trend;
+
+    final lowStockFormatted = (hasProviderData && dashboardProvider.formattedLowStockCount.isNotEmpty)
+        ? dashboardProvider.formattedLowStockCount
+        : m.lowStockItems.formatted;
 
     final cards = [
       _MetricCardSpec(
         title: context.tr('Total Sales'),
-        formattedValue: m.totalSales.formatted,
-        trend: m.totalSales.trend,
-        isPositive: m.totalSales.isPositive,
+        formattedValue: totalSalesFormatted,
+        trend: salesTrend,
+        isPositive: isSalesPositive,
         color: const Color(0xFF10B981), // Emerald
         icon: Icons.payments_outlined,
-        sparkline: m.totalSales.sparkline,
+        sparkline: salesSparkline,
         onTap: () {
           Navigator.pushNamed(context, '/sales');
         },
       ),
       _MetricCardSpec(
         title: context.tr('Total Orders'),
-        formattedValue: m.totalOrders.formatted,
-        trend: m.totalOrders.trend,
-        isPositive: m.totalOrders.isPositive,
+        formattedValue: totalOrdersFormatted,
+        trend: ordersTrend,
+        isPositive: isOrdersPositive,
         color: const Color(0xFF0284C7), // Sky blue
         icon: Icons.shopping_bag_outlined,
-        sparkline: m.totalOrders.sparkline,
+        sparkline: ordersSparkline,
         onTap: () {
           Navigator.pushNamed(context, '/orders');
         },
       ),
       _MetricCardSpec(
         title: context.tr('Total Customers'),
-        formattedValue: m.totalCustomers.formatted,
-        trend: m.totalCustomers.trend,
+        formattedValue: totalCustomersFormatted,
+        trend: customerTrend,
         isPositive: m.totalCustomers.isPositive,
         color: const Color(0xFF8B5CF6), // Purple
         icon: Icons.people_outline,
@@ -359,7 +409,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
       ),
       _MetricCardSpec(
         title: context.tr('Low Stock Items'),
-        formattedValue: m.lowStockItems.formatted,
+        formattedValue: lowStockFormatted,
         trend: m.lowStockItems.trend,
         isPositive: m.lowStockItems.isPositive,
         color: const Color(0xFFF59E0B), // Amber

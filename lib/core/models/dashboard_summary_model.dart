@@ -129,6 +129,7 @@ class SalesOverviewPoint {
     required this.label,
     required this.day,
     required this.amount,
+    this.orders = 0,
   });
 
   factory SalesOverviewPoint.fromJson(Map<String, dynamic> json) {
@@ -137,6 +138,7 @@ class SalesOverviewPoint {
       label: json['label'] as String? ?? '',
       day: json['day'] as String? ?? '',
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      orders: (json['orders'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -144,6 +146,7 @@ class SalesOverviewPoint {
   final String label;
   final String day;
   final double amount;
+  final int orders;
 }
 
 class SalesOverviewData {

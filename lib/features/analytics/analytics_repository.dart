@@ -10,6 +10,7 @@ enum AnalyticsRange {
   last7('last7', 'Last 7 Days'),
   last30('last30', 'Last 30 Days'),
   thisMonth('month', 'This Month'),
+  quarter('quarter', 'Quarter'),
   lastMonth('last_month', 'Last Month'),
   thisYear('year', 'This Year'),
   allTime('all', 'All Time'),
