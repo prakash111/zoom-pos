@@ -215,8 +215,16 @@
   <script>
     (function () {
       var dismissed = false;
+      var startTime = Date.now();
+      var MIN_DISPLAY_TIME_MS = 2200; // Keep loading for at least 2.2s for a smooth, high-fidelity experience
+
       function dismissLoadingScreen() {
         if (dismissed) return;
+        var elapsed = Date.now() - startTime;
+        if (elapsed < MIN_DISPLAY_TIME_MS) {
+          setTimeout(dismissLoadingScreen, MIN_DISPLAY_TIME_MS - elapsed);
+          return;
+        }
         dismissed = true;
         var screen = document.getElementById('app-loading-screen');
         if (!screen) return;
@@ -226,27 +234,40 @@
           if (screen && screen.parentNode) {
             screen.parentNode.removeChild(screen);
           }
-        }, 450);
+        }, 500);
       }
 
-      // Event 1: Flutter paints its first frame
-      window.addEventListener('flutter-first-frame', dismissLoadingScreen);
+      // Global hooks for Flutter app readiness
+      window.dismissFlutterSplash = dismissLoadingScreen;
+      window.addEventListener('flutter-app-ready', dismissLoadingScreen);
 
-      // Event 2: MutationObserver watches for Flutter canvas or view elements
-      var observer = new MutationObserver(function (mutations, obs) {
-        if (
-          document.querySelector('flutter-view') ||
-          document.querySelector('flt-glass-pane') ||
-          document.querySelector('flt-scene-host')
-        ) {
-          obs.disconnect();
-          setTimeout(dismissLoadingScreen, 120);
-        }
+      // Fallback: When Flutter paints first frame, allow up to 4s for auth/data hydration
+      // before dismissing if flutter-app-ready was not triggered
+      window.addEventListener('flutter-first-frame', function () {
+        setTimeout(dismissLoadingScreen, 4000);
       });
-      observer.observe(document.body, { childList: true, subtree: true });
 
-      // Fallback: dismiss after 7s so users are never stuck indefinitely
-      setTimeout(dismissLoadingScreen, 7000);
+      // Progressive loading hints so users see dynamic feedback while Flutter engine & assets load
+      var statusMessages = [
+        { delay: 1800, text: 'Initializing POS Engine...' },
+        { delay: 4000, text: 'Downloading application assets & cache...' },
+        { delay: 7000, text: 'Setting up offline database & sync engine...' },
+        { delay: 10000, text: 'Preparing terminal interface...' },
+        { delay: 14000, text: 'Starting application...' }
+      ];
+      var statusEl = document.querySelector('.status-text');
+      if (statusEl) {
+        statusMessages.forEach(function (item) {
+          setTimeout(function () {
+            if (!dismissed && statusEl) {
+              statusEl.textContent = item.text;
+            }
+          }, item.delay);
+        });
+      }
+
+      // Safety timeout: dismiss after 30s only as a last-resort fallback
+      setTimeout(dismissLoadingScreen, 30000);
     })();
   </script>
 
