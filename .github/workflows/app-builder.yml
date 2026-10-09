@@ -196,11 +196,11 @@ jobs:
         run: flutter pub get
 
       - name: Build signed Android release APK
-        run: flutter build apk --release --android-skip-build-dependency-validation
+        run: flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
 
       - name: Build Android App Bundle (AAB)
         continue-on-error: true
-        run: flutter build appbundle --release --android-skip-build-dependency-validation
+        run: flutter build appbundle --release --no-tree-shake-icons --android-skip-build-dependency-validation
 
       - name: Prepare White-Labeled Artifacts
         env:
@@ -318,7 +318,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Flutter Web release
-        run: flutter build web --release
+        run: flutter build web --release --no-tree-shake-icons
 
       - name: Prepare White-Labeled Web Artifact
         env:
@@ -456,7 +456,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Windows release
-        run: flutter build windows --release
+        run: flutter build windows --release --no-tree-shake-icons
 
       - name: Package White-Labeled Windows Artifact
         shell: pwsh

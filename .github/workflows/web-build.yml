@@ -84,7 +84,7 @@ jobs:
         run: |
           BASE_HREF="${{ inputs.base_href || '/pos-web/' }}"
           echo "Building Flutter Web release with base-href: $BASE_HREF"
-          flutter build web --release --base-href "$BASE_HREF"
+          flutter build web --release --base-href "$BASE_HREF" --no-tree-shake-icons
 
       - name: Prepare release artifacts
         run: |

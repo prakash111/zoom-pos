@@ -106,7 +106,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || '123456789' }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'zoom-pos' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || '123456789' }}
-        run: flutter build apk --release --android-skip-build-dependency-validation
+        run: flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
 
       - name: Build signed Android release App Bundle (AAB)
         env:
@@ -114,7 +114,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || '123456789' }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'zoom-pos' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || '123456789' }}
-        run: flutter build appbundle --release --android-skip-build-dependency-validation
+        run: flutter build appbundle --release --no-tree-shake-icons --android-skip-build-dependency-validation
 
       - name: Prepare release artifacts
         run: |

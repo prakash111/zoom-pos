@@ -65,7 +65,7 @@ jobs:
         # path being wrong, flutter/flutter#143589) is printed to the log.
         env:
           CL: "/D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
-        run: flutter build windows --release --verbose
+        run: flutter build windows --release --no-tree-shake-icons --verbose
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
