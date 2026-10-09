@@ -2029,45 +2029,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   IconData _resolveNavIcon(String iconName) {
-    switch (iconName.toLowerCase().trim()) {
-      case 'home':
-      case 'home_rounded':
-      case 'dashboard':
-        return Icons.home_rounded;
-      case 'receipt':
-      case 'receipt_long':
-      case 'sales':
-      case 'sale':
-        return Icons.receipt_long_outlined;
-      case 'shopping_bag':
-      case 'orders':
-      case 'order':
-        return Icons.shopping_bag_outlined;
-      case 'inventory':
-      case 'inventory_2':
-        return Icons.inventory_2_outlined;
-      case 'restaurant':
-      case 'restaurant_menu':
-      case 'dining':
-        return Icons.restaurant_menu_rounded;
-      case 'analytics':
-      case 'bar_chart':
-      case 'reports':
-        return Icons.bar_chart_rounded;
-      case 'grid_view':
-      case 'more':
-      case 'more_horiz':
-      case 'menu':
-        return Icons.grid_view_rounded;
-      case 'add':
-      case 'plus':
-        return Icons.add;
-      case 'point_of_sale':
-      case 'pos':
-        return Icons.point_of_sale_rounded;
-      default:
-        return Icons.widgets_outlined;
+    final clean = iconName.trim().toLowerCase();
+
+    if (clean.contains('home')) {
+      return Icons.home_rounded;
     }
+    if (clean.contains('sales') || clean.contains('receipt') || clean.contains('invoice')) {
+      return Icons.receipt_long_outlined;
+    }
+    if (clean.contains('orders') || clean.contains('order') || clean.contains('shopping_bag')) {
+      return Icons.shopping_bag_outlined;
+    }
+    if (clean.contains('more') || clean.contains('menu')) {
+      return Icons.more_horiz_rounded;
+    }
+    if (clean.contains('pos') || clean.contains('checkout') || clean.contains('point_of_sale')) {
+      return Icons.point_of_sale_rounded;
+    }
+    if (clean.contains('add') || clean.contains('plus')) {
+      return Icons.add_rounded;
+    }
+
+    return SduiIconRegistry.resolve(iconName, fallback: Icons.widgets_outlined);
   }
 
   void _handleDynamicNavigation(

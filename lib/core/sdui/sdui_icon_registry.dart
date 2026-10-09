@@ -181,6 +181,27 @@ class SduiIconRegistry {
     'check_circle_outline': Icons.check_circle_outline,
     'add': Icons.add,
     'login': Icons.login,
+
+    // Lead Management & Pipeline
+    'leaderboard': Icons.leaderboard_outlined,
+    'filter_alt': Icons.filter_alt_outlined,
+    'view_kanban': Icons.view_kanban_outlined,
+    'source': Icons.source_outlined,
+
+    // Administration & Users
+    'manage_accounts': Icons.manage_accounts_outlined,
+    'security': Icons.security_outlined,
+    'admin_panel_settings': Icons.admin_panel_settings_outlined,
+    'devices': Icons.devices_outlined,
+    'bolt': Icons.bolt_outlined,
+    'flash': Icons.bolt_outlined,
+    'flash_on': Icons.bolt_outlined,
+    'palette': Icons.palette_outlined,
+
+    // Shell & Bottom Navigation
+    'home': Icons.home_rounded,
+    'more': Icons.more_horiz_rounded,
+    'more_horiz': Icons.more_horiz_rounded,
   };
 
   /// Direct icon lookup alias matching `SduiIconRegistry.get(...)`.

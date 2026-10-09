@@ -106,7 +106,7 @@ Widget _buildBottomNavigationBar(
             // 5. More / Menu Tab
             _buildNavItem(
               context: context,
-              icon: Icons.grid_view_rounded,
+              icon: Icons.more_horiz_rounded,
               label: 'More',
               isSelected: currentIndex == 3,
               brandColor: brandColor,
@@ -159,7 +159,7 @@ Widget _buildNavItem({
   );
 }
 
-// Center Floating '+' Button
+// Center Floating Action Button
 Widget _buildCenterActionButton(
   BuildContext context,
   Color brandColor, {
@@ -183,7 +183,7 @@ Widget _buildCenterActionButton(
         ],
       ),
       child: const Icon(
-        Icons.add_rounded,
+        Icons.point_of_sale_rounded,
         color: Colors.white,
         size: 28,
       ),

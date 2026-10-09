@@ -57,10 +57,28 @@ class BottomNavItemConfig {
 
   factory BottomNavItemConfig.fromJson(Map<String, dynamic> json) {
     final rawArgs = json['arguments'];
+    final dynamic rawIcon = json['icon_name'] ?? json['icon'];
+    final id = json['id']?.toString() ?? '';
+    String resolvedIcon = id.isNotEmpty ? id : 'home';
+    if (resolvedIcon == 'quick_checkout') resolvedIcon = 'point_of_sale';
+
+    if (rawIcon is String && rawIcon.isNotEmpty) {
+      resolvedIcon = rawIcon;
+    } else if (rawIcon is Map) {
+      if (rawIcon['name'] != null && rawIcon['name'].toString().isNotEmpty) {
+        resolvedIcon = rawIcon['name'].toString();
+      } else if (rawIcon['code_point'] != null) {
+        resolvedIcon = '0x${(rawIcon['code_point'] is int ? (rawIcon['code_point'] as int).toRadixString(16) : rawIcon['code_point'])}';
+      }
+    } else if (json['code_point'] != null || json['icon_code'] != null) {
+      final cp = json['code_point'] ?? json['icon_code'];
+      resolvedIcon = '0x${(cp is int ? cp.toRadixString(16) : cp)}';
+    }
+
     return BottomNavItemConfig(
-      id: json['id']?.toString() ?? '',
+      id: id,
       label: json['label']?.toString() ?? json['title']?.toString() ?? '',
-      icon: json['icon']?.toString() ?? 'home',
+      icon: resolvedIcon,
       route: json['route']?.toString() ?? json['target_route']?.toString() ?? '/home',
       arguments: rawArgs is Map<String, dynamic>
           ? rawArgs
@@ -94,9 +112,24 @@ class CenterActionConfig {
 
   factory CenterActionConfig.fromJson(Map<String, dynamic> json) {
     final rawArgs = json['arguments'];
+    final dynamic rawIcon = json['icon_name'] ?? json['icon'];
+    String resolvedIcon = 'point_of_sale';
+    if (rawIcon is String && rawIcon.isNotEmpty) {
+      resolvedIcon = rawIcon;
+    } else if (rawIcon is Map) {
+      if (rawIcon['name'] != null && rawIcon['name'].toString().isNotEmpty) {
+        resolvedIcon = rawIcon['name'].toString();
+      } else if (rawIcon['code_point'] != null) {
+        resolvedIcon = '0x${(rawIcon['code_point'] is int ? (rawIcon['code_point'] as int).toRadixString(16) : rawIcon['code_point'])}';
+      }
+    } else if (json['code_point'] != null || json['icon_code'] != null) {
+      final cp = json['code_point'] ?? json['icon_code'];
+      resolvedIcon = '0x${(cp is int ? cp.toRadixString(16) : cp)}';
+    }
+
     return CenterActionConfig(
-      id: json['id']?.toString() ?? 'primary_action',
-      icon: json['icon']?.toString() ?? 'add',
+      id: json['id']?.toString() ?? 'quick_checkout',
+      icon: resolvedIcon,
       targetRoute: json['target_route']?.toString() ??
           json['route']?.toString() ??
           json['targetRoute']?.toString() ??
