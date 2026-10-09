@@ -24,53 +24,6 @@ class DynamicSduiIcon extends StatelessWidget {
     this.size = 20.0,
   });
 
-  static const Map<int, IconData> _standardCodePoints = {
-    // Point of Sale & Retail
-    0xe54c: Icons.point_of_sale,
-    0xe547: Icons.shopping_cart,
-    0xeb1f: Icons.shopping_cart_checkout,
-    0xe8cc: Icons.shopping_bag,
-    0xef64: Icons.receipt_long,
-    0xeef2: Icons.receipt,
-
-    // Staff Chat & Support
-    0xe153: Icons.chat_bubble_outline,
-    0xe24b: Icons.forum,
-    0xe44e: Icons.notifications_active,
-
-    // Human Resource Management (HRM)
-    0xe0ba: Icons.badge,
-    0xe055: Icons.access_time,
-    0xe226: Icons.event_note,
-    0xe227: Icons.event_busy,
-    0xe481: Icons.payments,
-
-    // Loyalty & Rewards
-    0xe041: Icons.account_balance_wallet,
-    0xe3d0: Icons.military_tech,
-    0xe661: Icons.tune,
-
-    // Common Core Navigation
-    0xe88a: Icons.home,
-    0xe871: Icons.grid_view,
-    0xe9b0: Icons.grid_view,
-    0xe8f4: Icons.inventory_2,
-    0xe7fb: Icons.people,
-    0xe85d: Icons.bar_chart,
-    0xe8b8: Icons.settings,
-    0xe8d1: Icons.storefront,
-    0xe145: Icons.add,
-    0xe1bd: Icons.widgets,
-  };
-
-  /// Resolves an integer code point, preferring const pre-compiled icons.
-  static IconData resolveCodePoint(int codePoint, [String fontFamily = 'MaterialIcons']) {
-    if (fontFamily == 'MaterialIcons' && _standardCodePoints.containsKey(codePoint)) {
-      return _standardCodePoints[codePoint]!;
-    }
-    return IconData(codePoint, fontFamily: fontFamily);
-  }
-
   @override
   Widget build(BuildContext context) {
     if (iconData == null) {
@@ -122,7 +75,7 @@ class DynamicSduiIcon extends StatelessWidget {
           final String fontFamily =
               map['font_family']?.toString() ?? 'MaterialIcons';
           return Icon(
-            resolveCodePoint(parsedPoint, fontFamily),
+            IconData(parsedPoint, fontFamily: fontFamily),
             size: size,
             color: color,
           );
@@ -140,7 +93,7 @@ class DynamicSduiIcon extends StatelessWidget {
     // 2. Direct Integer CodePoint
     if (iconData is int) {
       return Icon(
-        resolveCodePoint(iconData as int),
+        IconData(iconData as int, fontFamily: 'MaterialIcons'),
         size: size,
         color: color,
       );
@@ -165,7 +118,7 @@ class DynamicSduiIcon extends StatelessWidget {
         final String fontFamily =
             map['font_family']?.toString() ?? 'MaterialIcons';
         return Icon(
-          resolveCodePoint(parsedPoint, fontFamily),
+          IconData(parsedPoint, fontFamily: fontFamily),
           size: size,
           color: color,
         );
@@ -205,7 +158,7 @@ class DynamicSduiIcon extends StatelessWidget {
     if (trimmed.startsWith('0x') || trimmed.startsWith('0X')) {
       final codePoint = int.tryParse(trimmed) ?? 0xe1bd;
       return Icon(
-        resolveCodePoint(codePoint),
+        IconData(codePoint, fontFamily: 'MaterialIcons'),
         size: size,
         color: color,
       );
@@ -215,7 +168,7 @@ class DynamicSduiIcon extends StatelessWidget {
     final numeric = int.tryParse(trimmed);
     if (numeric != null && numeric > 100) {
       return Icon(
-        resolveCodePoint(numeric),
+        IconData(numeric, fontFamily: 'MaterialIcons'),
         size: size,
         color: color,
       );

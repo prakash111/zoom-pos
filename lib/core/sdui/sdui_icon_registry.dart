@@ -183,53 +183,6 @@ class SduiIconRegistry {
     'login': Icons.login,
   };
 
-  static const Map<int, IconData> _standardCodePoints = {
-    // Point of Sale & Retail
-    0xe54c: Icons.point_of_sale,
-    0xe547: Icons.shopping_cart,
-    0xeb1f: Icons.shopping_cart_checkout,
-    0xe8cc: Icons.shopping_bag,
-    0xef64: Icons.receipt_long,
-    0xeef2: Icons.receipt,
-
-    // Staff Chat & Support
-    0xe153: Icons.chat_bubble_outline,
-    0xe24b: Icons.forum,
-    0xe44e: Icons.notifications_active,
-
-    // Human Resource Management (HRM)
-    0xe0ba: Icons.badge,
-    0xe055: Icons.access_time,
-    0xe226: Icons.event_note,
-    0xe227: Icons.event_busy,
-    0xe481: Icons.payments,
-
-    // Loyalty & Rewards
-    0xe041: Icons.account_balance_wallet,
-    0xe3d0: Icons.military_tech,
-    0xe661: Icons.tune,
-
-    // Common Core Navigation
-    0xe88a: Icons.home,
-    0xe871: Icons.grid_view,
-    0xe9b0: Icons.grid_view,
-    0xe8f4: Icons.inventory_2,
-    0xe7fb: Icons.people,
-    0xe85d: Icons.bar_chart,
-    0xe8b8: Icons.settings,
-    0xe8d1: Icons.storefront,
-    0xe145: Icons.add,
-    0xe1bd: Icons.widgets,
-  };
-
-  /// Resolves an integer code point, preferring const pre-compiled icons.
-  static IconData resolveCodePoint(int codePoint, [String fontFamily = 'MaterialIcons']) {
-    if (fontFamily == 'MaterialIcons' && _standardCodePoints.containsKey(codePoint)) {
-      return _standardCodePoints[codePoint]!;
-    }
-    return IconData(codePoint, fontFamily: fontFamily);
-  }
-
   /// Direct icon lookup alias matching `SduiIconRegistry.get(...)`.
   static IconData get(dynamic iconName,
           {IconData fallback = Icons.widgets_outlined}) =>
@@ -243,7 +196,7 @@ class SduiIconRegistry {
     if (iconName is IconData) return iconName;
 
     if (iconName is int) {
-      return resolveCodePoint(iconName);
+      return IconData(iconName, fontFamily: 'MaterialIcons');
     }
 
     if (iconName is Map) {
@@ -257,7 +210,7 @@ class SduiIconRegistry {
         if (parsedPoint != null) {
           final String fontFamily =
               iconName['font_family']?.toString() ?? 'MaterialIcons';
-          return resolveCodePoint(parsedPoint, fontFamily);
+          return IconData(parsedPoint, fontFamily: fontFamily);
         }
       }
       final nested = iconName['name'] ?? iconName['key'] ?? iconName['icon'];
@@ -274,14 +227,14 @@ class SduiIconRegistry {
     if (str.startsWith('0x') || str.startsWith('0X')) {
       final codePoint = int.tryParse(str);
       if (codePoint != null) {
-        return resolveCodePoint(codePoint);
+        return IconData(codePoint, fontFamily: 'MaterialIcons');
       }
     }
 
     // Direct numeric string
     final numeric = int.tryParse(str);
     if (numeric != null && numeric > 100) {
-      return resolveCodePoint(numeric);
+      return IconData(numeric, fontFamily: 'MaterialIcons');
     }
 
     final normalized = str.toLowerCase().replaceAll('-', '_');
