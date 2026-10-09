@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/config/bootstrap_cache.dart';
 import '../../../core/config/dashboard_layout.dart';
 import '../../../core/config/nav_dock_provider.dart';
 import '../../../core/config/page_transitions.dart';
+import '../../../core/config/platform_branding_provider.dart';
 import '../../../core/config/theme.dart';
 import '../../../core/config/theme_provider.dart';
 import '../../../core/utils/color_utils.dart';
@@ -215,6 +217,7 @@ class _BrandColorGroupState extends State<_BrandColorGroup> {
 
   late final TextEditingController _hex;
   Timer? _persistDebounce;
+  Color? _pendingColor;
 
   @override
   void initState() {
@@ -226,50 +229,71 @@ class _BrandColorGroupState extends State<_BrandColorGroup> {
   @override
   void dispose() {
     _persistDebounce?.cancel();
+    if (_pendingColor != null) {
+      _sendServerPersist(_pendingColor!);
+    }
     _hex.dispose();
     super.dispose();
   }
 
-  void _apply(Color color) {
-    // 1. Instant local persistence + live re-theme.
+  void _apply(Color color, {bool immediate = false}) {
+    final hexColor = toHexColor(color);
+
+    // 1. Instant local persistence across all providers & caches + live re-theme
     context.read<ThemeProvider>().setColor(color);
-    _hex.text = toHexColor(color);
+    try {
+      context.read<PlatformBrandingProvider>().updateBrandColor(color);
+    } catch (_) {}
+    try {
+      BootstrapCache.instance.applyThemeJson({
+        'primary_color': hexColor,
+        'brand_color': hexColor,
+        'seed_color': hexColor,
+      });
+    } catch (_) {}
+    _hex.text = hexColor;
     setState(() {});
-    // 2. Background server persist (debounced) so it survives bootstrap sync and relogin.
+
+    _pendingColor = color;
     _persistDebounce?.cancel();
+
+    if (immediate) {
+      _sendServerPersist(color);
+    } else {
+      _persistDebounce = Timer(const Duration(milliseconds: 500), () {
+        if (_pendingColor != null) {
+          _sendServerPersist(_pendingColor!);
+        }
+      });
+    }
+  }
+
+  void _sendServerPersist(Color color) {
+    _pendingColor = null;
+    final hexColor = toHexColor(color);
     final company = context.read<AuthProvider>().company;
     final repo = SettingsRepository(context.read<ApiClient>());
     final apiClient = context.read<ApiClient>();
-    _persistDebounce = Timer(const Duration(milliseconds: 700), () async {
-      final hexColor = toHexColor(color);
-      // Persist to server app-preferences endpoint (accessible to all authenticated terminals)
-      try {
-        await apiClient.post('/settings/app-preferences', data: {
-          'brand_color': hexColor,
-          'primary_color': hexColor,
-          'seed_color': hexColor,
-        });
-      } catch (_) {
-        try {
-          await apiClient.post('/settings/brand-color', data: {
-            'brand_color': hexColor,
-            'primary_color': hexColor,
-          });
-        } catch (_) {}
-      }
 
-      // Also persist to company profile if authorized
-      if (company != null) {
-        try {
-          await repo.updateProfile(
-            name: company.name,
-            primaryColor: hexColor,
-          );
-        } catch (_) {
-          // Best effort — already persisted via app-preferences.
-        }
-      }
-    });
+    // 1. Persist to server app-preferences endpoint (accessible to all authenticated terminals)
+    apiClient.post('/settings/app-preferences', data: {
+      'brand_color': hexColor,
+      'primary_color': hexColor,
+      'seed_color': hexColor,
+    }).catchError((_) {
+      return apiClient.post('/settings/brand-color', data: {
+        'brand_color': hexColor,
+        'primary_color': hexColor,
+      });
+    }).catchError((_) => <String, dynamic>{});
+
+    // 2. Also persist to company profile if authorized
+    if (company != null) {
+      repo.updateProfile(
+        name: company.name,
+        primaryColor: hexColor,
+      ).then<void>((_) {}, onError: (_) {});
+    }
   }
 
   @override
@@ -288,7 +312,7 @@ class _BrandColorGroupState extends State<_BrandColorGroup> {
               children: [
                 for (final c in _swatches)
                   InkWell(
-                    onTap: () => _apply(c),
+                    onTap: () => _apply(c, immediate: true),
                     customBorder: const CircleBorder(),
                     child: Container(
                       width: 34,
@@ -332,15 +356,19 @@ class _BrandColorGroupState extends State<_BrandColorGroup> {
                       labelText: 'Custom hex',
                       isDense: true,
                     ),
+                    onSubmitted: (v) {
+                      final parsed = parseHexColor(v);
+                      if (parsed != null) _apply(parsed, immediate: true);
+                    },
                     onChanged: (v) {
                       final parsed = parseHexColor(v);
-                      if (parsed != null) _apply(parsed);
+                      if (parsed != null) _apply(parsed, immediate: false);
                     },
                   ),
                 ),
                 const SizedBox(width: 8),
                 TextButton(
-                  onPressed: () => _apply(AppTheme.primary),
+                  onPressed: () => _apply(AppTheme.primary, immediate: true),
                   child: const Text('Reset'),
                 ),
               ],

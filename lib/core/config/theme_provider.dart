@@ -55,6 +55,9 @@ class ThemeProvider extends ChangeNotifier {
   /// seed drives the theme.
   bool _tenantColorExplicit = false;
 
+  /// Whether the user or tenant has deliberately chosen a brand color.
+  bool get isExplicitTenantColor => _tenantColorExplicit;
+
   /// Safe hex → [Color] parse (`#RRGGBB` / `RRGGBB` / `#AARRGGBB`).
   static Color hexToColor(String? hexString,
       {Color fallback = const Color(0xFFF95700)}) {
@@ -103,7 +106,7 @@ class ThemeProvider extends ChangeNotifier {
   Future<void> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final hex = prefs.getString(_colorKey);
+      final hex = prefs.getString(_colorKey) ?? prefs.getString('zoom_pos.brand_color');
       final parsed = hex != null ? parseHexColor(hex) : null;
       if (parsed != null) {
         seedColor = parsed;
@@ -208,7 +211,9 @@ class ThemeProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_colorKey, toHexColor(color));
+      final hex = toHexColor(color);
+      await prefs.setString(_colorKey, hex);
+      await prefs.setString('zoom_pos.brand_color', hex);
     } catch (e) {
       debugPrint('ThemeProvider.setColor error: $e');
     }

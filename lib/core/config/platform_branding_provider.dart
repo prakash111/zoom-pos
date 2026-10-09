@@ -276,4 +276,15 @@ class PlatformBrandingProvider extends ChangeNotifier {
       // Offline / server unreachable — the cached values stand.
     }
   }
+
+  /// Directly updates and persists brand color so pre-auth screens (Login, Landing)
+  /// immediately reflect tenant brand color changes without waiting for a re-fetch.
+  Future<void> updateBrandColor(Color color) async {
+    primaryColor = color;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_primaryKey, _hex(color));
+    } catch (_) {}
+  }
 }

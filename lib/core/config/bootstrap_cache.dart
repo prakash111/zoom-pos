@@ -70,7 +70,9 @@ class BootstrapTheme {
 
   factory BootstrapTheme.fromJson(Map<String, dynamic> json) {
     return BootstrapTheme(
-      primaryColor: json['primary_color']?.toString(),
+      primaryColor: json['primary_color']?.toString() ??
+          json['brand_color']?.toString() ??
+          json['seed_color']?.toString(),
       accentColor: json['accent_color']?.toString(),
       drawerBg: json['drawer_bg']?.toString(),
       drawerGradientEnabled: json['drawer_gradient_enabled'] == true,

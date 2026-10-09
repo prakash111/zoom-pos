@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/config/platform_branding_provider.dart';
+import '../../../core/config/theme_provider.dart';
 import '../../../core/widgets/app_network_image.dart';
 import 'auth_illustration.dart';
 import 'auth_widgets.dart';
@@ -303,9 +304,11 @@ class AuthScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Superadmin global theme (tenant overrides only apply post-auth).
     final branding = context.watch<PlatformBrandingProvider>();
-    final primary = branding.primaryColor;
+    final themeProvider = context.watch<ThemeProvider>();
+    final primary = themeProvider.isExplicitTenantColor
+        ? themeProvider.seedColor
+        : branding.primaryColor;
     final ink = branding.secondaryColor;
     final pageBg = branding.authBgColor;
     final pageBgDark =

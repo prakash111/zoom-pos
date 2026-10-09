@@ -49,8 +49,9 @@ class _LandingThemeTokens {
         (mode == ThemeMode.system &&
             MediaQuery.platformBrightnessOf(context) == Brightness.dark);
 
-    final primary =
-        _parseColorStatic(branding.primaryColorHex, const Color(0xFF10B981));
+    final primary = themeProvider.isExplicitTenantColor
+        ? themeProvider.seedColor
+        : _parseColorStatic(branding.primaryColorHex, const Color(0xFF10B981));
     final accent =
         _parseColorStatic(branding.accentColorHex, const Color(0xFF38BDF8));
 
