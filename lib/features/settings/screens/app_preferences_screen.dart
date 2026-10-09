@@ -235,19 +235,39 @@ class _BrandColorGroupState extends State<_BrandColorGroup> {
     context.read<ThemeProvider>().setColor(color);
     _hex.text = toHexColor(color);
     setState(() {});
-    // 2. Background server persist (debounced) so it survives bootstrap sync.
+    // 2. Background server persist (debounced) so it survives bootstrap sync and relogin.
     _persistDebounce?.cancel();
     final company = context.read<AuthProvider>().company;
     final repo = SettingsRepository(context.read<ApiClient>());
+    final apiClient = context.read<ApiClient>();
     _persistDebounce = Timer(const Duration(milliseconds: 700), () async {
-      if (company == null) return;
+      final hexColor = toHexColor(color);
+      // Persist to server app-preferences endpoint (accessible to all authenticated terminals)
       try {
-        await repo.updateProfile(
-          name: company.name,
-          primaryColor: toHexColor(color),
-        );
+        await apiClient.post('/settings/app-preferences', data: {
+          'brand_color': hexColor,
+          'primary_color': hexColor,
+          'seed_color': hexColor,
+        });
       } catch (_) {
-        // Best effort — the local SharedPreferences value already applied.
+        try {
+          await apiClient.post('/settings/brand-color', data: {
+            'brand_color': hexColor,
+            'primary_color': hexColor,
+          });
+        } catch (_) {}
+      }
+
+      // Also persist to company profile if authorized
+      if (company != null) {
+        try {
+          await repo.updateProfile(
+            name: company.name,
+            primaryColor: hexColor,
+          );
+        } catch (_) {
+          // Best effort — already persisted via app-preferences.
+        }
       }
     });
   }
