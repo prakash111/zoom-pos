@@ -16,6 +16,7 @@ class OroitDashboardHome extends StatelessWidget {
     this.onAddProduct,
     this.onOpenTransactions,
     this.onFilter,
+    this.isEmbedded = false,
   });
 
   final AnalyticsModel analytics;
@@ -23,6 +24,7 @@ class OroitDashboardHome extends StatelessWidget {
   final VoidCallback? onAddProduct;
   final VoidCallback? onOpenTransactions;
   final VoidCallback? onFilter;
+  final bool isEmbedded;
 
   static const _bg = Color(0xFF0B0B12);
   static const _card = Color(0xFF15151F);
@@ -55,86 +57,122 @@ class OroitDashboardHome extends StatelessWidget {
           _mint),
     ];
 
+    final content = LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 960;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _header(),
+            const SizedBox(height: 18),
+            _statRow(cards, wide),
+            const SizedBox(height: 16),
+            if (wide)
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(flex: 3, child: _overviewCard(activity)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 1,
+                      child: _sideTiles(completedTotal),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              _overviewCard(activity),
+              const SizedBox(height: 16),
+              _sideTiles(completedTotal),
+            ],
+            const SizedBox(height: 16),
+            if (wide)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 2, child: _marketingCard(activity)),
+                  const SizedBox(width: 16),
+                  Expanded(flex: 3, child: _orderTrackingCard()),
+                ],
+              )
+            else ...[
+              _marketingCard(activity),
+              const SizedBox(height: 16),
+              _orderTrackingCard(),
+            ],
+          ],
+        );
+      },
+    );
+
     return DefaultTextStyle(
       style: const TextStyle(color: Colors.white),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: _bg,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: _border),
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 960;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _header(),
-                const SizedBox(height: 18),
-                _statRow(cards, wide),
-                const SizedBox(height: 16),
-                if (wide)
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(flex: 3, child: _overviewCard(activity)),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          flex: 1,
-                          child: _sideTiles(completedTotal),
-                        ),
-                      ],
-                    ),
-                  )
-                else ...[
-                  _overviewCard(activity),
-                  const SizedBox(height: 16),
-                  _sideTiles(completedTotal),
-                ],
-                const SizedBox(height: 16),
-                if (wide)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 2, child: _marketingCard(activity)),
-                      const SizedBox(width: 16),
-                      Expanded(flex: 3, child: _orderTrackingCard()),
-                    ],
-                  )
-                else ...[
-                  _marketingCard(activity),
-                  const SizedBox(height: 16),
-                  _orderTrackingCard(),
-                ],
-              ],
-            );
-          },
-        ),
-      ),
+      child: isEmbedded
+          ? content
+          : Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: _bg,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: _border),
+              ),
+              child: content,
+            ),
     );
   }
 
   // ------------------------------------------------------------------ header
   Widget _header() {
-    return Row(
-      children: [
-        const Expanded(
-          child: Text('Order statistic',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-        ),
-        Material(
+    return LayoutBuilder(
+      builder: (context, c) {
+        final isNarrow = c.maxWidth < 460;
+        const title = Text(
+          'Order statistic',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        );
+        final filterPill = Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: onFilter,
             borderRadius: BorderRadius.circular(8),
             child: _pill(analytics.rangeLabel),
           ),
-        ),
-        const SizedBox(width: 10),
-        _AddButton(onTap: onAddProduct),
-      ],
+        );
+        final addBtn = _AddButton(onTap: onAddProduct);
+
+        if (isNarrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(child: title),
+                  filterPill,
+                ],
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: addBtn,
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            const Expanded(child: title),
+            filterPill,
+            const SizedBox(width: 10),
+            addBtn,
+          ],
+        );
+      },
     );
   }
 
@@ -150,11 +188,24 @@ class OroitDashboardHome extends StatelessWidget {
         ],
       );
     }
-    return Wrap(
-      spacing: 14,
-      runSpacing: 14,
+    // Responsive 2x2 grid for mobile and tablet views
+    return Column(
       children: [
-        for (final c in cards) SizedBox(width: 220, child: _statCard(c)),
+        Row(
+          children: [
+            Expanded(child: _statCard(cards[0])),
+            const SizedBox(width: 12),
+            Expanded(child: _statCard(cards[1])),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _statCard(cards[2])),
+            const SizedBox(width: 12),
+            Expanded(child: _statCard(cards[3])),
+          ],
+        ),
       ],
     );
   }
@@ -166,7 +217,7 @@ class OroitDashboardHome extends StatelessWidget {
         FlSpot(i.toDouble(), analytics.revenueTrend[i].revenue),
     ];
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _card,
         borderRadius: BorderRadius.circular(16),
@@ -174,8 +225,14 @@ class OroitDashboardHome extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(s.label, style: const TextStyle(fontSize: 12.5, color: _muted)),
+          Text(
+            s.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: _muted, fontWeight: FontWeight.w500),
+          ),
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -186,45 +243,56 @@ class OroitDashboardHome extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: s.color),
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: s.color,
+                  ),
                 ),
               ),
-              SizedBox(
-                width: 66,
-                height: 30,
-                child: spots.length < 2
-                    ? const SizedBox.shrink()
-                    : LineChart(LineChartData(
-                        gridData: const FlGridData(show: false),
-                        titlesData: const FlTitlesData(show: false),
-                        borderData: FlBorderData(show: false),
-                        lineTouchData: const LineTouchData(enabled: false),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: spots,
-                            isCurved: true,
-                            color: s.color,
-                            barWidth: 2,
-                            dotData: const FlDotData(show: false),
-                          ),
-                        ],
-                      )),
-              ),
+              if (spots.length >= 2) ...[
+                const SizedBox(width: 4),
+                SizedBox(
+                  width: 48,
+                  height: 24,
+                  child: LineChart(
+                    LineChartData(
+                      gridData: const FlGridData(show: false),
+                      titlesData: const FlTitlesData(show: false),
+                      borderData: FlBorderData(show: false),
+                      lineTouchData: const LineTouchData(enabled: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: spots,
+                          isCurved: true,
+                          color: s.color,
+                          barWidth: 2,
+                          dotData: const FlDotData(show: false),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(up ? Icons.arrow_upward : Icons.arrow_downward,
-                  size: 12, color: up ? _mint : const Color(0xFFF87171)),
+              Icon(
+                up ? Icons.arrow_upward : Icons.arrow_downward,
+                size: 12,
+                color: up ? _mint : const Color(0xFFF87171),
+              ),
               const SizedBox(width: 2),
-              Text('${(s.delta.abs() * 100).toStringAsFixed(1)}%',
-                  style: TextStyle(
-                      fontSize: 11.5,
-                      color: up ? _mint : const Color(0xFFF87171))),
+              Text(
+                '${(s.delta.abs() * 100).toStringAsFixed(1)}%',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: up ? _mint : const Color(0xFFF87171),
+                ),
+              ),
             ],
           ),
         ],
@@ -252,15 +320,14 @@ class OroitDashboardHome extends StatelessWidget {
 
     return _panel(
       title: 'Order and Sale Overview',
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
+      trailing: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           _legendDot('Completed', _purple),
-          const SizedBox(width: 10),
           _legendDot('Pending', _amber),
-          const SizedBox(width: 10),
           _legendDot('Total', _cyan),
-          const SizedBox(width: 10),
           _pill('Last months'),
         ],
       ),
@@ -395,11 +462,12 @@ class OroitDashboardHome extends StatelessWidget {
         activity.length > 6 ? activity.sublist(activity.length - 6) : activity;
     return _panel(
       title: 'Marketing',
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
+      trailing: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           _legendDot('Completed', _purple),
-          const SizedBox(width: 10),
           _legendDot('Pending', _mint),
         ],
       ),
@@ -547,14 +615,21 @@ class OroitDashboardHome extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            alignment: WrapAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Text(title,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w700)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
               ),
-              if (trailing != null) Flexible(child: trailing),
+              if (trailing != null) trailing,
             ],
           ),
           const SizedBox(height: 16),

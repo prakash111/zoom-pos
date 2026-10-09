@@ -78,4 +78,33 @@ void main() {
     expect(find.text('Order Tracking'), findsOneWidget);
     expect(find.text('Marketing'), findsOneWidget);
   });
+
+  testWidgets('OroitDashboardHome renders 2x2 grid gracefully on narrow mobile screen',
+      (tester) async {
+    tester.view.physicalSize = const Size(380, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: OroitDashboardHome(
+            analytics: _model(),
+            formatter: CurrencyFormatter('\$'),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Order statistic'), findsOneWidget);
+    expect(find.text('Total orders'), findsOneWidget);
+    expect(find.text('Total sales'), findsOneWidget);
+    expect(find.text('Active order'), findsOneWidget);
+    expect(find.text('Average order size'), findsOneWidget);
+    expect(find.text('2765'), findsOneWidget);
+    expect(find.text('\$65,428.00'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

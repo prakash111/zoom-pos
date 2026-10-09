@@ -97,4 +97,34 @@ void main() {
     expect(find.text('Recent Customers'), findsOneWidget);
     expect(find.text('Daniel Gallego'), findsOneWidget);
   });
+
+  testWidgets('PoshDashboardHome renders gracefully on narrow mobile screen', (tester) async {
+    tester.view.physicalSize = const Size(380, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: PoshDashboardHome(
+            analytics: _model(),
+            formatter: CurrencyFormatter('\$'),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Statistics'), findsOneWidget);
+    expect(find.text('Total Earnings'), findsOneWidget);
+    expect(find.text('Number of Sales'), findsOneWidget);
+    expect(find.text('Catalogue'), findsOneWidget);
+    expect(find.text('Customers'), findsOneWidget);
+    expect(find.text('\$12,235.99'), findsOneWidget);
+    expect(find.text('318'), findsOneWidget);
+    expect(find.text('128 items'), findsOneWidget);
+    expect(find.text('TR-001-123456'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

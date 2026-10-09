@@ -48,7 +48,7 @@ class LandingData {
       });
     }
 
-    final isEnabled = json['landing_page_enabled'] ?? brandingMap['landing_page_enabled'];
+    final isEnabled = json['flutter_landing_page_enabled'] ?? json['landing_page_enabled'] ?? brandingMap['flutter_landing_page_enabled'] ?? brandingMap['landing_page_enabled'];
 
     return LandingData(
       theme: json['theme']?.toString() ?? 'theme_fast',

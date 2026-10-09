@@ -193,11 +193,15 @@ class PlatformBrandingProvider extends ChangeNotifier {
           : (platform.containsKey('show_auth_banner')
               ? _asBool(platform['show_auth_banner'], showAuthBanner)
               : showAuthBanner);
-      final landingEnabled = response.containsKey('landing_page_enabled')
-          ? _asBool(response['landing_page_enabled'], landingPageEnabled)
-          : (platform.containsKey('landing_page_enabled')
-              ? _asBool(platform['landing_page_enabled'], landingPageEnabled)
-              : landingPageEnabled);
+      final landingEnabled = response.containsKey('flutter_landing_page_enabled')
+          ? _asBool(response['flutter_landing_page_enabled'], landingPageEnabled)
+          : (platform.containsKey('flutter_landing_page_enabled')
+              ? _asBool(platform['flutter_landing_page_enabled'], landingPageEnabled)
+              : (response.containsKey('landing_page_enabled')
+                  ? _asBool(response['landing_page_enabled'], landingPageEnabled)
+                  : (platform.containsKey('landing_page_enabled')
+                      ? _asBool(platform['landing_page_enabled'], landingPageEnabled)
+                      : landingPageEnabled)));
 
       // Primary colour under any of its aliases (theme.primary /
       // theme.primary_color / brand_color / primary_color).

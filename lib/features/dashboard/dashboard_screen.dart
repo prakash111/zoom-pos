@@ -2865,6 +2865,7 @@ class _DashboardAnalytics extends StatelessWidget {
           onFilter: onFilter,
           onAddProduct: () => open('inventory'),
           onOpenTransactions: () => open('sales'),
+          isEmbedded: true,
         ),
       DashboardLayout.posh => PoshDashboardHome(
           analytics: analytics,
@@ -2906,10 +2907,55 @@ class _DashboardAnalytics extends StatelessWidget {
       );
     }
 
+    if (layout == DashboardLayout.oroit) {
+      return Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0B0B12),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFF262636)),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _DashboardShortcutRow(isDark: true),
+            if (analytics.lowStockCount > 0) ...[
+              const SizedBox(height: 12),
+              _StatusBanner(
+                container: const Color(0xFF1E1710),
+                onContainer: const Color(0xFFFEF3C7),
+                accent: const Color(0xFFFBBF24),
+                borderColor: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                icon: Icons.warning_amber_outlined,
+                title: l10n.lowStockWarning(analytics.lowStockCount),
+                onTap: () => open('inventory'),
+              ),
+            ],
+            if (analytics.totalReceivables > 0) ...[
+              const SizedBox(height: 12),
+              _StatusBanner(
+                container: const Color(0xFF101928),
+                onContainer: const Color(0xFFE0F2FE),
+                accent: const Color(0xFF38BDF8),
+                borderColor: const Color(0xFF38BDF8).withValues(alpha: 0.35),
+                icon: Icons.request_page_outlined,
+                title: l10n.featureDueReceivables,
+                subtitle:
+                    '${formatter.format(analytics.totalReceivables)} outstanding',
+                onTap: () => open('due_receivables'),
+              ),
+            ],
+            const SizedBox(height: 16),
+            layoutBody,
+          ],
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _DashboardShortcutRow(),
+        const _DashboardShortcutRow(isDark: false),
         if (analytics.lowStockCount > 0) ...[
           const SizedBox(height: 12),
           _StatusBanner(
@@ -2947,7 +2993,9 @@ class _DashboardAnalytics extends StatelessWidget {
 /// Tables) are hidden unless the authenticated tenant actually runs a
 /// kitchen: they never render for a retail / pharmacy / repair store.
 class _DashboardShortcutRow extends StatelessWidget {
-  const _DashboardShortcutRow();
+  const _DashboardShortcutRow({this.isDark = false});
+
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -2968,31 +3016,37 @@ class _DashboardShortcutRow extends StatelessWidget {
       if (hasTables) (Icons.table_restaurant, 'Tables', 'floor_plan'),
       if (hasKitchen) (Icons.receipt_long, 'Pending KOTs', 'kitchen_display'),
     ];
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        for (final (icon, label, key) in shortcuts)
-          _ShortcutButton(
-            icon: icon,
-            label: label,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                  builder: SduiComponentRegistry.instance.resolve(key)),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          for (var i = 0; i < shortcuts.length; i++) ...[
+            if (i > 0) const SizedBox(width: 10),
+            _ShortcutButton(
+              icon: shortcuts[i].$1,
+              label: shortcuts[i].$2,
+              isDark: isDark,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: SduiComponentRegistry.instance.resolve(shortcuts[i].$3)),
+              ),
             ),
-          ),
-      ],
+          ],
+        ],
+      ),
     );
   }
 }
 
 class _ShortcutButton extends StatefulWidget {
   const _ShortcutButton(
-      {required this.icon, required this.label, required this.onTap});
+      {required this.icon, required this.label, required this.onTap, this.isDark = false});
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool isDark;
 
   @override
   State<_ShortcutButton> createState() => _ShortcutButtonState();
@@ -3004,6 +3058,16 @@ class _ShortcutButtonState extends State<_ShortcutButton> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = widget.isDark;
+    final bgColor = isDark
+        ? (_hovered ? const Color(0xFF26263A) : const Color(0xFF15151F))
+        : (_hovered ? scheme.primary.withValues(alpha: 0.12) : Theme.of(context).cardColor);
+    final borderColor = isDark
+        ? (_hovered ? const Color(0xFF7C5CFF) : const Color(0xFF262636))
+        : (_hovered ? scheme.primary : scheme.outlineVariant);
+    final iconColor = isDark ? const Color(0xFF818CF8) : scheme.primary;
+    final textColor = isDark ? Colors.white : scheme.onSurface;
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -3011,13 +3075,9 @@ class _ShortcutButtonState extends State<_ShortcutButton> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
         decoration: BoxDecoration(
-          color: _hovered
-              ? scheme.primary.withValues(alpha: 0.12)
-              : Theme.of(context).cardColor,
+          color: bgColor,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: _hovered ? scheme.primary : scheme.outlineVariant,
-          ),
+          border: Border.all(color: borderColor),
         ),
         child: TappableScale(
           onTap: widget.onTap,
@@ -3027,11 +3087,11 @@ class _ShortcutButtonState extends State<_ShortcutButton> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(widget.icon, size: 18, color: scheme.primary),
+                Icon(widget.icon, size: 18, color: iconColor),
                 const SizedBox(width: 8),
                 Text(widget.label,
                     style: TextStyle(
-                        fontWeight: FontWeight.w600, color: scheme.onSurface)),
+                        fontWeight: FontWeight.w600, color: textColor)),
               ],
             ),
           ),
@@ -3052,6 +3112,7 @@ class _StatusBanner extends StatelessWidget {
     required this.title,
     this.subtitle,
     required this.onTap,
+    this.borderColor,
   });
 
   final Color container;
@@ -3061,6 +3122,7 @@ class _StatusBanner extends StatelessWidget {
   final String title;
   final String? subtitle;
   final VoidCallback onTap;
+  final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
@@ -3070,7 +3132,11 @@ class _StatusBanner extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: borderColor != null ? Border.all(color: borderColor!) : null,
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
