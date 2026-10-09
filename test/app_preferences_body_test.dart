@@ -12,7 +12,10 @@ import 'package:zoom_pos_mobile/features/auth/auth_provider.dart';
 import 'package:zoom_pos_mobile/features/settings/screens/app_preferences_screen.dart';
 import 'package:zoom_pos_mobile/l10n/app_localizations.dart';
 
-class _FakeApiClient extends Fake implements ApiClient {}
+class _FakeApiClient extends Fake implements ApiClient {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => Future.value(<String, dynamic>{});
+}
 
 class _FakeAuthProvider extends ChangeNotifier implements AuthProvider {
   @override

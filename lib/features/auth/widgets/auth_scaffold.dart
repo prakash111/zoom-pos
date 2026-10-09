@@ -305,8 +305,13 @@ class AuthScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final branding = context.watch<PlatformBrandingProvider>();
-    final themeProvider = context.watch<ThemeProvider>();
-    final primary = themeProvider.isExplicitTenantColor
+    ThemeProvider? themeProvider;
+    try {
+      themeProvider = Provider.of<ThemeProvider>(context, listen: true);
+    } catch (_) {
+      themeProvider = null;
+    }
+    final primary = (themeProvider != null && themeProvider.isExplicitTenantColor)
         ? themeProvider.seedColor
         : branding.primaryColor;
     final ink = branding.secondaryColor;

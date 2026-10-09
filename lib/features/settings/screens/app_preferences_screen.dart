@@ -271,29 +271,37 @@ class _BrandColorGroupState extends State<_BrandColorGroup> {
   void _sendServerPersist(Color color) {
     _pendingColor = null;
     final hexColor = toHexColor(color);
-    final company = context.read<AuthProvider>().company;
-    final repo = SettingsRepository(context.read<ApiClient>());
-    final apiClient = context.read<ApiClient>();
+    try {
+      final auth = Provider.of<AuthProvider?>(context, listen: false);
+      final company = auth?.company;
+      final apiClient = Provider.of<ApiClient?>(context, listen: false);
+      if (apiClient == null) return;
 
-    // 1. Persist to server app-preferences endpoint (accessible to all authenticated terminals)
-    apiClient.post('/settings/app-preferences', data: {
-      'brand_color': hexColor,
-      'primary_color': hexColor,
-      'seed_color': hexColor,
-    }).catchError((_) {
-      return apiClient.post('/settings/brand-color', data: {
-        'brand_color': hexColor,
-        'primary_color': hexColor,
-      });
-    }).catchError((_) => <String, dynamic>{});
+      // 1. Persist to server app-preferences endpoint (accessible to all authenticated terminals)
+      try {
+        apiClient.post('/settings/app-preferences', data: {
+          'brand_color': hexColor,
+          'primary_color': hexColor,
+          'seed_color': hexColor,
+        }).catchError((_) {
+          return apiClient.post('/settings/brand-color', data: {
+            'brand_color': hexColor,
+            'primary_color': hexColor,
+          });
+        }).catchError((_) => <String, dynamic>{});
+      } catch (_) {}
 
-    // 2. Also persist to company profile if authorized
-    if (company != null) {
-      repo.updateProfile(
-        name: company.name,
-        primaryColor: hexColor,
-      ).then<void>((_) {}, onError: (_) {});
-    }
+      // 2. Also persist to company profile if authorized
+      if (company != null) {
+        try {
+          final repo = SettingsRepository(apiClient);
+          repo.updateProfile(
+            name: company.name,
+            primaryColor: hexColor,
+          ).then<void>((_) {}, onError: (_) {});
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   @override

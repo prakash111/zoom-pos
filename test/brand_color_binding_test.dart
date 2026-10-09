@@ -114,13 +114,15 @@ void main() {
       final salesText = tester.widget<Text>(find.text('Sales'));
       expect(salesText.style?.color, equals(const Color(0xFF64748B)));
 
-      // Center '+' button container has brandColor
-      final addIcon = find.byIcon(Icons.add_rounded);
-      expect(addIcon, findsOneWidget);
+      // Center POS button container has brandColor
+      final centerIcon = find.byWidgetPredicate(
+        (w) => w is Icon && (w.icon == Icons.point_of_sale_rounded || w.icon == Icons.add_rounded),
+      );
+      expect(centerIcon, findsOneWidget);
 
       // Find the parent Container with brandColor
       final containerFinder = find.ancestor(
-        of: addIcon,
+        of: centerIcon,
         matching: find.byType(Container),
       );
       final container = tester.widget<Container>(containerFinder.first);
