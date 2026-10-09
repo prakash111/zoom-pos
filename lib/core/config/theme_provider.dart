@@ -28,6 +28,23 @@ class ThemeProvider extends ChangeNotifier {
   Color seedColor = AppTheme.primary;
   Color? accentColor;
 
+  /// The active Brand colour, dynamically bound to the tenant's chosen seed colour.
+  Color get brandColor => seedColor;
+
+  /// Updates the brand colour and notifies all listeners immediately.
+  void updateBrandColor(Color newColor) {
+    setColor(newColor);
+  }
+
+  /// Parses and loads brand colour from hex code ('#EA580C' or 'EA580C').
+  void loadFromHex(String hexCode) {
+    try {
+      final hex = hexCode.replaceAll('#', '').trim();
+      final parsed = Color(int.parse('0xFF$hex'));
+      setColor(parsed);
+    } catch (_) {}
+  }
+
   /// The Superadmin platform primary (from `GET /auth/branding` →
   /// `theme.primary` / `brand_color`). Used as the seed when this tenant has
   /// no brand colour of its own, so a Superadmin change reflects immediately.

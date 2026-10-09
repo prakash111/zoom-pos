@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/theme_provider.dart';
 import '../../../core/models/dashboard_summary_model.dart';
 import '../../../core/providers/dashboard_provider.dart';
 import '../../../core/services/dynamic_string_service.dart';
@@ -879,6 +880,13 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
 
   Widget _buildRecentTransactionsCard(BuildContext context, bool isDark) {
     final txList = widget.summary.recentTransactions;
+    final brandColor = () {
+      try {
+        return Provider.of<ThemeProvider>(context).brandColor;
+      } catch (_) {
+        return const Color(0xFF10B981);
+      }
+    }();
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -948,20 +956,7 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
                   child: Row(
                     children: [
                       // Initials avatar
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: tx.isCompleted
-                            ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                            : const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                        child: Text(
-                          tx.customerInitials,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: tx.isCompleted ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                          ),
-                        ),
-                      ),
+                      _buildTransactionAvatar(context, tx.customerInitials, brandColor),
                       const SizedBox(width: 12),
                       // Customer name & date
                       Expanded(
@@ -1029,6 +1024,40 @@ class _RedesignedMetricDashboardState extends State<RedesignedMetricDashboard> {
               },
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionAvatar(BuildContext context, String initials, [Color? activeBrandColor]) {
+    final brandColor = activeBrandColor ??
+        () {
+          try {
+            return Provider.of<ThemeProvider>(context).brandColor;
+          } catch (_) {
+            return const Color(0xFF10B981);
+          }
+        }();
+
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: brandColor.withValues(alpha: 0.18),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: brandColor.withValues(alpha: 0.45),
+          width: 1,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: TextStyle(
+          color: brandColor,
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }

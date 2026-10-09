@@ -213,6 +213,7 @@ class SduiNavItemSchema {
     required this.key,
     required this.title,
     required this.icon,
+    this.iconPayload,
     this.component,
     this.permission,
     this.parent,
@@ -228,6 +229,7 @@ class SduiNavItemSchema {
   final String key;
   final String title;
   final String icon;
+  final dynamic iconPayload;
   final String? component;
   final String? permission;
   final String? parent;
@@ -242,6 +244,7 @@ class SduiNavItemSchema {
   String? get effectiveParentId => parentId ?? parent;
   bool get isAccordion => type == 'accordion' || children.isNotEmpty;
   String? get route => targetEndpoint;
+  dynamic get dynamicIcon => iconPayload ?? icon;
 
   factory SduiNavItemSchema.fromJson(Map<String, dynamic> json) {
     final rawParent =
@@ -300,10 +303,32 @@ class SduiNavItemSchema {
         isFlatCoreAction ? const <SduiNavItemSchema>[] : parsedChildren;
     final normalizedType = normalizedChildren.isNotEmpty ? 'accordion' : 'link';
 
+    final dynamic rawIcon = json['icon'];
+    final dynamic iconPayload = (rawIcon is Map || rawIcon is int)
+        ? rawIcon
+        : (json['icon_code'] != null
+            ? {
+                'type': json['icon_type'] ?? 'material_code',
+                'code_point': json['icon_code'],
+                'font_family': json['icon_family'] ?? 'MaterialIcons',
+                'url': json['icon_url'],
+              }
+            : rawIcon);
+
+    final String iconStr = rawIcon is Map
+        ? (rawIcon['name'] ??
+                rawIcon['key'] ??
+                (rawIcon['code_point'] != null
+                    ? '0x${(rawIcon['code_point'] is int ? (rawIcon['code_point'] as int).toRadixString(16) : rawIcon['code_point'])}'
+                    : 'widgets'))
+            .toString()
+        : (rawIcon?.toString() ?? 'widgets');
+
     return SduiNavItemSchema(
       key: key,
       title: rawTitle.isNotEmpty ? rawTitle : key,
-      icon: json['icon']?.toString() ?? 'widgets',
+      icon: iconStr,
+      iconPayload: iconPayload,
       component: json['component']?.toString() ?? (key.isNotEmpty ? key : null),
       permission: json['permission']?.toString(),
       parent: normalizedParent,
@@ -325,7 +350,7 @@ class SduiNavItemSchema {
         'id': key,
         'title': title,
         'label': title,
-        'icon': icon,
+        'icon': iconPayload ?? icon,
         if (component != null) 'component': component,
         if (permission != null) 'permission': permission,
         if (parent != null) 'parent': parent,

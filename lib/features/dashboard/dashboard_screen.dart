@@ -2166,6 +2166,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildRedesignedFloatingBottomNav(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brandColor = context.watch<ThemeProvider>().brandColor;
     final BottomNavConfig? navConfig = BootstrapCache.instance.bottomNavConfig;
     final CenterActionConfig? centerAction = navConfig?.centerAction;
 
@@ -2197,22 +2198,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         width: 48,
         height: 48,
         decoration: BoxDecoration(
+          color: brandColor,
           shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            colors: [Color(0xFF10B981), Color(0xFF059669)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF10B981).withValues(alpha: 0.4),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: brandColor.withValues(alpha: 0.4),
+              blurRadius: 12,
+              spreadRadius: 2,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
         child: Icon(
-          centerAction != null ? _resolveNavIcon(centerAction.icon) : Icons.add,
+          centerAction != null ? _resolveNavIcon(centerAction.icon) : Icons.add_rounded,
           color: Colors.white,
           size: 28,
         ),
@@ -2237,6 +2235,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             isSelected: isHome && _dockIndex == 0,
             onTap: () => _handleDynamicNavigation(context, item.route, arguments: item.arguments),
             isDark: isDark,
+            brandColor: brandColor,
           );
         }),
         centerButtonWidget,
@@ -2247,6 +2246,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             isSelected: false,
             onTap: () => _handleDynamicNavigation(context, item.route, arguments: item.arguments),
             isDark: isDark,
+            brandColor: brandColor,
           );
         }),
       ];
@@ -2259,6 +2259,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           isSelected: _dockIndex == 0,
           onTap: () => setState(() => _dockIndex = 0),
           isDark: isDark,
+          brandColor: brandColor,
         ),
         _buildRedesignedNavItem(
           icon: Icons.receipt_long_outlined,
@@ -2266,6 +2267,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           isSelected: false,
           onTap: () => _handleDynamicNavigation(context, 'sales'),
           isDark: isDark,
+          brandColor: brandColor,
         ),
         centerButtonWidget,
         _buildRedesignedNavItem(
@@ -2274,6 +2276,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           isSelected: false,
           onTap: () => _handleDynamicNavigation(context, 'orders'),
           isDark: isDark,
+          brandColor: brandColor,
         ),
         _buildRedesignedNavItem(
           icon: Icons.grid_view_rounded,
@@ -2281,6 +2284,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           isSelected: false,
           onTap: () => _handleDynamicNavigation(context, 'drawer'),
           isDark: isDark,
+          brandColor: brandColor,
         ),
       ];
     }
@@ -2322,8 +2326,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required bool isSelected,
     required VoidCallback onTap,
     required bool isDark,
+    required Color brandColor,
   }) {
-    const activeColor = Color(0xFF10B981);
+    final activeColor = brandColor;
     final inactiveColor =
         isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core/navigation/navigation_provider.dart';
+import '../core/sdui/sdui_icon_registry.dart';
+import 'dynamic_sdui_icon.dart';
 import 'tenant_logo_avatar.dart';
 
 /// DrawerItemParser provides parser and builder utilities for navigation drawer items.
@@ -94,7 +96,9 @@ class DrawerItemParser {
         ? icon
         : (item['icon_data'] is IconData
             ? item['icon_data'] as IconData
-            : null);
+            : (icon is String && icon.isNotEmpty
+                ? SduiIconRegistry.resolve(icon)
+                : null));
 
     // Flat ListTile: empty children, null children, or non-list children ALWAYS render flat.
     // Never render an ExpansionTile or dropdown arrow for flat items.
@@ -111,9 +115,11 @@ class DrawerItemParser {
       final IconData effectiveIcon = iconData ??
           (icon is IconData
               ? icon
-              : (isNested
-                  ? Icons.subdirectory_arrow_right
-                  : Icons.circle_outlined));
+              : (icon is String && icon.isNotEmpty
+                  ? SduiIconRegistry.resolve(icon)
+                  : (isNested
+                      ? Icons.subdirectory_arrow_right
+                      : Icons.circle_outlined)));
 
       final bool isExternal = item['is_external'] == true ||
           item['is_external_url'] == true ||
@@ -140,8 +146,8 @@ class DrawerItemParser {
               ),
               const SizedBox(width: 6),
             ],
-            Icon(
-              effectiveIcon,
+            DynamicSduiIcon(
+              iconData: item['icon'] ?? effectiveIcon,
               size: isNested ? 18 : 22,
               color: effectiveColor,
             ),
@@ -184,8 +190,14 @@ class DrawerItemParser {
           left: 16.0 + (indent * 24.0),
           right: 16.0,
         ),
-        leading: Icon(
-          iconData ?? (icon is IconData ? icon : Icons.circle_outlined),
+        leading: DynamicSduiIcon(
+          iconData: item['icon'] ??
+              iconData ??
+              (icon is IconData
+                  ? icon
+                  : (icon != null
+                      ? SduiIconRegistry.resolve(icon)
+                      : Icons.circle_outlined)),
           size: 22,
           color: isSelected ? (selectedColor ?? activeColor) : activeColor,
         ),

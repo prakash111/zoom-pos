@@ -814,18 +814,6 @@ class _TransactionsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    Widget headCell(String t,
-            {TextAlign align = TextAlign.left, int flex = 1}) =>
-        Expanded(
-          flex: flex,
-          child: Text(t,
-              textAlign: align,
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: scheme.onSurfaceVariant)),
-        );
-
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

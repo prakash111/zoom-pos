@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../sdui/models/sdui_models.dart';
 import '../../sdui/sdui_icon_registry.dart';
+import '../../../widgets/dynamic_sdui_icon.dart';
 import '../split_navigation_tile.dart';
 
 /// Agnostic header bar for SDUI screens.
@@ -121,7 +122,6 @@ class SduiNavTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final iconData = SduiIconRegistry.resolve(item.icon);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -146,8 +146,8 @@ class SduiNavTile extends StatelessWidget {
               ),
               const SizedBox(width: 4),
             ],
-            Icon(
-              iconData,
+            DynamicSduiIcon(
+              iconData: item.dynamicIcon,
               size: indent > 0 ? 18 : 20,
               color: isSelected
                   ? theme.colorScheme.primary
@@ -300,7 +300,6 @@ class SduiSideDrawerContainer extends StatelessWidget {
       }
 
       final theme = Theme.of(context);
-      final iconData = SduiIconRegistry.resolve(item.icon);
       final isSelected = item.key == selectedKey;
 
       return SplitNavigationTile(
@@ -314,8 +313,8 @@ class SduiSideDrawerContainer extends StatelessWidget {
         selected: isSelected,
         selectedColor: theme.colorScheme.primary,
         iconColor: theme.colorScheme.onSurfaceVariant,
-        leading: Icon(
-          iconData,
+        leading: DynamicSduiIcon(
+          iconData: item.dynamicIcon,
           size: depth == 0 ? 20 : 18,
           color: isSelected
               ? theme.colorScheme.primary

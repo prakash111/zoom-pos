@@ -1,3 +1,4 @@
+// ignore_for_file: non_const_argument_for_const_parameter
 import 'package:flutter/material.dart';
 
 /// Centralized registry resolving server icon names to Flutter [IconData].
@@ -99,7 +100,23 @@ class SduiIconRegistry {
     'api': Icons.api_outlined,
     'vpn_key': Icons.vpn_key_outlined,
     'key': Icons.key_outlined,
-    'chat': Icons.chat_outlined,
+    'chat': Icons.chat_bubble_outline_rounded,
+    'live_chat': Icons.chat_bubble_outline_rounded,
+    'chat_messages': Icons.chat_bubble_outline_rounded,
+    'message': Icons.chat_bubble_outline_rounded,
+    'messages': Icons.chat_bubble_outline_rounded,
+    'forum': Icons.chat_bubble_outline_rounded,
+    'support_agent': Icons.chat_bubble_outline_rounded,
+    'send_staff_notification': Icons.notifications_active_outlined,
+    'send_to_mobile': Icons.notifications_active_outlined,
+    'notification': Icons.notifications_active_outlined,
+    'notifications': Icons.notifications_active_outlined,
+    'bell': Icons.notifications_active_outlined,
+    'campaign': Icons.campaign_outlined,
+    'staff_directory': Icons.badge_outlined,
+    'attendance': Icons.access_time_rounded,
+    'leave_requests': Icons.event_note_outlined,
+    'payroll': Icons.payments_outlined,
     'sms': Icons.sms_outlined,
     'textsms': Icons.textsms_outlined,
     'mail': Icons.mail_outlined,
@@ -108,7 +125,6 @@ class SduiIconRegistry {
     'slack': Icons.forum_outlined,
     'telegram': Icons.send_outlined,
     'discord': Icons.forum_outlined,
-    'bell': Icons.notifications_none_outlined,
     'megaphone': Icons.campaign_outlined,
     'arrow_forward_ios': Icons.arrow_forward_ios,
     'menu_open': Icons.menu_open_outlined,
@@ -168,15 +184,99 @@ class SduiIconRegistry {
   };
 
   /// Direct icon lookup alias matching `SduiIconRegistry.get(...)`.
-  static IconData get(String? iconName,
+  static IconData get(dynamic iconName,
           {IconData fallback = Icons.widgets_outlined}) =>
       resolve(iconName, fallback: fallback);
 
-  /// Resolves an icon name from server payload to an [IconData].
-  static IconData resolve(String? iconName,
+  /// Resolves an icon name, code point, or payload from server to an [IconData].
+  static IconData resolve(dynamic iconName,
       {IconData fallback = Icons.widgets_outlined}) {
-    if (iconName == null || iconName.isEmpty) return fallback;
-    final normalized = iconName.toLowerCase().trim().replaceAll('-', '_');
+    if (iconName == null) return fallback;
+
+    if (iconName is IconData) return iconName;
+
+    if (iconName is int) {
+      return IconData(iconName, fontFamily: 'MaterialIcons');
+    }
+
+    if (iconName is Map) {
+      final codePointVal = iconName['code_point'] ?? iconName['icon_code'];
+      if (codePointVal != null) {
+        final int? parsedPoint = codePointVal is int
+            ? codePointVal
+            : (codePointVal is String && codePointVal.startsWith('0x')
+                ? int.tryParse(codePointVal)
+                : int.tryParse(codePointVal.toString()));
+        if (parsedPoint != null) {
+          final String fontFamily =
+              iconName['font_family']?.toString() ?? 'MaterialIcons';
+          return IconData(parsedPoint, fontFamily: fontFamily);
+        }
+      }
+      final nested = iconName['name'] ?? iconName['key'] ?? iconName['icon'];
+      if (nested != null && nested != iconName) {
+        return resolve(nested, fallback: fallback);
+      }
+      return fallback;
+    }
+
+    final str = iconName.toString().trim();
+    if (str.isEmpty) return fallback;
+
+    // Check hex string (e.g., '0xe153')
+    if (str.startsWith('0x') || str.startsWith('0X')) {
+      final codePoint = int.tryParse(str);
+      if (codePoint != null) {
+        return IconData(codePoint, fontFamily: 'MaterialIcons');
+      }
+    }
+
+    // Direct numeric string
+    final numeric = int.tryParse(str);
+    if (numeric != null && numeric > 100) {
+      return IconData(numeric, fontFamily: 'MaterialIcons');
+    }
+
+    final normalized = str.toLowerCase().replaceAll('-', '_');
+
+    switch (normalized) {
+      // 1. LIVE CHAT ICON MAPPING
+      case 'live_chat':
+      case 'chat':
+      case 'message':
+      case 'messages':
+      case 'chat_messages':
+      case 'chat_bubble':
+      case 'chat_bubble_outline':
+      case 'forum':
+      case 'support_agent':
+        return Icons.chat_bubble_outline_rounded;
+
+      // 2. NOTIFICATION ICON MAPPING
+      case 'notifications_active':
+      case 'send_staff_notification':
+      case 'send_to_mobile':
+      case 'notification':
+      case 'notifications':
+      case 'bell':
+      case 'campaign':
+        return Icons.notifications_active_outlined;
+
+      // HRM & Operations
+      case 'staff_directory':
+      case 'badge':
+        return Icons.badge_outlined;
+      case 'attendance':
+      case 'schedule':
+        return Icons.access_time_rounded;
+      case 'leave_requests':
+      case 'event_note':
+        return Icons.event_note_outlined;
+      case 'payroll':
+      case 'payments':
+        return Icons.payments_outlined;
+    }
+
     return _icons[normalized] ?? fallback;
   }
 
