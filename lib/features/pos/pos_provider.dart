@@ -195,6 +195,14 @@ class PosProvider extends ChangeNotifier {
   double customDiscount = 0;
   bool isPercentDiscount = false;
 
+  // --- Reward Points & Coupon Discounts ---
+  double rewardPointsRedeemed = 0.0;
+  double rewardPointsDiscount = 0.0;
+
+  String? appliedCouponCode;
+  int? appliedCouponId;
+  double couponDiscount = 0.0;
+
   bool isCheckingOut = false;
   String? checkoutError;
 
@@ -345,7 +353,7 @@ class PosProvider extends ChangeNotifier {
   double get taxTotal =>
       _cart.values.fold<double>(0, (sum, item) => sum + item.taxAmount);
 
-  double get discount {
+  double get baseDiscount {
     if (customDiscount <= 0) return 0;
     if (isPercentDiscount) {
       return (subtotal * (customDiscount / 100)).clamp(0, subtotal);
@@ -353,9 +361,54 @@ class PosProvider extends ChangeNotifier {
     return customDiscount.clamp(0, subtotal);
   }
 
+  double get discount =>
+      (baseDiscount + rewardPointsDiscount + couponDiscount).clamp(0, subtotal);
+
   double get grandTotal =>
       (subtotal - discount + taxTotal).clamp(0, double.infinity);
   bool get cartIsEmpty => _cart.isEmpty;
+
+  void applyRewardPoints(double points, {double rate = 1.0}) {
+    if (points <= 0) {
+      clearRewardPoints();
+      return;
+    }
+    final available = (selectedCustomer?.loyaltyPoints ?? 0).toDouble();
+    final clampedPoints = points.clamp(0.0, available);
+    rewardPointsRedeemed = clampedPoints;
+    final maxAllowed = (subtotal - baseDiscount - couponDiscount).clamp(0.0, subtotal);
+    rewardPointsDiscount = (clampedPoints * rate).clamp(0.0, maxAllowed);
+    _manualAmountPaid = null;
+    notifyListeners();
+  }
+
+  void clearRewardPoints() {
+    rewardPointsRedeemed = 0.0;
+    rewardPointsDiscount = 0.0;
+    _manualAmountPaid = null;
+    notifyListeners();
+  }
+
+  void applyCoupon({
+    required String code,
+    required double discountAmount,
+    int? couponId,
+  }) {
+    appliedCouponCode = code;
+    appliedCouponId = couponId;
+    final maxAllowed = (subtotal - baseDiscount - rewardPointsDiscount).clamp(0.0, subtotal);
+    couponDiscount = discountAmount.clamp(0.0, maxAllowed);
+    _manualAmountPaid = null;
+    notifyListeners();
+  }
+
+  void clearCoupon() {
+    appliedCouponCode = null;
+    appliedCouponId = null;
+    couponDiscount = 0.0;
+    _manualAmountPaid = null;
+    notifyListeners();
+  }
 
   Future<void> loadCatalog() async {
     catalogStatus = CatalogStatus.loading;
@@ -713,6 +766,11 @@ class PosProvider extends ChangeNotifier {
     _rxSyntheticKeys.clear();
     customDiscount = 0;
     isPercentDiscount = false;
+    rewardPointsRedeemed = 0.0;
+    rewardPointsDiscount = 0.0;
+    appliedCouponCode = null;
+    appliedCouponId = null;
+    couponDiscount = 0.0;
     isSplitPayment = false;
     payments = [];
     _manualAmountPaid = null;
@@ -805,6 +863,9 @@ class PosProvider extends ChangeNotifier {
         changeReturned: soldChangeDue,
         dueDate: soldDueDate,
         dueReminderAt: soldDueReminderAt,
+        redeemedPoints: rewardPointsRedeemed > 0 ? rewardPointsRedeemed : null,
+        couponCode: appliedCouponCode,
+        notes: soldNotes,
       );
       return _syncEngine.queueOfflineSale(
           id: saleId, payload: payload, createdAt: soldAt);
@@ -860,6 +921,9 @@ class PosProvider extends ChangeNotifier {
         changeReturned: soldChangeDue,
         dueDate: soldDueDate,
         dueReminderAt: soldDueReminderAt,
+        redeemedPoints: rewardPointsRedeemed > 0 ? rewardPointsRedeemed : null,
+        couponCode: appliedCouponCode,
+        notes: soldNotes,
       );
       clearCart();
       isCheckingOut = false;

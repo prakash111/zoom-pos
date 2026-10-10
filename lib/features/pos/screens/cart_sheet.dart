@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/api/api_client.dart';
 import '../../../core/config/bootstrap_cache.dart';
 import '../../../core/models/customer_model.dart';
 import '../../../core/models/settings_models.dart';
@@ -522,6 +523,277 @@ class CartSheet extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildLoyaltyRedemptionSection(
+      BuildContext context, CustomerModel? customer, double cartTotal) {
+    if (customer == null || customer.id.isEmpty) return const SizedBox.shrink();
+
+    final pos = context.watch<PosProvider>();
+    final points = customer.loyaltyPoints;
+    final pointsMonetaryVal = points * 1.0;
+    const spendPerPoint = 100.0;
+    final willEarnPoints = (pos.grandTotal / spendPerPoint).floor();
+
+    if (pos.rewardPointsRedeemed > 0) {
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF064E3B).withValues(alpha: 0.25),
+          borderRadius: BorderRadius.circular(12),
+          border:
+              Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.6)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.stars, color: Color(0xFFF59E0B), size: 20),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '✓ ${pos.rewardPointsRedeemed.toInt()} pts applied (-₹${pos.rewardPointsDiscount.toStringAsFixed(2)})',
+                      style: const TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Remaining balance: ${(points - pos.rewardPointsRedeemed).toInt()} pts',
+                      style: const TextStyle(
+                          color: Color(0xFF94A3B8), fontSize: 11),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            TextButton(
+              onPressed: () => pos.clearRewardPoints(),
+              child: const Text('✕ Remove',
+                  style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(12),
+        border:
+            Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '${customer.customFields['tier_name'] ?? "Member"} • ',
+                      style: const TextStyle(
+                          color: Color(0xFF10B981),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    Flexible(
+                      child: Text(
+                        '$points Pts (₹${pointsMonetaryVal.toStringAsFixed(2)})',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Earns +$willEarnPoints pts on this sale',
+                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          if (points > 0)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF59E0B),
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () =>
+                  _showPointsRedeemDialog(context, points, cartTotal),
+              child: const Text('Redeem',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showPointsRedeemDialog(
+      BuildContext context, int availablePoints, double cartTotal) async {
+    final pos = context.read<PosProvider>();
+    final maxAllowedPoints = (pos.subtotal - pos.baseDiscount - pos.couponDiscount)
+        .clamp(0.0, availablePoints.toDouble());
+    final controller =
+        TextEditingController(text: maxAllowedPoints.toInt().toString());
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Redeem Reward Points'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Available Balance: $availablePoints pts (₹${availablePoints.toStringAsFixed(2)})'),
+            const SizedBox(height: 4),
+            Text(
+              'Max redeemable on this order: ${maxAllowedPoints.toInt()} pts',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Points to Redeem',
+                border: const OutlineInputBorder(),
+                prefixIcon:
+                    const Icon(Icons.stars, color: Color(0xFFF59E0B)),
+                suffixIcon: TextButton(
+                  onPressed: () {
+                    controller.text = maxAllowedPoints.toInt().toString();
+                  },
+                  child: const Text('MAX',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF59E0B)),
+            onPressed: () {
+              final pts = double.tryParse(controller.text.trim()) ?? 0;
+              if (pts > 0 && pts <= availablePoints) {
+                pos.applyRewardPoints(pts, rate: 1.0);
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                      content: Text(
+                          'Applied ${pts.toInt()} reward points (-₹${pos.rewardPointsDiscount.toStringAsFixed(2)})!')),
+                );
+              } else if (pts <= 0) {
+                pos.clearRewardPoints();
+                Navigator.of(ctx).pop();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                        'Cannot redeem more than $availablePoints points.'),
+                    backgroundColor: Colors.red.shade700,
+                  ),
+                );
+              }
+            },
+            child: const Text('Apply Points',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCouponSection(BuildContext context, PosProvider pos) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (pos.appliedCouponCode != null) {
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color:
+              const Color(0xFF047857).withValues(alpha: isDark ? 0.25 : 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border:
+              Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.6)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.confirmation_number,
+                color: Color(0xFF10B981), size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Coupon ${pos.appliedCouponCode} applied',
+                    style: const TextStyle(
+                      color: Color(0xFF10B981),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    'Discount: -₹${pos.couponDiscount.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: isDark
+                          ? const Color(0xFFCBD5E1)
+                          : const Color(0xFF334155),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                pos.clearCoupon();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Coupon removed.')),
+                );
+              },
+              child: const Text('✕ Remove',
+                  style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _CouponInputField(pos: pos);
   }
 
   Future<void> _openSplitPaymentEditor(
@@ -1148,6 +1420,12 @@ class CartSheet extends StatelessWidget {
                                 ],
                               ),
 
+                              if (pos.selectedCustomer != null)
+                                _buildLoyaltyRedemptionSection(
+                                    context, pos.selectedCustomer, pos.grandTotal),
+
+                              _buildCouponSection(context, pos),
+
                               if (pos.requiresCustomerForDue)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),
@@ -1335,12 +1613,28 @@ class CartSheet extends StatelessWidget {
                                     _TotalsRow(
                                         label: l10n.subtotal,
                                         value: formatter.format(pos.subtotal)),
-                                    if (pos.discount > 0)
+                                    if (pos.baseDiscount > 0)
                                       _TotalsRow(
                                         label: l10n.discount,
                                         value:
-                                            '-${formatter.format(pos.discount)}',
+                                            '-${formatter.format(pos.baseDiscount)}',
                                         valueColor: Colors.red.shade600,
+                                      ),
+                                    if (pos.rewardPointsDiscount > 0)
+                                      _TotalsRow(
+                                        label:
+                                            'Reward Points (${pos.rewardPointsRedeemed.toInt()} pts)',
+                                        value:
+                                            '-${formatter.format(pos.rewardPointsDiscount)}',
+                                        valueColor: const Color(0xFFF59E0B),
+                                      ),
+                                    if (pos.couponDiscount > 0)
+                                      _TotalsRow(
+                                        label:
+                                            'Coupon (${pos.appliedCouponCode ?? ""})',
+                                        value:
+                                            '-${formatter.format(pos.couponDiscount)}',
+                                        valueColor: const Color(0xFF10B981),
                                       ),
                                     if (pos.taxTotal > 0) ...[
                                       if (isIndia) ...[

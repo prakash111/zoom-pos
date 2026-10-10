@@ -531,6 +531,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// 0 = Home (this screen); 1..N = `_featuresFor(company)[index - 1]`.
   /// Shared by whichever nav dock is active — see [NavDockProvider].
   int _dockIndex = 0;
+  String? _selectedTileKey = 'home';
 
   Future<AnalyticsModel> _loadAnalytics() =>
       _analyticsRepository.fetchAnalytics(
@@ -804,14 +805,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// destination pushes a route and settles back on Home once it's popped.
   void _onDockItemSelected(BuildContext context, int index) {
     if (index == 0) {
-      setState(() => _dockIndex = 0);
+      setState(() {
+        _dockIndex = 0;
+        _selectedTileKey = 'home';
+      });
       return;
     }
 
-    setState(() => _dockIndex = index);
     final auth = context.read<AuthProvider>();
     final bootstrap = context.read<BootstrapCache>();
     final feature = _featuresFor(auth.company, auth.user)[index - 1];
+    setState(() {
+      _dockIndex = index;
+      _selectedTileKey = feature.key;
+    });
     if (feature.key == 'nav_storefront_group' ||
         feature.key == 'group_storefront' ||
         feature.key == 'sec_storefront') {
@@ -822,7 +829,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _resolveLiveStoreUrl(feature.url, auth.company, bootstrap);
       if (targetUrl.isNotEmpty) {
         launchUrl(Uri.parse(targetUrl), mode: LaunchMode.externalApplication);
-        setState(() => _dockIndex = 0);
         return;
       }
     }
@@ -832,7 +838,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             builder: feature.builder ??
                 (_) => ComingSoonScreen(title: title, icon: feature.icon)))
         .then((_) {
-      if (mounted) setState(() => _dockIndex = 0);
+      if (mounted) setState(() {});
     });
   }
 
@@ -1066,15 +1072,83 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
 
+        final bool isHomeSelected = _selectedTileKey == 'home' ||
+            (_selectedTileKey == null && _dockIndex == 0);
+
         final children = <Widget>[
-          ListTile(
-            leading: const Icon(Icons.home_outlined),
-            title: Text(l10n.navHome),
-            selected: _dockIndex == 0,
-            onTap: () {
-              Navigator.of(context).pop();
-              _onDockItemSelected(context, 0);
-            },
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            child: ListTile(
+              key: const ValueKey('drawer-item-home'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: isHomeSelected
+                    ? BorderSide(
+                        color: selectedItemColor.withValues(
+                            alpha: isDarkMode ? 0.45 : 0.35),
+                        width: 1.2,
+                      )
+                    : BorderSide.none,
+              ),
+              selectedTileColor: selectedItemColor.withValues(
+                  alpha: isDarkMode ? 0.22 : 0.12),
+              leading: isHomeSelected
+                  ? Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: selectedItemColor,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: selectedItemColor.withValues(alpha: 0.35),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.home, size: 18, color: Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.home_outlined),
+              title: Text(
+                l10n.navHome,
+                style: TextStyle(
+                  fontWeight:
+                      isHomeSelected ? FontWeight.w700 : FontWeight.w500,
+                  color:
+                      isHomeSelected ? selectedItemColor : unselectedItemColor,
+                ),
+              ),
+              trailing: isHomeSelected
+                  ? Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: selectedItemColor,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: selectedItemColor.withValues(alpha: 0.45),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    )
+                  : null,
+              selected: isHomeSelected,
+              selectedColor: selectedItemColor,
+              onTap: () {
+                setState(() {
+                  _selectedTileKey = 'home';
+                  _dockIndex = 0;
+                });
+                Navigator.of(context).pop();
+                _onDockItemSelected(context, 0);
+              },
+            ),
           ),
         ];
         final navSections = _sectionsFor(company, user);
@@ -1116,6 +1190,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
           final index = indexByKey[tile.key];
           if (index == null) return;
+          setState(() {
+            _selectedTileKey = tile.key;
+            _dockIndex = index;
+          });
           Navigator.of(context).pop();
           _onDockItemSelected(context, index);
         }
@@ -1172,76 +1250,141 @@ class _DashboardScreenState extends State<DashboardScreen> {
               right: 12,
             );
 
-            final isSelected = _dockIndex == index;
+            final isSelected = _selectedTileKey == tile.key ||
+                (_selectedTileKey == null && _dockIndex == index);
 
             if (nested.isEmpty) {
-              return ListTile(
-                key: ValueKey('drawer-item-${tile.key}'),
-                contentPadding: padding,
-                dense: depth > 0,
-                iconColor: isSelected ? selectedItemColor : unselectedIconColor,
-                textColor: isSelected ? selectedItemColor : unselectedItemColor,
-                selectedColor: selectedItemColor,
-                leading: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (depth > 0) ...[
-                      Text(
-                        '↳',
-                        style: TextStyle(
-                          color: unselectedIconColor,
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Icon(
-                      tile.icon,
-                      size: sectionParent ? 22 : (depth == 0 ? 24 : 18),
-                      color: isSelected
-                          ? selectedItemColor
-                          : (depth > 0
-                              ? unselectedIconColor.withValues(alpha: 0.85)
-                              : unselectedIconColor),
-                    ),
-                  ],
-                ),
-                title: Text(
-                  bootstrap.resolveNavigationLabel(
-                      tile.key, tile.titleOf(l10n)),
-                  style: TextStyle(
-                    fontSize: depth > 0 ? 13 : 14,
-                    fontWeight: sectionParent || isSelected
-                        ? FontWeight.w700
-                        : (depth > 0 ? FontWeight.w500 : FontWeight.w500),
-                    letterSpacing: sectionParent ? 0.2 : null,
-                    color: isSelected ? selectedItemColor : unselectedItemColor,
-                  ),
-                ),
-                selected: isSelected,
-                trailing: tile.isExternalUrl
-                    ? Icon(Icons.open_in_new,
-                        size: 15,
-                        color: unselectedIconColor.withValues(alpha: 0.7))
-                    : (tile.badge != null && tile.badge!.isNotEmpty
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFDC2626),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              tile.badge!,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold),
-                            ),
+              return Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                child: ListTile(
+                  key: ValueKey('drawer-item-${tile.key}'),
+                  contentPadding: padding,
+                  dense: depth > 0,
+                  iconColor: isSelected ? selectedItemColor : unselectedIconColor,
+                  textColor: isSelected ? selectedItemColor : unselectedItemColor,
+                  selectedColor: selectedItemColor,
+                  selectedTileColor: selectedItemColor.withValues(
+                      alpha: isDarkMode ? 0.22 : 0.12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: isSelected
+                        ? BorderSide(
+                            color: selectedItemColor.withValues(
+                                alpha: isDarkMode ? 0.45 : 0.35),
+                            width: 1.2,
                           )
-                        : null),
-                onTap: () => openTile(tile),
+                        : BorderSide.none,
+                  ),
+                  leading: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (depth > 0) ...[
+                        Text(
+                          '↳',
+                          style: TextStyle(
+                            color: unselectedIconColor,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      if (isSelected)
+                        Container(
+                          width: depth > 0 ? 26 : 32,
+                          height: depth > 0 ? 26 : 32,
+                          decoration: BoxDecoration(
+                            color: selectedItemColor,
+                            borderRadius:
+                                BorderRadius.circular(depth > 0 ? 6 : 8),
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    selectedItemColor.withValues(alpha: 0.35),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Icon(
+                              tile.icon,
+                              size: depth > 0 ? 14 : 18,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                      else
+                        Icon(
+                          tile.icon,
+                          size: sectionParent ? 22 : (depth == 0 ? 24 : 18),
+                          color: depth > 0
+                              ? unselectedIconColor.withValues(alpha: 0.85)
+                              : unselectedIconColor,
+                        ),
+                    ],
+                  ),
+                  title: Text(
+                    bootstrap.resolveNavigationLabel(
+                        tile.key, tile.titleOf(l10n)),
+                    style: TextStyle(
+                      fontSize: depth > 0 ? 13 : 14,
+                      fontWeight: sectionParent || isSelected
+                          ? FontWeight.w700
+                          : (depth > 0 ? FontWeight.w500 : FontWeight.w500),
+                      letterSpacing: sectionParent ? 0.2 : null,
+                      color:
+                          isSelected ? selectedItemColor : unselectedItemColor,
+                    ),
+                  ),
+                  selected: isSelected,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (tile.isExternalUrl)
+                        Icon(Icons.open_in_new,
+                            size: 15,
+                            color: unselectedIconColor.withValues(alpha: 0.7))
+                      else if (tile.badge != null && tile.badge!.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDC2626),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            tile.badge!,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      if (isSelected) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: selectedItemColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    selectedItemColor.withValues(alpha: 0.45),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  onTap: () => openTile(tile),
+                ),
               );
             }
 
@@ -1249,62 +1392,104 @@ class _DashboardScreenState extends State<DashboardScreen> {
               data: Theme.of(context).copyWith(
                 dividerColor: Colors.transparent,
               ),
-              child: SplitNavigationTile(
-                key: PageStorageKey<String>(
-                  'drawer-branch-${section.key}-${tile.key}',
-                ),
-                mainTileKey: ValueKey('drawer-item-${tile.key}'),
-                expandButtonKey: ValueKey('drawer-expand-${tile.key}'),
-                contentPadding: padding,
-                iconColor: unselectedIconColor,
-                selectedColor: selectedItemColor,
-                selected: isSelected,
-                dense: depth > 0,
-                leading: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (depth > 0) ...[
-                      Text(
-                        '↳',
-                        style: TextStyle(
-                          color: unselectedIconColor,
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Icon(
-                      tile.icon,
-                      size: sectionParent ? 22 : (depth == 0 ? 24 : 20),
-                      color: isSelected
-                          ? selectedItemColor
-                          : (depth > 0
-                              ? unselectedIconColor.withValues(alpha: 0.85)
-                              : unselectedIconColor),
-                    ),
-                  ],
-                ),
-                initiallyExpanded: false,
-                title: Text(
-                  bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
-                  style: TextStyle(
-                    fontWeight: sectionParent || isSelected
-                        ? FontWeight.w700
-                        : FontWeight.w500,
-                    letterSpacing: sectionParent ? 0.2 : null,
-                    color: isSelected ? selectedItemColor : unselectedItemColor,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                child: SplitNavigationTile(
+                  key: PageStorageKey<String>(
+                    'drawer-branch-${section.key}-${tile.key}',
                   ),
-                ),
-                children: [
-                  for (final child in nested)
-                    buildBranch(
-                      child,
-                      math.min(depth + 1, _maximumNavigationDepth),
+                  mainTileKey: ValueKey('drawer-item-${tile.key}'),
+                  expandButtonKey: ValueKey('drawer-expand-${tile.key}'),
+                  contentPadding: padding,
+                  iconColor: unselectedIconColor,
+                  selectedColor: selectedItemColor,
+                  selectedTileColor: selectedItemColor.withValues(
+                      alpha: isDarkMode ? 0.22 : 0.12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: isSelected
+                        ? BorderSide(
+                            color: selectedItemColor.withValues(
+                                alpha: isDarkMode ? 0.45 : 0.35),
+                            width: 1.2,
+                          )
+                        : BorderSide.none,
+                  ),
+                  selected: isSelected,
+                  dense: depth > 0,
+                  leading: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (depth > 0) ...[
+                        Text(
+                          '↳',
+                          style: TextStyle(
+                            color: unselectedIconColor,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      if (isSelected)
+                        Container(
+                          width: depth > 0 ? 26 : 32,
+                          height: depth > 0 ? 26 : 32,
+                          decoration: BoxDecoration(
+                            color: selectedItemColor,
+                            borderRadius:
+                                BorderRadius.circular(depth > 0 ? 6 : 8),
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    selectedItemColor.withValues(alpha: 0.35),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Icon(
+                              tile.icon,
+                              size: depth > 0 ? 14 : 18,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                      else
+                        Icon(
+                          tile.icon,
+                          size: sectionParent ? 22 : (depth == 0 ? 24 : 20),
+                          color: depth > 0
+                              ? unselectedIconColor.withValues(alpha: 0.85)
+                              : unselectedIconColor,
+                        ),
+                    ],
+                  ),
+                  initiallyExpanded: false,
+                  title: Text(
+                    bootstrap.resolveNavigationLabel(
+                        tile.key, tile.titleOf(l10n)),
+                    style: TextStyle(
+                      fontWeight: sectionParent || isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      letterSpacing: sectionParent ? 0.2 : null,
+                      color:
+                          isSelected ? selectedItemColor : unselectedItemColor,
                     ),
-                ],
-                // Parent accordion tiles only toggle expansion; no direct navigation
-                onTap: null,
+                  ),
+                  children: [
+                    for (final child in nested)
+                      buildBranch(
+                        child,
+                        math.min(depth + 1, _maximumNavigationDepth),
+                      ),
+                  ],
+                  // Parent accordion tiles only toggle expansion; no direct navigation
+                  onTap: null,
+                ),
               ),
             );
           }
@@ -1576,19 +1761,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
+    final isHomeSelected = _selectedTileKey == 'home' ||
+        (_selectedTileKey == null && _dockIndex == 0);
+
     final rows = <Widget>[
-      ListTile(
-        dense: true,
-        leading: const Icon(Icons.home_outlined, size: 22),
-        title: Text(l10n.navHome,
-            style: TextStyle(
-              fontWeight: _dockIndex == 0 ? FontWeight.w700 : FontWeight.normal,
-              color: _dockIndex == 0
-                  ? Theme.of(context).colorScheme.primary
-                  : null,
-            )),
-        selected: _dockIndex == 0,
-        onTap: () => _onDockItemSelected(context, 0),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: ListTile(
+          dense: true,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: isHomeSelected
+                ? BorderSide(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.35),
+                    width: 1.2,
+                  )
+                : BorderSide.none,
+          ),
+          selectedTileColor: Theme.of(context)
+              .colorScheme
+              .primary
+              .withValues(alpha: 0.12),
+          leading: isHomeSelected
+              ? Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.home, size: 16, color: Colors.white),
+                  ),
+                )
+              : const Icon(Icons.home_outlined, size: 22),
+          title: Text(l10n.navHome,
+              style: TextStyle(
+                fontWeight:
+                    isHomeSelected ? FontWeight.w700 : FontWeight.normal,
+                color: isHomeSelected
+                    ? Theme.of(context).colorScheme.primary
+                    : null,
+              )),
+          selected: isHomeSelected,
+          onTap: () {
+            setState(() {
+              _selectedTileKey = 'home';
+              _dockIndex = 0;
+            });
+            _onDockItemSelected(context, 0);
+          },
+        ),
       ),
     ];
 
@@ -1619,7 +1845,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             childrenByParent[tile.key] ??
             const <_FeatureTile>[];
         final index = indexByKey[tile.key]!;
-        final selected = _dockIndex == index;
+        final selected = _selectedTileKey == tile.key ||
+            (_selectedTileKey == null && _dockIndex == index);
         final labelColor =
             selected ? Theme.of(context).colorScheme.primary : null;
         final label = Text(
@@ -1648,14 +1875,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final pad = EdgeInsets.only(left: 12 + depth * 20, right: 8);
 
         if (nested.isEmpty) {
-          return ListTile(
-            key: ValueKey('rail-item-${tile.key}'),
-            dense: true,
-            contentPadding: pad,
-            leading: leading,
-            title: label,
-            selected: selected,
-            onTap: () => _onDockItemSelected(context, index),
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            child: ListTile(
+              key: ValueKey('rail-item-${tile.key}'),
+              dense: true,
+              contentPadding: pad,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: selected
+                    ? BorderSide(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.35),
+                        width: 1.2,
+                      )
+                    : BorderSide.none,
+              ),
+              selectedTileColor: Theme.of(context)
+                  .colorScheme
+                  .primary
+                  .withValues(alpha: 0.12),
+              leading: selected
+                  ? Container(
+                      width: depth > 0 ? 24 : 28,
+                      height: depth > 0 ? 24 : 28,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: Icon(tile.icon,
+                            size: depth > 0 ? 14 : 16, color: Colors.white),
+                      ),
+                    )
+                  : leading,
+              title: label,
+              selected: selected,
+              onTap: () {
+                setState(() {
+                  _selectedTileKey = tile.key;
+                  _dockIndex = index;
+                });
+                _onDockItemSelected(context, index);
+              },
+            ),
           );
         }
 

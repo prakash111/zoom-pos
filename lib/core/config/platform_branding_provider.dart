@@ -203,9 +203,11 @@ class PlatformBrandingProvider extends ChangeNotifier {
                       ? _asBool(platform['landing_page_enabled'], landingPageEnabled)
                       : landingPageEnabled)));
 
-      // Primary colour under any of its aliases (theme.primary /
-      // theme.primary_color / brand_color / primary_color).
-      final primary = _parseHex(theme['primary'] ??
+      // Primary colour under any of its aliases (flutter_app_brand_color /
+      // theme.primary / theme.primary_color / brand_color / primary_color).
+      final primary = _parseHex(theme['flutter_app_brand_color'] ??
+              response['flutter_app_brand_color'] ??
+              theme['primary'] ??
               theme['primary_color'] ??
               response['brand_color'] ??
               response['primary_color']) ??

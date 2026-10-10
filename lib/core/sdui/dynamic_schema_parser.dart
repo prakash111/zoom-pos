@@ -809,7 +809,9 @@ class DynamicSchemaParser {
   }
 
   static Widget _buildIcon(BuildContext context, Map<String, dynamic> schema) {
-    final iconName = schema['icon']?.toString() ?? 'widgets';
+    final iconVal = schema['code_point'] != null
+        ? schema
+        : (schema['icon'] ?? 'widgets');
     final size = _parseDouble(schema['size']) ?? 24.0;
     final color = schema['color'] != null
         ? _semanticColor(context, schema['color'],
@@ -817,7 +819,7 @@ class DynamicSchemaParser {
         : null;
 
     return Icon(
-      SduiIconRegistry.resolve(iconName),
+      SduiIconRegistry.resolve(iconVal),
       size: size,
       color: color,
     );
@@ -2483,14 +2485,14 @@ class DynamicSchemaParser {
     final subtitle = schema['subtitle'] == null
         ? null
         : context.tr(schema['subtitle'].toString());
-    final iconName = schema['leading_icon']?.toString();
+    final leadingIcon = schema['leading_icon'];
     final action = schema['action'] as Map<String, dynamic>?;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
         leading:
-            iconName != null ? Icon(SduiIconRegistry.resolve(iconName)) : null,
+            leadingIcon != null ? Icon(SduiIconRegistry.resolve(leadingIcon)) : null,
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: subtitle != null
             ? Text(subtitle, style: const TextStyle(fontSize: 12))

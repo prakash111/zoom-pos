@@ -127,10 +127,25 @@ class DrawerItemParser {
           item['action_type'] == 'external_url' ||
           item['action'] == 'external_url';
 
+      final activeThemeColor = selectedColor ?? activeColor;
+      final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
       return ListTile(
         key: ValueKey('drawer-item-${item['key'] ?? item['id'] ?? title}'),
         contentPadding: padding,
         dense: isNested,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: isSelected
+              ? BorderSide(
+                  color: activeThemeColor.withValues(
+                      alpha: isDark ? 0.45 : 0.35),
+                  width: 1.2,
+                )
+              : BorderSide.none,
+        ),
+        selectedTileColor: activeThemeColor.withValues(
+            alpha: isDark ? 0.22 : 0.12),
         leading: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -146,32 +161,78 @@ class DrawerItemParser {
               ),
               const SizedBox(width: 6),
             ],
-            DynamicSduiIcon(
-              iconData: item['icon'] ?? effectiveIcon,
-              size: isNested ? 18 : 22,
-              color: effectiveColor,
-            ),
+            if (isSelected)
+              Container(
+                width: isNested ? 26 : 32,
+                height: isNested ? 26 : 32,
+                decoration: BoxDecoration(
+                  color: activeThemeColor,
+                  borderRadius: BorderRadius.circular(isNested ? 6 : 8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: activeThemeColor.withValues(alpha: 0.35),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: DynamicSduiIcon(
+                    iconData: item['icon'] ?? effectiveIcon,
+                    size: isNested ? 14 : 18,
+                    color: Colors.white,
+                  ),
+                ),
+              )
+            else
+              DynamicSduiIcon(
+                iconData: item['icon'] ?? effectiveIcon,
+                size: isNested ? 18 : 22,
+                color: effectiveColor,
+              ),
           ],
         ),
         title: Text(
           title,
           style: TextStyle(
-            color: effectiveColor,
+            color: isSelected ? activeThemeColor : effectiveColor,
             fontSize: isNested ? 13 : 14,
             fontWeight: isSelected
                 ? FontWeight.w700
                 : (isNested ? FontWeight.w500 : FontWeight.w600),
           ),
         ),
-        trailing: isExternal
-            ? Icon(
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isExternal)
+              Icon(
                 Icons.open_in_new,
                 size: 16,
                 color: effectiveColor.withValues(alpha: 0.7),
-              )
-            : null,
+              ),
+            if (isSelected) ...[
+              const SizedBox(width: 6),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: activeThemeColor,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: activeThemeColor.withValues(alpha: 0.45),
+                      blurRadius: 4,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
         selected: isSelected,
-        selectedColor: selectedColor ?? activeColor,
+        selectedColor: activeThemeColor,
         onTap: onTap,
       );
     }

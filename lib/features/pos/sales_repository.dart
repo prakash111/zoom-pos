@@ -191,6 +191,9 @@ class SalesRepository {
     double changeReturned = 0,
     DateTime? dueDate,
     DateTime? dueReminderAt,
+    double? redeemedPoints,
+    String? couponCode,
+    String? notes,
   }) {
     return _client.post(ApiEndpoints.syncPush, data: {
       'sales': [
@@ -212,6 +215,9 @@ class SalesRepository {
           changeReturned: changeReturned,
           dueDate: dueDate,
           dueReminderAt: dueReminderAt,
+          redeemedPoints: redeemedPoints,
+          couponCode: couponCode,
+          notes: notes,
         ),
       ],
     });
@@ -258,6 +264,9 @@ class SalesRepository {
     double changeReturned = 0,
     DateTime? dueDate,
     DateTime? dueReminderAt,
+    double? redeemedPoints,
+    String? couponCode,
+    String? notes,
   }) {
     return {
       'id': id,
@@ -286,6 +295,12 @@ class SalesRepository {
         'due_date': dueDate.toIso8601String().split('T').first,
       if (dueReminderAt != null)
         'due_reminder_at': dueReminderAt.toUtc().toIso8601String(),
+      if (redeemedPoints != null && redeemedPoints > 0)
+        'redeemed_points': redeemedPoints,
+      if (couponCode != null && couponCode.isNotEmpty)
+        'coupon_code': couponCode,
+      if (notes != null && notes.isNotEmpty)
+        'notes': notes,
     };
   }
 
@@ -311,6 +326,9 @@ class SalesRepository {
     double changeReturned = 0,
     DateTime? dueDate,
     DateTime? dueReminderAt,
+    double? redeemedPoints,
+    String? couponCode,
+    String? notes,
   }) {
     return _salePayload(
       id: id,
@@ -330,6 +348,9 @@ class SalesRepository {
       changeReturned: changeReturned,
       dueDate: dueDate,
       dueReminderAt: dueReminderAt,
+      redeemedPoints: redeemedPoints,
+      couponCode: couponCode,
+      notes: notes,
     );
   }
 }

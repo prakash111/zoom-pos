@@ -16,6 +16,8 @@ class SplitNavigationTile extends StatefulWidget {
     this.dense = false,
     this.selected = false,
     this.selectedColor,
+    this.selectedTileColor,
+    this.shape,
     this.iconColor,
     this.initiallyExpanded = false,
     this.expandTooltip = 'Expand submenu',
@@ -31,6 +33,8 @@ class SplitNavigationTile extends StatefulWidget {
   final bool dense;
   final bool selected;
   final Color? selectedColor;
+  final Color? selectedTileColor;
+  final ShapeBorder? shape;
   final Color? iconColor;
   final bool initiallyExpanded;
   final String expandTooltip;
@@ -83,6 +87,8 @@ class _SplitNavigationTileState extends State<SplitNavigationTile> {
                 title: widget.title,
                 selected: widget.selected,
                 selectedColor: widget.selectedColor,
+                selectedTileColor: widget.selectedTileColor,
+                shape: widget.shape,
                 onTap: _handleTileTap,
               ),
             ),
