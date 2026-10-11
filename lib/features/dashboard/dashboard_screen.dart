@@ -1771,28 +1771,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     vertical: 4, horizontal: 2),
                                 child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.history_edu,
-                                            size: 14,
-                                            color: unselectedIconColor
-                                                .withValues(alpha: 0.8)),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'ZooM-POS v1.0.6',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: unselectedIconColor
-                                                .withValues(alpha: 0.85),
+                                    Expanded(
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.history_edu,
+                                              size: 14,
+                                              color: unselectedIconColor
+                                                  .withValues(alpha: 0.8)),
+                                          const SizedBox(width: 6),
+                                          Flexible(
+                                            child: Text(
+                                              'ZooM-POS v1.0.6',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: unselectedIconColor
+                                                    .withValues(alpha: 0.85),
+                                              ),
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
+                                    const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 7, vertical: 2.5),
