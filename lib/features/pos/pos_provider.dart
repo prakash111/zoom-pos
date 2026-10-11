@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/config/bootstrap_cache.dart';
 import '../../core/models/category_model.dart';
 import '../../core/models/customer_model.dart';
 import '../../core/models/product_model.dart';
@@ -373,11 +374,30 @@ class PosProvider extends ChangeNotifier {
       clearRewardPoints();
       return;
     }
-    final available = (selectedCustomer?.loyaltyPoints ?? 0).toDouble();
-    final clampedPoints = points.clamp(0.0, available);
+    final settings = BootstrapCache.instance.loyaltySettings;
+    if (!settings.isPointsEnabled) {
+      clearRewardPoints();
+      return;
+    }
+    final customerPoints = (selectedCustomer?.effectivePoints ?? 0).toDouble();
+    if (customerPoints < settings.minPointsToRedeem) {
+      clearRewardPoints();
+      return;
+    }
+
+    final effectiveRate = settings.redemptionValuePerPoint > 0 ? settings.redemptionValuePerPoint : rate;
+    final maxAllowedCartDiscount = (subtotal - baseDiscount - couponDiscount).clamp(0.0, subtotal);
+    final capPct = settings.maxRedemptionPercentage;
+    final capDiscount = (capPct > 0 && capPct < 100)
+        ? (subtotal * capPct / 100).clamp(0.0, maxAllowedCartDiscount)
+        : maxAllowedCartDiscount;
+
+    final maxCapPoints = effectiveRate > 0 ? (capDiscount / effectiveRate).floorToDouble() : 0.0;
+    final maxRedeemablePoints = customerPoints < maxCapPoints ? customerPoints : maxCapPoints;
+    final clampedPoints = points.clamp(0.0, maxRedeemablePoints);
+
     rewardPointsRedeemed = clampedPoints;
-    final maxAllowed = (subtotal - baseDiscount - couponDiscount).clamp(0.0, subtotal);
-    rewardPointsDiscount = (clampedPoints * rate).clamp(0.0, maxAllowed);
+    rewardPointsDiscount = (clampedPoints * effectiveRate).clamp(0.0, capDiscount);
     _manualAmountPaid = null;
     notifyListeners();
   }
@@ -800,6 +820,35 @@ class PosProvider extends ChangeNotifier {
       checkoutError = 'Attach a customer for due, partial, or credit sales.';
       notifyListeners();
       return null;
+    }
+
+    // Customer store wallet tender validation
+    final isWalletSingle = paymentMethod == 'wallet' && !isSplitPayment;
+    final walletSplitAmount = isSplitPayment
+        ? payments
+            .where((p) => p.method == 'wallet' || p.methodCode == 'wallet')
+            .fold(0.0, (sum, p) => sum + p.amount)
+        : 0.0;
+    final totalWalletTender = isWalletSingle ? amountPaid : walletSplitAmount;
+
+    if (totalWalletTender > 0.001) {
+      if (!BootstrapCache.instance.isWalletEnabled) {
+        checkoutError = 'Customer store wallet payments are currently disabled.';
+        notifyListeners();
+        return null;
+      }
+      if (selectedCustomer == null) {
+        checkoutError = 'Please select a registered customer to settle via Store Wallet.';
+        notifyListeners();
+        return null;
+      }
+      if (selectedCustomer!.walletBalance < totalWalletTender - 0.001) {
+        final short = totalWalletTender - selectedCustomer!.walletBalance;
+        checkoutError =
+            'Insufficient customer wallet balance. Short by ₹${short.toStringAsFixed(2)}.';
+        notifyListeners();
+        return null;
+      }
     }
 
     isCheckingOut = true;

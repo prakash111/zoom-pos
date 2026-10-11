@@ -409,6 +409,9 @@ class CartSheet extends StatelessWidget {
   }
 
   IconData _iconForMethod(String code) {
+    if (code.toLowerCase() == 'wallet') {
+      return Icons.account_balance_wallet;
+    }
     final sduiMethod = BootstrapCache.instance.paymentMethodFor(code);
     if (sduiMethod != null) {
       return SduiIconRegistry.resolve(sduiMethod.icon);
@@ -418,6 +421,9 @@ class CartSheet extends StatelessWidget {
   }
 
   Color _colorForMethod(String code, Color defaultPrimary) {
+    if (code.toLowerCase() == 'wallet') {
+      return const Color(0xFF10B981);
+    }
     final sduiMethod = BootstrapCache.instance.paymentMethodFor(code);
     if (sduiMethod != null) {
       return SduiIconRegistry.parseColor(sduiMethod.color,
@@ -531,10 +537,16 @@ class CartSheet extends StatelessWidget {
     if (customer == null || customer.id.isEmpty) return const SizedBox.shrink();
 
     final pos = context.watch<PosProvider>();
-    final points = customer.loyaltyPoints;
-    final pointsMonetaryVal = points * 1.0;
-    const spendPerPoint = 100.0;
-    final willEarnPoints = (pos.grandTotal / spendPerPoint).floor();
+    final settings = BootstrapCache.instance.loyaltySettings;
+    if (!settings.isPointsEnabled) return const SizedBox.shrink();
+
+    final points = customer.effectivePoints;
+    final rate = settings.redemptionValuePerPoint > 0 ? settings.redemptionValuePerPoint : 1.0;
+    final pointsMonetaryVal = points * rate;
+    final spendPerPoint = settings.spendAmountPerPoint > 0 ? settings.spendAmountPerPoint : 100.0;
+    final pointsAwarded = settings.pointsAwarded > 0 ? settings.pointsAwarded : 1.0;
+    final willEarnPoints = ((pos.grandTotal / spendPerPoint) * pointsAwarded * customer.tierMultiplier).floor();
+    final isLocked = points < settings.minPointsToRedeem;
 
     if (pos.rewardPointsRedeemed > 0) {
       return Container(
@@ -586,6 +598,63 @@ class CartSheet extends StatelessWidget {
       );
     }
 
+    if (isLocked) {
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF78350F).withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(12),
+          border:
+              Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.lock_outline, color: Color(0xFFF59E0B), size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        '${customer.tierName} • ',
+                        style: const TextStyle(
+                            color: Color(0xFF10B981),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      Flexible(
+                        child: Text(
+                          '$points Pts (₹${pointsMonetaryVal.toStringAsFixed(2)})',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Needs ${(settings.minPointsToRedeem - points)} more pts to redeem (Min ${settings.minPointsToRedeem} pts required)',
+                    style: const TextStyle(color: Color(0xFFFDE68A), fontSize: 11),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Earns +$willEarnPoints pts on this sale',
+                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.all(12),
@@ -605,7 +674,7 @@ class CartSheet extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      '${customer.customFields['tier_name'] ?? "Member"} • ',
+                      '${customer.tierName} • ',
                       style: const TextStyle(
                           color: Color(0xFF10B981),
                           fontSize: 11,
@@ -631,21 +700,20 @@ class CartSheet extends StatelessWidget {
               ],
             ),
           ),
-          if (points > 0)
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF59E0B),
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () =>
-                  _showPointsRedeemDialog(context, points, cartTotal),
-              child: const Text('Redeem',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B),
+              foregroundColor: Colors.white,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
+            onPressed: () =>
+                _showPointsRedeemDialog(context, points, cartTotal),
+            child: const Text('Redeem',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );
@@ -654,8 +722,20 @@ class CartSheet extends StatelessWidget {
   Future<void> _showPointsRedeemDialog(
       BuildContext context, int availablePoints, double cartTotal) async {
     final pos = context.read<PosProvider>();
-    final maxAllowedPoints = (pos.subtotal - pos.baseDiscount - pos.couponDiscount)
-        .clamp(0.0, availablePoints.toDouble());
+    final settings = BootstrapCache.instance.loyaltySettings;
+    final rate = settings.redemptionValuePerPoint > 0 ? settings.redemptionValuePerPoint : 1.0;
+    final capPct = settings.maxRedemptionPercentage;
+
+    final maxAllowedCartDiscount =
+        (pos.subtotal - pos.baseDiscount - pos.couponDiscount).clamp(0.0, pos.subtotal);
+    final capDiscount = (capPct > 0 && capPct < 100)
+        ? (pos.subtotal * capPct / 100).clamp(0.0, maxAllowedCartDiscount)
+        : maxAllowedCartDiscount;
+
+    final maxCapPoints = rate > 0 ? (capDiscount / rate).floorToDouble() : 0.0;
+    final maxAllowedPoints =
+        availablePoints < maxCapPoints ? availablePoints.toDouble() : maxCapPoints;
+
     final controller =
         TextEditingController(text: maxAllowedPoints.toInt().toString());
 
@@ -667,10 +747,10 @@ class CartSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Available Balance: $availablePoints pts (₹${availablePoints.toStringAsFixed(2)})'),
+            Text('Available Balance: $availablePoints pts (₹${(availablePoints * rate).toStringAsFixed(2)})'),
             const SizedBox(height: 4),
             Text(
-              'Max redeemable on this order: ${maxAllowedPoints.toInt()} pts',
+              'Max redeemable (Cap $capPct% of cart): ${maxAllowedPoints.toInt()} pts (-₹${(maxAllowedPoints * rate).toStringAsFixed(2)})',
               style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
             ),
             const SizedBox(height: 12),
@@ -704,8 +784,8 @@ class CartSheet extends StatelessWidget {
                 backgroundColor: const Color(0xFFF59E0B)),
             onPressed: () {
               final pts = double.tryParse(controller.text.trim()) ?? 0;
-              if (pts > 0 && pts <= availablePoints) {
-                pos.applyRewardPoints(pts, rate: 1.0);
+              if (pts > 0 && pts <= maxAllowedPoints) {
+                pos.applyRewardPoints(pts, rate: rate);
                 Navigator.of(ctx).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -719,7 +799,7 @@ class CartSheet extends StatelessWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                        'Cannot redeem more than $availablePoints points.'),
+                        'Cannot redeem more than ${maxAllowedPoints.toInt()} points (cart cap).'),
                     backgroundColor: Colors.red.shade700,
                   ),
                 );
@@ -972,7 +1052,8 @@ class CartSheet extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     // Load active payment methods dynamically
-    final activeMethods = pos.paymentMethods.isNotEmpty
+    final isWalletEnabled = BootstrapCache.instance.isWalletEnabled;
+    final List<PaymentMethodModel> activeMethods = pos.paymentMethods.isNotEmpty
         ? pos.paymentMethods.where((p) => p.isActive).toList()
         : [
             PaymentMethodModel(
@@ -1011,6 +1092,26 @@ class CartSheet extends StatelessWidget {
                 isActive: true,
                 orderIndex: 4),
           ];
+
+    if (isWalletEnabled) {
+      final hasWallet = activeMethods.any(
+          (p) => p.code.toLowerCase() == 'wallet' || p.id.toLowerCase() == 'wallet');
+      if (!hasWallet) {
+        activeMethods.add(
+          PaymentMethodModel(
+            id: 'wallet',
+            name: 'Store Wallet',
+            code: 'wallet',
+            description: 'Customer store prepaid wallet',
+            isActive: true,
+            orderIndex: 99,
+          ),
+        );
+      }
+    } else {
+      activeMethods.removeWhere((p) =>
+          p.code.toLowerCase() == 'wallet' || p.id.toLowerCase() == 'wallet');
+    }
 
     final wide = isWide(context);
 
@@ -1559,6 +1660,11 @@ class CartSheet extends StatelessWidget {
                                                     ? method.code
                                                     : method.id) ||
                                             pos.paymentMethod == method.id,
+                                        subtitle: (method.code.toLowerCase() == 'wallet' || method.id.toLowerCase() == 'wallet')
+                                            ? (pos.selectedCustomer != null
+                                                ? '${company?.currencySymbol ?? "₹"}${pos.selectedCustomer!.walletBalance.toStringAsFixed(2)}'
+                                                : 'No Customer')
+                                            : null,
                                         color: _colorForMethod(
                                             method.code.isNotEmpty
                                                 ? method.code
@@ -1591,6 +1697,16 @@ class CartSheet extends StatelessWidget {
                                       payableAmount: pos.amountPaid,
                                       currencySymbol:
                                           company?.currencySymbol ?? '\$'),
+                                ],
+
+                                if (pos.paymentMethod == 'wallet') ...[
+                                  const SizedBox(height: 12),
+                                  _StoreWalletDetailsCard(
+                                    customer: pos.selectedCustomer,
+                                    amountToPay: pos.amountPaid,
+                                    currencySymbol:
+                                        company?.currencySymbol ?? '₹',
+                                  ),
                                 ],
                               ],
 
@@ -1784,6 +1900,7 @@ class _PaymentMethodChip extends StatelessWidget {
     required this.color,
     required this.icon,
     required this.onTap,
+    this.subtitle,
   });
 
   final PaymentMethodModel method;
@@ -1791,6 +1908,7 @@ class _PaymentMethodChip extends StatelessWidget {
   final Color color;
   final IconData icon;
   final VoidCallback onTap;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -1801,7 +1919,7 @@ class _PaymentMethodChip extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFF10B981).withValues(alpha: 0.15)
@@ -1825,18 +1943,214 @@ class _PaymentMethodChip extends StatelessWidget {
                   : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
             ),
             const SizedBox(width: 8),
-            Text(
-              method.name,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: isSelected
-                    ? const Color(0xFF34D399)
-                    : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  method.name,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected
+                        ? const Color(0xFF34D399)
+                        : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A)),
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      color: isSelected
+                          ? const Color(0xFF34D399)
+                          : const Color(0xFF10B981),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StoreWalletDetailsCard extends StatelessWidget {
+  const _StoreWalletDetailsCard({
+    required this.customer,
+    required this.amountToPay,
+    required this.currencySymbol,
+  });
+
+  final CustomerModel? customer;
+  final double amountToPay;
+  final String currencySymbol;
+
+  @override
+  Widget build(BuildContext context) {
+    if (customer == null) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF881337).withValues(alpha: 0.25),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFF43F5E).withValues(alpha: 0.5)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFF43F5E), size: 20),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Please select a registered customer to settle via Store Wallet.',
+                style: TextStyle(
+                    color: Color(0xFFFDA4AF),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold),
               ),
             ),
           ],
         ),
+      );
+    }
+
+    final balance = customer!.walletBalance;
+    final balanceAfter = balance - amountToPay;
+    final isInsufficient = balanceAfter < -0.001;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF064E3B).withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isInsufficient
+              ? const Color(0xFFF43F5E).withValues(alpha: 0.6)
+              : const Color(0xFF10B981).withValues(alpha: 0.4),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.account_balance_wallet,
+                      color: Color(0xFF10B981), size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    'Customer Store Wallet',
+                    style: TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Text(
+                'Available: $currencySymbol${balance.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: Color(0xFF34D399),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('Total Debit',
+                          style: TextStyle(
+                              color: Color(0xFF94A3B8), fontSize: 10)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '-$currencySymbol${amountToPay.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                            color: Color(0xFFF87171),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'monospace'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('Balance After',
+                          style: TextStyle(
+                              color: Color(0xFF94A3B8), fontSize: 10)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$currencySymbol${balanceAfter.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          color: isInsufficient
+                              ? const Color(0xFFF87171)
+                              : const Color(0xFF34D399),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (isInsufficient) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF881337).withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline,
+                      color: Color(0xFFF43F5E), size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Insufficient balance! Customer needs $currencySymbol${balanceAfter.abs().toStringAsFixed(2)} more.',
+                      style: const TextStyle(
+                          color: Color(0xFFFDA4AF),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

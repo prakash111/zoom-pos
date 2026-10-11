@@ -115,6 +115,7 @@ class BootstrapCache extends ChangeNotifier {
   static const _formLabelsCacheKey =
       'zoom_pos.bootstrap.form_field_customizations';
   static const _bottomNavCacheKey = 'zoom_pos.bootstrap.bottom_nav';
+  static const _loyaltyCacheKey = 'zoom_pos.bootstrap.loyalty_settings';
 
   TenantSchema? tenant;
   Map<String, ModuleSchema> modules = {};
@@ -127,6 +128,9 @@ class BootstrapCache extends ChangeNotifier {
   Map<String, dynamic> config = {};
   Map<String, dynamic> localization = {};
   BootstrapTheme theme = const BootstrapTheme();
+  LoyaltySettings loyaltySettings = const LoyaltySettings();
+
+  bool get isWalletEnabled => loyaltySettings.isWalletEnabled;
 
   String get defaultDialCode {
     return localization['default_country_code']?.toString() ??
@@ -422,6 +426,18 @@ class BootstrapCache extends ChangeNotifier {
           _logParseFailure('cached bottom_nav', error, stackTrace);
         }
       }
+
+      final loyaltyRaw = prefs.getString(_loyaltyCacheKey);
+      if (loyaltyRaw != null) {
+        try {
+          final decoded = jsonDecode(loyaltyRaw);
+          if (decoded is Map) {
+            loyaltySettings = LoyaltySettings.fromJson(_safeMap(decoded));
+          }
+        } catch (error, stackTrace) {
+          _logParseFailure('cached loyalty_settings', error, stackTrace);
+        }
+      }
     } catch (error, stackTrace) {
       _logParseFailure('bootstrap disk cache', error, stackTrace);
     } finally {
@@ -592,6 +608,19 @@ class BootstrapCache extends ChangeNotifier {
               _bottomNavCacheKey, jsonEncode(bottomNavConfig!.toJson()));
         } catch (error, stackTrace) {
           _logParseFailure('server bottom_nav', error, stackTrace);
+        }
+      }
+
+      final loyaltyPayload = response['loyalty_settings'] ??
+          (response['tenant'] is Map ? response['tenant']['loyalty_settings'] : null) ??
+          (response['config'] is Map ? response['config']['loyalty_settings'] : null);
+      if (loyaltyPayload is Map) {
+        try {
+          loyaltySettings = LoyaltySettings.fromJson(_safeMap(loyaltyPayload));
+          await prefs.setString(
+              _loyaltyCacheKey, jsonEncode(loyaltySettings.toJson()));
+        } catch (error, stackTrace) {
+          _logParseFailure('server loyalty_settings', error, stackTrace);
         }
       }
     } catch (error, stackTrace) {

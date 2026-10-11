@@ -10,6 +10,7 @@ class PaymentEntry {
   });
 
   String methodCode;
+  String get method => methodCode;
   double amount;
   double? tendered;
   double changeReturned;

@@ -586,3 +586,59 @@ bool _safeNavBool(dynamic value, {required bool fallback}) {
   if (normalized == 'false' || normalized == '0') return false;
   return fallback;
 }
+
+/// Loyalty and customer prepaid store wallet rules configured by tenant.
+class LoyaltySettings {
+  const LoyaltySettings({
+    this.isPointsEnabled = true,
+    this.spendAmountPerPoint = 100.0,
+    this.pointsAwarded = 1.0,
+    this.redemptionValuePerPoint = 1.0,
+    this.minPointsToRedeem = 10,
+    this.maxRedemptionPercentage = 50,
+    this.isWalletEnabled = true,
+  });
+
+  final bool isPointsEnabled;
+  final double spendAmountPerPoint;
+  final double pointsAwarded;
+  final double redemptionValuePerPoint;
+  final int minPointsToRedeem;
+  final int maxRedemptionPercentage;
+  final bool isWalletEnabled;
+
+  factory LoyaltySettings.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const LoyaltySettings();
+    return LoyaltySettings(
+      isPointsEnabled: json['is_points_enabled'] == null
+          ? true
+          : (json['is_points_enabled'] == true ||
+              json['is_points_enabled'] == 1 ||
+              json['is_points_enabled'] == '1'),
+      spendAmountPerPoint:
+          (json['spend_amount_per_point'] as num?)?.toDouble() ?? 100.0,
+      pointsAwarded: (json['points_awarded'] as num?)?.toDouble() ?? 1.0,
+      redemptionValuePerPoint:
+          (json['redemption_value_per_point'] as num?)?.toDouble() ?? 1.0,
+      minPointsToRedeem: (json['min_points_to_redeem'] as num?)?.toInt() ?? 10,
+      maxRedemptionPercentage:
+          (json['max_redemption_percentage'] as num?)?.toInt() ?? 50,
+      isWalletEnabled: json['is_wallet_enabled'] == null
+          ? true
+          : (json['is_wallet_enabled'] == true ||
+              json['is_wallet_enabled'] == 1 ||
+              json['is_wallet_enabled'] == '1'),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'is_points_enabled': isPointsEnabled,
+        'spend_amount_per_point': spendAmountPerPoint,
+        'points_awarded': pointsAwarded,
+        'redemption_value_per_point': redemptionValuePerPoint,
+        'min_points_to_redeem': minPointsToRedeem,
+        'max_redemption_percentage': maxRedemptionPercentage,
+        'is_wallet_enabled': isWalletEnabled,
+      };
+}
+
