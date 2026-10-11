@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../core/navigation/navigation_provider.dart';
 import '../core/sdui/sdui_icon_registry.dart';
-import 'app_changelog_sheet.dart';
 import 'dynamic_sdui_icon.dart';
 import 'tenant_logo_avatar.dart';
 

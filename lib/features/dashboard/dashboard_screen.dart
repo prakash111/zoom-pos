@@ -6,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../widgets/tenant_logo_avatar.dart';
 import '../../widgets/help_support_bottom_sheet.dart';
-import '../../widgets/app_changelog_sheet.dart';
 import '../../core/config/platform_branding_provider.dart';
 
 import '../../core/api/api_client.dart';
@@ -1762,73 +1761,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             const SizedBox(height: 6),
                             InkWell(
-                              onTap: () {
+                              onTap: () async {
                                 Navigator.of(context).pop();
-                                showAppChangelogModal(context);
+                                final uri = Uri.parse('https://saas.zoomnearby.com/page/privacy-policy');
+                                if (await canLaunchUrl(uri)) {
+                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                } else {
+                                  await launchUrl(uri);
+                                }
                               },
                               borderRadius: BorderRadius.circular(8),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
                                     vertical: 4, horizontal: 2),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Row(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Row(
+                                    children: [
+                                      Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.history_edu,
+                                          Icon(Icons.info_outline,
                                               size: 14,
                                               color: unselectedIconColor
                                                   .withValues(alpha: 0.8)),
                                           const SizedBox(width: 6),
-                                          Flexible(
-                                            child: Text(
-                                              'ZooM-POS v1.0.6',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                          Text(
+                                            'ZooM-POS v1.0.6',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: unselectedIconColor
+                                                  .withValues(alpha: 0.85),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 7, vertical: 2.5),
+                                        decoration: BoxDecoration(
+                                          color: primaryColor
+                                              .withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(
+                                            color: primaryColor
+                                                .withValues(alpha: 0.3),
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              'Privacy Policy',
                                               style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: unselectedIconColor
-                                                    .withValues(alpha: 0.85),
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                                color: primaryColor,
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 7, vertical: 2.5),
-                                      decoration: BoxDecoration(
-                                        color: primaryColor
-                                            .withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: primaryColor
-                                              .withValues(alpha: 0.3),
-                                          width: 0.8,
+                                            const SizedBox(width: 3),
+                                            Icon(Icons.arrow_forward_ios,
+                                                size: 8, color: primaryColor),
+                                          ],
                                         ),
                                       ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            'Change-log',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w800,
-                                              color: primaryColor,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 3),
-                                          Icon(Icons.arrow_forward_ios,
-                                              size: 8, color: primaryColor),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
