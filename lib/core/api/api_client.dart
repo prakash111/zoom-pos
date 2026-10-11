@@ -4,6 +4,7 @@ import '../config/app_config.dart';
 import '../storage/app_preferences.dart';
 import '../storage/secure_storage_service.dart';
 import 'api_exception.dart';
+export 'api_exception.dart';
 
 /// Thin wrapper around Dio for the `/api/v1/pos/*` sync API.
 ///

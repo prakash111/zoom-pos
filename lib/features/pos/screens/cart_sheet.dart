@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/api/api_exception.dart';
 import '../../../core/config/bootstrap_cache.dart';
 import '../../../core/models/customer_model.dart';
 import '../../../core/models/settings_models.dart';
@@ -2135,3 +2136,172 @@ class _CashTenderSectionState extends State<_CashTenderSection> {
     );
   }
 }
+
+
+class _CouponInputField extends StatefulWidget {
+  const _CouponInputField({required this.pos});
+  final PosProvider pos;
+
+  @override
+  State<_CouponInputField> createState() => _CouponInputFieldState();
+}
+
+class _CouponInputFieldState extends State<_CouponInputField> {
+  final _controller = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _validateAndApplyCoupon() async {
+    final code = _controller.text.trim();
+    if (code.isEmpty) return;
+
+    setState(() => _isLoading = true);
+    try {
+      ApiClient? client;
+      try {
+        client = context.read<ApiClient>();
+      } catch (_) {}
+
+      if (client == null) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to connect to server.')),
+        );
+        return;
+      }
+
+      final res = await client.postAbsolute(
+        '/api/v1/storefront/coupons/validate',
+        data: {
+          'code': code,
+          'subtotal': widget.pos.subtotal,
+          if (widget.pos.selectedCustomer?.id != null)
+            'customer_id': widget.pos.selectedCustomer!.id,
+          if (widget.pos.selectedCustomer?.phone != null)
+            'phone': widget.pos.selectedCustomer!.phone,
+          if (widget.pos.selectedCustomer?.email != null)
+            'email': widget.pos.selectedCustomer!.email,
+        },
+      );
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (res['valid'] == true || res['success'] == true) {
+        final discountAmt = (res['discount_amount'] as num?)?.toDouble() ?? 0.0;
+        final couponId = res['id'] is int
+            ? res['id'] as int
+            : int.tryParse(res['id']?.toString() ?? '');
+        widget.pos.applyCoupon(
+          code: res['code']?.toString() ?? code.toUpperCase(),
+          discountAmount: discountAmt,
+          couponId: couponId,
+        );
+        _controller.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Coupon applied! -₹${discountAmt.toStringAsFixed(2)} off'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res['message']?.toString() ?? 'Invalid coupon code.'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to validate coupon: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF1E293B).withValues(alpha: 0.6)
+            : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : Colors.grey.shade300,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: 'Enter Promo / Coupon Code',
+                hintStyle: TextStyle(
+                  fontSize: 12,
+                  color:
+                      isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500,
+                ),
+                prefixIcon: const Icon(Icons.local_offer_outlined, size: 18),
+                border: InputBorder.none,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              ),
+              onSubmitted: (_) => _validateAndApplyCoupon(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: _isLoading ? null : _validateAndApplyCoupon,
+            child: _isLoading
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text('Apply',
+                    style:
+                        TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

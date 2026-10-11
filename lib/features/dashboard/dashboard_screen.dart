@@ -1339,50 +1339,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   selected: isSelected,
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (tile.isExternalUrl)
-                        Icon(Icons.open_in_new,
-                            size: 15,
-                            color: unselectedIconColor.withValues(alpha: 0.7))
-                      else if (tile.badge != null && tile.badge!.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDC2626),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            tile.badge!,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      if (isSelected) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: selectedItemColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color:
-                                    selectedItemColor.withValues(alpha: 0.45),
-                                blurRadius: 4,
-                                spreadRadius: 1,
+                  trailing: isSelected
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (tile.isExternalUrl)
+                              Icon(Icons.open_in_new,
+                                  size: 15,
+                                  color: unselectedIconColor.withValues(alpha: 0.7))
+                            else if (tile.badge != null && tile.badge!.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDC2626),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  tile.badge!,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold),
+                                ),
                               ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                            const SizedBox(width: 6),
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: selectedItemColor,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color:
+                                        selectedItemColor.withValues(alpha: 0.45),
+                                    blurRadius: 4,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      : (tile.isExternalUrl
+                          ? Icon(Icons.open_in_new,
+                              size: 15,
+                              color: unselectedIconColor.withValues(alpha: 0.7))
+                          : (tile.badge != null && tile.badge!.isNotEmpty
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDC2626),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    tile.badge!,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                )
+                              : null)),
                   onTap: () => openTile(tile),
                 ),
               );
