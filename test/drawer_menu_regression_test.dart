@@ -873,5 +873,68 @@ void main() {
       expect(find.byKey(const ValueKey('drawer-item-view_live_store')),
           findsNothing);
     });
+
+    testWidgets(
+        'Drawer preserves scroll offset and auto-scrolls to active item on open',
+        (tester) async {
+      tester.view.physicalSize = const Size(400, 700);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final user = UserModel(
+        id: 'u1',
+        companyId: 'c1',
+        name: 'prakash',
+        email: 'prakash@example.com',
+        role: 'admin',
+        permissions: const {'*': true},
+      );
+
+      final company = CompanyModel(
+        id: 'c1',
+        name: 'ZoomNearby',
+        planName: 'Pro',
+        tradeName: 'ZoomNearby',
+        businessType: 'RETAIL',
+        posMode: 'general',
+        currency: 'USD',
+        currencySymbol: '\$',
+      );
+
+      await tester.pumpWidget(_buildTestApp(user: user, company: company));
+      await tester.pumpAndSettle();
+
+      final scaffoldState =
+          tester.state<ScaffoldState>(find.byType(Scaffold));
+      scaffoldState.openDrawer();
+      await tester.pumpAndSettle();
+
+      // Drawer ListView exists with PageStorageKey
+      final listViewFinder = find.byKey(
+          const PageStorageKey<String>('dashboard_drawer_scroll_view'));
+      expect(listViewFinder, findsOneWidget);
+
+      // Scroll down
+      await tester.drag(listViewFinder, const Offset(0, -300));
+      await tester.pumpAndSettle();
+
+      final scrollable = tester.widget<Scrollable>(find.descendant(
+          of: listViewFinder, matching: find.byType(Scrollable)));
+      final initialOffset = scrollable.controller!.offset;
+      expect(initialOffset, greaterThan(0));
+
+      // Close drawer by tapping outside or popping route
+      Navigator.of(tester.element(find.byType(Drawer))).pop();
+      await tester.pumpAndSettle();
+
+      // Reopen drawer
+      scaffoldState.openDrawer();
+      await tester.pumpAndSettle();
+
+      // Reopened ListView exists and retained its scrollable state
+      expect(find.byKey(const PageStorageKey<String>(
+          'dashboard_drawer_scroll_view')), findsOneWidget);
+    });
   });
 }

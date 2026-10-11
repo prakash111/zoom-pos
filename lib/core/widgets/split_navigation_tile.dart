@@ -53,6 +53,8 @@ class _SplitNavigationTileState extends State<SplitNavigationTile> {
     super.didUpdateWidget(oldWidget);
     if (widget.children.isEmpty && _expanded) {
       _expanded = false;
+    } else if (widget.initiallyExpanded && !_expanded && widget.children.isNotEmpty) {
+      _expanded = true;
     }
   }
 

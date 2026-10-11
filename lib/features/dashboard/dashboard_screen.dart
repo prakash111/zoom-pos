@@ -533,6 +533,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _dockIndex = 0;
   String? _selectedTileKey = 'home';
 
+  final PageStorageBucket _drawerStorageBucket = PageStorageBucket();
+  final GlobalKey _activeDrawerItemKey = GlobalKey();
+  ScrollController? _drawerScrollController;
+  double _lastDrawerScrollOffset = 0.0;
+
+  void _onDrawerScroll() {
+    if (_drawerScrollController != null && _drawerScrollController!.hasClients) {
+      _lastDrawerScrollOffset = _drawerScrollController!.offset;
+    }
+  }
+
+  ScrollController _getOrCreateDrawerScrollController() {
+    if (_drawerScrollController == null || !_drawerScrollController!.hasClients) {
+      _drawerScrollController?.removeListener(_onDrawerScroll);
+      _drawerScrollController?.dispose();
+      _drawerScrollController = ScrollController(
+        initialScrollOffset: _lastDrawerScrollOffset,
+      );
+      _drawerScrollController!.addListener(_onDrawerScroll);
+    }
+    return _drawerScrollController!;
+  }
+
+  void _scrollToActiveDrawerItem({bool immediate = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final activeContext = _activeDrawerItemKey.currentContext;
+      if (activeContext != null && activeContext.mounted) {
+        Scrollable.ensureVisible(
+          activeContext,
+          alignment: 0.5,
+          duration:
+              immediate ? Duration.zero : const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
   Future<AnalyticsModel> _loadAnalytics() =>
       _analyticsRepository.fetchAnalytics(
         range: _range,
@@ -677,6 +716,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    _drawerScrollController?.removeListener(_onDrawerScroll);
+    _drawerScrollController?.dispose();
     _storeProvider?.removeListener(_storeChanged);
     super.dispose();
   }
@@ -1076,9 +1117,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             (_selectedTileKey == null && _dockIndex == 0);
 
         final children = <Widget>[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            child: ListTile(
+          KeyedSubtree(
+            key: isHomeSelected ? _activeDrawerItemKey : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              child: ListTile(
               key: const ValueKey('drawer-item-home'),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -1150,7 +1193,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               },
             ),
           ),
-        ];
+        ),
+      ];
         final navSections = _sectionsFor(company, user);
         if (navSections.isEmpty) {
           children.add(
@@ -1254,10 +1298,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 (_selectedTileKey == null && _dockIndex == index);
 
             if (nested.isEmpty) {
-              return Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                child: ListTile(
+              return KeyedSubtree(
+                key: isSelected ? _activeDrawerItemKey : null,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  child: ListTile(
                   key: ValueKey('drawer-item-${tile.key}'),
                   contentPadding: padding,
                   dense: depth > 0,
@@ -1405,17 +1451,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               : null)),
                   onTap: () => openTile(tile),
                 ),
-              );
-            }
-
-            return Theme(
-              data: Theme.of(context).copyWith(
-                dividerColor: Colors.transparent,
               ),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                child: SplitNavigationTile(
+            );
+          }
+
+            bool hasSelectedChildDescendant(_FeatureTile parent) {
+              final direct = childrenByParent[parent.key] ?? const <_FeatureTile>[];
+              for (final c in direct) {
+                final childSelected = _selectedTileKey == c.key ||
+                    (_selectedTileKey == null && _dockIndex == indexByKey[c.key]);
+                if (childSelected || hasSelectedChildDescendant(c)) {
+                  return true;
+                }
+              }
+              return false;
+            }
+            final hasSelectedChild = hasSelectedChildDescendant(tile);
+
+            return KeyedSubtree(
+              key: isSelected ? _activeDrawerItemKey : null,
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  dividerColor: Colors.transparent,
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  child: SplitNavigationTile(
                   key: PageStorageKey<String>(
                     'drawer-branch-${section.key}-${tile.key}',
                   ),
@@ -1487,7 +1549,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                     ],
                   ),
-                  initiallyExpanded: false,
+                  initiallyExpanded: hasSelectedChild,
                   title: Text(
                     bootstrap.resolveNavigationLabel(
                         tile.key, tile.titleOf(l10n)),
@@ -1511,8 +1573,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onTap: null,
                 ),
               ),
-            );
-          }
+            ),
+          );
+        }
 
           children.add(Padding(
             key: ValueKey('drawer-section-divider-${section.key}'),
@@ -1613,6 +1676,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final effectiveSupportPhone =
             supportPhone.isNotEmpty ? supportPhone : '+918535075196';
 
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _scrollToActiveDrawerItem();
+          }
+        });
+
         return Drawer(
           backgroundColor:
               drawerGradient != null ? Colors.transparent : drawerBgColor,
@@ -1630,9 +1699,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     headerWidget,
                     Expanded(
-                      child: ListView(
-                        padding: EdgeInsets.zero,
-                        children: children,
+                      child: PageStorage(
+                        bucket: _drawerStorageBucket,
+                        child: ListView(
+                          key: const PageStorageKey<String>(
+                              'dashboard_drawer_scroll_view'),
+                          controller: _getOrCreateDrawerScrollController(),
+                          padding: EdgeInsets.zero,
+                          children: children,
+                        ),
                       ),
                     ),
                     SafeArea(
@@ -2689,6 +2764,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
+      onDrawerChanged: (isOpened) {
+        if (isOpened) {
+          _scrollToActiveDrawerItem();
+        }
+      },
+      onEndDrawerChanged: (isOpened) {
+        if (isOpened) {
+          _scrollToActiveDrawerItem();
+        }
+      },
       appBar: AppBar(
         leadingWidth: isDesktopRail ? railWidth : null,
         automaticallyImplyLeading: !isDesktopRail,

@@ -479,6 +479,7 @@ class AppDrawer extends StatelessWidget {
             ),
             Expanded(
               child: ListView(
+                key: const PageStorageKey<String>('app_drawer_scroll_view'),
                 padding: EdgeInsets.zero,
                 children: [
                   if (sections != null)
