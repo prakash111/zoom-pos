@@ -1702,10 +1702,13 @@ class CartSheet extends StatelessWidget {
                                 if (pos.paymentMethod == 'wallet') ...[
                                   const SizedBox(height: 12),
                                   _StoreWalletDetailsCard(
+                                    pos: pos,
                                     customer: pos.selectedCustomer,
                                     amountToPay: pos.amountPaid,
                                     currencySymbol:
                                         company?.currencySymbol ?? '₹',
+                                    activeMethods: activeMethods,
+                                    primaryColor: primaryColor,
                                   ),
                                 ],
                               ],
@@ -1809,6 +1812,30 @@ class CartSheet extends StatelessWidget {
                                         ),
                                       ],
                                     ),
+                                    if (pos.isPartialWallet) ...[
+                                      const Divider(height: 12),
+                                      _TotalsRow(
+                                        label: 'Wallet Debit',
+                                        value:
+                                            '-${formatter.format(pos.walletDeductAmount)}',
+                                        valueColor: const Color(0xFF10B981),
+                                      ),
+                                      _TotalsRow(
+                                        label:
+                                            'Remaining (${pos.secondaryPaymentMethod.toUpperCase()})',
+                                        value: formatter
+                                            .format(pos.walletRemainingAmount),
+                                        valueColor: primaryColor,
+                                      ),
+                                      if (pos.secondaryPaymentMethod == 'cash' &&
+                                          pos.secondaryChangeDue > 0)
+                                        _TotalsRow(
+                                          label: 'Change Due',
+                                          value: formatter.format(
+                                              pos.secondaryChangeDue),
+                                          valueColor: const Color(0xFF10B981),
+                                        ),
+                                    ],
                                     if (pos.dueAmount > 0.001) ...[
                                       const Divider(height: 12),
                                       _TotalsRow(
@@ -1838,7 +1865,14 @@ class CartSheet extends StatelessWidget {
                                 ),
                                 onPressed: pos.cartIsEmpty ||
                                         pos.isCheckingOut ||
-                                        pos.requiresCustomerForDue
+                                        pos.requiresCustomerForDue ||
+                                        (pos.paymentMethod == 'wallet' &&
+                                            (pos.selectedCustomer == null ||
+                                                pos.selectedCustomer!.walletBalance <= 0.001)) ||
+                                        (pos.isPartialWallet &&
+                                            pos.secondaryPaymentMethod == 'cash' &&
+                                            pos.secondaryCashTendered > 0 &&
+                                            pos.secondaryCashTendered < pos.walletRemainingAmount - 0.001)
                                     ? null
                                     : () => _previewThenCheckout(context),
                                 child: pos.isCheckingOut
@@ -1982,17 +2016,26 @@ class _PaymentMethodChip extends StatelessWidget {
 
 class _StoreWalletDetailsCard extends StatelessWidget {
   const _StoreWalletDetailsCard({
+    required this.pos,
     required this.customer,
     required this.amountToPay,
     required this.currencySymbol,
+    required this.activeMethods,
+    required this.primaryColor,
   });
 
+  final PosProvider pos;
   final CustomerModel? customer;
   final double amountToPay;
   final String currencySymbol;
+  final List<PaymentMethodModel> activeMethods;
+  final Color primaryColor;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     if (customer == null) {
       return Container(
         padding: const EdgeInsets.all(12),
@@ -2020,18 +2063,31 @@ class _StoreWalletDetailsCard extends StatelessWidget {
     }
 
     final balance = customer!.walletBalance;
-    final balanceAfter = balance - amountToPay;
-    final isInsufficient = balanceAfter < -0.001;
+    final isZero = balance <= 0.001;
+    final isPartial = pos.isPartialWallet;
+    final isSufficient = balance >= amountToPay - 0.001;
+
+    // Filter available secondary payment methods (excluding wallet)
+    final secondaryOptions = activeMethods.where((m) {
+      final code = (m.code.isNotEmpty ? m.code : m.id).toLowerCase();
+      return code != 'wallet';
+    }).toList();
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF064E3B).withValues(alpha: 0.2),
+        color: isZero
+            ? const Color(0xFF881337).withValues(alpha: 0.15)
+            : (isPartial
+                ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFBEB))
+                : const Color(0xFF064E3B).withValues(alpha: 0.2)),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isInsufficient
-              ? const Color(0xFFF43F5E).withValues(alpha: 0.6)
-              : const Color(0xFF10B981).withValues(alpha: 0.4),
+          color: isZero
+              ? const Color(0xFFF43F5E).withValues(alpha: 0.5)
+              : (isPartial
+                  ? const Color(0xFFF59E0B).withValues(alpha: 0.6)
+                  : const Color(0xFF10B981).withValues(alpha: 0.4)),
         ),
       ),
       child: Column(
@@ -2040,15 +2096,24 @@ class _StoreWalletDetailsCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.account_balance_wallet,
-                      color: Color(0xFF10B981), size: 18),
-                  SizedBox(width: 6),
+                  Icon(
+                    Icons.account_balance_wallet,
+                    color: isZero
+                        ? const Color(0xFFF43F5E)
+                        : (isPartial ? const Color(0xFFF59E0B) : const Color(0xFF10B981)),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 6),
                   Text(
                     'Customer Store Wallet',
                     style: TextStyle(
-                        color: Color(0xFF10B981),
+                        color: isZero
+                            ? const Color(0xFFFDA4AF)
+                            : (isPartial
+                                ? (isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309))
+                                : const Color(0xFF10B981)),
                         fontSize: 13,
                         fontWeight: FontWeight.bold),
                   ),
@@ -2056,8 +2121,12 @@ class _StoreWalletDetailsCard extends StatelessWidget {
               ),
               Text(
                 'Available: $currencySymbol${balance.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  color: Color(0xFF34D399),
+                style: TextStyle(
+                  color: isZero
+                      ? const Color(0xFFFDA4AF)
+                      : (isPartial
+                          ? (isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309))
+                          : const Color(0xFF34D399)),
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'monospace',
@@ -2072,19 +2141,29 @@ class _StoreWalletDetailsCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
+                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
                   ),
                   child: Column(
                     children: [
-                      const Text('Total Debit',
+                      Text('Wallet Debit',
                           style: TextStyle(
-                              color: Color(0xFF94A3B8), fontSize: 10)),
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              fontSize: 10)),
                       const SizedBox(height: 2),
                       Text(
-                        '-$currencySymbol${amountToPay.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                            color: Color(0xFFF87171),
+                        isZero
+                            ? '$currencySymbol 0.00'
+                            : (isPartial
+                                ? '-$currencySymbol${pos.walletDeductAmount.toStringAsFixed(2)}'
+                                : '-$currencySymbol${amountToPay.toStringAsFixed(2)}'),
+                        style: TextStyle(
+                            color: isZero
+                                ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
+                                : const Color(0xFF10B981),
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'monospace'),
@@ -2098,21 +2177,31 @@ class _StoreWalletDetailsCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
+                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
                   ),
                   child: Column(
                     children: [
-                      const Text('Balance After',
+                      Text('Wallet Balance After',
                           style: TextStyle(
-                              color: Color(0xFF94A3B8), fontSize: 10)),
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              fontSize: 10)),
                       const SizedBox(height: 2),
                       Text(
-                        '$currencySymbol${balanceAfter.toStringAsFixed(2)}',
+                        isZero
+                            ? '$currencySymbol${balance.toStringAsFixed(2)}'
+                            : (isPartial
+                                ? '$currencySymbol 0.00'
+                                : '$currencySymbol${(balance - amountToPay).toStringAsFixed(2)}'),
                         style: TextStyle(
-                          color: isInsufficient
+                          color: isZero
                               ? const Color(0xFFF87171)
-                              : const Color(0xFF34D399),
+                              : (isPartial
+                                  ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
+                                  : const Color(0xFF34D399)),
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                           fontFamily: 'monospace',
@@ -2124,7 +2213,7 @@ class _StoreWalletDetailsCard extends StatelessWidget {
               ),
             ],
           ),
-          if (isInsufficient) ...[
+          if (isZero) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(8),
@@ -2132,16 +2221,132 @@ class _StoreWalletDetailsCard extends StatelessWidget {
                 color: const Color(0xFF881337).withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
+              child: const Row(
                 children: [
-                  const Icon(Icons.error_outline,
+                  Icon(Icons.error_outline,
                       color: Color(0xFFF43F5E), size: 16),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Insufficient balance! Customer needs $currencySymbol${balanceAfter.abs().toStringAsFixed(2)} more.',
-                      style: const TextStyle(
+                      'Customer has zero wallet balance. Please select another payment method.',
+                      style: TextStyle(
                           color: Color(0xFFFDA4AF),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (isPartial) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFFFEF3C7).withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.call_split,
+                              color: Color(0xFFF59E0B), size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Pay Remaining Balance Via',
+                            style: TextStyle(
+                              color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Text(
+                          'Due: $currencySymbol${pos.walletRemainingAmount.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Deducting full $currencySymbol${pos.walletDeductAmount.toStringAsFixed(2)} from wallet. Select method for the remaining $currencySymbol${pos.walletRemainingAmount.toStringAsFixed(2)}:',
+                    style: TextStyle(
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final method in secondaryOptions)
+                        _SecondaryPaymentMethodChip(
+                          method: method,
+                          isSelected: pos.secondaryPaymentMethod ==
+                              (method.code.isNotEmpty ? method.code : method.id),
+                          onTap: () {
+                            pos.setSecondaryPaymentMethod(
+                                method.code.isNotEmpty ? method.code : method.id);
+                          },
+                        ),
+                    ],
+                  ),
+                  if (pos.secondaryPaymentMethod == 'cash') ...[
+                    const SizedBox(height: 10),
+                    _SecondaryCashTenderInput(
+                      payableAmount: pos.walletRemainingAmount,
+                      currencySymbol: currencySymbol,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ] else if (isSufficient) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF064E3B).withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle_outline,
+                      color: Color(0xFF34D399), size: 16),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Wallet balance is sufficient. Amount will be debited automatically on order completion.',
+                      style: TextStyle(
+                          color: Color(0xFF6EE7B7),
                           fontSize: 11,
                           fontWeight: FontWeight.bold),
                     ),
@@ -2155,6 +2360,239 @@ class _StoreWalletDetailsCard extends StatelessWidget {
     );
   }
 }
+
+class _SecondaryPaymentMethodChip extends StatelessWidget {
+  const _SecondaryPaymentMethodChip({
+    required this.method,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final PaymentMethodModel method;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  IconData _iconFor(String code) {
+    final lower = code.toLowerCase();
+    if (lower.contains('cash')) return Icons.payments_outlined;
+    if (lower.contains('card')) return Icons.credit_card_outlined;
+    if (lower.contains('bank') || lower.contains('transfer')) return Icons.account_balance_outlined;
+    if (lower.contains('upi')) return Icons.qr_code_2_outlined;
+    return Icons.payment_outlined;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFF59E0B).withValues(alpha: 0.2)
+              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFFF59E0B)
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _iconFor(method.code.isNotEmpty ? method.code : method.id),
+              size: 15,
+              color: isSelected
+                  ? const Color(0xFFF59E0B)
+                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              method.name,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isSelected
+                    ? (isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309))
+                    : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SecondaryCashTenderInput extends StatefulWidget {
+  const _SecondaryCashTenderInput({
+    required this.payableAmount,
+    required this.currencySymbol,
+  });
+
+  final double payableAmount;
+  final String currencySymbol;
+
+  @override
+  State<_SecondaryCashTenderInput> createState() => _SecondaryCashTenderInputState();
+}
+
+class _SecondaryCashTenderInputState extends State<_SecondaryCashTenderInput> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final pos = context.read<PosProvider>();
+    _controller = TextEditingController(
+      text: pos.effectiveSecondaryCashTendered > 0
+          ? pos.effectiveSecondaryCashTendered.toStringAsFixed(2)
+          : widget.payableAmount.toStringAsFixed(2),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _SecondaryCashTenderInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.payableAmount != widget.payableAmount) {
+      final pos = context.read<PosProvider>();
+      if (pos.secondaryCashTendered == 0) {
+        _controller.text = widget.payableAmount.toStringAsFixed(2);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  List<double> _presetAmounts(double total) {
+    if (total <= 0) return const [0];
+    final result = <double>{double.parse(total.toStringAsFixed(2))};
+    const steps = [1.0, 5.0, 10.0, 50.0, 100.0, 500.0];
+    for (final step in steps) {
+      final rounded = (total / step).ceil() * step;
+      if (rounded > total) {
+        result.add(rounded);
+      }
+    }
+    final sorted = result.toList()..sort();
+    return sorted.take(5).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pos = context.watch<PosProvider>();
+    final presets = _presetAmounts(widget.payableAmount);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Cash Tendered for Remaining',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
+              ),
+            ),
+            if (pos.secondaryChangeDue > 0)
+              Text(
+                'Change: ${widget.currencySymbol}${pos.secondaryChangeDue.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF34D399),
+                  fontFamily: 'monospace',
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        TextField(
+          controller: _controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: TextStyle(
+            fontSize: 13,
+            color: isDark ? const Color(0xFFF8FAFC) : null,
+          ),
+          decoration: InputDecoration(
+            prefixText: widget.currencySymbol,
+            prefixStyle: TextStyle(
+              color: isDark ? const Color(0xFF94A3B8) : null,
+              fontWeight: FontWeight.w600,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFF59E0B), width: 1.5),
+            ),
+            filled: isDark,
+            fillColor: isDark ? const Color(0xFF1E293B) : null,
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          ),
+          onChanged: (val) => pos.setSecondaryCashTendered(double.tryParse(val) ?? 0),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final preset in presets)
+              ActionChip(
+                backgroundColor: isDark ? const Color(0xFF1E293B) : null,
+                side: BorderSide(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                labelStyle: TextStyle(
+                  color: isDark ? const Color(0xFFF8FAFC) : null,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                ),
+                label: Text(
+                  preset == presets.first
+                      ? 'Exact'
+                      : '${widget.currencySymbol}${preset.toStringAsFixed(0)}',
+                ),
+                onPressed: () {
+                  _controller.text = preset.toStringAsFixed(2);
+                  pos.setSecondaryCashTendered(preset);
+                },
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 
 class _TotalsRow extends StatelessWidget {
   const _TotalsRow({

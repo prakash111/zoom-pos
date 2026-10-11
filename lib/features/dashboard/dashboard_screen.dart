@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../widgets/tenant_logo_avatar.dart';
 import '../../widgets/help_support_bottom_sheet.dart';
+import '../../widgets/app_changelog_sheet.dart';
 import '../../core/config/platform_branding_provider.dart';
 
 import '../../core/api/api_client.dart';
@@ -1722,38 +1723,111 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ),
                         ),
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981)
-                                  .withValues(alpha: 0.15),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981)
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.support_agent,
+                                    color: Color(0xFF10B981), size: 18),
+                              ),
+                              title: const Text(
+                                'Help & Support',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              subtitle: Text(
+                                effectiveSupportPhone,
+                                style: TextStyle(
+                                  color: unselectedIconColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              trailing:
+                                  const Icon(Icons.chevron_right, size: 16),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                              onTap: () => _launchHelpSupport(
+                                  context, effectiveSupportPhone),
+                            ),
+                            const SizedBox(height: 6),
+                            InkWell(
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                showAppChangelogModal(context);
+                              },
                               borderRadius: BorderRadius.circular(8),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 4, horizontal: 2),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.history_edu,
+                                            size: 14,
+                                            color: unselectedIconColor
+                                                .withValues(alpha: 0.8)),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'ZooM-POS v1.0.6',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: unselectedIconColor
+                                                .withValues(alpha: 0.85),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 7, vertical: 2.5),
+                                      decoration: BoxDecoration(
+                                        color: primaryColor
+                                            .withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: primaryColor
+                                              .withValues(alpha: 0.3),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Change-log',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w800,
+                                              color: primaryColor,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Icon(Icons.arrow_forward_ios,
+                                              size: 8, color: primaryColor),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                            child: const Icon(Icons.support_agent,
-                                color: Color(0xFF10B981), size: 18),
-                          ),
-                          title: const Text(
-                            'Help & Support',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
-                          ),
-                          subtitle: Text(
-                            effectiveSupportPhone,
-                            style: TextStyle(
-                              color: unselectedIconColor,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          trailing: const Icon(Icons.chevron_right, size: 16),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          onTap: () => _launchHelpSupport(
-                              context, effectiveSupportPhone),
+                          ],
                         ),
                       ),
                     ),

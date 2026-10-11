@@ -215,6 +215,61 @@ class PosProvider extends ChangeNotifier {
   DateTime? dueDate;
   DateTime? dueReminderAt;
 
+  // --- Partial wallet settlement & secondary payment method ---
+  String secondaryPaymentMethod = 'cash';
+  double secondaryCashTendered = 0.0;
+  bool _secondaryCashTenderedManuallySet = false;
+
+  bool get isPartialWallet {
+    if (paymentMethod != 'wallet' || isSplitPayment) return false;
+    if (selectedCustomer == null) return false;
+    final bal = selectedCustomer!.walletBalance;
+    return bal > 0.001 && bal < grandTotal - 0.001;
+  }
+
+  double get walletDeductAmount {
+    if (selectedCustomer == null) return 0.0;
+    final bal = selectedCustomer!.walletBalance;
+    if (isPartialWallet) {
+      return bal.clamp(0.0, grandTotal);
+    }
+    if (paymentMethod == 'wallet' && !isSplitPayment) {
+      return grandTotal.clamp(0.0, bal);
+    }
+    return 0.0;
+  }
+
+  double get walletRemainingAmount {
+    if (!isPartialWallet) return 0.0;
+    return (grandTotal - walletDeductAmount).clamp(0.0, double.infinity);
+  }
+
+  double get effectiveSecondaryCashTendered =>
+      _secondaryCashTenderedManuallySet ? secondaryCashTendered : walletRemainingAmount;
+
+  double get secondaryChangeDue =>
+      (effectiveSecondaryCashTendered - walletRemainingAmount).clamp(0.0, double.infinity);
+
+  void setSecondaryPaymentMethod(String method) {
+    secondaryPaymentMethod = method;
+    _secondaryCashTenderedManuallySet = false;
+    secondaryCashTendered = 0.0;
+    notifyListeners();
+  }
+
+  void setSecondaryCashTendered(double amount) {
+    secondaryCashTendered = amount;
+    _secondaryCashTenderedManuallySet = true;
+    notifyListeners();
+  }
+
+  void resetSecondaryPayment() {
+    secondaryPaymentMethod = 'cash';
+    secondaryCashTendered = 0.0;
+    _secondaryCashTenderedManuallySet = false;
+    notifyListeners();
+  }
+
   DateTime get effectiveDueDate =>
       dueDate ?? DateTime.now().add(const Duration(days: 15));
   DateTime get effectiveDueReminderAt {
@@ -714,6 +769,11 @@ class PosProvider extends ChangeNotifier {
 
   void setPaymentMethod(String method) {
     paymentMethod = method;
+    if (method == 'wallet') {
+      secondaryPaymentMethod = 'cash';
+      secondaryCashTendered = 0.0;
+      _secondaryCashTenderedManuallySet = false;
+    }
     notifyListeners();
   }
 
@@ -796,6 +856,9 @@ class PosProvider extends ChangeNotifier {
     _manualAmountPaid = null;
     _cashTenderedManuallySet = false;
     cashTendered = 0;
+    secondaryPaymentMethod = 'cash';
+    secondaryCashTendered = 0.0;
+    _secondaryCashTenderedManuallySet = false;
     dueDate = null;
     dueReminderAt = null;
     if (paymentMethods.isNotEmpty) {
@@ -829,7 +892,9 @@ class PosProvider extends ChangeNotifier {
             .where((p) => p.method == 'wallet' || p.methodCode == 'wallet')
             .fold(0.0, (sum, p) => sum + p.amount)
         : 0.0;
-    final totalWalletTender = isWalletSingle ? amountPaid : walletSplitAmount;
+    final totalWalletTender = isWalletSingle
+        ? (isPartialWallet ? walletDeductAmount : amountPaid)
+        : walletSplitAmount;
 
     if (totalWalletTender > 0.001) {
       if (!BootstrapCache.instance.isWalletEnabled) {
@@ -866,10 +931,23 @@ class PosProvider extends ChangeNotifier {
     final soldCustomerPhone = selectedCustomer?.phone;
     final soldCustomerEmail = selectedCustomer?.email;
     final soldNotes = orderNotes;
-    final soldPaidAmount = amountPaid;
-    final soldDueAmount = dueAmount;
-    final soldChangeDue =
-        paymentMethod == 'cash' && !isSplitPayment ? changeDue : 0.0;
+
+    final isPartialWalletSale = isPartialWallet;
+    final partialWalletDeduct = walletDeductAmount;
+    final partialWalletRemaining = walletRemainingAmount;
+    final partialSecondaryMethod = secondaryPaymentMethod;
+    final partialSecondaryTendered = effectiveSecondaryCashTendered;
+    final partialSecondaryChange = secondaryChangeDue;
+
+    final soldPaidAmount = isPartialWalletSale ? grandTotal : amountPaid;
+    final soldDueAmount = isPartialWalletSale ? 0.0 : dueAmount;
+    final soldChangeDue = isSplitPayment
+        ? 0.0
+        : (paymentMethod == 'cash'
+            ? changeDue
+            : (isPartialWalletSale && partialSecondaryMethod == 'cash'
+                ? partialSecondaryChange
+                : 0.0));
     final taxName = soldTax > 0 ? (taxLabel ?? 'Tax') : null;
     final itemsPayload = soldItems
         .map((item) => {
@@ -885,10 +963,28 @@ class PosProvider extends ChangeNotifier {
     // Only sent when it changes what the backend would otherwise assume
     // (full payment, non-cash): a split breakdown, an explicit partial/zero
     // amount, or the cash tendered/change for a simple cash sale.
-    final paymentsPayload =
-        isSplitPayment ? payments.map((p) => p.toJson()).toList() : null;
+    final paymentsPayload = isSplitPayment
+        ? payments.map((p) => p.toJson()).toList()
+        : (isPartialWalletSale
+            ? [
+                PaymentEntry(
+                  methodCode: 'wallet',
+                  amount: partialWalletDeduct,
+                ).toJson(),
+                PaymentEntry(
+                  methodCode: partialSecondaryMethod,
+                  amount: partialWalletRemaining,
+                  tendered: partialSecondaryMethod == 'cash'
+                      ? partialSecondaryTendered
+                      : null,
+                  changeReturned: partialSecondaryMethod == 'cash'
+                      ? partialSecondaryChange
+                      : 0.0,
+                ).toJson(),
+              ]
+            : null);
     final needsPaidAmountOverride =
-        !isSplitPayment && soldPaidAmount < soldTotal - 0.001;
+        !isSplitPayment && !isPartialWalletSale && soldPaidAmount < soldTotal - 0.001;
     final soldDueDate = soldDueAmount > 0 ? effectiveDueDate : null;
     final soldDueReminderAt = soldDueAmount > 0 ? effectiveDueReminderAt : null;
 
@@ -899,7 +995,7 @@ class PosProvider extends ChangeNotifier {
         discount: soldDiscount,
         taxAmount: soldTax,
         taxName: taxName,
-        paymentMethod: paymentMethod,
+        paymentMethod: isPartialWalletSale ? 'split' : paymentMethod,
         customerId: selectedCustomer?.id,
         customerName: soldCustomerName,
         items: itemsPayload,
@@ -908,7 +1004,9 @@ class PosProvider extends ChangeNotifier {
         paidAmount: needsPaidAmountOverride ? soldPaidAmount : null,
         tendered: paymentMethod == 'cash' && !isSplitPayment
             ? effectiveCashTendered
-            : null,
+            : (isPartialWalletSale && partialSecondaryMethod == 'cash'
+                ? partialSecondaryTendered
+                : null),
         changeReturned: soldChangeDue,
         dueDate: soldDueDate,
         dueReminderAt: soldDueReminderAt,
@@ -958,7 +1056,7 @@ class PosProvider extends ChangeNotifier {
         discount: soldDiscount,
         taxAmount: soldTax,
         taxName: taxName,
-        paymentMethod: paymentMethod,
+        paymentMethod: isPartialWalletSale ? 'split' : paymentMethod,
         customerId: selectedCustomer?.id,
         customerName: soldCustomerName,
         items: itemsPayload,
@@ -966,7 +1064,9 @@ class PosProvider extends ChangeNotifier {
         paidAmount: needsPaidAmountOverride ? soldPaidAmount : null,
         tendered: paymentMethod == 'cash' && !isSplitPayment
             ? effectiveCashTendered
-            : null,
+            : (isPartialWalletSale && partialSecondaryMethod == 'cash'
+                ? partialSecondaryTendered
+                : null),
         changeReturned: soldChangeDue,
         dueDate: soldDueDate,
         dueReminderAt: soldDueReminderAt,
