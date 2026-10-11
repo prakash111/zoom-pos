@@ -1663,7 +1663,7 @@ class CartSheet extends StatelessWidget {
                                         subtitle: (method.code.toLowerCase() == 'wallet' || method.id.toLowerCase() == 'wallet')
                                             ? (pos.selectedCustomer != null
                                                 ? '${company?.currencySymbol ?? "₹"}${pos.selectedCustomer!.walletBalance.toStringAsFixed(2)}'
-                                                : 'No Customer')
+                                                : null)
                                             : null,
                                         color: _colorForMethod(
                                             method.code.isNotEmpty
