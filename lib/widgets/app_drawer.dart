@@ -518,7 +518,7 @@ class AppDrawer extends StatelessWidget {
                 ],
               ),
             ),
-            footer ?? _buildDefaultFooter(context, activeColor),
+            if (footer != null) footer!,
           ],
         ),
       ),
