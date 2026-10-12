@@ -893,8 +893,6 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
               order: index,
               customTitle: _sections[index].customTitle.trim().isNotEmpty &&
                       _sections[index].customTitle.trim().toLowerCase() !=
-                          _sections[index].label.toLowerCase() &&
-                      _sections[index].customTitle.trim().toLowerCase() !=
                           (_sections[index].tiles.isNotEmpty
                               ? _sections[index].tiles.first.label.toLowerCase()
                               : '')
