@@ -47,6 +47,7 @@ import '../../core/models/navigation_config_model.dart';
 import '../stores/store_switcher_sheet.dart';
 import '../settings/screens/change_password_screen.dart';
 import '../settings/settings_repository.dart';
+import '../legal/screens/legal_info_modal.dart';
 import '../../core/widgets/date_range_picker.dart';
 import '../../screens/dashboard/widgets/profile_menu_popup.dart';
 
@@ -1761,14 +1762,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             const SizedBox(height: 6),
                             InkWell(
-                              onTap: () async {
+                              onTap: () {
                                 Navigator.of(context).pop();
-                                final uri = Uri.parse('https://saas.zoomnearby.com/page/privacy-policy');
-                                if (await canLaunchUrl(uri)) {
-                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                } else {
-                                  await launchUrl(uri);
-                                }
+                                LegalInfoModal.show(context);
                               },
                               borderRadius: BorderRadius.circular(8),
                               child: Padding(
@@ -1816,7 +1812,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Text(
-                                              'Privacy Policy',
+                                              'More',
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w800,
