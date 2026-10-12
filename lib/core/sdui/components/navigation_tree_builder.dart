@@ -242,21 +242,21 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             ? byOrder
             : first.fallback.compareTo(second.fallback);
       });
-      String resolvedTitle =
+      String custom =
           sectionOverrides[meta.key]?.customTitle?.trim().isNotEmpty == true
               ? sectionOverrides[meta.key]!.customTitle!.trim()
               : (meta.customTitle?.trim().isNotEmpty == true
                   ? meta.customTitle!.trim()
-                  : meta.label);
-      if (rows.isNotEmpty &&
-          resolvedTitle.toLowerCase() == rows.first.item.label.toLowerCase() &&
-          resolvedTitle.toLowerCase() != meta.label.toLowerCase()) {
-        resolvedTitle = meta.label;
+                  : '');
+      if (custom.toLowerCase() == meta.label.toLowerCase() ||
+          (rows.isNotEmpty &&
+              custom.toLowerCase() == rows.first.item.label.toLowerCase())) {
+        custom = '';
       }
       final section = _WorkingSection(
         key: meta.key,
         label: meta.label,
-        customTitle: resolvedTitle,
+        customTitle: custom,
         tiles: [for (final row in rows) row.item],
       );
       _repairAndArrange(section);
@@ -265,18 +265,18 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
 
     if (sections.isEmpty) {
       for (final s in compiled) {
-        String resolvedTitle = s.customTitle?.trim().isNotEmpty == true
+        String custom = s.customTitle?.trim().isNotEmpty == true
             ? s.customTitle!.trim()
-            : s.label;
-        if (s.tiles.isNotEmpty &&
-            resolvedTitle.toLowerCase() == s.tiles.first.label.toLowerCase() &&
-            resolvedTitle.toLowerCase() != s.label.toLowerCase()) {
-          resolvedTitle = s.label;
+            : '';
+        if (custom.toLowerCase() == s.label.toLowerCase() ||
+            (s.tiles.isNotEmpty &&
+                custom.toLowerCase() == s.tiles.first.label.toLowerCase())) {
+          custom = '';
         }
         final sec = _WorkingSection(
           key: s.key,
           label: s.label,
-          customTitle: resolvedTitle,
+          customTitle: custom,
           tiles: [
             for (final t in s.tiles)
               _WorkingItem(key: t.key, label: t.label, visible: true)
@@ -893,11 +893,13 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
               order: index,
               customTitle: _sections[index].customTitle.trim().isNotEmpty &&
                       _sections[index].customTitle.trim().toLowerCase() !=
+                          _sections[index].label.toLowerCase() &&
+                      _sections[index].customTitle.trim().toLowerCase() !=
                           (_sections[index].tiles.isNotEmpty
                               ? _sections[index].tiles.first.label.toLowerCase()
                               : '')
                   ? _sections[index].customTitle.trim()
-                  : _sections[index].label,
+                  : null,
             ),
         ],
         items: items,
