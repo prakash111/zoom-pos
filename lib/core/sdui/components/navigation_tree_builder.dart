@@ -217,11 +217,9 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                 compiledByKey.containsKey(override!.section)
             ? override.section!
             : section.key;
-        final effectiveParent = tile.key == 'settings'
-            ? null
-            : (override != null
-                ? (override.level == 0 ? null : override.parentId)
-                : null);
+        final effectiveParent = override != null
+            ? (override.level == 0 ? null : override.parentId)
+            : null;
         (grouped[targetSection] ??= []).add((
           order: override?.order ?? index,
           fallback: fallback++,
@@ -376,19 +374,19 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     final byKey = {for (final tile in section.tiles) tile.key: tile};
 
     for (final tile in section.tiles) {
-      if (tile.key == 'settings') {
-        tile.parentKey = null;
-      }
       var cursor = tile.parentKey;
       final seen = <String>{tile.key};
       var depth = 0;
       var valid = true;
       while (cursor != null) {
         final parent = byKey[cursor];
-        if (parent == null ||
-            !seen.add(cursor) ||
-            ++depth > _maximumNavigationLevel) {
+        if (parent == null || !seen.add(cursor)) {
           valid = false;
+          break;
+        }
+        depth++;
+        if (depth > _maximumNavigationLevel) {
+          tile.parentKey = parent.parentKey;
           break;
         }
         cursor = parent.parentKey;
@@ -515,7 +513,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     _dragStartDepth = depth;
     _dragPreviewDepth = depth;
     _dragMaximumDepth =
-        _maximumNavigationLevel - _subtreeHeight(section, itemIndex);
+        math.max(1, _maximumNavigationLevel - _subtreeHeight(section, itemIndex));
     _dragReorderApplied = false;
     _dragFinalizeTimer?.cancel();
     _dragDepthNotifier.value = depth;
@@ -546,8 +544,10 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       _dragItemKey = item.key;
       _dragStartDepth = depth;
       _dragPreviewDepth = depth;
-      _dragMaximumDepth = _maximumNavigationLevel -
-          _subtreeHeight(_sections[sectionIndex], itemIndex);
+      _dragMaximumDepth = math.max(
+          1,
+          _maximumNavigationLevel -
+              _subtreeHeight(_sections[sectionIndex], itemIndex));
       _dragReorderApplied = false;
       _dragFinalizeTimer?.cancel();
       _dragDepthNotifier.value = depth;
@@ -588,12 +588,41 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         _maximumNavigationLevel - _subtreeHeight(section, itemIndex);
     var targetDepth = math.min(requestedDepth, maximumDepth);
 
-    // Store Settings is strictly a top-level Main Menu root item (level 0).
-    if (dragged.key == 'settings') {
-      targetDepth = 0;
-    } else if (itemIndex == 0) {
-      // WordPress's top-item rule: a row with nothing above it has no
-      // possible parent, regardless of how far right the pointer travelled.
+    if (itemIndex == 0) {
+      if (targetDepth > 0) {
+        final sectionIndex = _sections.indexOf(section);
+        _WorkingSection? prevSection;
+        _WorkingItem? prevItem;
+        for (var s = sectionIndex - 1; s >= 0; s--) {
+          if (_sections[s].tiles.isNotEmpty) {
+            prevSection = _sections[s];
+            prevItem = _sections[s].tiles.last;
+            break;
+          }
+        }
+        if (prevSection != null && prevItem != null) {
+          final subtreeEnd = _subtreeEnd(section, 0);
+          final moving = section.tiles.sublist(0, subtreeEnd);
+          section.tiles.removeRange(0, subtreeEnd);
+          String? parentKey;
+          if (targetDepth == 1) {
+            for (var i = prevSection.tiles.length - 1; i >= 0; i--) {
+              if (_depthOf(prevSection, prevSection.tiles[i].key) == 0) {
+                parentKey = prevSection.tiles[i].key;
+                break;
+              }
+            }
+            parentKey ??= prevItem.key;
+          } else {
+            parentKey = prevItem.key;
+          }
+          dragged.parentKey = parentKey;
+          prevSection.tiles.addAll(moving);
+          _repairAndArrange(prevSection);
+          _repairAndArrange(section);
+          return targetDepth;
+        }
+      }
       targetDepth = 0;
     } else {
       targetDepth = math.min(
@@ -658,10 +687,16 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
           targetSection.tiles.indexWhere((item) => item.key == dragged.key);
 
       if (targetSection.key != sourceSection.key) {
-        // Crossing a header always makes the moved subtree's first row a new
-        // Main Menu item. Descendants keep their internal relationships.
-        dragged.parentKey = null;
-        _dragPreviewDepth = 0;
+        if (_dragPreviewDepth > 0 && targetItemIndex > 0) {
+          _dragPreviewDepth = _applyRequestedDepth(
+            targetSection,
+            targetItemIndex,
+            _dragPreviewDepth,
+          );
+        } else {
+          dragged.parentKey = null;
+          _dragPreviewDepth = 0;
+        }
         _repairAndArrange(targetSection);
       } else {
         final requestedDepth =
@@ -690,18 +725,79 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     setState(() {
       final itemIndex = section.tiles.indexOf(item);
       if (itemIndex < 0) return;
-      if (requestedDepth == 0 || item.key == 'settings') {
+
+      if (requestedDepth <= 0) {
         item.parentKey = null;
+        _repairAndArrange(section);
+        return;
       }
-      _applyRequestedDepth(
-        section,
-        itemIndex,
-        item.key == 'settings' ? 0 : requestedDepth.clamp(0, _maximumNavigationLevel),
-      );
-      if (requestedDepth == 0 || item.key == 'settings') {
-        item.parentKey = null;
+
+      // requestedDepth >= 1 (Sub-Menu or Sub-Sub-Menu)
+      if (itemIndex > 0) {
+        final precedingItem = section.tiles[itemIndex - 1];
+        String? parentKey;
+        if (requestedDepth == 1) {
+          // Find nearest root item before it in this section
+          for (var i = itemIndex - 1; i >= 0; i--) {
+            if (_depthOf(section, section.tiles[i].key) == 0) {
+              parentKey = section.tiles[i].key;
+              break;
+            }
+          }
+          parentKey ??= precedingItem.key;
+        } else {
+          // requestedDepth >= 2: nest under the immediately preceding item
+          parentKey = precedingItem.key;
+        }
+        item.parentKey = parentKey;
+        _repairAndArrange(section);
+      } else {
+        // itemIndex == 0: root/top item in this section!
+        // Resolve preceding item across sections
+        final currentSectionIndex = _sections.indexOf(section);
+        _WorkingSection? targetSection;
+        _WorkingItem? precedingItem;
+        for (var sIdx = currentSectionIndex - 1; sIdx >= 0; sIdx--) {
+          if (_sections[sIdx].tiles.isNotEmpty) {
+            targetSection = _sections[sIdx];
+            precedingItem = targetSection.tiles.last;
+            break;
+          }
+        }
+
+        if (targetSection != null && precedingItem != null) {
+          final subtreeEnd = _subtreeEnd(section, 0);
+          final movingBlock = section.tiles.sublist(0, subtreeEnd);
+          section.tiles.removeRange(0, subtreeEnd);
+
+          String? parentKey;
+          if (requestedDepth == 1) {
+            for (var idx = targetSection.tiles.length - 1; idx >= 0; idx--) {
+              if (_depthOf(targetSection, targetSection.tiles[idx].key) == 0) {
+                parentKey = targetSection.tiles[idx].key;
+                break;
+              }
+            }
+            parentKey ??= precedingItem.key;
+          } else {
+            parentKey = precedingItem.key;
+          }
+
+          item.parentKey = parentKey;
+          targetSection.tiles.addAll(movingBlock);
+
+          _repairAndArrange(targetSection);
+          _repairAndArrange(section);
+        } else if (section.tiles.length > 1) {
+          final nextItem = section.tiles[1];
+          final subtreeEnd = _subtreeEnd(section, 0);
+          final movingBlock = section.tiles.sublist(0, subtreeEnd);
+          section.tiles.removeRange(0, subtreeEnd);
+          item.parentKey = nextItem.key;
+          section.tiles.insertAll(1, movingBlock);
+          _repairAndArrange(section);
+        }
       }
-      _repairAndArrange(section);
     });
   }
 
@@ -1010,15 +1106,8 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             icon: const Icon(Icons.format_indent_increase, size: 18),
             onSelected: (level) => _changeItemDepth(section, tile, level),
             itemBuilder: (context) {
-              final maximumDepth = itemIndex == 0
-                  ? 0
-                  : math.min(
-                      _maximumNavigationLevel -
-                          _subtreeHeight(section, itemIndex),
-                      _depthOf(section, section.tiles[itemIndex - 1].key) + 1,
-                    );
               return [
-                for (var level = 0; level <= maximumDepth; level++)
+                for (var level = 0; level <= _maximumNavigationLevel; level++)
                   PopupMenuItem<int>(
                     key: ValueKey('nav-level-option-${tile.key}-$level'),
                     value: level,
