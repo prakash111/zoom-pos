@@ -183,7 +183,7 @@ List<_NavSection> _serverDrivenSections() {
               continue;
             }
 
-            final bool isParentContainer = item.children.isNotEmpty ||
+            final bool isParentContainer = (item.children.isNotEmpty && item.key != 'nav_view_live_store') ||
                 item.key == 'nav_storefront_group' ||
                 item.key == 'group_storefront';
             tiles.add(_FeatureTile(
@@ -206,7 +206,7 @@ List<_NavSection> _serverDrivenSections() {
               item.badge,
             ));
             final parent = item.effectiveParentId ?? defaultParent;
-            if (parent != null && parent.isNotEmpty) {
+            if (parent != null && parent.isNotEmpty && parent != 'nav_view_live_store') {
               parentByKey[item.key] = parent;
             }
             if (item.children.isNotEmpty) {
@@ -1261,7 +1261,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 (override != null
                     ? (override.level == 0 ||
                         override.parentId == null ||
-                        override.parentId!.isEmpty)
+                        override.parentId!.isEmpty ||
+                        override.parentId == 'nav_view_live_store')
                     : (section.parentByKey[tile.key] == null));
 
             if (isMainMenu) {
@@ -1269,10 +1270,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             } else {
               final targetParentKey = (override != null &&
                       override.parentId != null &&
-                      override.parentId!.isNotEmpty)
+                      override.parentId!.isNotEmpty &&
+                      override.parentId != 'nav_view_live_store')
                   ? override.parentId!
                   : section.parentByKey[tile.key];
-              if (targetParentKey != null && targetParentKey.isNotEmpty) {
+              if (targetParentKey != null && targetParentKey.isNotEmpty && targetParentKey != 'nav_view_live_store') {
                 (childrenByParent[targetParentKey] ??= []).add(tile);
               } else {
                 rootItems.add(tile);

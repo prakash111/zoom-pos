@@ -242,15 +242,21 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             ? byOrder
             : first.fallback.compareTo(second.fallback);
       });
+      String resolvedTitle =
+          sectionOverrides[meta.key]?.customTitle?.trim().isNotEmpty == true
+              ? sectionOverrides[meta.key]!.customTitle!.trim()
+              : (meta.customTitle?.trim().isNotEmpty == true
+                  ? meta.customTitle!.trim()
+                  : meta.label);
+      if (rows.isNotEmpty &&
+          resolvedTitle.toLowerCase() == rows.first.item.label.toLowerCase() &&
+          resolvedTitle.toLowerCase() != meta.label.toLowerCase()) {
+        resolvedTitle = meta.label;
+      }
       final section = _WorkingSection(
         key: meta.key,
         label: meta.label,
-        customTitle:
-            sectionOverrides[meta.key]?.customTitle?.trim().isNotEmpty == true
-                ? sectionOverrides[meta.key]!.customTitle!.trim()
-                : (meta.customTitle?.trim().isNotEmpty == true
-                    ? meta.customTitle!.trim()
-                    : (rows.isNotEmpty ? rows.first.item.label : meta.label)),
+        customTitle: resolvedTitle,
         tiles: [for (final row in rows) row.item],
       );
       _repairAndArrange(section);
@@ -259,12 +265,18 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
 
     if (sections.isEmpty) {
       for (final s in compiled) {
+        String resolvedTitle = s.customTitle?.trim().isNotEmpty == true
+            ? s.customTitle!.trim()
+            : s.label;
+        if (s.tiles.isNotEmpty &&
+            resolvedTitle.toLowerCase() == s.tiles.first.label.toLowerCase() &&
+            resolvedTitle.toLowerCase() != s.label.toLowerCase()) {
+          resolvedTitle = s.label;
+        }
         final sec = _WorkingSection(
           key: s.key,
           label: s.label,
-          customTitle: s.customTitle?.trim().isNotEmpty == true
-              ? s.customTitle!.trim()
-              : (s.tiles.isNotEmpty ? s.tiles.first.label : s.label),
+          customTitle: resolvedTitle,
           tiles: [
             for (final t in s.tiles)
               _WorkingItem(key: t.key, label: t.label, visible: true)
@@ -374,6 +386,9 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     final byKey = {for (final tile in section.tiles) tile.key: tile};
 
     for (final tile in section.tiles) {
+      if (tile.parentKey == 'nav_view_live_store') {
+        tile.parentKey = null;
+      }
       var cursor = tile.parentKey;
       final seen = <String>{tile.key};
       var depth = 0;
@@ -589,41 +604,9 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     var targetDepth = math.min(requestedDepth, maximumDepth);
 
     if (itemIndex == 0) {
-      if (targetDepth > 0) {
-        final sectionIndex = _sections.indexOf(section);
-        _WorkingSection? prevSection;
-        _WorkingItem? prevItem;
-        for (var s = sectionIndex - 1; s >= 0; s--) {
-          if (_sections[s].tiles.isNotEmpty) {
-            prevSection = _sections[s];
-            prevItem = _sections[s].tiles.last;
-            break;
-          }
-        }
-        if (prevSection != null && prevItem != null) {
-          final subtreeEnd = _subtreeEnd(section, 0);
-          final moving = section.tiles.sublist(0, subtreeEnd);
-          section.tiles.removeRange(0, subtreeEnd);
-          String? parentKey;
-          if (targetDepth == 1) {
-            for (var i = prevSection.tiles.length - 1; i >= 0; i--) {
-              if (_depthOf(prevSection, prevSection.tiles[i].key) == 0) {
-                parentKey = prevSection.tiles[i].key;
-                break;
-              }
-            }
-            parentKey ??= prevItem.key;
-          } else {
-            parentKey = prevItem.key;
-          }
-          dragged.parentKey = parentKey;
-          prevSection.tiles.addAll(moving);
-          _repairAndArrange(prevSection);
-          _repairAndArrange(section);
-          return targetDepth;
-        }
-      }
       targetDepth = 0;
+      dragged.parentKey = null;
+      return 0;
     } else {
       targetDepth = math.min(
         targetDepth,
@@ -726,78 +709,30 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       final itemIndex = section.tiles.indexOf(item);
       if (itemIndex < 0) return;
 
-      if (requestedDepth <= 0) {
+      if (itemIndex == 0 || requestedDepth <= 0) {
         item.parentKey = null;
         _repairAndArrange(section);
         return;
       }
 
       // requestedDepth >= 1 (Sub-Menu or Sub-Sub-Menu)
-      if (itemIndex > 0) {
-        final precedingItem = section.tiles[itemIndex - 1];
-        String? parentKey;
-        if (requestedDepth == 1) {
-          // Find nearest root item before it in this section
-          for (var i = itemIndex - 1; i >= 0; i--) {
-            if (_depthOf(section, section.tiles[i].key) == 0) {
-              parentKey = section.tiles[i].key;
-              break;
-            }
-          }
-          parentKey ??= precedingItem.key;
-        } else {
-          // requestedDepth >= 2: nest under the immediately preceding item
-          parentKey = precedingItem.key;
-        }
-        item.parentKey = parentKey;
-        _repairAndArrange(section);
-      } else {
-        // itemIndex == 0: root/top item in this section!
-        // Resolve preceding item across sections
-        final currentSectionIndex = _sections.indexOf(section);
-        _WorkingSection? targetSection;
-        _WorkingItem? precedingItem;
-        for (var sIdx = currentSectionIndex - 1; sIdx >= 0; sIdx--) {
-          if (_sections[sIdx].tiles.isNotEmpty) {
-            targetSection = _sections[sIdx];
-            precedingItem = targetSection.tiles.last;
+      final precedingItem = section.tiles[itemIndex - 1];
+      String? parentKey;
+      if (requestedDepth == 1) {
+        // Find nearest root item before it in this section
+        for (var i = itemIndex - 1; i >= 0; i--) {
+          if (_depthOf(section, section.tiles[i].key) == 0) {
+            parentKey = section.tiles[i].key;
             break;
           }
         }
-
-        if (targetSection != null && precedingItem != null) {
-          final subtreeEnd = _subtreeEnd(section, 0);
-          final movingBlock = section.tiles.sublist(0, subtreeEnd);
-          section.tiles.removeRange(0, subtreeEnd);
-
-          String? parentKey;
-          if (requestedDepth == 1) {
-            for (var idx = targetSection.tiles.length - 1; idx >= 0; idx--) {
-              if (_depthOf(targetSection, targetSection.tiles[idx].key) == 0) {
-                parentKey = targetSection.tiles[idx].key;
-                break;
-              }
-            }
-            parentKey ??= precedingItem.key;
-          } else {
-            parentKey = precedingItem.key;
-          }
-
-          item.parentKey = parentKey;
-          targetSection.tiles.addAll(movingBlock);
-
-          _repairAndArrange(targetSection);
-          _repairAndArrange(section);
-        } else if (section.tiles.length > 1) {
-          final nextItem = section.tiles[1];
-          final subtreeEnd = _subtreeEnd(section, 0);
-          final movingBlock = section.tiles.sublist(0, subtreeEnd);
-          section.tiles.removeRange(0, subtreeEnd);
-          item.parentKey = nextItem.key;
-          section.tiles.insertAll(1, movingBlock);
-          _repairAndArrange(section);
-        }
+        parentKey ??= precedingItem.key;
+      } else {
+        // requestedDepth >= 2: nest under the immediately preceding item
+        parentKey = precedingItem.key;
       }
+      item.parentKey = parentKey;
+      _repairAndArrange(section);
     });
   }
 
@@ -956,11 +891,13 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             NavSectionOrder(
               key: _sections[index].key,
               order: index,
-              customTitle: _sections[index].customTitle.trim().isNotEmpty
+              customTitle: _sections[index].customTitle.trim().isNotEmpty &&
+                      _sections[index].customTitle.trim().toLowerCase() !=
+                          (_sections[index].tiles.isNotEmpty
+                              ? _sections[index].tiles.first.label.toLowerCase()
+                              : '')
                   ? _sections[index].customTitle.trim()
-                  : (_sections[index].tiles.isNotEmpty
-                      ? _sections[index].tiles.first.label
-                      : _sections[index].label),
+                  : _sections[index].label,
             ),
         ],
         items: items,
@@ -1185,9 +1122,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                     maxLength: 120,
                     decoration: InputDecoration(
                       labelText: 'Custom section title',
-                      hintText: section.tiles.isNotEmpty
-                          ? section.tiles.first.label
-                          : section.label,
+                      hintText: section.label,
                       helperText: section.tiles.isEmpty
                           ? 'Empty section — drop an item below this header'
                           : null,
