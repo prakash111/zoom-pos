@@ -18,6 +18,26 @@ const double _levelOneThreshold = 20;
 const double _levelTwoThreshold = 50;
 const int _maximumNavigationLevel = 2;
 
+const Set<String> _disallowedParentKeys = {
+  'nav_view_live_store',
+  'nav_storefront_banner_auth',
+  'nav_storefront_group',
+  'group_storefront',
+  'nav_storefront_domain',
+  'nav_storefront_menus',
+  'nav_storefront_inquiries',
+  'nav_storefront_gateways',
+  'nav_coupons_discounts',
+  'nav_store_faqs',
+  'nav_store_reviews',
+  'nav_storefront_pixels',
+  'pos',
+  'pharmacy_pos',
+  'salon_pos',
+  'restaurant_pos',
+  'consignments',
+};
+
 /// Converts the row's effective horizontal offset into the three snapped
 /// columns required by the mobile menu editor.
 int navigationIndentForOffset(double dx) {
@@ -217,9 +237,12 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                 compiledByKey.containsKey(override!.section)
             ? override.section!
             : section.key;
-        final effectiveParent = override != null
+        var effectiveParent = override != null
             ? (override.level == 0 ? null : override.parentId)
             : null;
+        if (effectiveParent != null && _disallowedParentKeys.contains(effectiveParent)) {
+          effectiveParent = null;
+        }
         (grouped[targetSection] ??= []).add((
           order: override?.order ?? index,
           fallback: fallback++,
@@ -386,7 +409,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     final byKey = {for (final tile in section.tiles) tile.key: tile};
 
     for (final tile in section.tiles) {
-      if (tile.parentKey == 'nav_view_live_store') {
+      if (tile.parentKey != null && _disallowedParentKeys.contains(tile.parentKey)) {
         tile.parentKey = null;
       }
       var cursor = tile.parentKey;
@@ -719,17 +742,23 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       final precedingItem = section.tiles[itemIndex - 1];
       String? parentKey;
       if (requestedDepth == 1) {
-        // Find nearest root item before it in this section
+        // Find nearest valid root item before it in this section
         for (var i = itemIndex - 1; i >= 0; i--) {
-          if (_depthOf(section, section.tiles[i].key) == 0) {
-            parentKey = section.tiles[i].key;
+          final candidateKey = section.tiles[i].key;
+          if (_depthOf(section, candidateKey) == 0 &&
+              !_disallowedParentKeys.contains(candidateKey)) {
+            parentKey = candidateKey;
             break;
           }
         }
-        parentKey ??= precedingItem.key;
+        if (parentKey == null && !_disallowedParentKeys.contains(precedingItem.key)) {
+          parentKey = precedingItem.key;
+        }
       } else {
-        // requestedDepth >= 2: nest under the immediately preceding item
-        parentKey = precedingItem.key;
+        // requestedDepth >= 2: nest under the immediately preceding item if allowed
+        if (!_disallowedParentKeys.contains(precedingItem.key)) {
+          parentKey = precedingItem.key;
+        }
       }
       item.parentKey = parentKey;
       _repairAndArrange(section);

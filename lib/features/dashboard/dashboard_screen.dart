@@ -62,6 +62,36 @@ const Set<String> _forcedRootKeys = <String>{
   'consignments',
   'nav_storefront_group',
   'group_storefront',
+  'nav_view_live_store',
+  'nav_storefront_banner_auth',
+  'nav_storefront_domain',
+  'nav_storefront_menus',
+  'nav_storefront_inquiries',
+  'nav_storefront_gateways',
+  'nav_coupons_discounts',
+  'nav_store_faqs',
+  'nav_store_reviews',
+  'nav_storefront_pixels',
+};
+
+const Set<String> _disallowedParentKeys = <String>{
+  'nav_view_live_store',
+  'nav_storefront_banner_auth',
+  'nav_storefront_group',
+  'group_storefront',
+  'nav_storefront_domain',
+  'nav_storefront_menus',
+  'nav_storefront_inquiries',
+  'nav_storefront_gateways',
+  'nav_coupons_discounts',
+  'nav_store_faqs',
+  'nav_store_reviews',
+  'nav_storefront_pixels',
+  'pos',
+  'pharmacy_pos',
+  'salon_pos',
+  'restaurant_pos',
+  'consignments',
 };
 
 class _FeatureTile {
@@ -183,9 +213,10 @@ List<_NavSection> _serverDrivenSections() {
               continue;
             }
 
-            final bool isParentContainer = (item.children.isNotEmpty && item.key != 'nav_view_live_store') ||
-                item.key == 'nav_storefront_group' ||
-                item.key == 'group_storefront';
+            final bool isParentContainer = item.children.isNotEmpty &&
+                !_disallowedParentKeys.contains(item.key) &&
+                item.key != 'nav_storefront_group' &&
+                item.key != 'group_storefront';
             tiles.add(_FeatureTile(
               item.key,
               (l10n) => BootstrapCache.instance.resolveNavigationLabel(
@@ -206,11 +237,16 @@ List<_NavSection> _serverDrivenSections() {
               item.badge,
             ));
             final parent = item.effectiveParentId ?? defaultParent;
-            if (parent != null && parent.isNotEmpty && parent != 'nav_view_live_store') {
+            if (parent != null &&
+                parent.isNotEmpty &&
+                !_disallowedParentKeys.contains(parent)) {
               parentByKey[item.key] = parent;
             }
-            if (item.children.isNotEmpty) {
+            if (item.children.isNotEmpty &&
+                !_disallowedParentKeys.contains(item.key)) {
               collectItems(item.children, item.key);
+            } else if (item.children.isNotEmpty) {
+              collectItems(item.children, defaultParent);
             }
           } catch (error, stackTrace) {
             debugPrint(
@@ -351,10 +387,13 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
           : (item != null
               ? (item.level == 0 ||
                       item.parentId == null ||
-                      item.parentId!.isEmpty
+                      item.parentId!.isEmpty ||
+                      _disallowedParentKeys.contains(item.parentId)
                   ? null
                   : (item.parentId ?? item.parent))
-              : sectionMetaByKey[entry.key]?.parentByKey[row.tile.key]);
+              : (_disallowedParentKeys.contains(sectionMetaByKey[entry.key]?.parentByKey[row.tile.key])
+                  ? null
+                  : sectionMetaByKey[entry.key]?.parentByKey[row.tile.key]));
       final candidate =
           rawParent == null || rawParent.isEmpty ? null : rawParent;
 
@@ -370,16 +409,20 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
           valid = false;
           break;
         }
-        cursor = _forcedRootKeys.contains(cursor)
+        cursor = _forcedRootKeys.contains(cursor) ||
+                _disallowedParentKeys.contains(cursor)
             ? null
             : (itemOverrides[cursor] != null
                 ? (itemOverrides[cursor]!.level == 0 ||
                         itemOverrides[cursor]!.parentId == null ||
-                        itemOverrides[cursor]!.parentId!.isEmpty
+                        itemOverrides[cursor]!.parentId!.isEmpty ||
+                        _disallowedParentKeys.contains(itemOverrides[cursor]!.parentId)
                     ? null
                     : (itemOverrides[cursor]!.parentId ??
                         itemOverrides[cursor]!.parent))
-                : sectionMetaByKey[entry.key]?.parentByKey[cursor]);
+                : (_disallowedParentKeys.contains(sectionMetaByKey[entry.key]?.parentByKey[cursor])
+                    ? null
+                    : sectionMetaByKey[entry.key]?.parentByKey[cursor]));
       }
       safeParent[row.tile.key] = valid ? candidate : null;
     }
@@ -1262,8 +1305,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ? (override.level == 0 ||
                         override.parentId == null ||
                         override.parentId!.isEmpty ||
-                        override.parentId == 'nav_view_live_store')
-                    : (section.parentByKey[tile.key] == null));
+                        _disallowedParentKeys.contains(override.parentId))
+                    : (section.parentByKey[tile.key] == null ||
+                        _disallowedParentKeys.contains(section.parentByKey[tile.key])));
 
             if (isMainMenu) {
               rootItems.add(tile);
@@ -1271,10 +1315,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               final targetParentKey = (override != null &&
                       override.parentId != null &&
                       override.parentId!.isNotEmpty &&
-                      override.parentId != 'nav_view_live_store')
+                      !_disallowedParentKeys.contains(override.parentId))
                   ? override.parentId!
                   : section.parentByKey[tile.key];
-              if (targetParentKey != null && targetParentKey.isNotEmpty && targetParentKey != 'nav_view_live_store') {
+              if (targetParentKey != null &&
+                  targetParentKey.isNotEmpty &&
+                  !_disallowedParentKeys.contains(targetParentKey)) {
                 (childrenByParent[targetParentKey] ??= []).add(tile);
               } else {
                 rootItems.add(tile);
@@ -1992,10 +2038,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ));
     }
 
+    final itemOverrides = {
+      for (final item in bootstrap.navConfig.items) item.key: item
+    };
+
     for (final section in navSections) {
       final childrenByParent = <String?, List<_FeatureTile>>{};
       for (final tile in section.tiles) {
-        final parent = section.parentByKey[tile.key];
+        final override = itemOverrides[tile.key];
+        final bool isForcedRoot = _forcedRootKeys.contains(tile.key);
+        String? parent;
+        if (isForcedRoot) {
+          parent = null;
+        } else if (override != null) {
+          parent = (override.level == 0 ||
+                  override.parentId == null ||
+                  override.parentId!.isEmpty ||
+                  _disallowedParentKeys.contains(override.parentId))
+              ? null
+              : override.parentId;
+        } else {
+          parent = section.parentByKey[tile.key];
+          if (parent != null && _disallowedParentKeys.contains(parent)) {
+            parent = null;
+          }
+        }
         (childrenByParent[parent] ??= []).add(tile);
       }
 
