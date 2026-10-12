@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -312,6 +313,23 @@ class CartSheet extends StatelessWidget {
 
   Future<void> _previewThenCheckout(BuildContext context) async {
     final pos = context.read<PosProvider>();
+    final authUser = context.read<AuthProvider>().user;
+    final canBypass = authUser?.can('loyalty.bypass_otp') ?? false;
+
+    // Check if Store Wallet is being used and requires OTP verification
+    final isWalletUsed = pos.paymentMethod == 'wallet' ||
+        (pos.isSplitPayment &&
+            pos.payments.any((p) => p.method == 'wallet' || p.methodCode == 'wallet'));
+
+    if (isWalletUsed && !canBypass && pos.selectedCustomer != null) {
+      final verified = await _showLoyaltyOtpDialog(
+        context,
+        customer: pos.selectedCustomer!,
+        purpose: 'wallet_spend',
+      );
+      if (!verified) return;
+    }
+
     final company = context.read<AuthProvider>().company;
     final isIndia = company?.isIndia ?? false;
 
@@ -537,6 +555,11 @@ class CartSheet extends StatelessWidget {
     if (customer == null || customer.id.isEmpty) return const SizedBox.shrink();
 
     final pos = context.watch<PosProvider>();
+    final authUser = context.watch<AuthProvider>().user;
+    final canRedeemPoints = authUser?.can('loyalty.redeem_points') ?? true;
+    final canViewLoyalty = authUser?.can('loyalty.view') ?? true;
+    if (!canViewLoyalty && !canRedeemPoints) return const SizedBox.shrink();
+
     final settings = BootstrapCache.instance.loyaltySettings;
     if (!settings.isPointsEnabled) return const SizedBox.shrink();
 
@@ -700,20 +723,21 @@ class CartSheet extends StatelessWidget {
               ],
             ),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF59E0B),
-              foregroundColor: Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+          if (canRedeemPoints)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF59E0B),
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () =>
+                  _showPointsRedeemDialog(context, points, cartTotal),
+              child: const Text('Redeem',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             ),
-            onPressed: () =>
-                _showPointsRedeemDialog(context, points, cartTotal),
-            child: const Text('Redeem',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-          ),
         ],
       ),
     );
@@ -782,16 +806,31 @@ class CartSheet extends StatelessWidget {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFF59E0B)),
-            onPressed: () {
+            onPressed: () async {
               final pts = double.tryParse(controller.text.trim()) ?? 0;
               if (pts > 0 && pts <= maxAllowedPoints) {
+                final customer = pos.selectedCustomer;
+                final authUser = context.read<AuthProvider>().user;
+                final canBypass = authUser?.can('loyalty.bypass_otp') ?? false;
+
+                if (!canBypass && customer != null) {
+                  final verified = await _showLoyaltyOtpDialog(
+                    context,
+                    customer: customer,
+                    purpose: 'points_redemption',
+                  );
+                  if (!verified) return;
+                }
+
                 pos.applyRewardPoints(pts, rate: rate);
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(
-                          'Applied ${pts.toInt()} reward points (-₹${pos.rewardPointsDiscount.toStringAsFixed(2)})!')),
-                );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content: Text(
+                            'Applied ${pts.toInt()} reward points (-₹${pos.rewardPointsDiscount.toStringAsFixed(2)})!')),
+                  );
+                }
               } else if (pts <= 0) {
                 pos.clearRewardPoints();
                 Navigator.of(ctx).pop();
@@ -1093,7 +1132,10 @@ class CartSheet extends StatelessWidget {
                 orderIndex: 4),
           ];
 
-    if (isWalletEnabled) {
+    final authUser = context.watch<AuthProvider>().user;
+    final canSpendWallet = authUser?.can('loyalty.spend_wallet') ?? true;
+
+    if (isWalletEnabled && canSpendWallet) {
       final hasWallet = activeMethods.any(
           (p) => p.code.toLowerCase() == 'wallet' || p.id.toLowerCase() == 'wallet');
       if (!hasWallet) {
@@ -1924,6 +1966,48 @@ class CartSheet extends StatelessWidget {
       expand: false,
       builder: (context, scrollController) => buildCartBody(scrollController),
     );
+  }
+
+  Future<bool> _showLoyaltyOtpDialog(
+    BuildContext context, {
+    required CustomerModel customer,
+    required String purpose,
+  }) async {
+    final client = context.read<ApiClient>();
+    final messenger = ScaffoldMessenger.of(context);
+
+    String phoneTip = customer.phone ?? '';
+    try {
+      final res = await client.post('/loyalty/auth/request-otp', data: {
+        'customer_id': customer.id,
+        'purpose': purpose,
+      });
+      if (res['phone_tip'] != null && (res['phone_tip'] as String).isNotEmpty) {
+        phoneTip = res['phone_tip'] as String;
+      }
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(e is ApiException ? e.message : 'Failed to send OTP: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return false;
+    }
+
+    if (!context.mounted) return false;
+    final verified = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => _LoyaltyOtpDialog(
+        client: client,
+        customer: customer,
+        purpose: purpose,
+        initialPhoneTip: phoneTip,
+      ),
+    );
+
+    return verified == true;
   }
 }
 
@@ -3053,6 +3137,233 @@ class _CouponInputFieldState extends State<_CouponInputField> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LoyaltyOtpDialog extends StatefulWidget {
+  const _LoyaltyOtpDialog({
+    required this.client,
+    required this.customer,
+    required this.purpose,
+    required this.initialPhoneTip,
+  });
+
+  final ApiClient client;
+  final CustomerModel customer;
+  final String purpose;
+  final String initialPhoneTip;
+
+  @override
+  State<_LoyaltyOtpDialog> createState() => _LoyaltyOtpDialogState();
+}
+
+class _LoyaltyOtpDialogState extends State<_LoyaltyOtpDialog> {
+  final TextEditingController _otpController = TextEditingController();
+  int _secondsLeft = 60;
+  Timer? _timer;
+  bool _isSubmitting = false;
+  String? _errorMessage;
+  late String _phoneTip;
+
+  @override
+  void initState() {
+    super.initState();
+    _phoneTip = widget.initialPhoneTip;
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _secondsLeft = 60;
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_secondsLeft > 0) {
+        if (mounted) setState(() => _secondsLeft--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> _resendOtp() async {
+    if (_secondsLeft > 0) return;
+    setState(() {
+      _errorMessage = null;
+    });
+
+    try {
+      final res = await widget.client.post('/loyalty/auth/request-otp', data: {
+        'customer_id': widget.customer.id,
+        'purpose': widget.purpose,
+      });
+      if (res['phone_tip'] != null && (res['phone_tip'] as String).isNotEmpty) {
+        _phoneTip = res['phone_tip'] as String;
+      }
+      _startTimer();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('OTP verification code resent successfully.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e is ApiException ? e.message : 'Failed to resend OTP: $e';
+        });
+      }
+    }
+  }
+
+  Future<void> _verifyOtp() async {
+    final code = _otpController.text.trim();
+    if (code.length < 4) {
+      setState(() => _errorMessage = 'Please enter the 6-digit verification code.');
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await widget.client.post('/loyalty/auth/verify-otp', data: {
+        'customer_id': widget.customer.id,
+        'otp': code,
+        'purpose': widget.purpose,
+      });
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _errorMessage = e is ApiException ? e.message : 'Invalid or expired OTP code.';
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _otpController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.security, color: Color(0xFFF59E0B), size: 24),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Customer Authorization',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'A 6-digit verification code was dispatched via WhatsApp / SMS to $_phoneTip to authorize loyalty deductions.',
+              style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _otpController,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              maxLength: 6,
+              autofocus: true,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 8,
+              ),
+              decoration: InputDecoration(
+                hintText: '••••••',
+                counterText: '',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFF59E0B), width: 2),
+                ),
+              ),
+              onSubmitted: (_) => _verifyOtp(),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                '⚠️ $_errorMessage',
+                style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_secondsLeft > 0)
+                  Text(
+                    'Resend code in ${_secondsLeft}s',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  )
+                else
+                  TextButton(
+                    onPressed: _resendOtp,
+                    child: const Text(
+                      'Resend Code',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFF59E0B),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFF59E0B),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: _isSubmitting ? null : _verifyOtp,
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Text(
+                  'Verify & Unlock',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+        ),
+      ],
     );
   }
 }
