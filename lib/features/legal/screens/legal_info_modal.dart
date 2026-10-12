@@ -32,7 +32,9 @@ class _LegalInfoModalState extends State<LegalInfoModal> {
   late final AppPagesService _service;
   bool _isLoading = true;
   String? _errorMessage;
-  List<AppPageModel> _pages = const [];
+  AppPagesPayload? _payload;
+
+  List<AppPageModel> get _pages => _payload?.pages ?? const [];
 
   @override
   void initState() {
@@ -52,10 +54,10 @@ class _LegalInfoModalState extends State<LegalInfoModal> {
     });
 
     try {
-      final items = await _service.getAppPages(forceRefresh: forceRefresh);
+      final payload = await _service.getAppPagesPayload(forceRefresh: forceRefresh);
       if (!mounted) return;
       setState(() {
-        _pages = items;
+        _payload = payload;
         _isLoading = false;
       });
     } catch (e) {
@@ -73,13 +75,27 @@ class _LegalInfoModalState extends State<LegalInfoModal> {
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.colorScheme.primary;
 
-    String appVersion = 'ZooM-POS v1.0.6';
-    try {
-      final branding = context.watch<PlatformBrandingProvider>();
-      if (branding.appVersion.isNotEmpty) {
-        appVersion = branding.appVersion;
-      }
-    } catch (_) {}
+    final branding = context.watch<PlatformBrandingProvider>();
+
+    // Server-driven modal title & subtitle
+    final String modalTitle =
+        _payload?.modalTitle.isNotEmpty == true ? _payload!.modalTitle : 'Legal & App Information';
+    final String modalSubtitle = _payload?.modalSubtitle.isNotEmpty == true
+        ? _payload!.modalSubtitle
+        : 'Terms, policies & regulatory disclosures';
+
+    // Server-driven version and footer visibility
+    // When disabled in Super Admin, branding.showAppVersion is false AND _payload.footerVisible is false
+    final bool shouldShowFooter = (_payload != null
+            ? (_payload!.footerVisible && _payload!.showAppVersion)
+            : branding.showAppVersion) &&
+        branding.showAppVersion;
+
+    final String? footerText = (_payload?.footerText?.isNotEmpty == true)
+        ? _payload!.footerText
+        : (branding.showAppVersion && branding.appVersion.isNotEmpty
+            ? branding.appVersion
+            : null);
 
     return Container(
       decoration: BoxDecoration(
@@ -127,7 +143,7 @@ class _LegalInfoModalState extends State<LegalInfoModal> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Legal & App Information',
+                        modalTitle,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -135,7 +151,7 @@ class _LegalInfoModalState extends State<LegalInfoModal> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Terms, policies & regulatory disclosures',
+                        modalSubtitle,
                         style: TextStyle(
                           fontSize: 11,
                           color: theme.textTheme.bodySmall?.color
@@ -160,33 +176,35 @@ class _LegalInfoModalState extends State<LegalInfoModal> {
             child: _buildBody(context, theme, isDark, primaryColor),
           ),
 
-          // Footer
-          const Divider(height: 1),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            color: isDark
-                ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2)
-                : Colors.grey.withValues(alpha: 0.04),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.shield_outlined,
-                  size: 13,
-                  color: theme.disabledColor,
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  appVersion,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+          // Server-controlled Footer (only rendered if enabled by server / Super Admin)
+          if (shouldShowFooter && footerText != null && footerText.trim().isNotEmpty) ...[
+            const Divider(height: 1),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              color: isDark
+                  ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2)
+                  : Colors.grey.withValues(alpha: 0.04),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.shield_outlined,
+                    size: 13,
                     color: theme.disabledColor,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 5),
+                  Text(
+                    footerText,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: theme.disabledColor,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

@@ -142,7 +142,10 @@ class PlatformBrandingProvider extends ChangeNotifier {
       if (prefs.containsKey(_showAppVersionKey)) {
         showAppVersion = prefs.getBool(_showAppVersionKey) ?? defaultShowAppVersion;
       }
-      appVersion = str(_appVersionKey) ?? appVersion;
+      appVersion = str(_appVersionKey) ?? (showAppVersion ? defaultAppVersion : '');
+      if (!showAppVersion) {
+        appVersion = '';
+      }
       if (prefs.containsKey(_inlineKey)) {
         headerInline = prefs.getBool(_inlineKey) ?? defaultHeaderInline;
       }
@@ -262,7 +265,9 @@ class PlatformBrandingProvider extends ChangeNotifier {
       set(showBanner, showAuthBanner, () => showAuthBanner = showBanner);
       set(landingEnabled, landingPageEnabled, () => landingPageEnabled = landingEnabled);
       set(showVersion, showAppVersion, () => showAppVersion = showVersion);
-      if (ver != null && ver.isNotEmpty) {
+      if (!showVersion) {
+        set('', appVersion, () => appVersion = '');
+      } else if (ver != null && ver.isNotEmpty) {
         set(ver, appVersion, () => appVersion = ver);
       }
       set(inline, headerInline, () => headerInline = inline);

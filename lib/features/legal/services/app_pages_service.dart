@@ -4,27 +4,81 @@ import '../../../core/api/api_client.dart';
 import '../../../core/config/app_config.dart';
 import '../models/app_page_model.dart';
 
+/// Server-driven metadata & pages bundle for Legal & App Information.
+class AppPagesPayload {
+  final List<AppPageModel> pages;
+  final bool showAppVersion;
+  final String? appVersion;
+  final String modalTitle;
+  final String modalSubtitle;
+  final bool footerVisible;
+  final String? footerText;
+
+  const AppPagesPayload({
+    required this.pages,
+    this.showAppVersion = true,
+    this.appVersion,
+    this.modalTitle = 'Legal & App Information',
+    this.modalSubtitle = 'Terms, policies & regulatory disclosures',
+    this.footerVisible = true,
+    this.footerText,
+  });
+}
+
 /// Service for fetching dynamic Super Admin CMS pages marked for the Flutter app.
 class AppPagesService {
   AppPagesService({ApiClient? apiClient}) : _apiClient = apiClient;
 
   final ApiClient? _apiClient;
   static List<AppPageModel>? _memoryCache;
+  static AppPagesPayload? _cachedPayload;
 
-  /// Fetch all active app pages.
-  Future<List<AppPageModel>> getAppPages({bool forceRefresh = false}) async {
-    if (!forceRefresh && _memoryCache != null && _memoryCache!.isNotEmpty) {
-      return _memoryCache!;
+  /// Fetch full server payload for legal & app pages modal.
+  Future<AppPagesPayload> getAppPagesPayload({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedPayload != null && _cachedPayload!.pages.isNotEmpty) {
+      return _cachedPayload!;
+    }
+
+    AppPagesPayload parsePayload(Map<String, dynamic> map) {
+      final items = _parseList(map['data']);
+      final bool showVersion = map['show_app_version'] == true ||
+          (map['show_app_version'] == null && map['footer_visible'] == true);
+      final String? version = map['app_version']?.toString();
+      final String modalTitle = map['modal_title']?.toString() ??
+          (map['modal'] is Map ? map['modal']['title']?.toString() : null) ??
+          'Legal & App Information';
+      final String modalSubtitle = map['modal_subtitle']?.toString() ??
+          (map['modal'] is Map ? map['modal']['subtitle']?.toString() : null) ??
+          'Terms, policies & regulatory disclosures';
+      final bool footerVisible = map['footer_visible'] != null
+          ? (map['footer_visible'] == true)
+          : (map['footer'] is Map
+              ? (map['footer']['visible'] == true)
+              : (showVersion && (version != null && version.isNotEmpty)));
+      final String? footerText = map['footer_text']?.toString() ??
+          (map['footer'] is Map ? map['footer']['text']?.toString() : null) ??
+          version;
+
+      return AppPagesPayload(
+        pages: items,
+        showAppVersion: showVersion,
+        appVersion: version,
+        modalTitle: modalTitle,
+        modalSubtitle: modalSubtitle,
+        footerVisible: footerVisible,
+        footerText: footerText,
+      );
     }
 
     // 1. Try via ApiClient
     if (_apiClient != null) {
       try {
         final res = await _apiClient.get('/app-pages');
-        final items = _parseList(res['data']);
-        if (items.isNotEmpty) {
-          _memoryCache = items;
-          return items;
+        if (res is Map<String, dynamic> && res['data'] != null) {
+          final payload = parsePayload(res);
+          _cachedPayload = payload;
+          _memoryCache = payload.pages;
+          return payload;
         }
       } catch (_) {
         // Fall back to direct HTTP call below
@@ -44,19 +98,31 @@ class AppPagesService {
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map<String, dynamic> && decoded['data'] != null) {
-          final items = _parseList(decoded['data']);
-          _memoryCache = items;
-          return items;
+          final payload = parsePayload(decoded);
+          _cachedPayload = payload;
+          _memoryCache = payload.pages;
+          return payload;
         }
       }
     } catch (_) {
-      if (_memoryCache != null && _memoryCache!.isNotEmpty) {
-        return _memoryCache!;
+      if (_cachedPayload != null) {
+        return _cachedPayload!;
       }
       rethrow;
     }
 
-    return _memoryCache ?? const [];
+    return _cachedPayload ??
+        const AppPagesPayload(
+          pages: [],
+          showAppVersion: false,
+          footerVisible: false,
+        );
+  }
+
+  /// Fetch all active app pages.
+  Future<List<AppPageModel>> getAppPages({bool forceRefresh = false}) async {
+    final payload = await getAppPagesPayload(forceRefresh: forceRefresh);
+    return payload.pages;
   }
 
   /// Fetch a single page by slug.

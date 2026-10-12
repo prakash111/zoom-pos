@@ -1806,12 +1806,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                               ),
                             ),
-                            if (brandingProvider.showAppVersion) ...[
+                            if (brandingProvider.showAppVersion &&
+                                brandingProvider.appVersion.trim().isNotEmpty) ...[
                               const SizedBox(height: 8),
                               Text(
-                                brandingProvider.appVersion.isNotEmpty
-                                    ? brandingProvider.appVersion
-                                    : 'ZooM-POS v1.0.6',
+                                brandingProvider.appVersion,
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   fontSize: 11,
