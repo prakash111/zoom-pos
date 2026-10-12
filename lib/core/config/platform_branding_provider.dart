@@ -37,6 +37,8 @@ class PlatformBrandingProvider extends ChangeNotifier {
   static const _bannerKey = 'zoom_pos.platform_auth_banner_url';
   static const _showBannerKey = 'zoom_pos.platform_show_auth_banner';
   static const _landingEnabledKey = 'zoom_pos.platform_landing_enabled';
+  static const _showAppVersionKey = 'zoom_pos.platform_show_app_version';
+  static const _appVersionKey = 'zoom_pos.platform_app_version';
 
   /// Fallbacks shown until (and unless) the server responds — these mirror the
   /// Superadmin contract defaults.
@@ -44,6 +46,8 @@ class PlatformBrandingProvider extends ChangeNotifier {
   static const String defaultTagline = 'Online inventory management system';
   static const String defaultSupportPhone = '+918535075196';
   static const String defaultSupportEmail = 'support@zoomnearby.com';
+  static const String defaultAppVersion = 'ZooM-POS v1.0.6';
+  static const bool defaultShowAppVersion = true;
 
   /// Auth marketing copy is purely Superadmin-authored — there is no app-side
   /// default. Empty means "render nothing".
@@ -71,6 +75,8 @@ class PlatformBrandingProvider extends ChangeNotifier {
   String? authBannerImageUrl;
   bool showAuthBanner = false;
   bool landingPageEnabled = true;
+  bool showAppVersion = defaultShowAppVersion;
+  String appVersion = defaultAppVersion;
   bool headerInline = defaultHeaderInline;
   bool showTagline = defaultShowTagline;
 
@@ -133,6 +139,10 @@ class PlatformBrandingProvider extends ChangeNotifier {
       if (prefs.containsKey(_landingEnabledKey)) {
         landingPageEnabled = prefs.getBool(_landingEnabledKey) ?? true;
       }
+      if (prefs.containsKey(_showAppVersionKey)) {
+        showAppVersion = prefs.getBool(_showAppVersionKey) ?? defaultShowAppVersion;
+      }
+      appVersion = str(_appVersionKey) ?? appVersion;
       if (prefs.containsKey(_inlineKey)) {
         headerInline = prefs.getBool(_inlineKey) ?? defaultHeaderInline;
       }
@@ -202,6 +212,16 @@ class PlatformBrandingProvider extends ChangeNotifier {
                   : (platform.containsKey('landing_page_enabled')
                       ? _asBool(platform['landing_page_enabled'], landingPageEnabled)
                       : landingPageEnabled)));
+      final showVersion = response.containsKey('show_app_version')
+          ? _asBool(response['show_app_version'], showAppVersion)
+          : (platform.containsKey('show_app_version')
+              ? _asBool(platform['show_app_version'], showAppVersion)
+              : showAppVersion);
+      final ver = pick('app_version', const [
+        'app_version',
+        'build_version',
+        'version',
+      ]);
 
       // Primary colour under any of its aliases (flutter_app_brand_color /
       // theme.primary / theme.primary_color / brand_color / primary_color).
@@ -241,6 +261,10 @@ class PlatformBrandingProvider extends ChangeNotifier {
       set(banner, authBannerImageUrl, () => authBannerImageUrl = banner);
       set(showBanner, showAuthBanner, () => showAuthBanner = showBanner);
       set(landingEnabled, landingPageEnabled, () => landingPageEnabled = landingEnabled);
+      set(showVersion, showAppVersion, () => showAppVersion = showVersion);
+      if (ver != null && ver.isNotEmpty) {
+        set(ver, appVersion, () => appVersion = ver);
+      }
       set(inline, headerInline, () => headerInline = inline);
       set(showTag, showTagline, () => showTagline = showTag);
       set(primary, primaryColor, () => primaryColor = primary);
@@ -267,6 +291,8 @@ class PlatformBrandingProvider extends ChangeNotifier {
         await prefs.setString(_supportEmailKey, supportEmail);
         await prefs.setBool(_showBannerKey, showAuthBanner);
         await prefs.setBool(_landingEnabledKey, landingPageEnabled);
+        await prefs.setBool(_showAppVersionKey, showAppVersion);
+        await prefs.setString(_appVersionKey, appVersion);
         Future<void> put(String k, String? v) => (v != null && v.isNotEmpty)
             ? prefs.setString(k, v)
             : prefs.remove(k);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/config/platform_branding_provider.dart';
 import '../../../core/widgets/adaptive_sheet.dart';
 import '../models/app_page_model.dart';
 import '../services/app_pages_service.dart';
@@ -71,6 +72,14 @@ class _LegalInfoModalState extends State<LegalInfoModal> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.colorScheme.primary;
+
+    String appVersion = 'ZooM-POS v1.0.6';
+    try {
+      final branding = context.watch<PlatformBrandingProvider>();
+      if (branding.appVersion.isNotEmpty) {
+        appVersion = branding.appVersion;
+      }
+    } catch (_) {}
 
     return Container(
       decoration: BoxDecoration(
@@ -168,7 +177,7 @@ class _LegalInfoModalState extends State<LegalInfoModal> {
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  'ZooM-POS v1.0.6',
+                  appVersion,
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,

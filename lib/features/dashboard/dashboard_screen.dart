@@ -1668,7 +1668,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           dividerColor: onDrawer.withValues(alpha: 0.22),
         );
 
-        final brandingProvider = context.read<PlatformBrandingProvider>();
+        final brandingProvider = context.watch<PlatformBrandingProvider>();
         final supportPhone = (bootstrap.config['support_whatsapp'] ??
                 bootstrap.config['support_phone'] ??
                 brandingProvider.supportPhone)
@@ -1760,76 +1760,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               onTap: () => _launchHelpSupport(
                                   context, effectiveSupportPhone),
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 8),
                             InkWell(
                               onTap: () {
                                 Navigator.of(context).pop();
                                 LegalInfoModal.show(context);
                               },
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 4, horizontal: 2),
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerLeft,
-                                  child: Row(
-                                    children: [
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.info_outline,
-                                              size: 14,
-                                              color: unselectedIconColor
-                                                  .withValues(alpha: 0.8)),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'ZooM-POS v1.0.6',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              color: unselectedIconColor
-                                                  .withValues(alpha: 0.85),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 7, vertical: 2.5),
-                                        decoration: BoxDecoration(
-                                          color: primaryColor
-                                              .withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(
-                                            color: primaryColor
-                                                .withValues(alpha: 0.3),
-                                            width: 0.8,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              'More',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w800,
-                                                color: primaryColor,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 3),
-                                            Icon(Icons.arrow_forward_ios,
-                                                size: 8, color: primaryColor),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                height: 48,
+                                padding: const EdgeInsets.symmetric(horizontal: 18),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF132034),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFF0D9488).withValues(alpha: 0.8),
+                                    width: 1.2,
                                   ),
+                                ),
+                                child: Row(
+                                  children: const [
+                                    Icon(
+                                      Icons.more_horiz_rounded,
+                                      size: 20,
+                                      color: Color(0xFF0D9488),
+                                    ),
+                                    SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'More',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                          letterSpacing: 0.2,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.chevron_right_rounded,
+                                      size: 18,
+                                      color: Color(0xFF0D9488),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
+                            if (brandingProvider.showAppVersion) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                brandingProvider.appVersion.isNotEmpty
+                                    ? brandingProvider.appVersion
+                                    : 'ZooM-POS v1.0.6',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF64748B),
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
