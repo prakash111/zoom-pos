@@ -1185,12 +1185,13 @@ class _SduiGenericListScreenState extends State<SduiGenericListScreen> {
       }
     }
     if (metricsList.isEmpty && _data?['metrics'] is Map) {
+      final currency = context.read<AuthProvider>().company?.currencySymbol ?? '\$';
       final m = _data!['metrics'] as Map;
       metricsList = [
         if (m['total_wallet_balance'] != null)
           {
             'label': 'Total Store Wallet',
-            'value': '₹${((m['total_wallet_balance'] as num).toDouble()).toStringAsFixed(2)}',
+            'value': '$currency${((m['total_wallet_balance'] as num).toDouble()).toStringAsFixed(2)}',
             'icon': 'account_balance_wallet',
             'color': '#10B981',
           },

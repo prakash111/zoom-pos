@@ -889,7 +889,7 @@ class PosProvider extends ChangeNotifier {
   /// [taxLabel] is only used to name the tax line on the persisted sale
   /// (e.g. "GST" for Indian tenants) — pass the caller's
   /// `company.taxLabel` where available.
-  Future<PosCheckoutResult?> checkout({String? taxLabel}) async {
+  Future<PosCheckoutResult?> checkout({String? taxLabel, String? currencySymbol}) async {
     if (_cart.isEmpty) return null;
 
     if (requiresCustomerForDue) {
@@ -910,6 +910,7 @@ class PosProvider extends ChangeNotifier {
         : walletSplitAmount;
 
     if (totalWalletTender > 0.001) {
+      final curr = currencySymbol ?? '\$';
       if (!BootstrapCache.instance.isWalletEnabled) {
         checkoutError = 'Customer store wallet payments are currently disabled.';
         notifyListeners();
@@ -923,7 +924,7 @@ class PosProvider extends ChangeNotifier {
       if (selectedCustomer!.walletBalance < totalWalletTender - 0.001) {
         final short = totalWalletTender - selectedCustomer!.walletBalance;
         checkoutError =
-            'Insufficient customer wallet balance. Short by ₹${short.toStringAsFixed(2)}.';
+            'Insufficient customer wallet balance. Short by $curr${short.toStringAsFixed(2)}.';
         notifyListeners();
         return null;
       }

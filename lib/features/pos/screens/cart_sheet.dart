@@ -386,7 +386,10 @@ class CartSheet extends StatelessWidget {
 
     final company = context.read<AuthProvider>().company;
     final messenger = ScaffoldMessenger.of(context);
-    final result = await pos.checkout(taxLabel: company?.taxLabel);
+    final result = await pos.checkout(
+      taxLabel: company?.taxLabel,
+      currencySymbol: company?.currencySymbol,
+    );
     if (!context.mounted) return;
 
     if (result != null) {
@@ -577,6 +580,8 @@ class CartSheet extends StatelessWidget {
     if (customer == null || customer.id.isEmpty) return const SizedBox.shrink();
 
     final pos = context.watch<PosProvider>();
+    final company = context.watch<AuthProvider>().company;
+    final currency = company?.currencySymbol ?? '\$';
     final authUser = context.watch<AuthProvider>().user;
     final canRedeemPoints = authUser?.can('loyalty.redeem_points') ?? true;
     final canViewLoyalty = authUser?.can('loyalty.view') ?? true;
@@ -614,7 +619,7 @@ class CartSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '✓ ${pos.rewardPointsRedeemed.toInt()} pts applied (-₹${pos.rewardPointsDiscount.toStringAsFixed(2)})',
+                      '✓ ${pos.rewardPointsRedeemed.toInt()} pts applied (-$currency${pos.rewardPointsDiscount.toStringAsFixed(2)})',
                       style: const TextStyle(
                         color: Color(0xFF10B981),
                         fontSize: 13,
@@ -672,7 +677,7 @@ class CartSheet extends StatelessWidget {
                       ),
                       Flexible(
                         child: Text(
-                          '$points Pts (₹${pointsMonetaryVal.toStringAsFixed(2)})',
+                          '$points Pts ($currency${pointsMonetaryVal.toStringAsFixed(2)})',
                           style: const TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -727,7 +732,7 @@ class CartSheet extends StatelessWidget {
                     ),
                     Flexible(
                       child: Text(
-                        '$points Pts (₹${pointsMonetaryVal.toStringAsFixed(2)})',
+                        '$points Pts ($currency${pointsMonetaryVal.toStringAsFixed(2)})',
                         style: const TextStyle(
                             color: Colors.white,
                             fontSize: 13,
@@ -768,6 +773,7 @@ class CartSheet extends StatelessWidget {
   Future<void> _showPointsRedeemDialog(
       BuildContext context, int availablePoints, double cartTotal) async {
     final pos = context.read<PosProvider>();
+    final currency = context.read<AuthProvider>().company?.currencySymbol ?? '\$';
     final settings = BootstrapCache.instance.loyaltySettings;
     final rate = settings.redemptionValuePerPoint > 0 ? settings.redemptionValuePerPoint : 1.0;
     final capPct = settings.maxRedemptionPercentage;
@@ -793,10 +799,10 @@ class CartSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Available Balance: $availablePoints pts (₹${(availablePoints * rate).toStringAsFixed(2)})'),
+            Text('Available Balance: $availablePoints pts ($currency${(availablePoints * rate).toStringAsFixed(2)})'),
             const SizedBox(height: 4),
             Text(
-              'Max redeemable (Cap $capPct% of cart): ${maxAllowedPoints.toInt()} pts (-₹${(maxAllowedPoints * rate).toStringAsFixed(2)})',
+              'Max redeemable (Cap $capPct% of cart): ${maxAllowedPoints.toInt()} pts (-$currency${(maxAllowedPoints * rate).toStringAsFixed(2)})',
               style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
             ),
             const SizedBox(height: 12),
@@ -848,7 +854,7 @@ class CartSheet extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                         content: Text(
-                            'Applied ${pts.toInt()} reward points (-₹${pos.rewardPointsDiscount.toStringAsFixed(2)})!')),
+                            'Applied ${pts.toInt()} reward points (-$currency${pos.rewardPointsDiscount.toStringAsFixed(2)})!')),
                   );
                 }
               } else if (pts <= 0) {
@@ -875,6 +881,8 @@ class CartSheet extends StatelessWidget {
 
   Widget _buildCouponSection(BuildContext context, PosProvider pos) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final company = context.watch<AuthProvider>().company;
+    final currency = company?.currencySymbol ?? '\$';
     if (pos.appliedCouponCode != null) {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 8),
@@ -904,7 +912,7 @@ class CartSheet extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Discount: -₹${pos.couponDiscount.toStringAsFixed(2)}',
+                    'Discount: -$currency${pos.couponDiscount.toStringAsFixed(2)}',
                     style: TextStyle(
                       color: isDark
                           ? const Color(0xFFCBD5E1)
@@ -1724,7 +1732,7 @@ class CartSheet extends StatelessWidget {
                                             pos.paymentMethod == method.id,
                                         subtitle: (method.code.toLowerCase() == 'wallet' || method.id.toLowerCase() == 'wallet')
                                             ? (pos.selectedCustomer != null
-                                                ? '${company?.currencySymbol ?? "₹"}${pos.selectedCustomer!.walletBalance.toStringAsFixed(2)}'
+                                                ? '${company?.currencySymbol ?? "\$"}${pos.selectedCustomer!.walletBalance.toStringAsFixed(2)}'
                                                 : null)
                                             : null,
                                         color: _colorForMethod(
@@ -1768,7 +1776,7 @@ class CartSheet extends StatelessWidget {
                                     customer: pos.selectedCustomer,
                                     amountToPay: pos.amountPaid,
                                     currencySymbol:
-                                        company?.currencySymbol ?? '₹',
+                                        company?.currencySymbol ?? '\$',
                                     activeMethods: activeMethods,
                                     primaryColor: primaryColor,
                                   ),
@@ -1997,7 +2005,9 @@ class CartSheet extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
 
     String phoneTip = customer.phone ?? '';
+    String? emailTip;
     String? channel;
+    List<String> channels = [];
     try {
       final res = await client.post('/loyalty/auth/request-otp', data: {
         'customer_id': customer.id,
@@ -2006,8 +2016,14 @@ class CartSheet extends StatelessWidget {
       if (res['phone_tip'] != null && (res['phone_tip'] as String).isNotEmpty) {
         phoneTip = res['phone_tip'] as String;
       }
+      if (res['email_tip'] != null && (res['email_tip'] as String).isNotEmpty) {
+        emailTip = res['email_tip'] as String;
+      }
       if (res['channel'] != null && (res['channel'] as String).isNotEmpty) {
         channel = res['channel'] as String;
+      }
+      if (res['channels'] is List) {
+        channels = (res['channels'] as List).map((e) => e.toString()).toList();
       }
     } catch (e) {
       messenger.showSnackBar(
@@ -2028,7 +2044,9 @@ class CartSheet extends StatelessWidget {
         customer: customer,
         purpose: purpose,
         initialPhoneTip: phoneTip,
+        initialEmailTip: emailTip,
         initialChannel: channel,
+        initialChannels: channels,
       ),
     );
 
@@ -3058,11 +3076,12 @@ class _CouponInputFieldState extends State<_CouponInputField> {
           discountAmount: discountAmt,
           couponId: couponId,
         );
+        final currency = context.read<AuthProvider>().company?.currencySymbol ?? '\$';
         _controller.clear();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                'Coupon applied! -₹${discountAmt.toStringAsFixed(2)} off'),
+                'Coupon applied! -$currency${discountAmt.toStringAsFixed(2)} off'),
             backgroundColor: const Color(0xFF10B981),
           ),
         );
@@ -3172,14 +3191,18 @@ class _LoyaltyOtpDialog extends StatefulWidget {
     required this.customer,
     required this.purpose,
     required this.initialPhoneTip,
+    this.initialEmailTip,
     this.initialChannel,
+    this.initialChannels = const [],
   });
 
   final ApiClient client;
   final CustomerModel customer;
   final String purpose;
   final String initialPhoneTip;
+  final String? initialEmailTip;
   final String? initialChannel;
+  final List<String> initialChannels;
 
   @override
   State<_LoyaltyOtpDialog> createState() => _LoyaltyOtpDialogState();
@@ -3192,13 +3215,17 @@ class _LoyaltyOtpDialogState extends State<_LoyaltyOtpDialog> {
   bool _isSubmitting = false;
   String? _errorMessage;
   late String _phoneTip;
+  String? _emailTip;
   String? _channel;
+  List<String> _channels = [];
 
   @override
   void initState() {
     super.initState();
     _phoneTip = widget.initialPhoneTip;
+    _emailTip = widget.initialEmailTip;
     _channel = widget.initialChannel;
+    _channels = List.from(widget.initialChannels);
     _startTimer();
   }
 
@@ -3228,8 +3255,14 @@ class _LoyaltyOtpDialogState extends State<_LoyaltyOtpDialog> {
       if (res['phone_tip'] != null && (res['phone_tip'] as String).isNotEmpty) {
         _phoneTip = res['phone_tip'] as String;
       }
+      if (res['email_tip'] != null && (res['email_tip'] as String).isNotEmpty) {
+        _emailTip = res['email_tip'] as String;
+      }
       if (res['channel'] != null && (res['channel'] as String).isNotEmpty) {
         _channel = res['channel'] as String;
+      }
+      if (res['channels'] is List) {
+        _channels = (res['channels'] as List).map((e) => e.toString()).toList();
       }
       _startTimer();
       if (mounted) {
@@ -3284,11 +3317,46 @@ class _LoyaltyOtpDialogState extends State<_LoyaltyOtpDialog> {
     super.dispose();
   }
 
+  String _formatChannelLabel() {
+    if (_channels.isNotEmpty) {
+      final names = _channels.map((c) {
+        switch (c.toLowerCase()) {
+          case 'whatsapp':
+            return 'WhatsApp';
+          case 'sms':
+            return 'SMS';
+          case 'email':
+            return 'Email';
+          default:
+            return c.toUpperCase();
+        }
+      }).toSet().toList();
+      if (names.length == 1) return names.first;
+      if (names.length == 2) return '${names[0]} & ${names[1]}';
+      return '${names.sublist(0, names.length - 1).join(', ')} & ${names.last}';
+    }
+    return _channel == 'whatsapp'
+        ? 'WhatsApp'
+        : (_channel == 'email'
+            ? 'Email'
+            : (_channel == 'sms' ? 'SMS' : 'WhatsApp / SMS'));
+  }
+
+  String _formatDestinationLabel() {
+    final hasPhone = _phoneTip.isNotEmpty;
+    final hasEmail = _emailTip != null && _emailTip!.isNotEmpty;
+    if (hasPhone && hasEmail && _channels.contains('email')) {
+      return 'to $_phoneTip & $_emailTip';
+    }
+    if (hasPhone) return 'to $_phoneTip';
+    if (hasEmail) return 'to $_emailTip';
+    return '';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final channelName = _channel == 'whatsapp'
-        ? 'WhatsApp'
-        : (_channel == 'sms' ? 'SMS' : 'WhatsApp / SMS');
+    final channelName = _formatChannelLabel();
+    final destText = _formatDestinationLabel();
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -3317,7 +3385,9 @@ class _LoyaltyOtpDialogState extends State<_LoyaltyOtpDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'A 6-digit verification code was dispatched via $channelName to $_phoneTip to authorize loyalty deductions.',
+              destText.isNotEmpty
+                  ? 'A 6-digit verification code was dispatched via $channelName $destText to authorize loyalty deductions.'
+                  : 'A 6-digit verification code was dispatched via $channelName to authorize loyalty deductions.',
               style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
             ),
             const SizedBox(height: 16),
