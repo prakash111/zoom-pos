@@ -87,11 +87,6 @@ const Set<String> _disallowedParentKeys = <String>{
   'nav_store_faqs',
   'nav_store_reviews',
   'nav_storefront_pixels',
-  'pos',
-  'pharmacy_pos',
-  'salon_pos',
-  'restaurant_pos',
-  'consignments',
 };
 
 class _FeatureTile {
