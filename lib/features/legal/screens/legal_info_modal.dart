@@ -159,33 +159,20 @@ class _LegalInfoModalState extends State<LegalInfoModal> {
                 ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2)
                 : Colors.grey.withValues(alpha: 0.04),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.shield_outlined,
-                      size: 13,
-                      color: theme.disabledColor,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      'ZooM-POS v1.0.6',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: theme.disabledColor,
-                      ),
-                    ),
-                  ],
+                Icon(
+                  Icons.shield_outlined,
+                  size: 13,
+                  color: theme.disabledColor,
                 ),
+                const SizedBox(width: 5),
                 Text(
-                  'Super Admin Synced',
+                  'ZooM-POS v1.0.6',
                   style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color: primaryColor.withValues(alpha: 0.8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: theme.disabledColor,
                   ),
                 ),
               ],
