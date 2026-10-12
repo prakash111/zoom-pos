@@ -1124,7 +1124,9 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
                     maxLength: 120,
                     decoration: InputDecoration(
                       labelText: 'Custom section title',
-                      hintText: section.label,
+                      hintText: section.tiles.isNotEmpty
+                          ? section.tiles.first.label
+                          : null,
                       helperText: section.tiles.isEmpty
                           ? 'Empty section — drop an item below this header'
                           : null,
