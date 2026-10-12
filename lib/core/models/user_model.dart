@@ -73,6 +73,10 @@ class UserModel {
       }
     }
 
+    if (permission == 'loyalty.bypass_otp') {
+      return false;
+    }
+
     final lowerRole = role.toLowerCase().trim();
     if (lowerRole == 'owner' ||
         lowerRole == 'admin' ||
@@ -82,7 +86,6 @@ class UserModel {
     }
     if (permissions['*'] == true) return true;
     if (permissions[permission] == true) return true;
-    if (permission == 'loyalty.bypass_otp') return false;
 
     if (dotIndex != -1) {
       final module = permission.substring(0, dotIndex);

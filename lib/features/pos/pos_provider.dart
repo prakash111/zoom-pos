@@ -199,6 +199,15 @@ class PosProvider extends ChangeNotifier {
   // --- Reward Points & Coupon Discounts ---
   double rewardPointsRedeemed = 0.0;
   double rewardPointsDiscount = 0.0;
+  String? loyaltyVerifiedCustomerId;
+
+  bool isLoyaltyCustomerVerified(String customerId) =>
+      loyaltyVerifiedCustomerId == customerId;
+
+  void markLoyaltyCustomerVerified(String customerId) {
+    loyaltyVerifiedCustomerId = customerId;
+    notifyListeners();
+  }
 
   String? appliedCouponCode;
   int? appliedCouponId;
@@ -763,6 +772,9 @@ class PosProvider extends ChangeNotifier {
   }
 
   void setCustomer(CustomerModel? customer) {
+    if (selectedCustomer?.id != customer?.id) {
+      loyaltyVerifiedCustomerId = null;
+    }
     selectedCustomer = customer;
     notifyListeners();
   }
@@ -848,6 +860,7 @@ class PosProvider extends ChangeNotifier {
     isPercentDiscount = false;
     rewardPointsRedeemed = 0.0;
     rewardPointsDiscount = 0.0;
+    loyaltyVerifiedCustomerId = null;
     appliedCouponCode = null;
     appliedCouponId = null;
     couponDiscount = 0.0;

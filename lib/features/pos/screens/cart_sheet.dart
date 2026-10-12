@@ -313,21 +313,24 @@ class CartSheet extends StatelessWidget {
 
   Future<void> _previewThenCheckout(BuildContext context) async {
     final pos = context.read<PosProvider>();
-    final authUser = context.read<AuthProvider>().user;
-    final canBypass = authUser?.can('loyalty.bypass_otp') ?? false;
 
-    // Check if Store Wallet is being used and requires OTP verification
+    // Check if Store Wallet or Reward Points are being used and require customer OTP authorization
     final isWalletUsed = pos.paymentMethod == 'wallet' ||
         (pos.isSplitPayment &&
             pos.payments.any((p) => p.method == 'wallet' || p.methodCode == 'wallet'));
+    final isPointsUsed = pos.rewardPointsRedeemed > 0;
 
-    if (isWalletUsed && !canBypass && pos.selectedCustomer != null) {
-      final verified = await _showLoyaltyOtpDialog(
-        context,
-        customer: pos.selectedCustomer!,
-        purpose: 'wallet_spend',
-      );
-      if (!verified) return;
+    if ((isWalletUsed || isPointsUsed) && pos.selectedCustomer != null) {
+      final customer = pos.selectedCustomer!;
+      if (!pos.isLoyaltyCustomerVerified(customer.id)) {
+        final verified = await _showLoyaltyOtpDialog(
+          context,
+          customer: customer,
+          purpose: isWalletUsed ? 'wallet_spend' : 'points_redemption',
+        );
+        if (!verified) return;
+        pos.markLoyaltyCustomerVerified(customer.id);
+      }
     }
 
     final company = context.read<AuthProvider>().company;
@@ -362,6 +365,25 @@ class CartSheet extends StatelessWidget {
 
   Future<void> _checkout(BuildContext context) async {
     final pos = context.read<PosProvider>();
+
+    final isWalletUsed = pos.paymentMethod == 'wallet' ||
+        (pos.isSplitPayment &&
+            pos.payments.any((p) => p.method == 'wallet' || p.methodCode == 'wallet'));
+    final isPointsUsed = pos.rewardPointsRedeemed > 0;
+
+    if ((isWalletUsed || isPointsUsed) && pos.selectedCustomer != null) {
+      final customer = pos.selectedCustomer!;
+      if (!pos.isLoyaltyCustomerVerified(customer.id)) {
+        final verified = await _showLoyaltyOtpDialog(
+          context,
+          customer: customer,
+          purpose: isWalletUsed ? 'wallet_spend' : 'points_redemption',
+        );
+        if (!verified) return;
+        pos.markLoyaltyCustomerVerified(customer.id);
+      }
+    }
+
     final company = context.read<AuthProvider>().company;
     final messenger = ScaffoldMessenger.of(context);
     final result = await pos.checkout(taxLabel: company?.taxLabel);
@@ -810,16 +832,14 @@ class CartSheet extends StatelessWidget {
               final pts = double.tryParse(controller.text.trim()) ?? 0;
               if (pts > 0 && pts <= maxAllowedPoints) {
                 final customer = pos.selectedCustomer;
-                final authUser = context.read<AuthProvider>().user;
-                final canBypass = authUser?.can('loyalty.bypass_otp') ?? false;
-
-                if (!canBypass && customer != null) {
+                if (customer != null && !pos.isLoyaltyCustomerVerified(customer.id)) {
                   final verified = await _showLoyaltyOtpDialog(
                     context,
                     customer: customer,
                     purpose: 'points_redemption',
                   );
                   if (!verified) return;
+                  pos.markLoyaltyCustomerVerified(customer.id);
                 }
 
                 pos.applyRewardPoints(pts, rate: rate);
@@ -1977,6 +1997,7 @@ class CartSheet extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
 
     String phoneTip = customer.phone ?? '';
+    String? channel;
     try {
       final res = await client.post('/loyalty/auth/request-otp', data: {
         'customer_id': customer.id,
@@ -1984,6 +2005,9 @@ class CartSheet extends StatelessWidget {
       });
       if (res['phone_tip'] != null && (res['phone_tip'] as String).isNotEmpty) {
         phoneTip = res['phone_tip'] as String;
+      }
+      if (res['channel'] != null && (res['channel'] as String).isNotEmpty) {
+        channel = res['channel'] as String;
       }
     } catch (e) {
       messenger.showSnackBar(
@@ -2004,6 +2028,7 @@ class CartSheet extends StatelessWidget {
         customer: customer,
         purpose: purpose,
         initialPhoneTip: phoneTip,
+        initialChannel: channel,
       ),
     );
 
@@ -3147,12 +3172,14 @@ class _LoyaltyOtpDialog extends StatefulWidget {
     required this.customer,
     required this.purpose,
     required this.initialPhoneTip,
+    this.initialChannel,
   });
 
   final ApiClient client;
   final CustomerModel customer;
   final String purpose;
   final String initialPhoneTip;
+  final String? initialChannel;
 
   @override
   State<_LoyaltyOtpDialog> createState() => _LoyaltyOtpDialogState();
@@ -3165,11 +3192,13 @@ class _LoyaltyOtpDialogState extends State<_LoyaltyOtpDialog> {
   bool _isSubmitting = false;
   String? _errorMessage;
   late String _phoneTip;
+  String? _channel;
 
   @override
   void initState() {
     super.initState();
     _phoneTip = widget.initialPhoneTip;
+    _channel = widget.initialChannel;
     _startTimer();
   }
 
@@ -3198,6 +3227,9 @@ class _LoyaltyOtpDialogState extends State<_LoyaltyOtpDialog> {
       });
       if (res['phone_tip'] != null && (res['phone_tip'] as String).isNotEmpty) {
         _phoneTip = res['phone_tip'] as String;
+      }
+      if (res['channel'] != null && (res['channel'] as String).isNotEmpty) {
+        _channel = res['channel'] as String;
       }
       _startTimer();
       if (mounted) {
@@ -3254,6 +3286,10 @@ class _LoyaltyOtpDialogState extends State<_LoyaltyOtpDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final channelName = _channel == 'whatsapp'
+        ? 'WhatsApp'
+        : (_channel == 'sms' ? 'SMS' : 'WhatsApp / SMS');
+
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Row(
@@ -3281,7 +3317,7 @@ class _LoyaltyOtpDialogState extends State<_LoyaltyOtpDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'A 6-digit verification code was dispatched via WhatsApp / SMS to $_phoneTip to authorize loyalty deductions.',
+              'A 6-digit verification code was dispatched via $channelName to $_phoneTip to authorize loyalty deductions.',
               style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
             ),
             const SizedBox(height: 16),
