@@ -1315,8 +1315,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 childrenByParent[tile.key] ??
                 const <_FeatureTile>[];
             final index = indexByKey[tile.key]!;
+            final override = itemOverrides[tile.key];
+            final effectiveDepth = override != null &&
+                    (override.parentId == null || override.parentId!.isEmpty) &&
+                    override.level > 0
+                ? override.level
+                : depth;
+            final isEffectiveSectionParent = sectionParent && effectiveDepth == 0;
             final padding = EdgeInsets.only(
-              left: 16 + depth * 30,
+              left: 16 + effectiveDepth * 30,
               right: 12,
             );
 
@@ -1332,7 +1339,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: ListTile(
                   key: ValueKey('drawer-item-${tile.key}'),
                   contentPadding: padding,
-                  dense: depth > 0,
+                  dense: effectiveDepth > 0,
                   iconColor: isSelected ? selectedItemColor : unselectedIconColor,
                   textColor: isSelected ? selectedItemColor : unselectedItemColor,
                   selectedColor: selectedItemColor,
@@ -1351,7 +1358,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   leading: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (depth > 0) ...[
+                      if (effectiveDepth > 0) ...[
                         Text(
                           '↳',
                           style: TextStyle(
@@ -1364,12 +1371,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
                       if (isSelected)
                         Container(
-                          width: depth > 0 ? 26 : 32,
-                          height: depth > 0 ? 26 : 32,
+                          width: effectiveDepth > 0 ? 26 : 32,
+                          height: effectiveDepth > 0 ? 26 : 32,
                           decoration: BoxDecoration(
                             color: selectedItemColor,
                             borderRadius:
-                                BorderRadius.circular(depth > 0 ? 6 : 8),
+                                BorderRadius.circular(effectiveDepth > 0 ? 6 : 8),
                             boxShadow: [
                               BoxShadow(
                                 color:
@@ -1382,7 +1389,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Center(
                             child: Icon(
                               tile.icon,
-                              size: depth > 0 ? 14 : 18,
+                              size: effectiveDepth > 0 ? 14 : 18,
                               color: Colors.white,
                             ),
                           ),
@@ -1390,8 +1397,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       else
                         Icon(
                           tile.icon,
-                          size: sectionParent ? 22 : (depth == 0 ? 24 : 18),
-                          color: depth > 0
+                          size: isEffectiveSectionParent ? 22 : (effectiveDepth == 0 ? 24 : 18),
+                          color: effectiveDepth > 0
                               ? unselectedIconColor.withValues(alpha: 0.85)
                               : unselectedIconColor,
                         ),
@@ -1401,11 +1408,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     bootstrap.resolveNavigationLabel(
                         tile.key, tile.titleOf(l10n)),
                     style: TextStyle(
-                      fontSize: depth > 0 ? 13 : 14,
-                      fontWeight: sectionParent || isSelected
+                      fontSize: effectiveDepth > 0 ? 13 : 14,
+                      fontWeight: isEffectiveSectionParent || isSelected
                           ? FontWeight.w700
-                          : (depth > 0 ? FontWeight.w500 : FontWeight.w500),
-                      letterSpacing: sectionParent ? 0.2 : null,
+                          : (effectiveDepth > 0 ? FontWeight.w500 : FontWeight.w500),
+                      letterSpacing: isEffectiveSectionParent ? 0.2 : null,
                       color:
                           isSelected ? selectedItemColor : unselectedItemColor,
                     ),
@@ -2053,6 +2060,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             childrenByParent[tile.key] ??
             const <_FeatureTile>[];
         final index = indexByKey[tile.key]!;
+        final override = itemOverrides[tile.key];
+        final effectiveDepth = override != null &&
+                (override.parentId == null || override.parentId!.isEmpty) &&
+                override.level > 0
+            ? override.level
+            : depth;
+        final isEffectiveSectionParent = sectionParent && effectiveDepth == 0;
         final selected = _selectedTileKey == tile.key ||
             (_selectedTileKey == null && _dockIndex == index);
         final labelColor =
@@ -2060,27 +2074,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final label = Text(
           bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
           style: TextStyle(
-            fontSize: depth > 0 ? 13 : 14,
-            fontWeight: sectionParent || selected
+            fontSize: effectiveDepth > 0 ? 13 : 14,
+            fontWeight: isEffectiveSectionParent || selected
                 ? FontWeight.w700
-                : (depth > 0 ? FontWeight.w500 : FontWeight.normal),
-            letterSpacing: sectionParent ? 0.2 : null,
+                : (effectiveDepth > 0 ? FontWeight.w500 : FontWeight.normal),
+            letterSpacing: isEffectiveSectionParent ? 0.2 : null,
             color: labelColor,
           ),
         );
         final leading = Icon(
           tile.icon,
-          size: depth == 0 ? 22 : 18,
+          size: effectiveDepth == 0 ? 22 : 18,
           color: selected
               ? Theme.of(context).colorScheme.primary
               : (tp.drawerTextColor ??
-                  (sectionParent
+                  (isEffectiveSectionParent
                       ? (Theme.of(context).brightness == Brightness.dark
                           ? const Color(0xFFE2E8F0)
                           : const Color(0xFF334155))
                       : null)),
         );
-        final pad = EdgeInsets.only(left: 12 + depth * 20, right: 8);
+        final pad = EdgeInsets.only(left: 12 + effectiveDepth * 20, right: 8);
 
         if (nested.isEmpty) {
           return Padding(
@@ -2107,15 +2121,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   .withValues(alpha: 0.12),
               leading: selected
                   ? Container(
-                      width: depth > 0 ? 24 : 28,
-                      height: depth > 0 ? 24 : 28,
+                      width: effectiveDepth > 0 ? 24 : 28,
+                      height: effectiveDepth > 0 ? 24 : 28,
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.primary,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Center(
                         child: Icon(tile.icon,
-                            size: depth > 0 ? 14 : 16, color: Colors.white),
+                            size: effectiveDepth > 0 ? 14 : 16, color: Colors.white),
                       ),
                     )
                   : leading,

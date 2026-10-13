@@ -65,12 +65,14 @@ class _WorkingItem {
     required this.label,
     required this.visible,
     this.parentKey,
+    this.level = 0,
   });
 
   final String key;
   final String label;
   bool visible;
   String? parentKey;
+  int level;
 }
 
 class _WorkingSection {
@@ -224,11 +226,13 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             ? override.section!
             : section.key;
         var effectiveParent = override != null
-            ? (override.level == 0 ? null : override.parentId)
+            ? (override.parentId != null &&
+                    override.parentId!.isNotEmpty &&
+                    !_disallowedParentKeys.contains(override.parentId)
+                ? override.parentId
+                : null)
             : null;
-        if (effectiveParent != null && _disallowedParentKeys.contains(effectiveParent)) {
-          effectiveParent = null;
-        }
+        final overrideLevel = override?.level ?? 0;
         (grouped[targetSection] ??= []).add((
           order: override?.order ?? index,
           fallback: fallback++,
@@ -237,6 +241,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             label: tile.label,
             visible: override?.visible ?? true,
             parentKey: effectiveParent,
+            level: overrideLevel,
           ),
         ));
       }
@@ -394,12 +399,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   void _repairAndArrange(_WorkingSection section) {
     final byKey = {for (final tile in section.tiles) tile.key: tile};
 
-    for (var i = 0; i < section.tiles.length; i++) {
-      final tile = section.tiles[i];
-      if (i == 0) {
-        tile.parentKey = null;
-        continue;
-      }
+    for (final tile in section.tiles) {
       if (tile.parentKey != null && _disallowedParentKeys.contains(tile.parentKey)) {
         tile.parentKey = null;
       }
@@ -420,7 +420,11 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         }
         cursor = parent.parentKey;
       }
-      if (!valid) tile.parentKey = null;
+      if (!valid) {
+        tile.parentKey = null;
+      } else if (tile.parentKey != null) {
+        tile.level = depth;
+      }
     }
 
     final childrenByParent = <String?, List<_WorkingItem>>{};
@@ -457,15 +461,20 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     var depth = 0;
     var current = byKey[key];
 
-    while (current?.parentKey != null &&
-        depth < _maximumNavigationLevel &&
-        seen.add(current!.key)) {
-      final parent = byKey[current.parentKey];
-      if (parent == null) break;
-      depth++;
-      current = parent;
+    if (current == null) return 0;
+    if (current.parentKey != null && byKey.containsKey(current.parentKey)) {
+      while (current?.parentKey != null &&
+          depth < _maximumNavigationLevel &&
+          seen.add(current!.key)) {
+        final parent = byKey[current.parentKey];
+        if (parent == null) break;
+        depth++;
+        current = parent;
+      }
+      return depth;
     }
-    return depth;
+
+    return current.level.clamp(0, _maximumNavigationLevel);
   }
 
   int _subtreeEnd(_WorkingSection section, int startIndex) {
@@ -542,7 +551,10 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     _dragStartDepth = depth;
     _dragPreviewDepth = depth;
     _dragMaximumDepth = itemIndex == 0
-        ? 0
+        ? math.max(
+            0,
+            _maximumNavigationLevel - _subtreeHeight(section, itemIndex),
+          )
         : math.max(
             0,
             math.min(
@@ -583,7 +595,10 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       _dragStartDepth = depth;
       _dragPreviewDepth = depth;
       _dragMaximumDepth = itemIndex == 0
-          ? 0
+          ? math.max(
+              0,
+              _maximumNavigationLevel - _subtreeHeight(section, itemIndex),
+            )
           : math.max(
               0,
               math.min(
@@ -633,9 +648,18 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     var targetDepth = math.min(requestedDepth, maximumDepth);
 
     if (itemIndex == 0) {
-      targetDepth = 0;
+      targetDepth = math.min(requestedDepth, _maximumNavigationLevel);
+      if (targetDepth > 0) {
+        for (final child in section.tiles) {
+          if (child.parentKey == dragged.key) {
+            child.parentKey = null;
+            child.level = 0;
+          }
+        }
+      }
       dragged.parentKey = null;
-      return 0;
+      dragged.level = targetDepth.clamp(0, _maximumNavigationLevel);
+      return dragged.level;
     } else {
       targetDepth = math.min(
         targetDepth,
@@ -655,8 +679,9 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       }
     }
     dragged.parentKey = parentKey;
+    dragged.level = targetDepth;
 
-    return parentKey == null ? 0 : targetDepth;
+    return targetDepth;
   }
 
   void _onUnifiedReorder(int oldIndex, int newIndex) {
@@ -740,8 +765,24 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       final itemIndex = section.tiles.indexOf(item);
       if (itemIndex < 0) return;
 
-      if (itemIndex == 0 || requestedDepth <= 0) {
+      // Auto-detach / flatten any children of this item so they sit directly under the section header
+      for (final child in section.tiles) {
+        if (child.parentKey == item.key) {
+          child.parentKey = null;
+          child.level = 0;
+        }
+      }
+
+      if (requestedDepth <= 0) {
         item.parentKey = null;
+        item.level = 0;
+        _repairAndArrange(section);
+        return;
+      }
+
+      if (itemIndex == 0) {
+        item.parentKey = null;
+        item.level = requestedDepth.clamp(0, _maximumNavigationLevel);
         _repairAndArrange(section);
         return;
       }
@@ -765,9 +806,6 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             break;
           }
         }
-        if (parentKey == null && !_disallowedParentKeys.contains(precedingItem.key)) {
-          parentKey = precedingItem.key;
-        }
       } else {
         // requestedDepth >= 2: nest under nearest depth 1 item above it
         for (var i = itemIndex - 1; i >= 0; i--) {
@@ -783,6 +821,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         }
       }
       item.parentKey = parentKey;
+      item.level = targetDepth;
       _repairAndArrange(section);
     });
   }
@@ -1095,9 +1134,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             onSelected: (level) => _changeItemDepth(section, tile, level),
             itemBuilder: (context) {
               return [
-                for (var level = 0;
-                    level <= (itemIndex == 0 ? 0 : _maximumNavigationLevel);
-                    level++)
+                for (var level = 0; level <= _maximumNavigationLevel; level++)
                   PopupMenuItem<int>(
                     key: ValueKey('nav-level-option-${tile.key}-$level'),
                     value: level,
