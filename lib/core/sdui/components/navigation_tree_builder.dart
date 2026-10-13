@@ -765,19 +765,20 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       final itemIndex = section.tiles.indexOf(item);
       if (itemIndex < 0) return;
 
-      // Auto-detach / flatten any children of this item so they sit directly under the section header
-      for (final child in section.tiles) {
-        if (child.parentKey == item.key) {
-          child.parentKey = null;
-          child.level = 0;
-        }
-      }
-
       if (requestedDepth <= 0) {
         item.parentKey = null;
         item.level = 0;
         _repairAndArrange(section);
         return;
+      }
+
+      // Auto-detach / flatten any children of this item so they sit directly under the section header
+      // when converting this item into a Sub-Menu (requestedDepth > 0):
+      for (final child in section.tiles) {
+        if (child.parentKey == item.key) {
+          child.parentKey = null;
+          child.level = 0;
+        }
       }
 
       if (itemIndex == 0) {
