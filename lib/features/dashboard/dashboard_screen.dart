@@ -2141,22 +2141,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
 
-        bool hasSelectedChildDescendant(_FeatureTile parent) {
-          final direct = childrenByParent[parent.key] ?? const <_FeatureTile>[];
-          for (final c in direct) {
-            final cIndex = indexByKey[c.key];
-            final childSelected = _selectedTileKey == c.key ||
-                (_selectedTileKey != null && c.url != null && _selectedTileKey == c.url) ||
-                (_selectedTileKey == null && cIndex != null && _dockIndex == cIndex);
-            if (childSelected || hasSelectedChildDescendant(c)) {
-              return true;
-            }
-          }
-          return false;
-        }
-
-        final hasSelectedChild = hasSelectedChildDescendant(tile);
-
         return Theme(
           data: Theme.of(context).copyWith(
             dividerColor: Colors.transparent,
@@ -2170,7 +2154,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             selected: selected,
             selectedColor: Theme.of(context).colorScheme.primary,
             iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
-            initiallyExpanded: hasSelectedChild,
+            initiallyExpanded: true,
             leading: leading,
             title: label,
             children: [
