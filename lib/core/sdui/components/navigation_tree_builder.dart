@@ -474,7 +474,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       return depth;
     }
 
-    return current.level.clamp(0, _maximumNavigationLevel);
+    return current.level.clamp(0, _maximumNavigationLevel).toInt();
   }
 
   int _subtreeEnd(_WorkingSection section, int startIndex) {
@@ -658,7 +658,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
         }
       }
       dragged.parentKey = null;
-      dragged.level = targetDepth.clamp(0, _maximumNavigationLevel);
+      dragged.level = targetDepth.clamp(0, _maximumNavigationLevel).toInt();
       return dragged.level;
     } else {
       targetDepth = math.min(
@@ -782,7 +782,7 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
 
       if (itemIndex == 0) {
         item.parentKey = null;
-        item.level = requestedDepth.clamp(0, _maximumNavigationLevel);
+        item.level = requestedDepth.clamp(0, _maximumNavigationLevel).toInt();
         _repairAndArrange(section);
         return;
       }
@@ -790,10 +790,10 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
       // requestedDepth >= 1 (Sub-Menu or Sub-Sub-Menu)
       final precedingItem = section.tiles[itemIndex - 1];
       final precedingDepth = _depthOf(section, precedingItem.key);
-      final targetDepth = requestedDepth.clamp(
+      final int targetDepth = requestedDepth.clamp(
         1,
         math.min(_maximumNavigationLevel, precedingDepth + 1),
-      );
+      ).toInt();
 
       String? parentKey;
       if (targetDepth == 1) {
