@@ -302,6 +302,18 @@ class SduiSideDrawerContainer extends StatelessWidget {
       final theme = Theme.of(context);
       final isSelected = item.key == selectedKey;
 
+      bool hasSelectedDescendant(SduiNavItemSchema parent) {
+        if (selectedKey == null || selectedKey.isEmpty) return false;
+        final ch = childrenByParent[parent.key] ?? const [];
+        for (final c in ch) {
+          if (c.key == selectedKey || (c.targetEndpoint != null && c.targetEndpoint == selectedKey) || (c.url != null && c.url == selectedKey)) return true;
+          if (hasSelectedDescendant(c)) return true;
+        }
+        return false;
+      }
+
+      final hasSelectedChild = hasSelectedDescendant(item);
+
       return SplitNavigationTile(
         key: PageStorageKey<String>(
             'sdui-drawer-branch-${section.key}-${item.key}'),
@@ -309,7 +321,7 @@ class SduiSideDrawerContainer extends StatelessWidget {
         expandButtonKey: ValueKey('sdui-drawer-expand-${item.key}'),
         contentPadding:
             EdgeInsets.only(left: 12.0 + (depth * 20.0), right: 4.0),
-        initiallyExpanded: false,
+        initiallyExpanded: hasSelectedChild,
         selected: isSelected,
         selectedColor: theme.colorScheme.primary,
         iconColor: theme.colorScheme.onSurfaceVariant,

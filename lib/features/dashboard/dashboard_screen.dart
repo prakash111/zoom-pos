@@ -60,15 +60,11 @@ const Set<String> _forcedRootKeys = <String>{
   'salon_pos',
   'restaurant_pos',
   'consignments',
-  'nav_storefront_group',
-  'group_storefront',
   'nav_view_live_store',
 };
 
 const Set<String> _disallowedParentKeys = <String>{
   'nav_view_live_store',
-  'nav_storefront_group',
-  'group_storefront',
 };
 
 class _FeatureTile {
@@ -191,9 +187,7 @@ List<_NavSection> _serverDrivenSections() {
             }
 
             final bool isParentContainer = item.children.isNotEmpty &&
-                !_disallowedParentKeys.contains(item.key) &&
-                item.key != 'nav_storefront_group' &&
-                item.key != 'group_storefront';
+                !_disallowedParentKeys.contains(item.key);
             tiles.add(_FeatureTile(
               item.key,
               (l10n) => BootstrapCache.instance.resolveNavigationLabel(
@@ -1492,6 +1486,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               final direct = childrenByParent[parent.key] ?? const <_FeatureTile>[];
               for (final c in direct) {
                 final childSelected = _selectedTileKey == c.key ||
+                    (_selectedTileKey != null && c.url != null && _selectedTileKey == c.url) ||
                     (_selectedTileKey == null && _dockIndex == indexByKey[c.key]);
                 if (childSelected || hasSelectedChildDescendant(c)) {
                   return true;
@@ -2146,6 +2141,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
 
+        bool hasSelectedChildDescendant(_FeatureTile parent) {
+          final direct = childrenByParent[parent.key] ?? const <_FeatureTile>[];
+          for (final c in direct) {
+            final cIndex = indexByKey[c.key];
+            final childSelected = _selectedTileKey == c.key ||
+                (_selectedTileKey != null && c.url != null && _selectedTileKey == c.url) ||
+                (_selectedTileKey == null && cIndex != null && _dockIndex == cIndex);
+            if (childSelected || hasSelectedChildDescendant(c)) {
+              return true;
+            }
+          }
+          return false;
+        }
+
+        final hasSelectedChild = hasSelectedChildDescendant(tile);
+
         return Theme(
           data: Theme.of(context).copyWith(
             dividerColor: Colors.transparent,
@@ -2159,7 +2170,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             selected: selected,
             selectedColor: Theme.of(context).colorScheme.primary,
             iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
-            initiallyExpanded: true,
+            initiallyExpanded: hasSelectedChild,
             leading: leading,
             title: label,
             children: [

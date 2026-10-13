@@ -71,6 +71,7 @@ class DrawerItemParser {
     Map<String, dynamic> item, {
     required Color activeColor,
     Color? selectedColor,
+    String? selectedKey,
     VoidCallback? onTap,
     void Function(Map<String, dynamic> child)? onChildTap,
     bool isSelected = false,
@@ -86,6 +87,29 @@ class DrawerItemParser {
             .toList()
         : const <Map<String, dynamic>>[];
     final bool hasValidChildren = validChildren.isNotEmpty;
+
+    bool hasSelectedDescendant(List<Map<String, dynamic>> childrenList) {
+      if (selectedKey == null || selectedKey.isEmpty) return false;
+      final target = selectedKey!.trim().toLowerCase();
+      for (final child in childrenList) {
+        final childKey = (child['key'] ?? child['id'])?.toString().trim().toLowerCase();
+        final childRoute = child['route']?.toString().trim().toLowerCase();
+        final childTarget = child['target_endpoint']?.toString().trim().toLowerCase();
+        final childUrl = child['url']?.toString().trim().toLowerCase();
+        if (childKey != null && (childKey == target || childKey == target.replaceAll('/', ''))) return true;
+        if (childRoute != null && (childRoute == target || childRoute.endsWith(target) || target.endsWith(childRoute))) return true;
+        if (childTarget != null && (childTarget == target || childTarget.endsWith(target) || target.endsWith(childTarget))) return true;
+        if (childUrl != null && childUrl == target) return true;
+        final sub = child['children'];
+        if (sub is Iterable) {
+          final subList = List.from(sub).whereType<Map>().map((e) => safeMap(e)).toList();
+          if (hasSelectedDescendant(subList)) return true;
+        }
+      }
+      return false;
+    }
+
+    final bool hasSelectedChild = hasSelectedDescendant(validChildren);
 
     final String title = item['title']?.toString() ??
         item['custom_title']?.toString() ??
@@ -245,12 +269,17 @@ class DrawerItemParser {
       child: ExpansionTile(
         key: PageStorageKey(
             'drawer-expandable-${item['key'] ?? item['id'] ?? title}'),
-        initiallyExpanded:
-            item['initially_expanded'] == true || item['expanded'] == true,
+        initiallyExpanded: hasSelectedChild ||
+            item['initially_expanded'] == true ||
+            item['expanded'] == true,
         tilePadding: EdgeInsets.only(
           left: 16.0 + (indent * 24.0),
           right: 16.0,
         ),
+        iconColor: isSelected ? (selectedColor ?? activeColor) : activeColor,
+        collapsedIconColor: isSelected
+            ? (selectedColor ?? activeColor)
+            : (selectedColor ?? activeColor).withValues(alpha: 0.8),
         leading: DynamicSduiIcon(
           iconData: item['icon'] ??
               iconData ??
@@ -274,11 +303,15 @@ class DrawerItemParser {
           if (!childMap.containsKey('indent') && !childMap.containsKey('level')) {
             childMap['indent'] = indent + 1;
           }
+          final childKey = (childMap['key'] ?? childMap['id'])?.toString();
+          final bool isChildSelected = childKey != null && selectedKey != null && childKey == selectedKey;
           return buildDrawerMenuItem(
             context,
             childMap,
             activeColor: activeColor,
             selectedColor: selectedColor,
+            selectedKey: selectedKey,
+            isSelected: isChildSelected,
             onTap: () => onChildTap?.call(childMap),
             onChildTap: onChildTap,
           );
@@ -459,6 +492,64 @@ class AppDrawer extends StatelessWidget {
   final VoidCallback? headerOnTap;
   final Widget? footer;
 
+  static List<NavItem> _nestSectionItems(List<NavItem> rawItems) {
+    final hasFlatChildren = rawItems.any((it) =>
+        it.parentId != null &&
+        it.parentId!.isNotEmpty &&
+        rawItems.any((p) => p.key == it.parentId));
+
+    if (!hasFlatChildren) {
+      return rawItems;
+    }
+
+    final itemByKey = {for (final it in rawItems) it.key: it};
+    final childrenByParent = <String, List<NavItem>>{};
+    final rootItems = <NavItem>[];
+
+    for (final it in rawItems) {
+      if (it.parentId != null &&
+          it.parentId!.isNotEmpty &&
+          itemByKey.containsKey(it.parentId)) {
+        (childrenByParent[it.parentId!] ??= []).add(it);
+      } else {
+        rootItems.add(it);
+      }
+    }
+
+    NavItem nest(NavItem parent) {
+      final direct = childrenByParent[parent.key] ?? const <NavItem>[];
+      if (direct.isEmpty && parent.children.isEmpty) {
+        return parent;
+      }
+      final allChildren = [
+        ...parent.children.map(nest),
+        ...direct.map(nest),
+      ];
+      return NavItem(
+        key: parent.key,
+        title: parent.title,
+        icon: parent.icon,
+        route: parent.route,
+        parentId: parent.parentId,
+        level: parent.level,
+        indent: parent.indent,
+        order: parent.order,
+        visible: parent.visible,
+        children: allChildren,
+        component: parent.component,
+        permission: parent.permission,
+        actionType: parent.actionType,
+        type: allChildren.isNotEmpty ? 'accordion' : parent.type,
+        targetEndpoint: parent.targetEndpoint,
+        isExternalUrl: parent.isExternalUrl,
+        url: parent.url,
+        badge: parent.badge,
+      );
+    }
+
+    return rootItems.map(nest).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
@@ -500,12 +591,14 @@ class AppDrawer extends StatelessWidget {
                             ),
                           ),
                         ),
-                      for (final item in section.items)
+                      for (final item in _nestSectionItems(section.items))
                         if (!DrawerItemParser.isLanguageItem(item))
                           DrawerItemParser.buildDrawerMenuItem(
                             context,
                             item.toJson(),
                             activeColor: activeColor,
+                            selectedColor: activeColor,
+                            selectedKey: selectedKey,
                             isSelected: item.key == selectedKey,
                             onTap: () => onItemTap?.call(item),
                             onChildTap: (childMap) {
