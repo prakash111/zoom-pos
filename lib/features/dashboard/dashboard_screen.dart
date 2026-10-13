@@ -349,10 +349,12 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
     final safeParent = <String, String?>{};
 
     _FeatureTile? lastRootRow;
+    _FeatureTile? lastSubRow;
 
     for (final row in rows) {
       final item = itemOverrides[row.tile.key];
       final isForcedRoot = _forcedRootKeys.contains(row.tile.key);
+      final int level = item?.level ?? 0;
       String? rawParent;
 
       if (isForcedRoot) {
@@ -364,8 +366,10 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
           rawParent = item.parentId;
         } else if (item.parent != null && item.parent!.isNotEmpty) {
           rawParent = item.parent;
-        } else if (item.level > 0) {
+        } else if (level == 1) {
           rawParent = lastRootRow?.key;
+        } else if (level >= 2) {
+          rawParent = lastSubRow?.key ?? lastRootRow?.key;
         }
       } else {
         rawParent = sectionMetaByKey[entry.key]?.parentByKey[row.tile.key];
@@ -400,6 +404,9 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
       safeParent[row.tile.key] = valid ? candidate : null;
       if (safeParent[row.tile.key] == null) {
         lastRootRow = row.tile;
+        lastSubRow = null;
+      } else if (level == 1) {
+        lastSubRow = row.tile;
       }
     }
 
@@ -1272,10 +1279,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final rootItems = <_FeatureTile>[];
           final childrenByParent = <String?, List<_FeatureTile>>{};
           _FeatureTile? currentRoot;
+          _FeatureTile? lastSubRoot;
 
           for (final tile in section.tiles) {
             final override = itemOverrides[tile.key];
             final bool isForcedRoot = _forcedRootKeys.contains(tile.key);
+            final int level = override?.level ?? 0;
 
             String? targetParentKey;
             if (!isForcedRoot) {
@@ -1287,8 +1296,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   section.parentByKey[tile.key]!.isNotEmpty &&
                   !_disallowedParentKeys.contains(section.parentByKey[tile.key])) {
                 targetParentKey = section.parentByKey[tile.key];
-              } else if ((override?.level ?? 0) > 0) {
+              } else if (level == 1) {
                 targetParentKey = currentRoot?.key;
+              } else if (level >= 2) {
+                targetParentKey = lastSubRoot?.key ?? currentRoot?.key;
               }
             }
 
@@ -1297,8 +1308,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 targetParentKey != tile.key &&
                 section.tiles.any((t) => t.key == targetParentKey)) {
               (childrenByParent[targetParentKey] ??= []).add(tile);
+              if (level == 1) {
+                lastSubRoot = tile;
+              }
             } else {
               currentRoot = tile;
+              lastSubRoot = null;
               rootItems.add(tile);
             }
           }
@@ -1701,12 +1716,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final effectiveSupportPhone =
             supportPhone.isNotEmpty ? supportPhone : '+918535075196';
 
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _scrollToActiveDrawerItem();
-          }
-        });
-
         return Drawer(
           backgroundColor:
               drawerGradient != null ? Colors.transparent : drawerBgColor,
@@ -1728,7 +1737,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         bucket: _drawerStorageBucket,
                         child: ListView(
                           key: const PageStorageKey<String>(
-                              'dashboard_drawer_scroll_view'),
+                              'pos_main_navigation_drawer_scroll'),
                           controller: _getOrCreateDrawerScrollController(),
                           padding: EdgeInsets.zero,
                           children: children,
@@ -2024,10 +2033,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final rootItems = <_FeatureTile>[];
       final childrenByParent = <String?, List<_FeatureTile>>{};
       _FeatureTile? currentRoot;
+      _FeatureTile? lastSubRoot;
 
       for (final tile in section.tiles) {
         final override = itemOverrides[tile.key];
         final bool isForcedRoot = _forcedRootKeys.contains(tile.key);
+        final int level = override?.level ?? 0;
 
         String? targetParentKey;
         if (!isForcedRoot) {
@@ -2039,8 +2050,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               section.parentByKey[tile.key]!.isNotEmpty &&
               !_disallowedParentKeys.contains(section.parentByKey[tile.key])) {
             targetParentKey = section.parentByKey[tile.key];
-          } else if ((override?.level ?? 0) > 0) {
+          } else if (level == 1) {
             targetParentKey = currentRoot?.key;
+          } else if (level >= 2) {
+            targetParentKey = lastSubRoot?.key ?? currentRoot?.key;
           }
         }
 
@@ -2049,8 +2062,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             targetParentKey != tile.key &&
             section.tiles.any((t) => t.key == targetParentKey)) {
           (childrenByParent[targetParentKey] ??= []).add(tile);
+          if (level == 1) {
+            lastSubRoot = tile;
+          }
         } else {
           currentRoot = tile;
+          lastSubRoot = null;
           rootItems.add(tile);
         }
       }

@@ -912,7 +912,7 @@ void main() {
 
       // Drawer ListView exists with PageStorageKey
       final listViewFinder = find.byKey(
-          const PageStorageKey<String>('dashboard_drawer_scroll_view'));
+          const PageStorageKey<String>('pos_main_navigation_drawer_scroll'));
       expect(listViewFinder, findsOneWidget);
 
       // Scroll down
@@ -934,7 +934,7 @@ void main() {
 
       // Reopened ListView exists and retained its scrollable state
       expect(find.byKey(const PageStorageKey<String>(
-          'dashboard_drawer_scroll_view')), findsOneWidget);
+          'pos_main_navigation_drawer_scroll')), findsOneWidget);
     });
   });
 }
