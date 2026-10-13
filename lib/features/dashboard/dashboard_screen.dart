@@ -63,30 +63,12 @@ const Set<String> _forcedRootKeys = <String>{
   'nav_storefront_group',
   'group_storefront',
   'nav_view_live_store',
-  'nav_storefront_banner_auth',
-  'nav_storefront_domain',
-  'nav_storefront_menus',
-  'nav_storefront_inquiries',
-  'nav_storefront_gateways',
-  'nav_coupons_discounts',
-  'nav_store_faqs',
-  'nav_store_reviews',
-  'nav_storefront_pixels',
 };
 
 const Set<String> _disallowedParentKeys = <String>{
   'nav_view_live_store',
-  'nav_storefront_banner_auth',
   'nav_storefront_group',
   'group_storefront',
-  'nav_storefront_domain',
-  'nav_storefront_menus',
-  'nav_storefront_inquiries',
-  'nav_storefront_gateways',
-  'nav_coupons_discounts',
-  'nav_store_faqs',
-  'nav_store_reviews',
-  'nav_storefront_pixels',
 };
 
 class _FeatureTile {

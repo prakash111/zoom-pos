@@ -20,17 +20,8 @@ const int _maximumNavigationLevel = 2;
 
 const Set<String> _disallowedParentKeys = {
   'nav_view_live_store',
-  'nav_storefront_banner_auth',
   'nav_storefront_group',
   'group_storefront',
-  'nav_storefront_domain',
-  'nav_storefront_menus',
-  'nav_storefront_inquiries',
-  'nav_storefront_gateways',
-  'nav_coupons_discounts',
-  'nav_store_faqs',
-  'nav_store_reviews',
-  'nav_storefront_pixels',
 };
 
 /// Converts the row's effective horizontal offset into the three snapped
@@ -403,7 +394,12 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   void _repairAndArrange(_WorkingSection section) {
     final byKey = {for (final tile in section.tiles) tile.key: tile};
 
-    for (final tile in section.tiles) {
+    for (var i = 0; i < section.tiles.length; i++) {
+      final tile = section.tiles[i];
+      if (i == 0) {
+        tile.parentKey = null;
+        continue;
+      }
       if (tile.parentKey != null && _disallowedParentKeys.contains(tile.parentKey)) {
         tile.parentKey = null;
       }
@@ -545,8 +541,16 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     _dragStartX = event.position.dx;
     _dragStartDepth = depth;
     _dragPreviewDepth = depth;
-    _dragMaximumDepth =
-        math.max(1, _maximumNavigationLevel - _subtreeHeight(section, itemIndex));
+    _dragMaximumDepth = itemIndex == 0
+        ? 0
+        : math.max(
+            0,
+            math.min(
+                  _maximumNavigationLevel,
+                  _depthOf(section, section.tiles[itemIndex - 1].key) + 1,
+                ) -
+                _subtreeHeight(section, itemIndex),
+          );
     _dragReorderApplied = false;
     _dragFinalizeTimer?.cancel();
     _dragDepthNotifier.value = depth;
@@ -572,15 +576,22 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
   void _onItemDragStart(int sectionIndex, int itemIndex) {
     final item = _sections[sectionIndex].tiles[itemIndex];
     if (_dragItemKey != item.key) {
-      final depth = _depthOf(_sections[sectionIndex], item.key);
+      final section = _sections[sectionIndex];
+      final depth = _depthOf(section, item.key);
       _dragSectionIndex = sectionIndex;
       _dragItemKey = item.key;
       _dragStartDepth = depth;
       _dragPreviewDepth = depth;
-      _dragMaximumDepth = math.max(
-          1,
-          _maximumNavigationLevel -
-              _subtreeHeight(_sections[sectionIndex], itemIndex));
+      _dragMaximumDepth = itemIndex == 0
+          ? 0
+          : math.max(
+              0,
+              math.min(
+                    _maximumNavigationLevel,
+                    _depthOf(section, section.tiles[itemIndex - 1].key) + 1,
+                  ) -
+                  _subtreeHeight(section, itemIndex),
+            );
       _dragReorderApplied = false;
       _dragFinalizeTimer?.cancel();
       _dragDepthNotifier.value = depth;
@@ -635,8 +646,10 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
     String? parentKey;
     if (targetDepth > 0) {
       for (var index = itemIndex - 1; index >= 0; index--) {
-        if (_depthOf(section, section.tiles[index].key) == targetDepth - 1) {
-          parentKey = section.tiles[index].key;
+        final candidate = section.tiles[index];
+        if (_depthOf(section, candidate.key) == targetDepth - 1 &&
+            !_disallowedParentKeys.contains(candidate.key)) {
+          parentKey = candidate.key;
           break;
         }
       }
@@ -735,8 +748,14 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
 
       // requestedDepth >= 1 (Sub-Menu or Sub-Sub-Menu)
       final precedingItem = section.tiles[itemIndex - 1];
+      final precedingDepth = _depthOf(section, precedingItem.key);
+      final targetDepth = requestedDepth.clamp(
+        1,
+        math.min(_maximumNavigationLevel, precedingDepth + 1),
+      );
+
       String? parentKey;
-      if (requestedDepth == 1) {
+      if (targetDepth == 1) {
         // Find nearest valid root item before it in this section
         for (var i = itemIndex - 1; i >= 0; i--) {
           final candidateKey = section.tiles[i].key;
@@ -750,8 +769,16 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
           parentKey = precedingItem.key;
         }
       } else {
-        // requestedDepth >= 2: nest under the immediately preceding item if allowed
-        if (!_disallowedParentKeys.contains(precedingItem.key)) {
+        // requestedDepth >= 2: nest under nearest depth 1 item above it
+        for (var i = itemIndex - 1; i >= 0; i--) {
+          final candidateKey = section.tiles[i].key;
+          if (_depthOf(section, candidateKey) == 1 &&
+              !_disallowedParentKeys.contains(candidateKey)) {
+            parentKey = candidateKey;
+            break;
+          }
+        }
+        if (parentKey == null && !_disallowedParentKeys.contains(precedingItem.key)) {
           parentKey = precedingItem.key;
         }
       }
@@ -1068,7 +1095,9 @@ class _NavMenuSettingsTabState extends State<NavMenuSettingsTab> {
             onSelected: (level) => _changeItemDepth(section, tile, level),
             itemBuilder: (context) {
               return [
-                for (var level = 0; level <= _maximumNavigationLevel; level++)
+                for (var level = 0;
+                    level <= (itemIndex == 0 ? 0 : _maximumNavigationLevel);
+                    level++)
                   PopupMenuItem<int>(
                     key: ValueKey('nav-level-option-${tile.key}-$level'),
                     value: level,
