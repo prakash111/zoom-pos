@@ -493,10 +493,14 @@ class AppDrawer extends StatelessWidget {
   final Widget? footer;
 
   static List<NavItem> _nestSectionItems(List<NavItem> rawItems) {
+    if (rawItems.isEmpty) return rawItems;
+
     final hasFlatChildren = rawItems.any((it) =>
-        it.parentId != null &&
-        it.parentId!.isNotEmpty &&
-        rawItems.any((p) => p.key == it.parentId));
+        (it.parentId != null &&
+            it.parentId!.isNotEmpty &&
+            rawItems.any((p) => p.key == it.parentId)) ||
+        it.level > 0 ||
+        it.indent > 0);
 
     if (!hasFlatChildren) {
       return rawItems;
@@ -505,13 +509,22 @@ class AppDrawer extends StatelessWidget {
     final itemByKey = {for (final it in rawItems) it.key: it};
     final childrenByParent = <String, List<NavItem>>{};
     final rootItems = <NavItem>[];
+    NavItem? currentRoot;
 
     for (final it in rawItems) {
+      String? targetParentKey;
       if (it.parentId != null &&
           it.parentId!.isNotEmpty &&
           itemByKey.containsKey(it.parentId)) {
-        (childrenByParent[it.parentId!] ??= []).add(it);
+        targetParentKey = it.parentId;
+      } else if ((it.level > 0 || it.indent > 0) && currentRoot != null) {
+        targetParentKey = currentRoot.key;
+      }
+
+      if (targetParentKey != null && targetParentKey != it.key) {
+        (childrenByParent[targetParentKey] ??= []).add(it);
       } else {
+        currentRoot = it;
         rootItems.add(it);
       }
     }

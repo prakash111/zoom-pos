@@ -63,9 +63,7 @@ const Set<String> _forcedRootKeys = <String>{
   'nav_view_live_store',
 };
 
-const Set<String> _disallowedParentKeys = <String>{
-  'nav_view_live_store',
-};
+const Set<String> _disallowedParentKeys = <String>{};
 
 class _FeatureTile {
   _FeatureTile(this.key, this.titleOf, this.icon,
@@ -350,23 +348,31 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
     final rowByKey = {for (final row in rows) row.tile.key: row};
     final safeParent = <String, String?>{};
 
+    _FeatureTile? lastRootRow;
+
     for (final row in rows) {
       final item = itemOverrides[row.tile.key];
       final isForcedRoot = _forcedRootKeys.contains(row.tile.key);
-      final rawParent = isForcedRoot
-          ? null
-          : (item != null
-              ? (item.level == 0 ||
-                      item.parentId == null ||
-                      item.parentId!.isEmpty ||
-                      _disallowedParentKeys.contains(item.parentId)
-                  ? null
-                  : (item.parentId ?? item.parent))
-              : (_disallowedParentKeys.contains(sectionMetaByKey[entry.key]?.parentByKey[row.tile.key])
-                  ? null
-                  : sectionMetaByKey[entry.key]?.parentByKey[row.tile.key]));
+      String? rawParent;
+
+      if (isForcedRoot) {
+        rawParent = null;
+      } else if (item != null) {
+        if (item.level == 0 && (item.parentId == null || item.parentId!.isEmpty)) {
+          rawParent = null;
+        } else if (item.parentId != null && item.parentId!.isNotEmpty) {
+          rawParent = item.parentId;
+        } else if (item.parent != null && item.parent!.isNotEmpty) {
+          rawParent = item.parent;
+        } else if (item.level > 0) {
+          rawParent = lastRootRow?.key;
+        }
+      } else {
+        rawParent = sectionMetaByKey[entry.key]?.parentByKey[row.tile.key];
+      }
+
       final candidate =
-          rawParent == null || rawParent.isEmpty ? null : rawParent;
+          rawParent == null || rawParent.isEmpty || rawParent == row.tile.key ? null : rawParent;
 
       var cursor = candidate;
       var valid = true;
@@ -380,22 +386,21 @@ List<_NavSection> _sectionsFor(CompanyModel? company, UserModel? user) {
           valid = false;
           break;
         }
-        cursor = _forcedRootKeys.contains(cursor) ||
-                _disallowedParentKeys.contains(cursor)
+        cursor = _forcedRootKeys.contains(cursor)
             ? null
             : (itemOverrides[cursor] != null
                 ? (itemOverrides[cursor]!.level == 0 ||
                         itemOverrides[cursor]!.parentId == null ||
-                        itemOverrides[cursor]!.parentId!.isEmpty ||
-                        _disallowedParentKeys.contains(itemOverrides[cursor]!.parentId)
+                        itemOverrides[cursor]!.parentId!.isEmpty
                     ? null
                     : (itemOverrides[cursor]!.parentId ??
                         itemOverrides[cursor]!.parent))
-                : (_disallowedParentKeys.contains(sectionMetaByKey[entry.key]?.parentByKey[cursor])
-                    ? null
-                    : sectionMetaByKey[entry.key]?.parentByKey[cursor]));
+                : sectionMetaByKey[entry.key]?.parentByKey[cursor]);
       }
       safeParent[row.tile.key] = valid ? candidate : null;
+      if (safeParent[row.tile.key] == null) {
+        lastRootRow = row.tile;
+      }
     }
 
     int compareRows(
@@ -1266,36 +1271,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           final rootItems = <_FeatureTile>[];
           final childrenByParent = <String?, List<_FeatureTile>>{};
+          _FeatureTile? currentRoot;
 
           for (final tile in section.tiles) {
             final override = itemOverrides[tile.key];
             final bool isForcedRoot = _forcedRootKeys.contains(tile.key);
-            // Check if the item is explicitly a Main Menu (level 0)
-            final bool isMainMenu = isForcedRoot ||
-                (override != null
-                    ? (override.level == 0 ||
-                        override.parentId == null ||
-                        override.parentId!.isEmpty ||
-                        _disallowedParentKeys.contains(override.parentId))
-                    : (section.parentByKey[tile.key] == null ||
-                        _disallowedParentKeys.contains(section.parentByKey[tile.key])));
 
-            if (isMainMenu) {
-              rootItems.add(tile);
-            } else {
-              final targetParentKey = (override != null &&
-                      override.parentId != null &&
-                      override.parentId!.isNotEmpty &&
-                      !_disallowedParentKeys.contains(override.parentId))
-                  ? override.parentId!
-                  : section.parentByKey[tile.key];
-              if (targetParentKey != null &&
-                  targetParentKey.isNotEmpty &&
-                  !_disallowedParentKeys.contains(targetParentKey)) {
-                (childrenByParent[targetParentKey] ??= []).add(tile);
-              } else {
-                rootItems.add(tile);
+            String? targetParentKey;
+            if (!isForcedRoot) {
+              if (override?.parentId != null &&
+                  override!.parentId!.isNotEmpty &&
+                  !_disallowedParentKeys.contains(override.parentId)) {
+                targetParentKey = override.parentId;
+              } else if (section.parentByKey[tile.key] != null &&
+                  section.parentByKey[tile.key]!.isNotEmpty &&
+                  !_disallowedParentKeys.contains(section.parentByKey[tile.key])) {
+                targetParentKey = section.parentByKey[tile.key];
+              } else if ((override?.level ?? 0) > 0) {
+                targetParentKey = currentRoot?.key;
               }
+            }
+
+            if (targetParentKey != null &&
+                targetParentKey.isNotEmpty &&
+                targetParentKey != tile.key &&
+                section.tiles.any((t) => t.key == targetParentKey)) {
+              (childrenByParent[targetParentKey] ??= []).add(tile);
+            } else {
+              currentRoot = tile;
+              rootItems.add(tile);
             }
           }
 
@@ -1309,16 +1313,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 childrenByParent[tile.key] ??
                 const <_FeatureTile>[];
             final index = indexByKey[tile.key]!;
-            final override = itemOverrides[tile.key];
-            final effectiveDepth = override != null &&
-                    (override.parentId == null || override.parentId!.isEmpty) &&
-                    override.level > 0
-                ? override.level
-                : depth;
-            final isEffectiveSectionParent = sectionParent && effectiveDepth == 0;
             final padding = EdgeInsets.only(
-              left: 16 + effectiveDepth * 30,
-              right: 12,
+              left: 16.0 + (depth * 30.0),
+              right: 12.0,
             );
 
             final isSelected = _selectedTileKey == tile.key ||
@@ -1333,7 +1330,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: ListTile(
                   key: ValueKey('drawer-item-${tile.key}'),
                   contentPadding: padding,
-                  dense: effectiveDepth > 0,
+                  dense: depth > 0,
                   iconColor: isSelected ? selectedItemColor : unselectedIconColor,
                   textColor: isSelected ? selectedItemColor : unselectedItemColor,
                   selectedColor: selectedItemColor,
@@ -1349,64 +1346,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           )
                         : BorderSide.none,
                   ),
-                  leading: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (effectiveDepth > 0) ...[
-                        Text(
-                          '↳',
-                          style: TextStyle(
-                            color: unselectedIconColor,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      if (isSelected)
-                        Container(
-                          width: effectiveDepth > 0 ? 26 : 32,
-                          height: effectiveDepth > 0 ? 26 : 32,
-                          decoration: BoxDecoration(
-                            color: selectedItemColor,
-                            borderRadius:
-                                BorderRadius.circular(effectiveDepth > 0 ? 6 : 8),
-                            boxShadow: [
-                              BoxShadow(
-                                color:
-                                    selectedItemColor.withValues(alpha: 0.35),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Icon(
-                              tile.icon,
-                              size: effectiveDepth > 0 ? 14 : 18,
-                              color: Colors.white,
+                  leading: depth > 0
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.subdirectory_arrow_right_rounded,
+                              size: 16,
+                              color: isSelected
+                                  ? selectedItemColor
+                                  : unselectedIconColor.withValues(alpha: 0.85),
                             ),
-                          ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              tile.icon,
+                              size: 18,
+                              color: isSelected
+                                  ? selectedItemColor
+                                  : unselectedIconColor.withValues(alpha: 0.85),
+                            ),
+                          ],
                         )
-                      else
-                        Icon(
-                          tile.icon,
-                          size: isEffectiveSectionParent ? 22 : (effectiveDepth == 0 ? 24 : 18),
-                          color: effectiveDepth > 0
-                              ? unselectedIconColor.withValues(alpha: 0.85)
-                              : unselectedIconColor,
-                        ),
-                    ],
-                  ),
+                      : (isSelected
+                          ? Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: selectedItemColor,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: selectedItemColor.withValues(alpha: 0.35),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  tile.icon,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            )
+                          : Icon(
+                              tile.icon,
+                              size: sectionParent ? 22 : 24,
+                              color: unselectedIconColor,
+                            )),
                   title: Text(
                     bootstrap.resolveNavigationLabel(
                         tile.key, tile.titleOf(l10n)),
                     style: TextStyle(
-                      fontSize: effectiveDepth > 0 ? 13 : 14,
-                      fontWeight: isEffectiveSectionParent || isSelected
+                      fontSize: depth > 0 ? 13 : 14,
+                      fontWeight: sectionParent || isSelected
                           ? FontWeight.w700
-                          : (effectiveDepth > 0 ? FontWeight.w500 : FontWeight.w500),
-                      letterSpacing: isEffectiveSectionParent ? 0.2 : null,
+                          : FontWeight.w500,
+                      letterSpacing: sectionParent ? 0.2 : null,
                       color:
                           isSelected ? selectedItemColor : unselectedItemColor,
                     ),
@@ -1528,55 +1525,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   selected: isSelected,
                   dense: depth > 0,
-                  leading: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (depth > 0) ...[
-                        Text(
-                          '↳',
-                          style: TextStyle(
-                            color: unselectedIconColor,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      if (isSelected)
-                        Container(
-                          width: depth > 0 ? 26 : 32,
-                          height: depth > 0 ? 26 : 32,
-                          decoration: BoxDecoration(
-                            color: selectedItemColor,
-                            borderRadius:
-                                BorderRadius.circular(depth > 0 ? 6 : 8),
-                            boxShadow: [
-                              BoxShadow(
-                                color:
-                                    selectedItemColor.withValues(alpha: 0.35),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Icon(
-                              tile.icon,
-                              size: depth > 0 ? 14 : 18,
-                              color: Colors.white,
+                  leading: depth > 0
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.subdirectory_arrow_right_rounded,
+                              size: 16,
+                              color: isSelected
+                                  ? selectedItemColor
+                                  : unselectedIconColor.withValues(alpha: 0.85),
                             ),
-                          ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              tile.icon,
+                              size: 18,
+                              color: isSelected
+                                  ? selectedItemColor
+                                  : unselectedIconColor.withValues(alpha: 0.85),
+                            ),
+                          ],
                         )
-                      else
-                        Icon(
-                          tile.icon,
-                          size: sectionParent ? 22 : (depth == 0 ? 24 : 20),
-                          color: depth > 0
-                              ? unselectedIconColor.withValues(alpha: 0.85)
-                              : unselectedIconColor,
-                        ),
-                    ],
-                  ),
+                      : (isSelected
+                          ? Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: selectedItemColor,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: selectedItemColor.withValues(alpha: 0.35),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  tile.icon,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            )
+                          : Icon(
+                              tile.icon,
+                              size: sectionParent ? 22 : 24,
+                              color: unselectedIconColor,
+                            )),
                   initiallyExpanded: hasSelectedChild,
                   title: Text(
                     bootstrap.resolveNavigationLabel(
@@ -2022,27 +2019,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
     };
 
     for (final section in navSections) {
+      if (section.tiles.isEmpty) continue;
+
+      final rootItems = <_FeatureTile>[];
       final childrenByParent = <String?, List<_FeatureTile>>{};
+      _FeatureTile? currentRoot;
+
       for (final tile in section.tiles) {
         final override = itemOverrides[tile.key];
         final bool isForcedRoot = _forcedRootKeys.contains(tile.key);
-        String? parent;
-        if (isForcedRoot) {
-          parent = null;
-        } else if (override != null) {
-          parent = (override.level == 0 ||
-                  override.parentId == null ||
-                  override.parentId!.isEmpty ||
-                  _disallowedParentKeys.contains(override.parentId))
-              ? null
-              : override.parentId;
-        } else {
-          parent = section.parentByKey[tile.key];
-          if (parent != null && _disallowedParentKeys.contains(parent)) {
-            parent = null;
+
+        String? targetParentKey;
+        if (!isForcedRoot) {
+          if (override?.parentId != null &&
+              override!.parentId!.isNotEmpty &&
+              !_disallowedParentKeys.contains(override.parentId)) {
+            targetParentKey = override.parentId;
+          } else if (section.parentByKey[tile.key] != null &&
+              section.parentByKey[tile.key]!.isNotEmpty &&
+              !_disallowedParentKeys.contains(section.parentByKey[tile.key])) {
+            targetParentKey = section.parentByKey[tile.key];
+          } else if ((override?.level ?? 0) > 0) {
+            targetParentKey = currentRoot?.key;
           }
         }
-        (childrenByParent[parent] ??= []).add(tile);
+
+        if (targetParentKey != null &&
+            targetParentKey.isNotEmpty &&
+            targetParentKey != tile.key &&
+            section.tiles.any((t) => t.key == targetParentKey)) {
+          (childrenByParent[targetParentKey] ??= []).add(tile);
+        } else {
+          currentRoot = tile;
+          rootItems.add(tile);
+        }
       }
 
       Widget branch(
@@ -2055,13 +2065,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             childrenByParent[tile.key] ??
             const <_FeatureTile>[];
         final index = indexByKey[tile.key]!;
-        final override = itemOverrides[tile.key];
-        final effectiveDepth = override != null &&
-                (override.parentId == null || override.parentId!.isEmpty) &&
-                override.level > 0
-            ? override.level
-            : depth;
-        final isEffectiveSectionParent = sectionParent && effectiveDepth == 0;
         final selected = _selectedTileKey == tile.key ||
             (_selectedTileKey == null && _dockIndex == index);
         final labelColor =
@@ -2069,27 +2072,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final label = Text(
           bootstrap.resolveNavigationLabel(tile.key, tile.titleOf(l10n)),
           style: TextStyle(
-            fontSize: effectiveDepth > 0 ? 13 : 14,
-            fontWeight: isEffectiveSectionParent || selected
+            fontSize: depth > 0 ? 13 : 14,
+            fontWeight: sectionParent || selected
                 ? FontWeight.w700
-                : (effectiveDepth > 0 ? FontWeight.w500 : FontWeight.normal),
-            letterSpacing: isEffectiveSectionParent ? 0.2 : null,
+                : (depth > 0 ? FontWeight.w500 : FontWeight.normal),
+            letterSpacing: sectionParent ? 0.2 : null,
             color: labelColor,
           ),
         );
-        final leading = Icon(
-          tile.icon,
-          size: effectiveDepth == 0 ? 22 : 18,
-          color: selected
-              ? Theme.of(context).colorScheme.primary
-              : (tp.drawerTextColor ??
-                  (isEffectiveSectionParent
-                      ? (Theme.of(context).brightness == Brightness.dark
-                          ? const Color(0xFFE2E8F0)
-                          : const Color(0xFF334155))
-                      : null)),
-        );
-        final pad = EdgeInsets.only(left: 12 + effectiveDepth * 20, right: 8);
+        final leading = depth > 0
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.subdirectory_arrow_right_rounded,
+                    size: 16,
+                    color: selected
+                        ? Theme.of(context).colorScheme.primary
+                        : (tp.drawerTextColor ??
+                            Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    tile.icon,
+                    size: 18,
+                    color: selected
+                        ? Theme.of(context).colorScheme.primary
+                        : (tp.drawerTextColor ??
+                            Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              )
+            : Icon(
+                tile.icon,
+                size: sectionParent ? 22 : 24,
+                color: selected
+                    ? Theme.of(context).colorScheme.primary
+                    : (tp.drawerTextColor ??
+                        (sectionParent
+                            ? (Theme.of(context).brightness == Brightness.dark
+                                ? const Color(0xFFE2E8F0)
+                                : const Color(0xFF334155))
+                            : null)),
+              );
+        final pad = EdgeInsets.only(left: 12 + depth * 20, right: 8);
 
         if (nested.isEmpty) {
           return Padding(
@@ -2116,15 +2142,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   .withValues(alpha: 0.12),
               leading: selected
                   ? Container(
-                      width: effectiveDepth > 0 ? 24 : 28,
-                      height: effectiveDepth > 0 ? 24 : 28,
+                      width: depth > 0 ? 24 : 28,
+                      height: depth > 0 ? 24 : 28,
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.primary,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Center(
                         child: Icon(tile.icon,
-                            size: effectiveDepth > 0 ? 14 : 16, color: Colors.white),
+                            size: depth > 0 ? 14 : 16, color: Colors.white),
                       ),
                     )
                   : leading,
@@ -2165,8 +2191,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
       }
-
-      final rootItems = childrenByParent[null] ?? const <_FeatureTile>[];
       rows.add(Padding(
         key: ValueKey('rail-section-divider-${section.key}'),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

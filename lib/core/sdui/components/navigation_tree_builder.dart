@@ -18,11 +18,7 @@ const double _levelOneThreshold = 20;
 const double _levelTwoThreshold = 50;
 const int _maximumNavigationLevel = 2;
 
-const Set<String> _disallowedParentKeys = {
-  'nav_view_live_store',
-  'nav_storefront_group',
-  'group_storefront',
-};
+const Set<String> _disallowedParentKeys = <String>{};
 
 /// Converts the row's effective horizontal offset into the three snapped
 /// columns required by the mobile menu editor.
