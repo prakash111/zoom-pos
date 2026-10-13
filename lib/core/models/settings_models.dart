@@ -427,15 +427,19 @@ class NavConfig {
       for (final raw in _safeNavList(rawNodes)) {
         final json = _safeNavMap(raw);
         if (json.isEmpty) continue;
+        final rawLevel = _safeNavInt(json['level']);
+        final effectiveLevel = parent == null && rawLevel != null && rawLevel > 0
+            ? rawLevel.clamp(0, 2).toInt()
+            : level.clamp(0, 2).toInt();
         final node = NavItemConfig.fromJson({
           ...json,
           'section': section,
           'parent_id': parent,
-          'level': level.clamp(0, 2),
+          'level': effectiveLevel,
           'children': const [],
         });
         flattened.add(node);
-        visit(json['children'], section, node.key, level + 1);
+        visit(json['children'], section, node.key, effectiveLevel + 1);
       }
     }
 
@@ -507,10 +511,22 @@ class NavConfig {
             'section': section,
             'parent': parent,
             'parent_id': parent,
-            'level': level.clamp(0, 2),
+            'level': (parent == null && rows[order].level > 0
+                    ? rows[order].level
+                    : level)
+                .clamp(0, 2)
+                .toInt(),
             'order': order,
             'visible': rows[order].visible,
-            'children': buildNodes(section, rows[order].key, level + 1),
+            'children': buildNodes(
+                section,
+                rows[order].key,
+                (parent == null && rows[order].level > 0
+                        ? rows[order].level
+                        : level)
+                    .clamp(0, 2)
+                    .toInt() +
+                    1),
           },
       ];
     }
