@@ -175,6 +175,9 @@ jobs:
                   except (subprocess.CalledProcessError,ET.ParseError):pass
               log=adb('logcat','-d','-v','brief','flutter:V','AndroidRuntime:E','*:S');pathlib.Path(phase+'.log').write_text(log)
               assert not re.search(r'FATAL EXCEPTION|NoSuchMethodError|UnsatisfiedLinkError|JNI DETECTED ERROR|Unhandled Exception',log),log[-3000:]
+              with open(phase+'.png','wb') as f:subprocess.run(['adb','exec-out','screencap','-p'],stdout=f,check=True)
+              pathlib.Path(phase+'.xml').write_text(xml if 'xml' in locals() else '<hierarchy/>')
+              pathlib.Path(phase+'.activity.txt').write_text(adb('shell','dumpsys','activity','activities'))
               assert ready,'Native sign-in or landing screen was not reached before deadline'
               with open(phase+'.png','wb') as f:subprocess.run(['adb','exec-out','screencap','-p'],stdout=f,check=True)
               print('PASS: signed Android 16 '+phase+' reached native sign-in/landing without runtime exceptions')
@@ -223,12 +226,15 @@ jobs:
           script: |
             adb install -r sales-crm-inventory-1.0.6-build-9.apk
             adb shell pm grant com.zoomnearby.zoompos android.permission.POST_NOTIFICATIONS || true
+            adb shell pm grant com.zoomnearby.zoompos android.permission.BLUETOOTH_CONNECT || true
+            adb shell pm grant com.zoomnearby.zoompos android.permission.BLUETOOTH_SCAN || true
+            adb shell appops set com.zoomnearby.zoompos USE_FULL_SCREEN_INTENT allow || true
             python3 zoompos-startup.py
       - name: Store startup evidence privately
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for file in first-launch.png first-launch.log first-launch.xml cold-relaunch.png cold-relaunch.log cold-relaunch.xml retail-demo-login.png retail-demo-login.log retail-demo-login.xml retail-session-relaunch.png retail-session-relaunch.log retail-session-relaunch.xml; do
+          for file in first-launch.png first-launch.log first-launch.xml first-launch.activity.txt cold-relaunch.png cold-relaunch.log cold-relaunch.xml cold-relaunch.activity.txt retail-demo-login.png retail-demo-login.log retail-demo-login.xml retail-session-relaunch.png retail-session-relaunch.log retail-session-relaunch.xml; do
             if [ -f "$file" ]; then gh release upload "$PRIVATE_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "$file" --clobber; fi
           done
