@@ -17,17 +17,43 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: Reuse matching verified private build
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          import os,json,subprocess,hashlib,shutil
+          reuse=False
+          result=subprocess.run(['gh','release','download',os.environ['PRIVATE_RELEASE_TAG'],'--repo',os.environ['GITHUB_REPOSITORY'],'--pattern','BUILDINFO.json','--clobber'],capture_output=True,text=True)
+          if result.returncode==0:
+              info=json.loads(Path('BUILDINFO.json').read_text())
+              if info.get('sourceSha256')==os.environ['PRIVATE_SOURCE_SHA256'] and info.get('versionCode')==9:
+                  for name in info['files']:
+                      assert name in ['sales-crm-inventory-1.0.6-build-9.apk','sales-crm-inventory-1.0.6-build-9.aab']
+                      subprocess.run(['gh','release','download',os.environ['PRIVATE_RELEASE_TAG'],'--repo',os.environ['GITHUB_REPOSITORY'],'--pattern',name,'--clobber'],check=True)
+                      assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==info['files'][name]['sha256']
+                  for kind,target in [('apk','build/app/outputs/flutter-apk/app-release.apk'),('aab','build/app/outputs/bundle/release/app-release.aab')]:
+                      dest=Path(target);dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile('sales-crm-inventory-1.0.6-build-9.'+kind,dest)
+                  reuse=True
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:output.write('reuse='+str(reuse).lower()+'\n')
+          print('Verified source and artifact checksum reuse: '+str(reuse))
+          PYTHON
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
       - uses: subosito/flutter-action@v2
+        if: steps.existing.outputs.reuse != 'true'
         with:
           flutter-version: '3.47.7'
           channel: stable
           cache: true
       - uses: gradle/actions/setup-gradle@v4
+        if: steps.existing.outputs.reuse != 'true'
       - name: Restore private source snapshot
+        if: steps.existing.outputs.reuse != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -44,6 +70,7 @@ jobs:
               archive.extractall('.')
           PYTHON
       - name: Restore release signing
+        if: steps.existing.outputs.reuse != 'true'
         env:
           STORE: ${{ secrets.ZOOMPOS_PLAY_KEYSTORE_BASE64 }}
         run: |
@@ -53,9 +80,13 @@ jobs:
           p.write_bytes(base64.b64decode(os.environ['STORE'],validate=True));p.chmod(0o600)
           PYTHON
       - run: flutter pub get --enforce-lockfile
+        if: steps.existing.outputs.reuse != 'true'
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        if: steps.existing.outputs.reuse != 'true'
       - run: flutter test
+        if: steps.existing.outputs.reuse != 'true'
       - name: Build release APK and AAB
+        if: steps.existing.outputs.reuse != 'true'
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/zoompos-play.jks
           KEYSTORE_PASSWORD: ${{ secrets.ZOOMPOS_PLAY_STORE_PASSWORD }}
@@ -124,6 +155,62 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Prepare startup probe
+        run: |
+          cat > zoompos-startup.py <<'PYTHON'
+          import subprocess,time,pathlib,re,xml.etree.ElementTree as ET
+          package='com.zoomnearby.zoompos'
+          def adb(*a):return subprocess.check_output(['adb',*a],text=True,stderr=subprocess.STDOUT)
+          for phase in ['first-launch','cold-relaunch']:
+              adb('shell','am','force-stop',package);adb('logcat','-c');adb('shell','am','start','-W','-n',package+'/.MainActivity')
+              ready=False;deadline=time.time()+75
+              while time.time()<deadline:
+                  time.sleep(2)
+                  try:
+                      adb('shell','uiautomator','dump','/sdcard/zoompos-ui.xml')
+                      xml=adb('shell','cat','/sdcard/zoompos-ui.xml');root=ET.fromstring(xml)
+                      text=' '.join(n.attrib.get('text','')+' '+n.attrib.get('content-desc','') for n in root.iter('node'))
+                      if any(s.lower() in text.lower() for s in ['Welcome back','Sign in to your account','Get Started','Log in']):
+                          ready=True;pathlib.Path(phase+'.xml').write_text(xml);break
+                  except (subprocess.CalledProcessError,ET.ParseError):pass
+              log=adb('logcat','-d','-v','brief','flutter:V','AndroidRuntime:E','*:S');pathlib.Path(phase+'.log').write_text(log)
+              assert not re.search(r'FATAL EXCEPTION|NoSuchMethodError|UnsatisfiedLinkError|JNI DETECTED ERROR|Unhandled Exception',log),log[-3000:]
+              assert ready,'Native sign-in or landing screen was not reached before deadline'
+              with open(phase+'.png','wb') as f:subprocess.run(['adb','exec-out','screencap','-p'],stdout=f,check=True)
+              print('PASS: signed Android 16 '+phase+' reached native sign-in/landing without runtime exceptions')
+          
+          def capture_ui():
+              adb('shell','uiautomator','dump','/sdcard/zoompos-ui.xml')
+              xml=adb('shell','cat','/sdcard/zoompos-ui.xml')
+              return xml,ET.fromstring(xml)
+          def clean_log(value):
+              value=re.sub(r'(?i)(Bearer\s+)[A-Za-z0-9._|=-]+',r'\1[REDACTED]',value)
+              value=re.sub(r'\b\d+\|[A-Za-z0-9]{25,}\b','[REDACTED]',value)
+              value=re.sub(r'\b[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\b','[REDACTED]',value)
+              return value
+          xml,root=capture_ui()
+          retail=next((n for n in root.iter('node') if n.attrib.get('text','').strip()=='Retail' or n.attrib.get('content-desc','').strip()=='Retail'),None)
+          assert retail is not None,'The native sign-in screen did not expose the public Retail demo button'
+          coords=[int(n) for n in re.findall(r'\d+',retail.attrib['bounds'])];assert len(coords)==4
+          adb('shell','input','tap',str((coords[0]+coords[2])//2),str((coords[1]+coords[3])//2))
+          for phase in ['retail-demo-login','retail-session-relaunch']:
+              if phase.endswith('relaunch'):
+                  adb('shell','am','force-stop',package);adb('logcat','-c');adb('shell','am','start','-W','-n',package+'/.MainActivity')
+              deadline=time.time()+90;ready=False
+              while time.time()<deadline:
+                  time.sleep(2)
+                  try:
+                      xml,root=capture_ui();labels=' '.join(n.attrib.get('text','')+' '+n.attrib.get('content-desc','') for n in root.iter('node'))
+                      if 'Welcome back' not in labels and any(x.lower() in labels.lower() for x in ['Total Sales','Sales Overview','Order statistic','Dashboard']):
+                          ready=True;break
+                  except (subprocess.CalledProcessError,ET.ParseError):pass
+              log=clean_log(adb('logcat','-d','-v','brief','flutter:V','AndroidRuntime:E','*:S'));pathlib.Path(phase+'.log').write_text(log)
+              assert not re.search(r'FATAL EXCEPTION|NoSuchMethodError|UnsatisfiedLinkError|JNI DETECTED ERROR|Unhandled Exception',log),log[-2500:]
+              assert ready,'Public Retail demo did not reach the native dashboard: '+phase
+              pathlib.Path(phase+'.xml').write_text(xml)
+              with open(phase+'.png','wb') as f:subprocess.run(['adb','exec-out','screencap','-p'],stdout=f,check=True)
+              print('PASS: signed Android 16 '+phase+' reached the native dashboard without runtime exceptions')
+          PYTHON
       - name: Install and cold-launch signed release on Android 16
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -136,33 +223,12 @@ jobs:
           script: |
             adb install -r sales-crm-inventory-1.0.6-build-9.apk
             adb shell pm grant com.zoomnearby.zoompos android.permission.POST_NOTIFICATIONS || true
-            python3 - <<'PYTHON'
-            import subprocess,time,pathlib,re,xml.etree.ElementTree as ET
-            package='com.zoomnearby.zoompos'
-            def adb(*a):return subprocess.check_output(['adb',*a],text=True,stderr=subprocess.STDOUT)
-            for phase in ['first-launch','cold-relaunch']:
-                adb('shell','am','force-stop',package);adb('logcat','-c');adb('shell','am','start','-W','-n',package+'/.MainActivity')
-                ready=False;deadline=time.time()+75
-                while time.time()<deadline:
-                    time.sleep(2)
-                    try:
-                        adb('shell','uiautomator','dump','/sdcard/zoompos-ui.xml')
-                        xml=adb('shell','cat','/sdcard/zoompos-ui.xml');root=ET.fromstring(xml)
-                        text=' '.join(n.attrib.get('text','')+' '+n.attrib.get('content-desc','') for n in root.iter('node'))
-                        if any(s.lower() in text.lower() for s in ['Welcome back','Sign in to your account','Get Started','Log in']):
-                            ready=True;pathlib.Path(phase+'.xml').write_text(xml);break
-                    except (subprocess.CalledProcessError,ET.ParseError):pass
-                log=adb('logcat','-d','-v','brief','flutter:V','AndroidRuntime:E','*:S');pathlib.Path(phase+'.log').write_text(log)
-                assert not re.search(r'FATAL EXCEPTION|NoSuchMethodError|UnsatisfiedLinkError|JNI DETECTED ERROR|Unhandled Exception',log),log[-3000:]
-                assert ready,'Native sign-in or landing screen was not reached before deadline'
-                with open(phase+'.png','wb') as f:subprocess.run(['adb','exec-out','screencap','-p'],stdout=f,check=True)
-                print('PASS: signed Android 16 '+phase+' reached native sign-in/landing without runtime exceptions')
-            PYTHON
+            python3 zoompos-startup.py
       - name: Store startup evidence privately
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for file in first-launch.png first-launch.log first-launch.xml cold-relaunch.png cold-relaunch.log cold-relaunch.xml; do
+          for file in first-launch.png first-launch.log first-launch.xml cold-relaunch.png cold-relaunch.log cold-relaunch.xml retail-demo-login.png retail-demo-login.log retail-demo-login.xml retail-session-relaunch.png retail-session-relaunch.log retail-session-relaunch.xml; do
             if [ -f "$file" ]; then gh release upload "$PRIVATE_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "$file" --clobber; fi
           done
