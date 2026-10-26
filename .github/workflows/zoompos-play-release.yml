@@ -1,0 +1,152 @@
+name: SALES CRM Play release verification
+run-name: SALES CRM 1.0.6 (9) — signed build and Android 16 startup
+'on':
+  push:
+    branches: ['release/zoompos-play-1.0.6-9-20261026112536']
+permissions:
+  contents: write
+concurrency:
+  group: zoompos-play-106-9
+  cancel-in-progress: false
+env:
+  PRIVATE_RELEASE_TAG: 'zoompos-play-1.0.6-9-20261026112536'
+  PRIVATE_SOURCE_ASSET: '677948496'
+  PRIVATE_SOURCE_SHA256: 'fb797eb803b80033b9732837ae9cd8440e358279ecbf435c19a1a9ce9a05b397'
+jobs:
+  signed-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          channel: stable
+          cache: true
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Restore private source snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/assets/$PRIVATE_SOURCE_ASSET" -H 'Accept: application/octet-stream' > source.zip
+          echo "$PRIVATE_SOURCE_SHA256  source.zip" | sha256sum -c -
+          python3 - <<'PYTHON'
+          from pathlib import Path, PurePosixPath
+          import zipfile
+          with zipfile.ZipFile('source.zip') as archive:
+              for entry in archive.infolist():
+                  p=PurePosixPath(entry.filename)
+                  assert not p.is_absolute() and '..' not in p.parts
+                  assert p.suffix not in ['.jks','.keystore','.pem','.key']
+              archive.extractall('.')
+          PYTHON
+      - name: Restore release signing
+        env:
+          STORE: ${{ secrets.ZOOMPOS_PLAY_KEYSTORE_BASE64 }}
+        run: |
+          python3 - <<'PYTHON'
+          import os,base64,pathlib
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'zoompos-play.jks'
+          p.write_bytes(base64.b64decode(os.environ['STORE'],validate=True));p.chmod(0o600)
+          PYTHON
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter test
+      - name: Build release APK and AAB
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/zoompos-play.jks
+          KEYSTORE_PASSWORD: ${{ secrets.ZOOMPOS_PLAY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ZOOMPOS_PLAY_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ZOOMPOS_PLAY_KEY_ALIAS }}
+        run: |
+          flutter build apk --release --no-pub --no-tree-shake-icons --android-skip-build-dependency-validation --build-name=1.0.6 --build-number=9
+          flutter build appbundle --release --no-pub --no-tree-shake-icons --android-skip-build-dependency-validation --build-name=1.0.6 --build-number=9
+      - name: Verify package, version, signature and alignment
+        run: |
+          python3 - <<'PYTHON'
+          import os,pathlib,subprocess,re,hashlib,json,shutil
+          tools=sorted((pathlib.Path(os.environ['ANDROID_HOME'])/'build-tools').iterdir())[-1]
+          apk=pathlib.Path('build/app/outputs/flutter-apk/app-release.apk');aab=pathlib.Path('build/app/outputs/bundle/release/app-release.aab')
+          cert='e6606d626a310c0acfe9e0ee0e48079d35efe7b77ee5e5511cf9f87ce9e3bb7d'
+          signed=subprocess.check_output([str(tools/'apksigner'),'verify','--print-certs',str(apk)],text=True);assert cert in signed.lower()
+          badging=subprocess.check_output([str(tools/'aapt'),'dump','badging',str(apk)],text=True)
+          assert "name='com.zoomnearby.zoompos'" in badging and "versionCode='9'" in badging and "versionName='1.0.6'" in badging
+          assert int(re.search(r"targetSdkVersion:'(\d+)'",badging)[1])>=36
+          subprocess.run([str(tools/'zipalign'),'-c','-P','16','4',str(apk)],check=True)
+          aabcert=subprocess.check_output(['keytool','-printcert','-jarfile',str(aab)],text=True)
+          assert re.search(r'SHA256:\s*([A-F0-9:]+)',aabcert)[1].replace(':','').lower()==cert
+          verify=subprocess.check_output(['jarsigner','-verify',str(aab)],text=True);assert 'jar verified' in verify.lower()
+          files={}
+          for src,name in [(apk,'sales-crm-inventory-1.0.6-build-9.apk'),(aab,'sales-crm-inventory-1.0.6-build-9.aab')]:
+              shutil.copyfile(src,name);files[name]={'sha256':hashlib.sha256(src.read_bytes()).hexdigest(),'bytes':src.stat().st_size}
+          pathlib.Path('BUILDINFO.json').write_text(json.dumps({'package':'com.zoomnearby.zoompos','versionName':'1.0.6','versionCode':9,'sourceSha256':os.environ['PRIVATE_SOURCE_SHA256'],'certificateSha256':cert,'files':files},indent=2))
+          pathlib.Path('SHA256SUMS').write_text(''.join(v['sha256']+'  '+k+'\n' for k,v in files.items()))
+          print('PASS: package, version, target SDK 36, existing signing certificate and 16 KB ZIP alignment')
+          PYTHON
+      - name: Store private signed outputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$PRIVATE_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" sales-crm-inventory-1.0.6-build-9.apk sales-crm-inventory-1.0.6-build-9.aab BUILDINFO.json SHA256SUMS --clobber
+      - name: Remove signing files
+        if: always()
+        run: rm -f "$RUNNER_TEMP/zoompos-play.jks" android/key.properties
+  android-startup:
+    needs: signed-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Download verified APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$PRIVATE_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern 'sales-crm-inventory-1.0.6-build-9.apk' --pattern 'SHA256SUMS'
+          grep 'apk$' SHA256SUMS | sha256sum -c -
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install and cold-launch signed release on Android 16
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -camera-back none
+          script: |
+            adb install -r sales-crm-inventory-1.0.6-build-9.apk
+            python3 - <<'PYTHON'
+            import subprocess,time,pathlib,re,xml.etree.ElementTree as ET
+            package='com.zoomnearby.zoompos'
+            def adb(*a):return subprocess.check_output(['adb',*a],text=True,stderr=subprocess.STDOUT)
+            for phase in ['first-launch','cold-relaunch']:
+                adb('shell','am','force-stop',package);adb('logcat','-c');adb('shell','am','start','-W','-n',package+'/.MainActivity')
+                ready=False;deadline=time.time()+75
+                while time.time()<deadline:
+                    time.sleep(2)
+                    try:
+                        adb('shell','uiautomator','dump','/sdcard/zoompos-ui.xml')
+                        xml=adb('shell','cat','/sdcard/zoompos-ui.xml');root=ET.fromstring(xml)
+                        text=' '.join(n.attrib.get('text','')+' '+n.attrib.get('content-desc','') for n in root.iter('node'))
+                        if any(s.lower() in text.lower() for s in ['Welcome back','Sign in to your account','Get Started','Log in']):
+                            ready=True;pathlib.Path(phase+'.xml').write_text(xml);break
+                    except (subprocess.CalledProcessError,ET.ParseError):pass
+                log=adb('logcat','-d','-v','brief','flutter:V','AndroidRuntime:E','*:S');pathlib.Path(phase+'.log').write_text(log)
+                assert not re.search(r'FATAL EXCEPTION|NoSuchMethodError|UnsatisfiedLinkError|JNI DETECTED ERROR|Unhandled Exception',log),log[-3000:]
+                assert ready,'Native sign-in or landing screen was not reached before deadline'
+                with open(phase+'.png','wb') as f:subprocess.run(['adb','exec-out','screencap','-p'],stdout=f,check=True)
+                print('PASS: signed Android 16 '+phase+' reached native sign-in/landing without runtime exceptions')
+            PYTHON
+      - name: Store startup evidence privately
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for file in first-launch.png first-launch.log first-launch.xml cold-relaunch.png cold-relaunch.log cold-relaunch.xml; do
+            if [ -f "$file" ]; then gh release upload "$PRIVATE_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "$file" --clobber; fi
+          done
