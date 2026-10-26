@@ -10,8 +10,8 @@ concurrency:
   cancel-in-progress: false
 env:
   PRIVATE_RELEASE_TAG: 'zoompos-play-1.0.6-9-20261026112536'
-  PRIVATE_SOURCE_ASSET: '677948496'
-  PRIVATE_SOURCE_SHA256: 'fb797eb803b80033b9732837ae9cd8440e358279ecbf435c19a1a9ce9a05b397'
+  PRIVATE_SOURCE_ASSET: '677994090'
+  PRIVATE_SOURCE_SHA256: '31c72dc0cd5583edc0cd643e1cf926ee4ca22cdf67a1c140e0fc66c3f0077a9c'
 jobs:
   signed-build:
     runs-on: ubuntu-latest
@@ -76,13 +76,28 @@ jobs:
           assert "name='com.zoomnearby.zoompos'" in badging and "versionCode='9'" in badging and "versionName='1.0.6'" in badging
           assert int(re.search(r"targetSdkVersion:'(\d+)'",badging)[1])>=36
           subprocess.run([str(tools/'zipalign'),'-c','-P','16','4',str(apk)],check=True)
+          import zipfile,struct
+          native_checks=[]
+          with zipfile.ZipFile(apk) as archive:
+              for name in archive.namelist():
+                  if not name.endswith('.so') or not any('/'+abi+'/' in name for abi in ['arm64-v8a','x86_64']):continue
+                  data=archive.read(name)
+                  assert data[:4]==b'\x7fELF' and data[4]==2
+                  order='<' if data[5]==1 else '>';offset=struct.unpack_from(order+'Q',data,32)[0];entry_size,count=struct.unpack_from(order+'HH',data,54)
+                  alignments=[]
+                  for i in range(count):
+                      fields=struct.unpack_from(order+'IIQQQQQQ',data,offset+entry_size*i)
+                      if fields[0]==1:alignments.append(fields[-1])
+                  assert alignments and all(a>=16384 for a in alignments),(name,alignments)
+                  native_checks.append(name)
+          print('PASS: all '+str(len(native_checks))+' 64-bit native libraries have 16 KB ELF alignment')
           aabcert=subprocess.check_output(['keytool','-printcert','-jarfile',str(aab)],text=True)
           assert re.search(r'SHA256:\s*([A-F0-9:]+)',aabcert)[1].replace(':','').lower()==cert
           verify=subprocess.check_output(['jarsigner','-verify',str(aab)],text=True);assert 'jar verified' in verify.lower()
           files={}
           for src,name in [(apk,'sales-crm-inventory-1.0.6-build-9.apk'),(aab,'sales-crm-inventory-1.0.6-build-9.aab')]:
               shutil.copyfile(src,name);files[name]={'sha256':hashlib.sha256(src.read_bytes()).hexdigest(),'bytes':src.stat().st_size}
-          pathlib.Path('BUILDINFO.json').write_text(json.dumps({'package':'com.zoomnearby.zoompos','versionName':'1.0.6','versionCode':9,'sourceSha256':os.environ['PRIVATE_SOURCE_SHA256'],'certificateSha256':cert,'files':files},indent=2))
+          pathlib.Path('BUILDINFO.json').write_text(json.dumps({'package':'com.zoomnearby.zoompos','versionName':'1.0.6','versionCode':9,'sourceSha256':os.environ['PRIVATE_SOURCE_SHA256'],'certificateSha256':cert,'files':files,'native16KBLibraries':native_checks},indent=2))
           pathlib.Path('SHA256SUMS').write_text(''.join(v['sha256']+'  '+k+'\n' for k,v in files.items()))
           print('PASS: package, version, target SDK 36, existing signing certificate and 16 KB ZIP alignment')
           PYTHON
@@ -120,6 +135,7 @@ jobs:
           emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect -camera-back none
           script: |
             adb install -r sales-crm-inventory-1.0.6-build-9.apk
+            adb shell pm grant com.zoomnearby.zoompos android.permission.POST_NOTIFICATIONS || true
             python3 - <<'PYTHON'
             import subprocess,time,pathlib,re,xml.etree.ElementTree as ET
             package='com.zoomnearby.zoompos'
